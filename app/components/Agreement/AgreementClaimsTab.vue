@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc */
@@ -17,7 +18,7 @@ import type {
   FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementClaimCreateSchema } from '~~/shared/types/schemas'
-import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, isCanonicalMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 type ClaimTableRow = FundingCaseAgreementClaimRow & {
   fiscalYearGroup: string
@@ -143,7 +144,7 @@ const fiscalYearOptions = computed<FiscalYearLookupItem[]>(() => {
   return [...byId.values()]
 })
 
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, currency)
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value)
 const getMonthLabel = (month: number) => t(`agreement.claims.months.${MONTH_KEYS[month]}`)
 const getPeriodLabel = (claim: ClaimTableRow) => `${getMonthLabel(claim.egcs_fc_periodstart)} - ${getMonthLabel(claim.egcs_fc_periodend)}`
 
@@ -155,13 +156,13 @@ const tableRows = computed<ClaimTableRow[]>(() => claims.value.map((claim: Fundi
       reconcileLineIds.has(String(line.egcs_fc_lineitem))
       && positiveReconcileIds.value.has(String(line.egcs_fc_fundingagreementclaimreconcile))
     ))
-    .map(line => line.egcs_fc_reconciled))
+    .map(line => line.egcs_fc_reconciled), currency)
 
   return {
     ...claim,
     fiscalYearGroup: claim.fiscal_year_display ?? t('common.unavailable'),
     lineCount: lines.length,
-    submittedAmount: sumMoney(lines.map(line => line.egcs_fc_amount)),
+    submittedAmount: sumMoney(lines.map(line => line.egcs_fc_amount), currency),
     reconciledAmount
   }
 }).filter((row: ClaimTableRow) => {
@@ -177,7 +178,7 @@ const tableRows = computed<ClaimTableRow[]>(() => claims.value.map((claim: Fundi
     getStatusLabel(row.egcs_fc_status),
     row.submittedAmount,
     row.reconciledAmount
-  ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch))
+  ].some(value => isCanonicalMoney(value) ? moneyMatchesSearch(value, normalizedSearch, locale.value) : String(value ?? '').toLowerCase().includes(normalizedSearch))
 }))
 
 const {
@@ -198,7 +199,7 @@ const {
 })
 const isFiscalYearGroupRow = (row: ClaimGroupedRow) => isGroupRow(row, FISCAL_YEAR_GROUP_COLUMN_ID)
 const getGroupedRowTotal = (row: ClaimGroupedRow, key: 'submittedAmount' | 'reconciledAmount') =>
-  sumMoney((row.leafRows ?? row.subRows ?? []).map(item => item.original[key]))
+  sumMoney((row.leafRows ?? row.subRows ?? []).map(item => item.original[key]), currency)
 const getGroupedClaimStatuses = (row: ClaimGroupedRow) => [
   ...new Set((row.leafRows ?? row.subRows ?? []).map(item => item.original.egcs_fc_status))
 ]

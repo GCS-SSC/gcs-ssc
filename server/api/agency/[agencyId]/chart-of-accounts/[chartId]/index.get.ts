@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3'
+import { sql } from 'kysely'
 import { authorize } from '~~/server/utils/authorize'
 import { withActiveAgencyReadTransaction } from '~~/server/utils/agency-auth'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -19,6 +20,7 @@ export default defineEventHandler(async event => {
       .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', agencyId)
       .where('Agency_Chart_of_Account._deleted', '=', false)
       .selectAll('Agency_Chart_of_Account')
+      .select(sql<boolean>`agency_chart_is_in_use("Agency_Chart_of_Account".id)`.as('is_in_use'))
       .select('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display')
       .executeTakeFirst()
     return chart ?? await notFound(event, 'CHART_OF_ACCOUNT_NOT_FOUND', 'apiErrors.transfer_payment.chart_of_account_not_found')

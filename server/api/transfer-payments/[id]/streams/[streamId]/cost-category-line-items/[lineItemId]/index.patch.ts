@@ -1,3 +1,4 @@
+import { projectStreamCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import type { Scope } from '~~/shared/utils/scopes'
 import { TransferPaymentCostCategoryLineItemPatchSchema } from '~~/shared/types/schemas'
@@ -109,7 +110,7 @@ export default defineEventHandler(async event => {
           .where('egcs_tp_transferpaymentstream', '=', streamId)
           .where('_deleted', '=', false)
           .returningAll()
-          .executeTakeFirstOrThrow()
+          .executeTakeFirstOrThrow().then(projectStreamCostLineItem)
       } catch (error) {
         return await throwIfTransferPaymentUniqueConstraintError(event, error)
       }

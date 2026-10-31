@@ -14,7 +14,7 @@ import {
   validateApprovalTemplateStepSequences
 } from './approval-template-common'
 import { DirectReviewEntityTypeIdentitySchema, PaginationSchema, PositivePostgresBigintIdSchema, RequiredStringId, type WithId } from './common'
-import { MoneySchema, NonNegativeMoneySchema } from './money'
+import { NonNegativeDecimalAmountSchema, NonNegativeMoneySchema, validateMoneyCurrency } from './money'
 import {
   AMENDED_TYPE_ENUM,
   AGENCY_CHART_KIND_ENUM,
@@ -127,7 +127,7 @@ export const TransferPaymentStreamWizardHoldbackBasisSchema = TransferPaymentStr
 
 export const TransferPaymentFinancialLimitsSchema = z.object({
   egcs_tp_transferpaymentstream: RequiredId(),
-  egcs_tp_maxallowableperrecipient: NonNegativeMoneySchema,
+  egcs_tp_maxallowableperrecipient: NonNegativeDecimalAmountSchema,
   egcs_tp_maxpercentofsupportavailableperrecipient: RequiredNumeric(5, 2)
     .min(0, { error: 'validation.invalid_number' })
     .max(1, { error: 'validation.invalid_number' }),
@@ -164,13 +164,21 @@ export const TransferPaymentBudgetListQuerySchema = PaginationSchema.extend({
   purpose: z.literal('allocation', { error: 'validation.invalid_selection' }).optional()
 })
 
-export const TransferPaymentBudgetSchema = z.object({
+export const TransferPaymentBudgetBaseSchema = z.object({
   egcs_tp_fiscalyear: PositivePostgresBigintIdSchema,
   egcs_tp_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
-  egcs_tp_totalbudget: MoneySchema,
+  egcs_tp_totalbudget: NonNegativeMoneySchema,
   egcs_tp_overcommitthreshold: RequiredNumeric(5, 2)
     .min(0, { error: 'validation.invalid_number' })
     .max(1, { error: 'validation.invalid_number' })
+})
+
+export const TransferPaymentBudgetSchema = TransferPaymentBudgetBaseSchema.superRefine((data, ctx) => {
+  validateMoneyCurrency(data.egcs_tp_totalbudget, data.egcs_tp_currency, ctx, ['egcs_tp_totalbudget'])
+})
+
+export const TransferPaymentBudgetPatchSchema = TransferPaymentBudgetBaseSchema.partial().superRefine((data, ctx) => {
+  validateMoneyCurrency(data.egcs_tp_totalbudget, data.egcs_tp_currency, ctx, ['egcs_tp_totalbudget'])
 })
 
 export type TransferPaymentBudget = z.infer<typeof TransferPaymentBudgetSchema>
@@ -178,7 +186,7 @@ export type TransferPaymentBudgetItem = WithId<TransferPaymentBudget>
 
 export const TransferPaymentStreamBudgetSchema = z.object({
   egcs_tp_transferpaymentbudget: RequiredId(),
-  egcs_tp_totalbudget: MoneySchema,
+  egcs_tp_totalbudget: NonNegativeMoneySchema,
   egcs_tp_overcommitthreshold: RequiredNumeric(5, 2)
     .min(0, { error: 'validation.invalid_number' })
     .max(1, { error: 'validation.invalid_number' })
@@ -240,8 +248,10 @@ export const TransferPaymentWizardObjectiveSchema = TransferPaymentObjectiveSche
 
 export type TransferPaymentWizardObjective = z.infer<typeof TransferPaymentWizardObjectiveSchema>
 
-export const TransferPaymentWizardBudgetSchema = TransferPaymentBudgetSchema.extend({
+export const TransferPaymentWizardBudgetSchema = TransferPaymentBudgetBaseSchema.extend({
   tempId: RequiredString()
+}).superRefine((data, ctx) => {
+  validateMoneyCurrency(data.egcs_tp_totalbudget, data.egcs_tp_currency, ctx, ['egcs_tp_totalbudget'])
 })
 
 export type TransferPaymentWizardBudget = z.infer<typeof TransferPaymentWizardBudgetSchema>
@@ -406,6 +416,7 @@ export const TransferPaymentWizardSchema = z.object({
 export type TransferPaymentWizard = z.infer<typeof TransferPaymentWizardSchema>
 
 export const TransferPaymentAmendmentTypeSchema = z.object({
+  egcs_tp_active: z.boolean().optional(),
   egcs_tp_amended: z.enum(AMENDED_TYPE_ENUM, {
     error: 'validation.required'
   }),
@@ -416,9 +427,10 @@ export const TransferPaymentAmendmentTypeSchema = z.object({
 })
 
 export type TransferPaymentAmendmentType = z.infer<typeof TransferPaymentAmendmentTypeSchema>
-export type TransferPaymentAmendmentTypeItem = WithId<TransferPaymentAmendmentType>
+export type TransferPaymentAmendmentTypeItem = WithId<TransferPaymentAmendmentType> & { in_use?: boolean }
 
 export const TransferPaymentAmendmentSubtypesSchema = z.object({
+  egcs_tp_active: z.boolean().optional(),
   amendment_type_ids: RequiredUniqueSelectionIdsSchema(),
   egcs_tp_name_en: StreamStorageText(255),
   egcs_tp_name_fr: StreamStorageText(255),
@@ -428,7 +440,7 @@ export const TransferPaymentAmendmentSubtypesSchema = z.object({
 })
 
 export type TransferPaymentAmendmentSubtypes = z.infer<typeof TransferPaymentAmendmentSubtypesSchema>
-export type TransferPaymentAmendmentSubtypesItem = WithId<TransferPaymentAmendmentSubtypes>
+export type TransferPaymentAmendmentSubtypesItem = WithId<TransferPaymentAmendmentSubtypes> & { in_use?: boolean }
 
 export const TransferPaymentAgreementSubtypeSchema = z.object({
   egcs_tp_agreementtype: RequiredId(),
@@ -629,6 +641,7 @@ const validateChartOfAccountDimensions = (
 }
 
 export const AgencyChartOfAccountBaseSchema = z.object({
+  egcs_ay_active: z.boolean({ error: 'validation.required' }).default(true),
   egcs_ay_kind: z.enum(AGENCY_CHART_KIND_ENUM, { error: 'validation.required' }).default('commitment'),
   egcs_ay_fiscalyear: PositivePostgresBigintIdSchema,
   egcs_ay_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
@@ -644,12 +657,13 @@ export const AgencyChartOfAccountSchema = AgencyChartOfAccountBaseSchema.superRe
   (data, ctx) => validateChartOfAccountDimensions(data.egcs_ay_accountingdimensions, ctx)
 )
 export const AgencyChartOfAccountPatchSchema = AgencyChartOfAccountBaseSchema.partial().extend({
+  egcs_ay_active: AgencyChartOfAccountBaseSchema.shape.egcs_ay_active.removeDefault().optional(),
   egcs_ay_kind: AgencyChartOfAccountBaseSchema.shape.egcs_ay_kind.removeDefault().optional()
 }).superRefine(
   (data, ctx) => validateChartOfAccountDimensions(data.egcs_ay_accountingdimensions, ctx)
 )
 export type AgencyChartOfAccount = z.infer<typeof AgencyChartOfAccountSchema>
-export type AgencyChartOfAccountItem = WithId<AgencyChartOfAccount & { fiscal_year_display?: string }>
+export type AgencyChartOfAccountItem = WithId<AgencyChartOfAccount & { fiscal_year_display?: string; is_in_use?: boolean }>
 
 export const TransferPaymentStreamChartOfAccountBaseSchema = z.object({
   egcs_tp_agencychartofaccount: PositivePostgresBigintIdSchema

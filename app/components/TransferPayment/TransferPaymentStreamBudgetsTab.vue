@@ -172,12 +172,12 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
     </template>
     <template #egcs_tp_totalbudget-cell="{ row }">
       <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ formatMoneyText(row.original.egcs_tp_totalbudget, locale, row.original.egcs_tp_currency.toUpperCase()) }}
+        {{ formatMoneyText(row.original.egcs_tp_totalbudget, locale) }}
       </span>
     </template>
     <template #program_total_budget-cell="{ row }">
       <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ row.original.program_total_budget ? formatMoneyText(row.original.program_total_budget, locale, row.original.egcs_tp_currency.toUpperCase()) : t('common.none') }}
+        {{ row.original.program_total_budget ? formatMoneyText(row.original.program_total_budget, locale) : t('common.none') }}
       </span>
     </template>
     <template #egcs_tp_overcommitthreshold-cell="{ row }">

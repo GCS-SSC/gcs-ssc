@@ -1,3 +1,4 @@
+import { installMonetaryTableGuards } from '../schema/currency-money'
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '../../../shared/types/database'
 
@@ -67,7 +68,7 @@ CREATE TABLE "Applicant_Recipient_Funding_History" (
   "egcs_ar_description_fr" text,
   "egcs_ar_startdate" date NOT NULL,
   "egcs_ar_enddate" date NOT NULL,
-  "egcs_ar_fundingamount" numeric(19,2) NOT NULL,
+  "egcs_ar_fundingamount" numeric NOT NULL,
   "egcs_ar_currency" currency_codes NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Applicant_Recipient_Funding_History_pkey" PRIMARY KEY (id),
@@ -339,4 +340,5 @@ CREATE TRIGGER trg_register_applicantrecipient BEFORE INSERT ON "Applicant_Recip
 
 CREATE TRIGGER trg_soft_delete_applicantrecipient_assignments AFTER UPDATE OF _deleted ON "Applicant_Recipient_Profile" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('applicantrecipient');
 END $baseline$`.execute(db)
+  await installMonetaryTableGuards(db, 'applicant-recipient')
 }

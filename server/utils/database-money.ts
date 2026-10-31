@@ -1,7 +1,8 @@
 import { expressionBuilder, type Expression, type ExpressionWrapper } from 'kysely'
 import {
-  isNumeric19Money,
-  parseMoneyText,
+  isPersistableMoney,
+  moneyFromMinorUnits,
+  type MinorUnits,
   type Money
 } from '~~/shared/utils/money'
 
@@ -20,16 +21,16 @@ export const databaseMoneyText = (expression: Expression<unknown>): ExpressionWr
   expressions.cast<string>(expression, 'text')
 
 /**
- * Produces a numeric(19,2) write expression from exact canonical money.
+ * Produces an integer minor-unit NUMERIC write expression; owning-row guards enforce denomination.
  *
  * @param value - Canonical monetary value for one persisted row.
  * @returns A numeric-valued Kysely expression.
  */
-export const databaseMoneyValue = (value: Money): ExpressionWrapper<never, never, number> => {
-  if (!isNumeric19Money(value)) {
-    throw new RangeError('Money exceeds PostgreSQL numeric(19,2).')
+export const databaseMoneyValue = (value: Money): ExpressionWrapper<never, never, MinorUnits> => {
+  if (!isPersistableMoney(value)) {
+    throw new RangeError('Money exceeds the persisted amount range.')
   }
-  return expressions.cast<number>(expressions.val(value), 'numeric(19, 2)')
+  return expressions.cast<MinorUnits>(expressions.val(value.amount), 'numeric')
 }
 
 /**
@@ -38,12 +39,13 @@ export const databaseMoneyValue = (value: Money): ExpressionWrapper<never, never
  * Numeric driver output is rejected so converted paths cannot accidentally fall
  * back to the legacy global Number parser.
  *
- * @param value - Database value selected through `databaseMoneyText`.
+ * @param value - Database minor units selected through `databaseMoneyText`.
+ * @param currency - Currency resolved from the owning record.
  * @returns Canonical exact money.
  */
-export const parseDatabaseMoney = (value: unknown): Money => {
+export const parseDatabaseMoney = (value: unknown, currency: string): Money => {
   if (typeof value !== 'string') {
     throw new TypeError('Database money must be selected as text.')
   }
-  return parseMoneyText(value)
+  return moneyFromMinorUnits(value, currency)
 }

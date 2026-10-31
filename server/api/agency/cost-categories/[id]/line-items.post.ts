@@ -1,3 +1,4 @@
+import { projectAgencyCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { validateAgencyBudgetCalculation } from '~~/server/utils/agency-budget-calculation'
 import { AgencyCostCategoryLineItemSchema } from '~~/shared/types/schemas'
@@ -40,7 +41,7 @@ export default defineEventHandler(async event => {
             ...validated
           })
           .returningAll()
-          .executeTakeFirstOrThrow()
+          .executeTakeFirstOrThrow().then(projectAgencyCostLineItem)
       }
     )
   } catch (error: unknown) {

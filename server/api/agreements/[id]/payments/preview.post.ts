@@ -1,6 +1,6 @@
 import { defineEventHandler } from 'h3'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { assertAgreementPaymentFiscalYear, prepareAgreementPaymentRoute, resolveActiveAgreementPaymentCommitmentByType } from '~~/server/utils/agreement-payment'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { prepareAgreementPaymentOffsetPlan } from '~~/server/utils/agreement-payment-offset-plan'
@@ -12,7 +12,8 @@ export default defineEventHandler(async event => {
   const { agreementId, agreementContext, db } = prepared
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementPaymentCreateSchema)
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext) => {
-    await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+    const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+    await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_paymentamount])
     await resolveActiveAgreementPaymentCommitmentByType(event, trx, agreementId, validated.egcs_fc_commitmenttype, validated.egcs_fc_currency)
     await assertAgreementPaymentFiscalYear(event, trx, agreementId, validated.egcs_fc_fiscalyear, validated.egcs_fc_currency)
     return await withPaymentRecoveryErrors(event, async () => (await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, validated, { preview: true })).preview)

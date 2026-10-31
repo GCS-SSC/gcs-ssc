@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- Agreement authorization helpers expose typed contracts covered by focused tests. */
 import type { H3Event } from 'h3'
 import type { Insertable, Kysely, RawBuilder, Transaction } from 'kysely'
@@ -28,6 +29,23 @@ import { resolveAssignmentTargetAgreementId } from './agreement-assignment-targe
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { dateOnlySql } from './database-date'
 import { setCatalogCacheAgencies } from './catalog-cache'
+
+/**
+ * Converts bounded nonmonetary profile decimals at response and extension-hook boundaries.
+ * @param row - Selected Agreement profile containing exact database decimals.
+ * @returns Profile DTO with validated numeric holdback and risk score.
+ */
+export const toAgreementProfileNumericDto = <T extends {
+  egcs_fc_holdback: string | number
+  egcs_fc_riskscore?: string | number | null
+}>(row: T) => {
+  const { egcs_fc_holdback: holdback, egcs_fc_riskscore: riskScore, ...rest } = row
+  return {
+    ...rest,
+    egcs_fc_holdback: parseSafeDecimal(String(holdback)),
+    egcs_fc_riskscore: riskScore == null ? null : parseSafeDecimal(String(riskScore))
+  }
+}
 
 type AgreementAction = Extract<AbilityAction, 'create' | 'read' | 'update' | 'delete'>
 type AgreementDb = Kysely<Database> | Transaction<Database>
@@ -369,7 +387,7 @@ export const resolveAgreementRiskRatingContext = async (
   const row = await db
     .selectFrom('Transfer_Payment_Stream_Risk_Rating')
     .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('egcs_tp_riskscore', '=', riskScore)
+    .where('egcs_tp_riskscore', '=', String(riskScore))
     .where('_deleted', '=', false)
     .select([
       'id',
@@ -387,7 +405,7 @@ export const resolveAgreementRiskRatingContext = async (
   return {
     id: String(row.id),
     streamId: String(row.stream_id),
-    riskScore: Number(row.risk_score),
+    riskScore: parseSafeDecimal(String(row.risk_score)),
     nameEn: row.name_en ?? undefined,
     nameFr: row.name_fr ?? undefined
   }

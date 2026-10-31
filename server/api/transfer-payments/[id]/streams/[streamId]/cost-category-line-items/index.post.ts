@@ -1,3 +1,4 @@
+import { projectStreamCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { TransferPaymentCostCategoryLineItemSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -50,7 +51,7 @@ export default defineEventHandler(async event => {
             egcs_tp_costsharingratio: validated.egcs_tp_costsharingratio
           })
           .returningAll()
-          .executeTakeFirstOrThrow()
+          .executeTakeFirstOrThrow().then(projectStreamCostLineItem)
       } catch (error) {
         return await throwIfTransferPaymentUniqueConstraintError(event, error)
       }

@@ -1,3 +1,4 @@
+import { isAmendmentSubtypeInUse } from '~~/server/utils/amendment-catalog-integrity'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { TransferPaymentAmendmentSubtypesSchema } from '~~/shared/types/schemas/transfer-payment'
 import { authorize } from '~~/server/utils/authorize'
@@ -42,65 +43,34 @@ export default defineEventHandler(async event => {
 
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, streamContext.agencyId, streamId, 'update', async trx => {
-      await assertTransferPaymentStreamSetupExists(event, trx
+      const current = await assertTransferPaymentStreamSetupExists(event, trx
         .selectFrom('Transfer_Payment_Amendment_Subtype')
         .where('id', '=', subtypeId)
         .where('egcs_tp_transferpaymentstream', '=', streamId)
         .where('_deleted', '=', false)
-        .select(['id', 'egcs_tp_name_en', 'egcs_tp_name_fr'])
+        .selectAll()
         .forUpdate()
         .executeTakeFirst(), 'AMENDMENT_SUBTYPE_NOT_FOUND', 'apiErrors.transfer_payment.amendment_subtype_not_found')
 
       const { amendment_type_ids: amendmentTypeIds, ...subtypeValues } = payload
-      if (amendmentTypeIds) {
+      const currentTypeIds = await trx.selectFrom('Transfer_Payment_Amendment_Subtype_Type')
+        .select('egcs_tp_amendmenttype').where('egcs_tp_amendmentsubtype', '=', subtypeId)
+        .where('_deleted', '=', false).execute().then(rows => rows.map(row => String(row.egcs_tp_amendmenttype)))
+      const mappingChanged = amendmentTypeIds !== undefined && (amendmentTypeIds.length !== currentTypeIds.length
+        || amendmentTypeIds.some(id => !currentTypeIds.includes(id)))
+      const definitionChanged = (subtypeValues.egcs_tp_name_en !== undefined && subtypeValues.egcs_tp_name_en !== current.egcs_tp_name_en)
+        || (subtypeValues.egcs_tp_name_fr !== undefined && subtypeValues.egcs_tp_name_fr !== current.egcs_tp_name_fr)
+        || (subtypeValues.egcs_tp_description_en !== undefined && subtypeValues.egcs_tp_description_en !== current.egcs_tp_description_en)
+        || (subtypeValues.egcs_tp_description_fr !== undefined && subtypeValues.egcs_tp_description_fr !== current.egcs_tp_description_fr)
+      if ((definitionChanged || mappingChanged) && await isAmendmentSubtypeInUse(trx, subtypeId)) {
+        return await badRequest(event, 'AMENDMENT_SUBTYPE_IN_USE', 'apiErrors.transfer_payment.amendment_subtype_in_use')
+      }
+      if (mappingChanged && amendmentTypeIds) {
         const amendmentTypes = await trx.selectFrom('Transfer_Payment_Amendment_Type')
           .where('id', 'in', amendmentTypeIds).where('egcs_tp_transferpaymentstream', '=', streamId)
-          .where('_deleted', '=', false).select('id').execute()
+          .where('_deleted', '=', false).where('egcs_tp_active', '=', true).select('id').execute()
         if (amendmentTypes.length !== amendmentTypeIds.length) {
           return await badRequest(event, 'INVALID_AMENDMENT_TYPE', 'apiErrors.transfer_payment.invalid_amendment_type')
-        }
-        const amendmentScopeRows = await trx
-          .selectFrom('Funding_Case_Agreement_Amendment_Subtype')
-          .innerJoin(
-            'Funding_Case_Agreement_Amendment',
-            'Funding_Case_Agreement_Amendment.id',
-            'Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendment'
-          )
-          .innerJoin(
-            'Funding_Case_Agreement_Amendment_Type',
-            'Funding_Case_Agreement_Amendment_Type.egcs_fc_amendment',
-            'Funding_Case_Agreement_Amendment.id'
-          )
-          .innerJoin('Common_Status', 'Common_Status.id', 'Funding_Case_Agreement_Amendment.egcs_fc_status')
-          .select([
-            'Funding_Case_Agreement_Amendment.id as amendment_id',
-            'Funding_Case_Agreement_Amendment_Type.egcs_fc_amendmenttype as amendment_type_id'
-          ])
-          .where('Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendmentsubtype', '=', subtypeId)
-          .where('Funding_Case_Agreement_Amendment_Subtype._deleted', '=', false)
-          .where('Funding_Case_Agreement_Amendment_Type._deleted', '=', false)
-          .where('Funding_Case_Agreement_Amendment._deleted', '=', false)
-          .where('Funding_Case_Agreement_Amendment.egcs_fc_isopen', '=', true)
-          .where('Common_Status.egcs_cn_terminal', '=', false)
-          .where('Common_Status._deleted', '=', false)
-          .forUpdate('Funding_Case_Agreement_Amendment_Subtype')
-          .execute()
-        const retainedTypeIds = new Set(amendmentTypeIds)
-        const compatibleAmendments = new Set(
-          amendmentScopeRows
-            .filter(row => retainedTypeIds.has(String(row.amendment_type_id)))
-            .map(row => String(row.amendment_id))
-        )
-        const invalidatesAmendment = amendmentScopeRows.some(
-          row => !compatibleAmendments.has(String(row.amendment_id))
-        )
-
-        if (invalidatesAmendment) {
-          return await badRequest(
-            event,
-            'AMENDMENT_SUBTYPE_MAPPING_IN_USE',
-            'apiErrors.transfer_payment.amendment_subtype_mapping_in_use'
-          )
         }
       }
       const updated = Object.keys(subtypeValues).length > 0
@@ -116,7 +86,7 @@ export default defineEventHandler(async event => {
         : await trx.selectFrom('Transfer_Payment_Amendment_Subtype').selectAll()
             .where('id', '=', subtypeId).where('egcs_tp_transferpaymentstream', '=', streamId)
             .where('_deleted', '=', false).executeTakeFirstOrThrow()
-      if (amendmentTypeIds) {
+      if (mappingChanged && amendmentTypeIds) {
         await trx.updateTable('Transfer_Payment_Amendment_Subtype_Type').set({ _deleted: true })
           .where('egcs_tp_amendmentsubtype', '=', subtypeId).where('_deleted', '=', false).execute()
         await trx.insertInto('Transfer_Payment_Amendment_Subtype_Type').values(amendmentTypeIds.map(typeId => ({
@@ -125,7 +95,7 @@ export default defineEventHandler(async event => {
           _deleted: false
         }))).execute()
       }
-      return { ...updated, amendment_type_ids: amendmentTypeIds }
+      return { ...updated, amendment_type_ids: amendmentTypeIds ?? currentTypeIds }
     }
   )
 })

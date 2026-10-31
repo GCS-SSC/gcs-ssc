@@ -1,3 +1,4 @@
+import { toRiskRatingDto } from '~~/server/utils/agreement-risk-rating'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { TransferPaymentStreamRiskRatingSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -30,7 +31,7 @@ export default defineEventHandler(async event => {
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, streamContext.agencyId, streamId, 'create', async trx => {
       try {
-        return await trx
+        const created = await trx
           .insertInto('Transfer_Payment_Stream_Risk_Rating')
           .values({
             ...body,
@@ -39,6 +40,7 @@ export default defineEventHandler(async event => {
           })
           .returningAll()
           .executeTakeFirstOrThrow()
+        return toRiskRatingDto(created)
       } catch (error) {
         return await throwIfTransferPaymentUniqueConstraintError(event, error)
       }

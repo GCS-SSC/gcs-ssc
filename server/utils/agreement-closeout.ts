@@ -11,14 +11,14 @@ import type {
 } from '~~/shared/types/agreement-closeout'
 import { hasApprovedTargetEvidence } from '~~/server/utils/business-approval-evidence'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { addMoney, compareMoney, parseMoney, subtractMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, zeroMoney, subtractMoney, type Money } from '~~/shared/utils/money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { agreementPaymentIsFinal } from './agreement-payment-source'
 import { formatCorrectionReference } from '~~/shared/utils/correction'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 
-export const CLOSEOUT_SNAPSHOT_SCHEMA_VERSION = 1 as const
+export const CLOSEOUT_SNAPSHOT_SCHEMA_VERSION = 2 as const
 export const ACTIVE_CLOSEOUT_WORKFLOW_STATUSES = [
   'pending',
   'active',
@@ -34,11 +34,9 @@ export type AgreementCloseoutRuntimeContext = {
   isOpen: boolean
 }
 
-const ZERO_MONEY = parseMoney('0')
-
 export const getCloseoutFinancialState = (variance: Money): CloseoutFinancialState => {
-  if (compareMoney(variance, ZERO_MONEY) < 0) return 'outstanding_payment'
-  if (compareMoney(variance, ZERO_MONEY) > 0) return 'outstanding_advance'
+  if (compareMoney(variance, zeroMoney(variance.currency)) < 0) return 'outstanding_payment'
+  if (compareMoney(variance, zeroMoney(variance.currency)) > 0) return 'outstanding_advance'
   return 'reconciled'
 }
 
@@ -157,26 +155,26 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
   const rows = new Map<string, MutableFinancial>()
   const readRow = (fiscalYearId: string, agencyFiscalYearId: string, fiscalYear: string, currency: Currency_Codes): MutableFinancial => {
     const key = `${agencyFiscalYearId}:${currency}`
-    const current = rows.get(key) ?? { fiscalYearId, fiscalYear, currency, approvedClaimAmount: ZERO_MONEY,
-      originalApprovedClaimAmount: ZERO_MONEY, accountReceivableRecoveryAmount: ZERO_MONEY,
-      cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
+    const current = rows.get(key) ?? { fiscalYearId, fiscalYear, currency, approvedClaimAmount: zeroMoney(currency),
+      originalApprovedClaimAmount: zeroMoney(currency), accountReceivableRecoveryAmount: zeroMoney(currency),
+      cashPaidAmount: zeroMoney(currency), correctionAmount: zeroMoney(currency), paidAmount: zeroMoney(currency) }
     rows.set(key, current)
     return current
   }
   for (const row of claimRows) {
     const current = readRow(String(row.fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
-    current.approvedClaimAmount = addMoney(current.approvedClaimAmount, parseDatabaseMoney(row.amount))
-    current.originalApprovedClaimAmount = addMoney(current.originalApprovedClaimAmount ?? ZERO_MONEY, parseDatabaseMoney(row.amount))
+    current.approvedClaimAmount = addMoney(current.approvedClaimAmount, parseDatabaseMoney(row.amount, row.currency))
+    current.originalApprovedClaimAmount = addMoney(current.originalApprovedClaimAmount, parseDatabaseMoney(row.amount, row.currency))
   }
   for (const row of operationalPaymentRows) {
     const current = readRow(String(row.fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
-    const amount = parseDatabaseMoney(row.amount)
+    const amount = parseDatabaseMoney(row.amount, row.currency)
     current.cashPaidAmount = addMoney(current.cashPaidAmount, amount)
     current.paidAmount = addMoney(current.paidAmount, amount)
   }
   for (const row of correctionRows) {
     const current = readRow(String(row.agency_fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
-    const amount = parseDatabaseMoney(row.amount)
+    const amount = parseDatabaseMoney(row.amount, row.currency)
     current.correctionAmount = addMoney(current.correctionAmount, amount)
     current.paidAmount = addMoney(current.paidAmount, amount)
   }
@@ -198,7 +196,7 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
   for (const row of recoveries) {
     const current = recoveryRow(String(row.sourceAgencyFiscalYearId), row.currency)
     current.paidAmount = addMoney(current.paidAmount, row.amount)
-    current.accountReceivableRecoveryAmount = addMoney(current.accountReceivableRecoveryAmount ?? ZERO_MONEY, row.amount)
+    current.accountReceivableRecoveryAmount = addMoney(current.accountReceivableRecoveryAmount, row.amount)
   }
   for (const row of claimRecoveries) {
     const current = recoveryRow(String(row.agencyFiscalYearId), row.currency)
@@ -208,31 +206,29 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
     const { approvedClaimAmount, paidAmount, cashPaidAmount, correctionAmount, originalApprovedClaimAmount, accountReceivableRecoveryAmount, ...identity } = row
     const variance = subtractMoney(paidAmount, approvedClaimAmount)
     return { ...identity, approvedClaimAmount, paidAmount,
-      ...(correctionRows.length || recoveries.length ? { cashPaidAmount, correctionAmount } : {}),
-      ...(recoveries.length || claimRecoveries.length ? { originalApprovedClaimAmount, accountReceivableRecoveryAmount } : {}),
+      cashPaidAmount, correctionAmount, originalApprovedClaimAmount, accountReceivableRecoveryAmount,
       variance, state: getCloseoutFinancialState(variance) }
   }).sort((left, right) => left.fiscalYear.localeCompare(right.fiscalYear) || left.currency.localeCompare(right.currency))
 
   const totalsByCurrency = new Map<Currency_Codes, { approvedClaimAmount: Money, originalApprovedClaimAmount: Money, accountReceivableRecoveryAmount: Money, cashPaidAmount: Money, correctionAmount: Money, paidAmount: Money }>()
   for (const row of reportRows) {
-    const total = totalsByCurrency.get(row.currency) ?? { approvedClaimAmount: ZERO_MONEY, originalApprovedClaimAmount: ZERO_MONEY, accountReceivableRecoveryAmount: ZERO_MONEY, cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
+    const total = totalsByCurrency.get(row.currency) ?? { approvedClaimAmount: zeroMoney(row.currency), originalApprovedClaimAmount: zeroMoney(row.currency), accountReceivableRecoveryAmount: zeroMoney(row.currency), cashPaidAmount: zeroMoney(row.currency), correctionAmount: zeroMoney(row.currency), paidAmount: zeroMoney(row.currency) }
     total.approvedClaimAmount = addMoney(total.approvedClaimAmount, row.approvedClaimAmount)
-    total.originalApprovedClaimAmount = addMoney(total.originalApprovedClaimAmount, row.originalApprovedClaimAmount ?? row.approvedClaimAmount)
-    total.accountReceivableRecoveryAmount = addMoney(total.accountReceivableRecoveryAmount, row.accountReceivableRecoveryAmount ?? ZERO_MONEY)
+    total.originalApprovedClaimAmount = addMoney(total.originalApprovedClaimAmount, row.originalApprovedClaimAmount)
+    total.accountReceivableRecoveryAmount = addMoney(total.accountReceivableRecoveryAmount, row.accountReceivableRecoveryAmount)
     total.paidAmount = addMoney(total.paidAmount, row.paidAmount)
-    total.cashPaidAmount = addMoney(total.cashPaidAmount, row.cashPaidAmount ?? row.paidAmount)
-    total.correctionAmount = addMoney(total.correctionAmount, row.correctionAmount ?? ZERO_MONEY)
+    total.cashPaidAmount = addMoney(total.cashPaidAmount, row.cashPaidAmount)
+    total.correctionAmount = addMoney(total.correctionAmount, row.correctionAmount)
     totalsByCurrency.set(row.currency, total)
   }
   const totals = [...totalsByCurrency].map(([currency, value]) => {
     const { approvedClaimAmount, cashPaidAmount, correctionAmount, originalApprovedClaimAmount, accountReceivableRecoveryAmount, paidAmount } = value
     const variance = subtractMoney(paidAmount, approvedClaimAmount)
     return { currency, approvedClaimAmount, paidAmount,
-      ...(correctionRows.length || recoveries.length ? { cashPaidAmount, correctionAmount } : {}),
-      ...(recoveries.length || claimRecoveries.length ? { originalApprovedClaimAmount, accountReceivableRecoveryAmount } : {}),
+      cashPaidAmount, correctionAmount, originalApprovedClaimAmount, accountReceivableRecoveryAmount,
       variance, state: getCloseoutFinancialState(variance) }
   }).sort((left, right) => left.currency.localeCompare(right.currency))
-  return { ready: totals.every(total => compareMoney(total.variance, ZERO_MONEY) === 0), rows: reportRows, totals }
+  return { ready: totals.every(total => compareMoney(total.variance, zeroMoney(total.currency)) === 0), rows: reportRows, totals }
 }
 
 const addBlocker = (

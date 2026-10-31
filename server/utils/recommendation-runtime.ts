@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- typed recommendation runtime helpers */
 import type { H3Event } from 'h3'
 import type { Kysely, Selectable, Transaction } from 'kysely'
@@ -351,6 +352,7 @@ export const fetchRuntimeRecommendationSetWithRecommendations = async (
         runtimeItemId: String(recommendation.runtimeItemId),
         publicationVersionId: String(recommendation.publicationVersionId),
         publicationVersion: Number(recommendation.publicationVersion),
+        order: parseSafeDecimal(String(recommendation.order)),
         definition: schema.definition,
         name_en: schema.nameEn,
         name_fr: schema.nameFr
@@ -444,11 +446,11 @@ export const createRuntimeRecommendationSetInTransaction = async (
     .executeTakeFirst()
   if (!pinnedByWorkflow) return null
   const runtimeId = String(runtime.id)
-  const rootOrder = input.runtimeItemOrder ?? Number((await input.db.selectFrom('Common_Runtime_Item')
+  const rootOrder = input.runtimeItemOrder ?? parseSafeDecimal(String((await input.db.selectFrom('Common_Runtime_Item')
     .select(eb => eb.fn.max('egcs_cn_order').as('maximum'))
     .where('egcs_cn_runtime', '=', runtimeId)
     .where('egcs_cn_parentruntimeitem', 'is', null)
-    .executeTakeFirst())?.maximum ?? 0) + 1
+    .executeTakeFirst())?.maximum ?? 0)) + 1
   const setItemId = await createRuntimeItem(input.db, {
     egcs_cn_runtime: runtimeId,
     egcs_cn_parentruntimeitem: null,
@@ -586,7 +588,7 @@ export const advanceRecommendationRuntimeAfterTerminalItem = async (
     .forUpdate()
     .execute()
   if (positive) {
-    const next = siblings.find(item => item.egcs_cn_order > current.recommendationOrder
+    const next = siblings.find(item => parseSafeDecimal(String(item.egcs_cn_order)) > parseSafeDecimal(String(current.recommendationOrder))
       && item.egcs_cn_state === 'pending')
     if (next) {
       await transitionRuntimeItem(db, {

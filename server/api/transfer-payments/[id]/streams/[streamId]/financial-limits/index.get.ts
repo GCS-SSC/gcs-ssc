@@ -1,3 +1,5 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
+import { parseDecimalText } from '~~/shared/utils/money'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { createTransferPaymentScopedAuthorizeHandler, authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
@@ -5,7 +7,7 @@ import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { notFound, badRequest } from '~~/server/utils/api-errors'
 import { PaginationSchema } from '~~/shared/types/schemas/common'
 import { sql } from 'kysely'
-import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { databaseMoneyText } from '~~/server/utils/database-money'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -65,7 +67,10 @@ export default defineEventHandler(async event => {
   return {
     items: items.map(item => ({
       ...item,
-      egcs_tp_maxallowableperrecipient: parseDatabaseMoney(item.egcs_tp_maxallowableperrecipient)
+      egcs_tp_maxpercentofsupportavailableperrecipient: parseSafeDecimal(String(item.egcs_tp_maxpercentofsupportavailableperrecipient)),
+      egcs_tp_maxpercentofretroactivecostsallowable: parseSafeDecimal(String(item.egcs_tp_maxpercentofretroactivecostsallowable)),
+      egcs_tp_stackinglimit: parseSafeDecimal(String(item.egcs_tp_stackinglimit)),
+      egcs_tp_maxallowableperrecipient: parseDecimalText(item.egcs_tp_maxallowableperrecipient)
     })),
     total,
     stats: {

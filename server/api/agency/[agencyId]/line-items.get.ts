@@ -1,3 +1,4 @@
+import { projectAgencyCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -67,7 +68,7 @@ export default defineEventHandler(async event => {
         .orderBy('Agency_Cost_Category_Line_Item.id', 'asc')
         .limit(limit)
         .offset(offset)
-        .execute(),
+        .execute().then(rows => rows.map(projectAgencyCostLineItem)),
       filteredCount: filteredQuery
         .select(eb => eb.fn.count('Agency_Cost_Category_Line_Item.id').as('total'))
         .executeTakeFirst(),

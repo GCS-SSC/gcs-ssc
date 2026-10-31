@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler } from 'h3'
 import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
@@ -195,6 +196,8 @@ export default defineEventHandler(async event => {
       const permission = permissions.get(String(item.id))
       return {
         ...item,
+        egcs_fc_holdback: parseSafeDecimal(String(item.egcs_fc_holdback)),
+        egcs_fc_riskscore: item.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(item.egcs_fc_riskscore)),
         can_update: permission?.canUpdate ?? false,
         can_delete: permission?.canDelete ?? false
       }

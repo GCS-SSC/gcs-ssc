@@ -123,7 +123,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
         label-en-key="egcs_ay_name_en"
         label-fr-key="egcs_ay_name_fr"
         :aria-label="t('transfer_payment.agency')"
-        :disabled="isAgencyLocked"
+        :disabled="isAgencyLocked || Boolean(model.id)"
         @resolved-items="onAgencyResolved" />
     </UFormField>
     <div class="grid gap-2" :class="{ 'grid-cols-2': isStacked, 'grid-cols-1': !isStacked }">

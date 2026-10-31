@@ -2,7 +2,7 @@ import { defineEventHandler } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeAgreementStreamLookupRoute, prepareAgreementStreamLookupRoute } from '~~/server/utils/agreement-stream-lookup-routes'
 import { buildListRouteResponse } from '~~/server/utils/list-route-response'
-import { isAgreementRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
+import { isAgreementRiskRatingWorkflowManaged, toRiskRatingDto } from '~~/server/utils/agreement-risk-rating'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -30,7 +30,7 @@ export default defineEventHandler(async event => {
     baseQuery = baseQuery.where(eb => eb.or([
       eb('egcs_tp_name_en', 'ilike', `%${lookup.escapedSearch}%`),
       eb('egcs_tp_name_fr', 'ilike', `%${lookup.escapedSearch}%`),
-      ...(Number.isFinite(scoreSearch) ? [eb('egcs_tp_riskscore', '=', scoreSearch)] : [])
+      ...(Number.isFinite(scoreSearch) ? [eb('egcs_tp_riskscore', '=', String(scoreSearch))] : [])
     ]))
   }
 
@@ -54,7 +54,7 @@ export default defineEventHandler(async event => {
   ])
 
   return {
-    ...buildListRouteResponse(items, countResult, countResult, lookup.page, lookup.limit),
+    ...buildListRouteResponse(items.map(toRiskRatingDto), countResult, countResult, lookup.page, lookup.limit),
     workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, lookup.streamId, lookup.agreementContext?.agreementId)
   }
 })

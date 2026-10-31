@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { formatMoneyText } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { PaginationSchema } from '~~/shared/types/schemas'
@@ -36,7 +37,7 @@ export default defineEventHandler(async event => {
   const rows = await query.select(['payment.id', 'a.egcs_fc_agreementnumber', 'payment.egcs_fc_currency', databaseMoneyText(sql.ref('payment.egcs_fc_paymentamount')).as('egcs_fc_amount')])
     .orderBy('payment.id', 'desc').limit(limit).offset((page - 1) * limit).execute()
   const count = await query.select(sql<string>`count(*)::text`.as('total')).executeTakeFirstOrThrow()
-  return { items: rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount),
-    label_en: `${row.egcs_fc_agreementnumber} · ${row.id} · ${row.egcs_fc_amount} ${row.egcs_fc_currency.toUpperCase()}`,
-    label_fr: `${row.egcs_fc_agreementnumber} · ${row.id} · ${row.egcs_fc_amount} ${row.egcs_fc_currency.toUpperCase()}` })), total: Number(count.total), page, limit }
+  return { items: rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, row.egcs_fc_currency),
+    label_en: `${row.egcs_fc_agreementnumber} · ${row.id} · ${formatMoneyText(parseDatabaseMoney(row.egcs_fc_amount, row.egcs_fc_currency), 'en')}`,
+    label_fr: `${row.egcs_fc_agreementnumber} · ${row.id} · ${formatMoneyText(parseDatabaseMoney(row.egcs_fc_amount, row.egcs_fc_currency), 'fr')}` })), total: Number(count.total), page, limit }
 })

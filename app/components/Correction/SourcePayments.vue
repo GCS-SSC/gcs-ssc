@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TransferPaymentStreamChartOfAccountDimension } from '~~/shared/types/schemas/transfer-payment'
 import { appRouteLocations } from '~/utils/route-locations'
-import { formatMoneyText, parseMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const { sources, agreementId, canOpen = false } = defineProps<{
   sources: Array<{
@@ -12,7 +12,7 @@ const { sources, agreementId, canOpen = false } = defineProps<{
       allocations: Array<{
         egcs_fc_commitmentlinenumber: string | number
         egcs_fc_accountingdimensions: TransferPaymentStreamChartOfAccountDimension[]
-        egcs_fc_amount: string | null
+        egcs_fc_amount: Money | null
       }>
     }
   }>
@@ -21,9 +21,9 @@ const { sources, agreementId, canOpen = false } = defineProps<{
 }>()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
-const amount = (value: string | null, currency: string) => value === null
+const amount = (value: Money | null) => value === null
   ? t('common.not_available')
-  : formatMoneyText(parseMoneyText(value), locale.value, currency)
+  : formatMoneyText(value, locale.value)
 </script>
 
 <template>
@@ -45,7 +45,7 @@ const amount = (value: string | null, currency: string) => value === null
             <h5 class="font-medium">
               {{ t('correction.line_heading', { number: allocation.egcs_fc_commitmentlinenumber }) }}
             </h5>
-            <span class="font-semibold tabular-nums">{{ amount(allocation.egcs_fc_amount, source.egcs_fc_evidence.header.egcs_fc_currency) }}</span>
+            <span class="font-semibold tabular-nums">{{ amount(allocation.egcs_fc_amount) }}</span>
           </div>
           <CorrectionAccountingDimensions :dimensions="allocation.egcs_fc_accountingdimensions" />
         </div>

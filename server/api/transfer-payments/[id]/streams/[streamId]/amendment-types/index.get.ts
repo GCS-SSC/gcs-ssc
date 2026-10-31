@@ -58,9 +58,13 @@ export default defineEventHandler(async event => {
 
     const [items, countResult, statsResult] = await Promise.all([
       baseQuery.selectAll('Transfer_Payment_Amendment_Type')
+        .select(sql<boolean>`EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Amendment_Type" selected WHERE selected.egcs_fc_amendmenttype = "Transfer_Payment_Amendment_Type".id)`.as('in_use'))
         .orderBy('Transfer_Payment_Amendment_Type.id', 'asc').limit(limit).offset(offset).execute(),
       baseQuery.select(eb => eb.fn.count('Transfer_Payment_Amendment_Type.id').as('total')).executeTakeFirst(),
-      scopedQuery.select(eb => eb.fn.count('Transfer_Payment_Amendment_Type.id').as('total'))
+      scopedQuery.select(eb => [
+        eb.fn.count('Transfer_Payment_Amendment_Type.id').as('total'),
+        eb.fn.count('Transfer_Payment_Amendment_Type.id').filterWhere('Transfer_Payment_Amendment_Type.egcs_tp_active', '=', true).as('active')
+      ])
         .executeTakeFirst()
     ])
 
@@ -72,7 +76,7 @@ export default defineEventHandler(async event => {
       total,
       stats: {
         total: globalTotal,
-        active: globalTotal
+        active: Number(statsResult?.active ?? 0)
       },
       page,
       limit

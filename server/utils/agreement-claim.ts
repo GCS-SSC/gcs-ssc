@@ -1,4 +1,4 @@
-import { assertAgreementCurrency, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported claim helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import { sql, type Insertable, type Kysely, type Selectable, type Transaction } from 'kysely'
@@ -77,7 +77,7 @@ export const createAgreementClaimAggregate = async (
   if (!await isAgreementClaimProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) return { status: 'applicant_recipient_unavailable' }
   const currency = await resolveAgreementCurrency(trx, input.agreementId)
   if (!currency) return { status: 'agreement_unavailable' }
-  if (input.lineItems.some(line => line.currency !== currency)) {
+  if (input.lineItems.some(line => line.currency !== currency || parseMoney(line.amount).currency !== currency.toUpperCase())) {
     throw new Error('Claim line currencies must match the owning Agreement currency.')
   }
   const fiscalYear = await trx
@@ -747,7 +747,8 @@ export const patchAgreementClaimLineItem = async (
           return existing
         }
 
-        await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? existing.egcs_fc_currency)
+        const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? existing.egcs_fc_currency)
+        await assertCurrencyMoneyValues(event, currency, [patchedAmount, patchedTotalAmount].filter(value => value !== undefined))
         const references = await validateAgreementClaimLineItemPatchReferences(event, trx, agreementId, existing, patchValues)
         if (!hasKey(references, 'nextClaimId')) {
           return references
@@ -786,8 +787,8 @@ export const patchAgreementClaimLineItem = async (
 
         return {
           ...updated,
-          egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount),
-          egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount)
+          egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount, currency),
+          egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount, currency)
         }
       }
     )
@@ -1274,6 +1275,9 @@ export const patchAgreementClaimReconcileLineItem = async (
           return await badRequest(event, 'AGREEMENT_CLAIM_RECONCILE_LINE_ITEM_NOT_FOUND', 'apiErrors.agreement.claim_reconcile_line_item_not_found')
         }
 
+        const currency = await assertAgreementCurrency(event, trx, agreementId)
+        await assertCurrencyMoneyValues(event, currency, [patchedReconciled, patchedSampled].filter(value => value != null))
+
         const target = await resolveAgreementClaimReconcileLineItemPatchTarget(event, trx, agreementId, existing, patchValues)
         if (!hasKey(target, 'nextClaimId') || !hasKey(target, 'nextReconcileId')) {
           return target
@@ -1315,8 +1319,8 @@ export const patchAgreementClaimReconcileLineItem = async (
 
         return {
           ...updated,
-          egcs_fc_reconciled: parseDatabaseMoney(updated.egcs_fc_reconciled),
-          egcs_fc_sampled: updated.egcs_fc_sampled == null ? updated.egcs_fc_sampled : parseDatabaseMoney(updated.egcs_fc_sampled)
+          egcs_fc_reconciled: parseDatabaseMoney(updated.egcs_fc_reconciled, currency),
+          egcs_fc_sampled: updated.egcs_fc_sampled == null ? updated.egcs_fc_sampled : parseDatabaseMoney(updated.egcs_fc_sampled, currency)
         }
       }
     )
@@ -1334,31 +1338,14 @@ const validateAgreementClaimReconcilePatch = async (
   existing: Record<'egcs_fc_fundingagreementclaim' | 'egcs_fc_isfinal', unknown>,
   patchValues: FundingCaseAgreementClaimReconcilePatch
 ) => {
-  if (Object.hasOwn(patchValues, 'egcs_fc_fundingagreementclaim')) {
-    const claim = await assertAgreementClaimReadyForReconcile(event, db, agreementId, String(patchValues.egcs_fc_fundingagreementclaim))
-    if (!hasKey(claim, 'id')) {
-      return claim
-    }
-  }
-
-  const nextClaimId = String(patchValues.egcs_fc_fundingagreementclaim ?? existing.egcs_fc_fundingagreementclaim)
-  if (nextClaimId !== String(existing.egcs_fc_fundingagreementclaim)) {
-    // Deleted line history retains the same composite Claim identity.
-    const retainedLine = await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
-      .select('id')
-      .where('egcs_fc_fundingagreementclaimreconcile', '=', reconcileId)
-      .executeTakeFirst()
-    if (retainedLine) {
-      return await badRequest(event, 'AGREEMENT_CLAIM_RECONCILE_LINES_EXIST', 'apiErrors.agreement.claim_reconcile_lines_exist')
-    }
-  }
+  const claimId = String(existing.egcs_fc_fundingagreementclaim)
   const nextIsFinal = patchValues.egcs_fc_isfinal ?? existing.egcs_fc_isfinal
   if (nextIsFinal) {
-    const finalConflict = await assertSingleFinalAgreementClaimReconcile(event, db, nextClaimId, reconcileId)
+    const finalConflict = await assertSingleFinalAgreementClaimReconcile(event, db, claimId, reconcileId)
     if (finalConflict) {
       return finalConflict
     }
-    const inProgressConflict = await assertNoInProgressAgreementClaimReconcile(event, db, nextClaimId, reconcileId)
+    const inProgressConflict = await assertNoInProgressAgreementClaimReconcile(event, db, claimId, reconcileId)
     if (inProgressConflict) {
       return inProgressConflict
     }
@@ -1388,7 +1375,6 @@ export const patchAgreementClaimReconcile = async (
         if (!reconcile) return []
         return [
           { type: 'claim', id: String(reconcile.egcs_fc_fundingagreementclaim) },
-          { type: 'claim', id: String(patchValues.egcs_fc_fundingagreementclaim ?? reconcile.egcs_fc_fundingagreementclaim) },
           { type: 'claimReconcile', id: reconcileId }
         ]
       },
@@ -1480,6 +1466,10 @@ export const saveAgreementClaimReconcileLineItemsBulk = async (
           return await badRequest(event, 'AGREEMENT_CLAIM_RECONCILE_LINE_SET_STALE', 'apiErrors.request.invalid')
         }
 
+        const currency = await assertAgreementCurrency(event, trx, agreementId)
+        await assertCurrencyMoneyValues(event, currency, submitted.flatMap(line =>
+          line.egcs_fc_sampled == null ? [line.egcs_fc_reconciled] : [line.egcs_fc_reconciled, line.egcs_fc_sampled]))
+
         const existingByClaimLineId = new Map(existingLines.map(line => [String(line.egcs_fc_lineitem), line]))
         for (const line of submitted) {
           const existing = existingByClaimLineId.get(line.claim_line_id)
@@ -1561,8 +1551,8 @@ export const saveAgreementClaimReconcileLineItemsBulk = async (
         return {
           lines: rows.map(row => ({
             ...row,
-            egcs_fc_reconciled: parseDatabaseMoney(row.egcs_fc_reconciled),
-            egcs_fc_sampled: row.egcs_fc_sampled == null ? row.egcs_fc_sampled : parseDatabaseMoney(row.egcs_fc_sampled)
+            egcs_fc_reconciled: parseDatabaseMoney(row.egcs_fc_reconciled, currency),
+            egcs_fc_sampled: row.egcs_fc_sampled == null ? row.egcs_fc_sampled : parseDatabaseMoney(row.egcs_fc_sampled, currency)
           }))
         }
       }

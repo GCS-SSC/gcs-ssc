@@ -1,3 +1,5 @@
+import { sql } from 'kysely'
+
 export const AGREEMENT_ADDRESS_SELECT_COLUMNS = [
   'Funding_Case_Agreement_Address.id as id',
   'Funding_Case_Agreement_Address.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
@@ -10,8 +12,8 @@ export const AGREEMENT_ADDRESS_SELECT_COLUMNS = [
   'Common_Address.egcs_cn_addresscountry as egcs_cn_addresscountry',
   'Common_Address.egcs_cn_addresssubdivision as egcs_cn_addresssubdivision',
   'Common_Address.egcs_cn_gcaddressid as egcs_cn_gcaddressid',
-  'Common_Address.egcs_cn_latitude as egcs_cn_latitude',
-  'Common_Address.egcs_cn_longitude as egcs_cn_longitude',
+  sql<number | null>`${sql.ref('Common_Address.egcs_cn_latitude')}::double precision`.as('egcs_cn_latitude'),
+  sql<number | null>`${sql.ref('Common_Address.egcs_cn_longitude')}::double precision`.as('egcs_cn_longitude'),
   'Common_Address.egcs_cn_mainphone as egcs_cn_mainphone',
   'Common_Address.egcs_cn_mainphoneextension as egcs_cn_mainphoneextension',
   'Common_Address.egcs_cn_postalcodezipcode as egcs_cn_postalcodezipcode',

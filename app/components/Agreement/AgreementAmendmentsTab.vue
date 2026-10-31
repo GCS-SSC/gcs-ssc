@@ -12,9 +12,10 @@ import { appRouteLocations } from '~/utils/route-locations'
 import type {
   FundingCaseAgreementAmendmentListResponse,
   FundingCaseAgreementAmendmentRow,
+  FundingCaseAgreementBudgetDifference,
   FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
-import { compareMoney, formatMoneyText, moneyFromCents, moneyToCents, parseMoney } from '~~/shared/utils/money'
+import { absMoney, compareMoney, formatMoneyText, zeroMoney } from '~~/shared/utils/money'
 
 const { agreementId, canCreate } = defineProps<{
   agreementId: string
@@ -103,16 +104,14 @@ watch(() => agreementId, () => {
   isCreateOpen.value = false
 }, { flush: 'sync' })
 const hasOpenAmendment = computed(() => response.value.items.some(amendment => amendment.egcs_fc_isopen === true))
-const ZERO_MONEY = parseMoney('0')
 const formatBudgetDifference = (amendment: FundingCaseAgreementAmendmentRow): string => {
   const budgetDifferences = amendment.budget_differences ?? []
   if (budgetDifferences.length === 0) return t('common.none')
   return budgetDifferences.map(budgetDifference => {
-    const cents = moneyToCents(budgetDifference.difference)
-    const absoluteValue = moneyFromCents(cents < BigInt(0) ? -cents : cents)
-    const formatted = formatMoneyText(absoluteValue, locale.value, budgetDifference.currency.toUpperCase())
-    if (compareMoney(budgetDifference.difference, ZERO_MONEY) > 0) return `+${formatted}`
-    if (compareMoney(budgetDifference.difference, ZERO_MONEY) < 0) return `-${formatted}`
+    const absoluteValue = absMoney(budgetDifference.difference)
+    const formatted = formatMoneyText(absoluteValue, locale.value)
+    if (compareMoney(budgetDifference.difference, zeroMoney(budgetDifference.difference.currency)) > 0) return `+${formatted}`
+    if (compareMoney(budgetDifference.difference, zeroMoney(budgetDifference.difference.currency)) < 0) return `-${formatted}`
     return formatted
   }).join(' / ')
 }
@@ -333,7 +332,7 @@ const createAmendment = async () => {
       </template>
 
       <template #budget_differences-cell="{ row }">
-        <span :class="row.original.budget_differences?.every(item => compareMoney(item.difference, ZERO_MONEY) === 0) ? 'text-muted' : 'font-medium text-default'">
+        <span :class="row.original.budget_differences?.every((item: FundingCaseAgreementBudgetDifference) => compareMoney(item.difference, zeroMoney(item.difference.currency)) === 0) ? 'text-muted' : 'font-medium text-default'">
           {{ formatBudgetDifference(row.original) }}
         </span>
       </template>

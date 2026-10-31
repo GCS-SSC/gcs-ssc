@@ -1,4 +1,4 @@
-import type { Money } from '~~/shared/utils/money'
+import type { Money, MoneyInput } from '~~/shared/utils/money'
 
 type FundingHistorySource = 'system' | 'external'
 
@@ -80,7 +80,7 @@ export interface FundingHistoryFormState {
   egcs_ar_description_fr?: string
   egcs_ar_startdate?: string
   egcs_ar_enddate?: string
-  egcs_ar_fundingamount?: string
+  egcs_ar_fundingamount?: MoneyInput
   egcs_ar_currency?: string
   confirmations: string[]
 }

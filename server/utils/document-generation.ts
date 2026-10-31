@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc */
+import { DocumentRenderBudgetError } from './document-render-budget'
 import { DocumentConditionError } from './document-conditions'
 import { DocumentConversionError, getFallbackValue, valueOrFallback, renderDocument } from './document-rendering'
 import type { GeneratedDocument, DocumentRenderingOptions } from './document-rendering'
@@ -17,7 +18,7 @@ import type { CloseoutDocumentPersistence } from '~~/shared/types/agreement-clos
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
-import { formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, parseDecimalText, zeroMoney, isCanonicalMoney, majorMoneyText, percentageMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { getAgreementPaidAccountingProjection, summarizePaidAccountingByCurrency } from './agreement-accounting-projection'
 
 export type GeneratedAgreementDocument = GeneratedDocument
@@ -61,29 +62,20 @@ export const readDocumentStoredFile = async (
 }
 
 export const formatDocumentMoney = (value: Money, language: Language_Preference = 'eng'): string =>
-  formatMoneyText(value, language === 'fra' ? 'fr-CA' : 'en-US', 'CAD')
+  formatMoneyText(value, language === 'fra' ? 'fr-CA' : 'en-US')
 
 /**
- * Preserves the unresolved DEC-041 number formatting boundary without admitting numbers to ordinary money formatting.
- *
- * @param amount - Legacy number produced by the unresolved holdback calculation.
- * @param language - Document language used for currency presentation.
- * @returns The existing localized holdback currency presentation.
+ * Serializes exact minor-unit money as major-unit decimal text for document templates.
+ * @param value - Prepared document context, including host or extension monetary values.
+ * @returns Template data with display amounts independent of persistence units.
  */
-export const formatLegacyDec041HoldbackMoney = (amount: number, language: Language_Preference = 'eng'): string => {
-  if (language === 'eng') {
-    return `CA$${amount.toLocaleString('en-CA', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })}`
+const documentMoneyText = (value: unknown): unknown => {
+  if (isCanonicalMoney(value)) return majorMoneyText(value)
+  if (Array.isArray(value)) return value.map(documentMoneyText)
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, documentMoneyText(item)]))
   }
-
-  return new Intl.NumberFormat('fr-CA', {
-    style: 'currency',
-    currency: 'CAD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount)
+  return value
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -204,6 +196,9 @@ export const renderGeneratedAgreementDocument = async (
   try {
     return await renderDocument(template.egcs_ay_templatekind, templateBytes, context, language, outputFormat, baseFilename, options)
   } catch (error) {
+    if (error instanceof DocumentRenderBudgetError) {
+      return await badRequest(event, 'DOCUMENT_RENDER_LIMIT_EXCEEDED', 'apiErrors.document_generation.render_limit_exceeded')
+    }
     if (error instanceof DocumentConditionError) {
       return await badRequest(event, 'DOCUMENT_CONDITION_INVALID', `apiErrors.document_generation.condition_${error.reason}`, { expression: error.expression })
     }
@@ -362,7 +357,6 @@ export const buildAgreementDocumentContext = async (
 ): Promise<Record<string, unknown>> => {
   const localized = <T extends { en: unknown, fr: unknown }>(value: T): unknown => language === 'fra' ? value.fr : value.en
   const localizedValue = (value: unknown): string => valueOrFallback(value, language)
-  const localizedMoney = (value: Money): string => formatDocumentMoney(value, language)
   const localizedAddress = (address: Parameters<typeof formatAddress>[0]): string => formatAddress(address, language)
 
   const agreement = await db
@@ -387,6 +381,7 @@ export const buildAgreementDocumentContext = async (
       'Funding_Case_Agreement_Profile.egcs_fc_authorizedassistancestartdate as startDate',
       'Funding_Case_Agreement_Profile.egcs_fc_authorizedassistanceenddate as endDate',
       'Funding_Case_Agreement_Profile.egcs_fc_holdback as holdback',
+      'Funding_Case_Agreement_Profile.egcs_fc_currency as currency',
       'Agency_Holdback_Basis.egcs_ay_name_en as holdbackBasisEn',
       'Agency_Holdback_Basis.egcs_ay_name_fr as holdbackBasisFr',
       'Agency_Holdback_Basis.egcs_ay_languageindependentcode as holdbackBasisCode',
@@ -402,6 +397,8 @@ export const buildAgreementDocumentContext = async (
   if (!agreement) {
     return {}
   }
+
+  const localizedMoney = (value: Money): string => formatDocumentMoney(value, language)
 
   const [recipients, recipientAddresses, activities, activityOutcomes, activityResponsibleParties, budgetYears, budgetItems, commitments, payments, claims, forecasts, customFieldDefinitions] = await Promise.all([
     db.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
@@ -586,24 +583,29 @@ export const buildAgreementDocumentContext = async (
 
   if (versions.validationEvent) await validatePersistedAgreementCustomFieldSelections(versions.validationEvent, customFieldDefinitions, agreement.customFieldValues)
 
-  const zeroMoney = parseMoney('0')
+  const emptyAmount = zeroMoney(agreement.currency)
   const accountingProjection = await getAgreementPaidAccountingProjection(db, agreementId, { paymentMode: 'finalized' })
-  const getAmount = (value: unknown): Money => value == null ? zeroMoney : parseDatabaseMoney(value)
+  const getAmount = (value: Money | null): Money => value ?? emptyAmount
   const fundingByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, budgetItems.map(item => String(item.rowId))))
   const getOtherFundingTotal = (item: { rowId: string }): Money =>
-    sumMoney((fundingByLine.get(String(item.rowId)) ?? []).map(source => source.egcs_fc_amount))
-  const lineItems = budgetItems.map(item => ({
-    ...item,
-    fiscalYearId: String(item.fiscalYearId),
-    fiscalYear: localizedValue(item.fiscalYear),
-    costCategory: localizedValue(localized({ en: item.costCategoryEn, fr: item.costCategoryFr })),
-    category: localizedValue(localized({ en: item.categoryEn, fr: item.categoryFr })),
-    subsection: localizedValue(item.subsection),
-    description: localizedValue(item.description),
-    totalAmountFormatted: localizedMoney(getAmount(item.totalAmount)),
-    programFundingFormatted: localizedMoney(getAmount(item.programFunding)),
-    otherFundingFormatted: localizedMoney(getOtherFundingTotal(item))
-  }))
+    sumMoney((fundingByLine.get(String(item.rowId)) ?? []).map(source => source.egcs_fc_amount), agreement.currency)
+  const lineItems = budgetItems.map(row => {
+    const item = { ...row,
+      totalAmount: parseDatabaseMoney(row.totalAmount, agreement.currency),
+      programFunding: parseDatabaseMoney(row.programFunding, agreement.currency) }
+    return ({
+      ...item,
+      fiscalYearId: String(item.fiscalYearId),
+      fiscalYear: localizedValue(item.fiscalYear),
+      costCategory: localizedValue(localized({ en: item.costCategoryEn, fr: item.costCategoryFr })),
+      category: localizedValue(localized({ en: item.categoryEn, fr: item.categoryFr })),
+      subsection: localizedValue(item.subsection),
+      description: localizedValue(item.description),
+      totalAmountFormatted: localizedMoney(getAmount(item.totalAmount)),
+      programFundingFormatted: localizedMoney(getAmount(item.programFunding)),
+      otherFundingFormatted: localizedMoney(getOtherFundingTotal(item))
+    })
+  })
   const getSchedule2ColumnKey = (subsection: unknown): 'programDelivery' | 'administrative' | 'capital' => {
     const normalized = String(subsection ?? '').toLowerCase()
     if (normalized.includes('admin')) {
@@ -619,18 +621,18 @@ export const buildAgreementDocumentContext = async (
     const yearLineItems = lineItems.filter(item => String(item.fiscalYearId) === String(year.id))
     const sectionNames = Array.from(new Set(yearLineItems.map(item => localizedValue(item.costCategory))))
     const schedule2SectionNames = Array.from(new Set(yearLineItems.map(item => localizedValue(item.subsection))))
-    const totalAmount = sumMoney(yearLineItems.map(item => getAmount(item.totalAmount)))
-    const programFunding = sumMoney(yearLineItems.map(item => getAmount(item.programFunding)))
-    const otherFunding = sumMoney(yearLineItems.map(item => getOtherFundingTotal(item)))
+    const totalAmount = sumMoney(yearLineItems.map(item => getAmount(item.totalAmount)), agreement.currency)
+    const programFunding = sumMoney(yearLineItems.map(item => getAmount(item.programFunding)), agreement.currency)
+    const otherFunding = sumMoney(yearLineItems.map(item => getOtherFundingTotal(item)), agreement.currency)
     const programDeliveryFunding = sumMoney(yearLineItems
       .filter(item => getSchedule2ColumnKey(item.subsection) === 'programDelivery')
-      .map(item => getAmount(item.programFunding)))
+      .map(item => getAmount(item.programFunding)), agreement.currency)
     const administrativeFunding = sumMoney(yearLineItems
       .filter(item => getSchedule2ColumnKey(item.subsection) === 'administrative')
-      .map(item => getAmount(item.programFunding)))
+      .map(item => getAmount(item.programFunding)), agreement.currency)
     const capitalFunding = sumMoney(yearLineItems
       .filter(item => getSchedule2ColumnKey(item.subsection) === 'capital')
-      .map(item => getAmount(item.programFunding)))
+      .map(item => getAmount(item.programFunding)), agreement.currency)
 
     return {
       id: String(year.id),
@@ -641,12 +643,12 @@ export const buildAgreementDocumentContext = async (
       programDeliveryFundingFormatted: localizedMoney(programDeliveryFunding),
       administrativeFundingFormatted: localizedMoney(administrativeFunding),
       capitalFundingFormatted: localizedMoney(capitalFunding),
-      totalContributionFormatted: localizedMoney(sumMoney([programDeliveryFunding, administrativeFunding, capitalFunding])),
+      totalContributionFormatted: localizedMoney(sumMoney([programDeliveryFunding, administrativeFunding, capitalFunding], agreement.currency)),
       sections: sectionNames.map(sectionName => {
         const sectionLineItems = yearLineItems.filter(item => item.costCategory === sectionName)
-        const sectionTotalAmount = sumMoney(sectionLineItems.map(item => getAmount(item.totalAmount)))
-        const sectionProgramFunding = sumMoney(sectionLineItems.map(item => getAmount(item.programFunding)))
-        const sectionOtherFunding = sumMoney(sectionLineItems.map(item => getOtherFundingTotal(item)))
+        const sectionTotalAmount = sumMoney(sectionLineItems.map(item => getAmount(item.totalAmount)), agreement.currency)
+        const sectionProgramFunding = sumMoney(sectionLineItems.map(item => getAmount(item.programFunding)), agreement.currency)
+        const sectionOtherFunding = sumMoney(sectionLineItems.map(item => getOtherFundingTotal(item)), agreement.currency)
         const subsectionNames = Array.from(new Set(sectionLineItems.map(item => localizedValue(item.subsection))))
 
         return {
@@ -656,7 +658,7 @@ export const buildAgreementDocumentContext = async (
           otherFundingFormatted: localizedMoney(sectionOtherFunding),
           subsections: subsectionNames.map(subsectionName => {
             const subsectionLineItems = sectionLineItems.filter(item => item.subsection === subsectionName)
-            const subsectionProgramFunding = sumMoney(subsectionLineItems.map(item => getAmount(item.programFunding)))
+            const subsectionProgramFunding = sumMoney(subsectionLineItems.map(item => getAmount(item.programFunding)), agreement.currency)
 
             return {
               name: subsectionName,
@@ -681,7 +683,7 @@ export const buildAgreementDocumentContext = async (
       }),
       schedule2Sections: schedule2SectionNames.map(sectionName => {
         const sectionLineItems = yearLineItems.filter(item => item.subsection === sectionName)
-        const sectionProgramFunding = sumMoney(sectionLineItems.map(item => getAmount(item.programFunding)))
+        const sectionProgramFunding = sumMoney(sectionLineItems.map(item => getAmount(item.programFunding)), agreement.currency)
 
         return {
           name: sectionName,
@@ -701,16 +703,16 @@ export const buildAgreementDocumentContext = async (
     const yearAmounts = budgetYearsWithDetails.map(year => {
       const amount = sumMoney(categoryLineItems
         .filter(item => String(item.fiscalYearId) === String(year.id))
-        .map(item => getAmount(item.programFunding)))
+        .map(item => getAmount(item.programFunding)), agreement.currency)
 
       return localizedMoney(amount)
     })
-    const total = sumMoney(categoryLineItems.map(item => getAmount(item.programFunding)))
+    const total = sumMoney(categoryLineItems.map(item => getAmount(item.programFunding)), agreement.currency)
 
     return {
       name: categoryName,
-      year1AmountFormatted: yearAmounts[0] || localizedMoney(parseMoney('0')),
-      year2AmountFormatted: yearAmounts[1] || localizedMoney(parseMoney('0')),
+      year1AmountFormatted: yearAmounts[0] || localizedMoney(emptyAmount),
+      year2AmountFormatted: yearAmounts[1] || localizedMoney(emptyAmount),
       totalAmountFormatted: localizedMoney(total)
     }
   })
@@ -718,28 +720,27 @@ export const buildAgreementDocumentContext = async (
     name: 'TOTAL',
     year1AmountFormatted: localizedMoney(sumMoney(lineItems
       .filter(item => String(item.fiscalYearId) === String(budgetYearsWithDetails[0]?.id))
-      .map(item => getAmount(item.programFunding)))),
+      .map(item => getAmount(item.programFunding)), agreement.currency)),
     year2AmountFormatted: localizedMoney(sumMoney(lineItems
       .filter(item => String(item.fiscalYearId) === String(budgetYearsWithDetails[1]?.id))
-      .map(item => getAmount(item.programFunding)))),
-    totalAmountFormatted: localizedMoney(sumMoney(lineItems.map(item => getAmount(item.programFunding))))
+      .map(item => getAmount(item.programFunding)), agreement.currency)),
+    totalAmountFormatted: localizedMoney(sumMoney(lineItems.map(item => getAmount(item.programFunding)), agreement.currency))
   }
   const schedule2Years = budgetYearsWithDetails
 
   const primaryRecipient = recipients[0]
   const primaryAddress = recipientAddresses.find(address => String(address.applicantRecipientId) === String(primaryRecipient?.applicantRecipientId))
-  const totalProgramFunding = sumMoney(lineItems.map(item => getAmount(item.programFunding)))
+  const totalProgramFunding = sumMoney(lineItems.map(item => getAmount(item.programFunding)), agreement.currency)
   const totalProgramDeliveryFunding = sumMoney(lineItems
     .filter(item => getSchedule2ColumnKey(item.subsection) === 'programDelivery')
-    .map(item => getAmount(item.programFunding)))
+    .map(item => getAmount(item.programFunding)), agreement.currency)
   const totalAdministrativeFunding = sumMoney(lineItems
     .filter(item => getSchedule2ColumnKey(item.subsection) === 'administrative')
-    .map(item => getAmount(item.programFunding)))
+    .map(item => getAmount(item.programFunding)), agreement.currency)
   const totalCapitalFunding = sumMoney(lineItems
     .filter(item => getSchedule2ColumnKey(item.subsection) === 'capital')
-    .map(item => getAmount(item.programFunding)))
-  // DEC-041: holdback rounding is unresolved; keep this one derived-money boundary explicit.
-  const holdbackAmount = Number(totalProgramFunding) * (Number(agreement.holdback || 0) / 100)
+    .map(item => getAmount(item.programFunding)), agreement.currency)
+  const holdbackAmount = percentageMoney(totalProgramFunding, parseDecimalText(String(agreement.holdback ?? 0)))
   const activityOutcomesByActivityId = new Map<string, typeof activityOutcomes>()
   for (const outcome of activityOutcomes) {
     const key = String(outcome.activityId)
@@ -769,7 +770,7 @@ export const buildAgreementDocumentContext = async (
       holdback: localizedValue(agreement.holdback),
       holdbackBasis: localizedValue(localized({ en: agreement.holdbackBasisEn, fr: agreement.holdbackBasisFr })),
       holdbackBasisCode: localizedValue(agreement.holdbackBasisCode),
-      holdbackAmount: formatLegacyDec041HoldbackMoney(holdbackAmount, language)
+      holdbackAmount: localizedMoney(holdbackAmount)
     },
     agency: { name: localizedValue(localized({ en: agreement.agencyNameEn, fr: agreement.agencyNameFr })) },
     program: { name: localizedValue(localized({ en: agreement.programNameEn, fr: agreement.programNameFr })) },
@@ -838,20 +839,20 @@ export const buildAgreementDocumentContext = async (
     },
     payments: payments.map(payment => ({
       ...payment,
-      amount: parseDatabaseMoney(payment.amount),
-      amountFormatted: localizedMoney(parseDatabaseMoney(payment.amount))
+      amount: parseDatabaseMoney(payment.amount, agreement.currency),
+      amountFormatted: localizedMoney(parseDatabaseMoney(payment.amount, agreement.currency))
     })),
     claims,
     forecasts
   }
 
   if (!event) {
-    return baseContext
+    return Object.fromEntries(Object.entries(baseContext).map(([key, value]) => [key, documentMoneyText(value)]))
   }
 
   const providers = event.context.documentGenerationContextProviders
   if (!Array.isArray(providers)) {
-    return baseContext
+    return Object.fromEntries(Object.entries(baseContext).map(([key, value]) => [key, documentMoneyText(value)]))
   }
 
   let context: Record<string, unknown> = baseContext
@@ -863,7 +864,7 @@ export const buildAgreementDocumentContext = async (
     context = deepMergeContext(context, extensionContext)
   }
 
-  return context
+  return Object.fromEntries(Object.entries(context).map(([key, value]) => [key, documentMoneyText(value)]))
 }
 
 export const loadAgreementDocumentRenderInput = async (

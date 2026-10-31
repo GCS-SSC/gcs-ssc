@@ -37,6 +37,7 @@ const {
   query = {},
   prependItems = [],
   excludeValues = [],
+  disabledValues = [],
   selectedFetchUrl,
   selectedValuesQueryKey,
   multiple = false,
@@ -55,6 +56,7 @@ const {
   query?: Record<string, string | number | boolean>
   prependItems?: AdminCommonSelectOption[]
   excludeValues?: Array<string | number>
+  disabledValues?: Array<string | number>
   selectedFetchUrl?: string
   selectedValuesQueryKey?: string
   multiple?: boolean
@@ -522,7 +524,7 @@ watch(selectedHydrationSignature, () => {
   void hydrateSelectedItems(normalizedValues.value)
 }, { immediate: true })
 
-const selectItems = computed<AdminCommonSelectOption[]>(() => {
+const selectItems = computed<Array<AdminCommonSelectOption & { disabled?: boolean }>>(() => {
   const excludedValueSet = new Set(excludeValues.map(value => String(value)))
   const dedupedItems = new Map<string, AdminCommonSelectOption>()
 
@@ -562,7 +564,8 @@ const selectItems = computed<AdminCommonSelectOption[]>(() => {
     })
   }
 
-  return [...dedupedItems.values()]
+  const disabledValueSet = new Set(disabledValues.map(String))
+  return [...dedupedItems.values()].map(item => disabledValueSet.has(item.value) ? { ...item, disabled: true } : item)
 })
 const displayedModel = computed<LookupModelValue>(() => {
   const availableValues = new Set(selectItems.value.map(item => item.value))

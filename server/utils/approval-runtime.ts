@@ -201,13 +201,16 @@ export const listApprovalRuntime = async (
   entityId: string,
   options: {
     canManage: boolean
+    approvalOnly?: boolean
   }
 ) => {
   if (
     entityType !== 'commonreview'
   ) {
     const currentUser = await resolveCurrentCommonUser(event)
-    const routingSlips = await fetchCanonicalRoutingSlips(event.context.$db, entityType, entityId)
+    const routingSlips = await fetchCanonicalRoutingSlips(event.context.$db, entityType, entityId, {
+      assignedCommonUserId: options.approvalOnly ? currentUser?.id ?? null : undefined
+    })
     const runtimeRoutingSlips = await Promise.all(routingSlips.map(async (routingSlip, index) => {
       const { approvals, certificationsByApprovalId } = await getRuntimeApprovals(event.context.$db, String(routingSlip.id))
       const policy = await getRuntimeAdditionalApprovalPolicy(event.context.$db, routingSlip)

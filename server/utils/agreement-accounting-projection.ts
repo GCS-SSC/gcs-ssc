@@ -2,13 +2,12 @@
 import { sql, type Kysely } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
-import { addMoney, compareMoney, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, zeroMoney, negateMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { hasPositiveCompletionTerminus } from './completion-terminus'
 import { agreementPaymentIsFinal, agreementPaymentApprovalIsEligible } from './agreement-payment-source'
 import { hasAccountingTable, hasCorrectionSchema } from './correction-schema'
-
-const ZERO = parseMoney('0.00')
+import { resolveAgreementCurrency } from './agreement-currency'
 
 type CreditMemoCodingRow = {
   id: string
@@ -46,7 +45,7 @@ export const readEffectiveCorrectionAdjustments = async (
     .where('correction._deleted', '=', false).where('adjustment._deleted', '=', false)
   if (options.currency) query = query.where('correction.egcs_fc_currency', '=', options.currency)
   const rows = await query.execute()
-  return rows.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount) }))
+  return rows.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount, row.currency) }))
 }
 
 /** Approved linked Credit Memo coding reduces paid once; receivable principal never changes paid. */
@@ -89,8 +88,9 @@ export const readEffectiveAccountReceivableRecoveries = async (
   const paidByLine = new Map(lines.map(line => [String(line.id), line.egcs_fc_correctedpaid]))
   const result: CreditMemoPaidAdjustment[] = []
   for (const memo of [...manual.rows, ...offsets.rows]) {
+    const ZERO = zeroMoney(memo.currency)
     const candidates = lines.filter(line => String(line.egcs_fc_agencychartofaccount) === memo.agencyChartId && line.currency === memo.currency)
-    let remaining = parseDatabaseMoney(memo.amount)
+    let remaining = parseDatabaseMoney(memo.amount, memo.currency)
     const period = (new Date(memo.accountingDate).getUTCMonth() + 9) % 12
     if (!candidates.length) {
       result.push({ ...memo, commitmentLineId: '', periodStart: period, periodEnd: period,
@@ -108,7 +108,7 @@ export const readEffectiveAccountReceivableRecoveries = async (
         collectionDate: memo.accountingDate, amount })
       paidByLine.set(String(line.id), addMoney(available, amount))
       remaining = subtractMoney(remaining, attributed)
-      if (remaining === ZERO) break
+      if (compareMoney(remaining, ZERO) === 0) break
     }
   }
   return result
@@ -144,7 +144,7 @@ export const readEffectiveAccountReceivableClaimRecoveries = async (
       .where('version.egcs_fc_iscurrent', '=', true).where('year._deleted', '=', false).where('version._deleted', '=', false))
     .execute()
   return rows.filter(row => !options.currency || row.currency === options.currency)
-    .map(row => ({ ...row, amount: subtractMoney(ZERO, parseDatabaseMoney(row.amount)) }))
+    .map(row => ({ ...row, amount: negateMoney(parseDatabaseMoney(row.amount, row.currency)) }))
 }
 
 /** Actual recorded paid components, never the protective paid floor used by capacity checks. */
@@ -194,20 +194,21 @@ export const getAgreementAccountingLines = async (
   const corrections = await readEffectiveCorrectionAdjustments(db, agreementId)
   const recoveries = options.omitCreditMemos ? [] : await readEffectiveAccountReceivableRecoveries(db, agreementId)
   return lines.flatMap(({ active, ...line }) => {
+    const ZERO = zeroMoney(line.currency)
     const original = sumMoney(payments.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id))
-      .map(row => parseDatabaseMoney(row.amount)))
+      .map(row => parseDatabaseMoney(row.amount, row.currency)), line.currency)
     // JV incoming coding belongs to its shared pool; it is attributed to this exact line only for this same coding.
     const jv = sumMoney(voucherRows.filter(row => row.currency === line.currency && successful.has(String(row.voucherId))
       && String(row.paymentId) !== options.excludePaymentId && String(row.commitmentLineId) === String(line.id)
-      && String(row.agencyChartId) === String(line.egcs_fc_agencychartofaccount)).map(row => parseDatabaseMoney(row.amount)))
-    const prior = sumMoney(corrections.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id)).map(row => row.amount))
+      && String(row.agencyChartId) === String(line.egcs_fc_agencychartofaccount)).map(row => parseDatabaseMoney(row.amount, row.currency)), line.currency)
+    const prior = sumMoney(corrections.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id)).map(row => row.amount), line.currency)
     const recovered = sumMoney(recoveries.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id)
-      && String(row.agencyChartId) === String(line.egcs_fc_agencychartofaccount)).map(row => row.amount))
-    if (!active && [original, jv, prior, recovered].every(amount => amount === ZERO)) return []
+      && String(row.agencyChartId) === String(line.egcs_fc_agencychartofaccount)).map(row => row.amount), line.currency)
+    if (!active && [original, jv, prior, recovered].every(amount => compareMoney(amount, ZERO) === 0)) return []
     // Historical paid keeps its exact source row; only active rows contribute committed funds.
-    return [{ ...line, egcs_fc_commitmentamount: active ? parseDatabaseMoney(line.egcs_fc_commitmentamount) : ZERO,
+    return [{ ...line, egcs_fc_commitmentamount: active ? parseDatabaseMoney(line.egcs_fc_commitmentamount, line.currency) : ZERO,
       egcs_fc_originalpaid: original, egcs_fc_jveffect: jv, egcs_fc_priorcorrections: prior, egcs_fc_arrecoveries: recovered,
-      egcs_fc_correctedpaid: sumMoney([original, jv, prior, recovered]) }]
+      egcs_fc_correctedpaid: sumMoney([original, jv, prior, recovered], line.currency) }]
   })
 }
 
@@ -216,12 +217,14 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
   const lines = await getAgreementAccountingLines(db, agreementId, { paymentMode: 'finalized' })
   const pools = new Map<string, { committed: Money; paid: Money }>()
   for (const line of lines) {
+    const ZERO = zeroMoney(line.currency)
     const key = String(line.egcs_fc_agencychartofaccount)
     const pool = pools.get(key) ?? { committed: ZERO, paid: ZERO }
     pools.set(key, { committed: addMoney(pool.committed, line.egcs_fc_commitmentamount),
-      paid: addMoney(pool.paid, sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_priorcorrections])) })
+      paid: addMoney(pool.paid, sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_priorcorrections], line.currency)) })
   }
   for (const row of await readEffectiveAccountReceivableRecoveries(db, agreementId)) {
+    const ZERO = zeroMoney(row.currency)
     const key = String(row.agencyChartId)
     const pool = pools.get(key) ?? { committed: ZERO, paid: ZERO }
     pool.paid = addMoney(pool.paid, row.amount)
@@ -233,7 +236,7 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'voucher.egcs_fc_payment')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_chartofaccount')
     .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'coding.egcs_tp_agencychartofaccount')
-    .select(['voucher.id', 'coding.egcs_tp_agencychartofaccount as codingId', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
+    .select(['voucher.id', 'voucher.egcs_fc_currency as currency', 'coding.egcs_tp_agencychartofaccount as codingId', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('voucher.egcs_fc_fundingagreement', '=', agreementId).where('line.egcs_fc_kind', '=', 'adjustment')
     .whereRef('account.egcs_ay_currency', '=', 'voucher.egcs_fc_currency')
     .where(agreementPaymentIsFinal('payment', { requireResolvedApproval: true }))
@@ -241,9 +244,10 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
   for (const id of new Set(vouchers.map(row => String(row.id)))) {
     if (!await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', id)) continue
     for (const row of vouchers.filter(item => String(item.id) === id)) {
+      const ZERO = zeroMoney(row.currency)
       const key = String(row.codingId)
       const pool = pools.get(key) ?? { committed: ZERO, paid: ZERO }
-      pool.paid = addMoney(pool.paid, parseDatabaseMoney(row.amount))
+      pool.paid = addMoney(pool.paid, parseDatabaseMoney(row.amount, row.currency))
       pools.set(key, pool)
     }
   }
@@ -290,7 +294,7 @@ export const getAgreementPaidAccountingProjection = async (
   const entries: Array<{ id: string; kind: 'cash_payment' | 'journal_voucher' | 'correction' | 'account_receivable_recovery';
     agencyFiscalYearId: string; fiscalYearId: string; fiscalYearOrder: string; fiscalYearLabel: string;
     month: number; currency: Database['Funding_Case_Agreement_Payment']['egcs_fc_currency']; amount: Money }> = payments.map(row => ({
-    ...row, id: String(row.id), kind: 'cash_payment', amount: parseDatabaseMoney(row.amount),
+    ...row, id: String(row.id), kind: 'cash_payment', amount: parseDatabaseMoney(row.amount, row.currency),
     agencyFiscalYearId: String(row.agencyFiscalYearId), fiscalYearOrder: String(row.fiscalYearOrder), fiscalYearId: String(row.fiscalYearId) }))
   for (const row of await readEffectiveCorrectionAdjustments(db, agreementId, { currency })) {
     const year = years.find(candidate => String(candidate.agencyFiscalYearId) === String(row.agencyFiscalYearId))
@@ -326,7 +330,7 @@ export const getAgreementPaidAccountingProjection = async (
       entries.push({ id, kind: 'journal_voucher', ...year, agencyFiscalYearId: String(year.agencyFiscalYearId),
         fiscalYearId: String(year.fiscalYearId), fiscalYearOrder: String(year.fiscalYearOrder),
         month: (new Date(row.egcs_fc_requesteddate).getUTCMonth() + 9) % 12, currency: row.egcs_fc_currency,
-        amount: parseDatabaseMoney(row.amount) })
+        amount: parseDatabaseMoney(row.amount, row.egcs_fc_currency) })
     }
   }
   return { agreementId, entries }
@@ -336,11 +340,11 @@ export const getAgreementPaidAccountingProjection = async (
 export const summarizePaidAccountingByCurrency = (entries: Awaited<ReturnType<typeof getAgreementPaidAccountingProjection>>['entries']) =>
   [...new Set(entries.map(entry => entry.currency))].map(currency => {
     const selected = entries.filter(entry => entry.currency === currency)
-    return { currency, cashPaid: sumMoney(selected.filter(entry => entry.kind === 'cash_payment').map(entry => entry.amount)),
-      jvEffects: sumMoney(selected.filter(entry => entry.kind === 'journal_voucher').map(entry => entry.amount)),
-      accountReceivableRecoveries: sumMoney(selected.filter(entry => entry.kind === 'account_receivable_recovery').map(entry => entry.amount)),
-      correctionAdjustments: sumMoney(selected.filter(entry => entry.kind === 'correction').map(entry => entry.amount)),
-      correctedRecordedPaid: sumMoney(selected.map(entry => entry.amount)) }
+    return { currency, cashPaid: sumMoney(selected.filter(entry => entry.kind === 'cash_payment').map(entry => entry.amount), currency),
+      jvEffects: sumMoney(selected.filter(entry => entry.kind === 'journal_voucher').map(entry => entry.amount), currency),
+      accountReceivableRecoveries: sumMoney(selected.filter(entry => entry.kind === 'account_receivable_recovery').map(entry => entry.amount), currency),
+      correctionAdjustments: sumMoney(selected.filter(entry => entry.kind === 'correction').map(entry => entry.amount), currency),
+      correctedRecordedPaid: sumMoney(selected.map(entry => entry.amount), currency) }
   })
 
 /** Cumulative period accounting plus posted credits through the selected fiscal year. */
@@ -362,10 +366,13 @@ export const getAgreementRecordedPaidToDate = async (
     && BigInt(row.fiscalYearOrder) <= BigInt(year.yearOrder))
   const currencies = new Set([...selected, ...credits].map(row => row.currency))
   if (currencies.size > 1) throw new Error('Recorded paid currency is ambiguous')
-  return { agreementId, cashPaidAmount: sumMoney(selected.filter(row => row.kind === 'cash_payment').map(row => row.amount)),
-    jvEffectAmount: sumMoney(selected.filter(row => row.kind === 'journal_voucher').map(row => row.amount)),
-    accountReceivableRecoveryAmount: sumMoney(selected.filter(row => row.kind === 'account_receivable_recovery').map(row => row.amount)),
-    creditMemoAmount: subtractMoney(ZERO, sumMoney(credits.map(row => row.amount))),
-    correctionAmount: sumMoney(selected.filter(row => row.kind === 'correction').map(row => row.amount)),
-    recordedPaidAmount: sumMoney(selected.map(row => row.amount)), currency: input.currency ?? selected[0]?.currency ?? credits[0]?.currency ?? null }
+  const currency = input.currency ?? selected[0]?.currency ?? credits[0]?.currency ?? await resolveAgreementCurrency(db, agreementId)
+  if (!currency) throw new Error('Recorded paid requires a live owning Agreement currency')
+  const ZERO = zeroMoney(currency)
+  return { agreementId, cashPaidAmount: sumMoney(selected.filter(row => row.kind === 'cash_payment').map(row => row.amount), currency),
+    jvEffectAmount: sumMoney(selected.filter(row => row.kind === 'journal_voucher').map(row => row.amount), currency),
+    accountReceivableRecoveryAmount: sumMoney(selected.filter(row => row.kind === 'account_receivable_recovery').map(row => row.amount), currency),
+    creditMemoAmount: subtractMoney(ZERO, sumMoney(credits.map(row => row.amount), currency)),
+    correctionAmount: sumMoney(selected.filter(row => row.kind === 'correction').map(row => row.amount), currency),
+    recordedPaidAmount: sumMoney(selected.map(row => row.amount), currency), currency }
 }

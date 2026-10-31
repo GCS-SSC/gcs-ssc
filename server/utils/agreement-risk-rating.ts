@@ -1,9 +1,20 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { PublishedRiskRatingEffect, PublishedWorkflowConfiguration } from './workflow-setup-versioning'
 import type { WorkflowRoutingEvidence } from './workflow-routing-contract'
 import type { AgreementRiskSource, SubmissionRisk } from '~~/shared/types/risk'
 import { readPublishedWorkflowConfiguration } from './workflow-setup-versioning'
+
+/**
+ * Converts a persisted nonmonetary score at the risk catalog response boundary.
+ * @param row - Risk catalog projection with exact database decimal text.
+ * @returns Existing catalog DTO with its validated numeric score.
+ */
+export const toRiskRatingDto = <T extends { egcs_tp_riskscore: string | number }>(row: T) => {
+  const { egcs_tp_riskscore: score, ...rest } = row
+  return { ...rest, egcs_tp_riskscore: parseSafeDecimal(String(score)) }
+}
 
 type DbClient = Kysely<Database> | Transaction<Database>
 type RiskRatingMapping = NonNullable<WorkflowRoutingEvidence['riskRatingMapping']>
@@ -23,13 +34,13 @@ export const captureRiskRatingMapping = async (
   const ratings = await db.selectFrom('Transfer_Payment_Stream_Risk_Rating')
     .select(['id', 'egcs_tp_riskscore', 'egcs_tp_name_en', 'egcs_tp_name_fr'])
     .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('egcs_tp_riskscore', 'in', scores)
+    .where('egcs_tp_riskscore', 'in', scores.map(String))
     .where('_deleted', '=', false)
     .orderBy('id', 'asc')
     .forUpdate()
     .execute()
   const bands = effect.bands.map(band => {
-    const matches = ratings.filter(rating => Number(rating.egcs_tp_riskscore) === band.riskScore)
+    const matches = ratings.filter(rating => parseSafeDecimal(String(rating.egcs_tp_riskscore)) === band.riskScore)
     if (matches.length !== 1) throw new Error('Risk Rating score requires exactly one active Stream rating')
     const rating = matches[0]!
     return { maximumScore: band.maximumScore, riskScore: band.riskScore,
@@ -144,7 +155,7 @@ export const isRiskRatingPinned = async (db: DbClient, streamId: string, riskRat
   if (linked.some(row => {
     const definition = readPublishedWorkflowConfiguration(row.egcs_cn_definition)
     return definition.purpose === 'risk_rating' && definition.riskRatingEffect?.bands
-      .some(band => band.riskScore === Number(rating.egcs_tp_riskscore))
+      .some(band => band.riskScore === parseSafeDecimal(String(rating.egcs_tp_riskscore)))
   })) return true
   const attempts = await db.selectFrom('Common_Runtime as runtime')
     .innerJoin('Common_Workflow_Run as run', 'run.id', 'runtime.id')
@@ -202,14 +213,14 @@ export const resolveLatestRiskRating = async (db: DbClient, target: RiskRatingTa
     .select('Common_Review.egcs_cn_reviewresult')
     .where('Common_Runtime_Item.egcs_cn_runtime', '=', String(run.id))
     .where('Common_Runtime_Item.egcs_cn_publicationversion', '=', effect.assessmentSchemaVersionId)
-    .where('Common_Runtime_Item.egcs_cn_order', '=', sourceReview.order)
-    .where('Set_Item.egcs_cn_order', '=', sourceMember.sequence)
+    .where('Common_Runtime_Item.egcs_cn_order', '=', String(sourceReview.order))
+    .where('Set_Item.egcs_cn_order', '=', String(sourceMember.sequence))
     .where('Set_Item.egcs_cn_publicationversion', '=', sourceMember.publicationVersionId)
     .where('Common_Review._deleted', '=', false)
     .executeTakeFirst()
   const assessmentScore = review?.egcs_cn_reviewresult === null || review?.egcs_cn_reviewresult === undefined
     ? Number.NaN
-    : Number(review.egcs_cn_reviewresult)
+    : parseSafeDecimal(String(review.egcs_cn_reviewresult))
   const band = Number.isFinite(assessmentScore)
     ? mapping.bands.find(candidate => assessmentScore <= candidate.maximumScore)
     : undefined
@@ -270,7 +281,7 @@ export const resolveAgreementRiskSource = async (db: DbClient, agreementId: stri
     .orderBy('revision.egcs_fc_approvedat', 'desc').orderBy('revision.id', 'desc').execute()
   const amendmentRisk = revisions.flatMap(row => {
     const packet = row.egcs_fc_packet as unknown as { schemaVersion?: number, risk?: SubmissionRisk }
-    return packet.schemaVersion === 3 && packet.risk?.apply ? [{ row, risk: packet.risk }] : []
+    return packet.schemaVersion === 4 && packet.risk?.apply ? [{ row, risk: packet.risk }] : []
   })[0]
   const amendmentIsLatest = amendmentRisk && (!direct?.completedAt
     || new Date(amendmentRisk.row.egcs_fc_approvedat).getTime() >= new Date(direct.completedAt).getTime())

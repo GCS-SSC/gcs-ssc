@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { assertAgreementPaymentCommitmentCurrent } from './agreement-payment-commitment-controls'
 /* eslint-disable jsdoc/require-jsdoc -- Review approval helpers expose typed contracts covered by focused tests. */
 import type { H3Event } from 'h3'
@@ -98,7 +99,7 @@ export const getReviewApprovalContext = async (
   if (!reviewDefinition) return null
   const setup = readPublishedReviewSetup(row.setDefinition)
   if (!Array.isArray(setup.members)) return null
-  const member = setup.members.find(candidate => candidate.order === row.reviewOrder)
+  const member = setup.members.find(candidate => candidate.order === parseSafeDecimal(String(row.reviewOrder)))
   const approval: PublishedPublicationReference | undefined = member?.approval
   return {
     reviewId: String(row.reviewId),
@@ -147,7 +148,7 @@ export const canCurrentUserReadReviewApprovals = async (event: H3Event, reviewId
 export const listReviewApprovalRuntime = async (
   event: H3Event,
   reviewId: string,
-  options: { canManage: boolean }
+  options: { canManage: boolean, approvalOnly?: boolean }
 ) => {
   const context = await getReviewApprovalContext(event.context.$db, reviewId)
   if (!context) return null

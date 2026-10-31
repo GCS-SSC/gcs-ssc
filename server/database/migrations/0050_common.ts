@@ -185,6 +185,9 @@ CREATE TABLE "Common_Approval" (
   "egcs_cn_assigneduser" bigint,
   "egcs_cn_requiregroupdetails" boolean DEFAULT false NOT NULL,
   "egcs_cn_onbehalf" bigint,
+  "egcs_cn_onbehalfname_en" text,
+  "egcs_cn_onbehalfname_fr" text,
+  "egcs_cn_onbehalfrequireactual" boolean,
   "egcs_cn_approvername" text,
   "egcs_cn_approvalpositiontitle" text,
   "egcs_cn_isadded" boolean NOT NULL,
@@ -2593,9 +2596,16 @@ AS $function$
         RETURN NEW;
       END IF;
 
-      SELECT egcs_ay_requireactual INTO requires_actual
+      SELECT egcs_ay_name_en, egcs_ay_name_fr, egcs_ay_requireactual
+      INTO NEW.egcs_cn_onbehalfname_en, NEW.egcs_cn_onbehalfname_fr, NEW.egcs_cn_onbehalfrequireactual
       FROM "Agency_Approval_Behalf_Type"
-      WHERE id = NEW.egcs_cn_onbehalf;
+      WHERE id = NEW.egcs_cn_onbehalf AND _deleted = false
+      FOR SHARE;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Approval on-behalf type is unavailable'
+          USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_approvalbehalfevidence';
+      END IF;
+      requires_actual := NEW.egcs_cn_onbehalfrequireactual;
 
       IF requires_actual = true AND (
         NULLIF(BTRIM(NEW.egcs_cn_approvername), '') IS NULL

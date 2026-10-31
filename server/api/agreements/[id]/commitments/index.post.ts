@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementCommitmentCreateSchema } from '~~/shared/types/schemas'
 import { assertAgreementCommitmentTotalWithinProgramFunding, assertCommitmentTypeBelongsToAgreementStream, prepareAgreementCommitmentRoute } from '~~/server/utils/agreement-commitment'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
@@ -23,7 +23,8 @@ export default defineEventHandler(async event => {
 
   try {
     return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext, auth) => {
-      await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+      const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+      await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_totalamount])
       const commitmentType = await assertCommitmentTypeBelongsToAgreementStream(event, trx, validated.egcs_fc_type, currentContext.streamId)
       if (!commitmentType || !('id' in commitmentType)) return commitmentType
       const extensionResponse = await runExtensionCreateOperationHooks(
@@ -55,6 +56,11 @@ export default defineEventHandler(async event => {
         .returning(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'))
         .executeTakeFirstOrThrow()
 
+      const exactCreatedCommitment = {
+        ...createdCommitment,
+        egcs_fc_totalamount: parseDatabaseMoney(createdCommitment.egcs_fc_totalamount, createdCommitment.egcs_fc_currency)
+      }
+
       await assertAgreementCommitmentTotalWithinProgramFunding(event, trx, agreementId, String(createdCommitment.id), validated.egcs_fc_totalamount, { replaceTotal: true })
 
       await createPrimaryEntityAssignment(trx, 'fundingcaseagreementcommitment', String(createdCommitment.id), creatorId)
@@ -65,13 +71,13 @@ export default defineEventHandler(async event => {
         'agreement.commitments.create',
         currentContext,
         validated,
-        createdCommitment as Record<string, unknown>
+        exactCreatedCommitment as Record<string, unknown>
       )
 
       await allocateAgreementCommitment(event, trx, { agreementId, agencyId: currentContext.agencyId, streamId: currentContext.streamId,
         commitmentId: String(createdCommitment.id), commitmentTypeId: validated.egcs_fc_type, amount: validated.egcs_fc_totalamount, currency: validated.egcs_fc_currency })
 
-      return { ...createdCommitment, egcs_fc_totalamount: parseDatabaseMoney(createdCommitment.egcs_fc_totalamount) }
+      return exactCreatedCommitment
     }, { action: 'create', correctionFinancialMutation: true })
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)

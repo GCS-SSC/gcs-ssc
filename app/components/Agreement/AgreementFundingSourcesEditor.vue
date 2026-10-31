@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Form-local callbacks have descriptive names and narrow types. */
 import { ref, watch } from 'vue'
-import type { Money } from '~~/shared/utils/money'
+import { zeroMoney, type MoneyInput } from '~~/shared/utils/money'
 import { nanoid } from 'nanoid'
 
 type FundingSource = {
   egcs_fc_fundingsubtype: string
-  egcs_fc_amount: Money
+  egcs_fc_amount: MoneyInput
   egcs_fc_description_en?: string | null
   egcs_fc_description_fr?: string | null
   funding_type_name_en?: string | null
@@ -42,7 +42,7 @@ const addSource = () => {
   rowKeys.value.push(nanoid())
   draftSources.value = [
     ...draftSources.value,
-    { egcs_fc_fundingsubtype: '', egcs_fc_amount: '0.00' as Money }
+    { egcs_fc_fundingsubtype: '', egcs_fc_amount: zeroMoney(currency) }
   ]
   emit('update:modelValue', draftSources.value.map(source => ({ ...source })))
 }
@@ -99,7 +99,7 @@ const retainedOption = (source: FundingSource) => {
           :aria-required="!disabled"
           :required="!disabled"
           class="w-full"
-          @update:model-value="value => updateSource(index, { egcs_fc_amount: String(value ?? '') as Money })"
+          @update:model-value="value => updateSource(index, { egcs_fc_amount: value })"
         />
       </UFormField>
       <CommonActionButton v-if="!disabled" type="button" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('agreement.funding_sources.remove')" @click="removeSource(index)" />

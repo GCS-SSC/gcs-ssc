@@ -1,3 +1,4 @@
+import { validatePersistedMonetaryRows } from '../schema/currency-money'
 import { hashPassword } from 'better-auth/crypto'
 import { sql, type Kysely, type Migration } from 'kysely'
 import type { Database } from '~~/shared/types/database'
@@ -86,6 +87,7 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
   await sql`SET CONSTRAINTS ALL IMMEDIATE`.execute(db)
   await initializeCatalogCacheRevisions(db)
   await seedNotificationDemo(db as unknown as Kysely<Database>)
+  await validatePersistedMonetaryRows(db)
 }
 
 export const up: Migration['up'] = async db => {

@@ -5,7 +5,7 @@ import type { FundingCaseAgreementCommitmentLineBalances } from './funding-case-
 
 /** Host financial basis retained on calculation and refreshed only while the Payment is editable. */
 export interface PaymentEvidence {
-  version: 1
+  version: 2
   capturedAt: string
   selection: {
     fiscalYearId: string

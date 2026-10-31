@@ -1,4 +1,4 @@
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement payment helpers receive complete documentation. */
 import { getRouterParam, type H3Event } from 'h3'
 import { sql } from 'kysely'
@@ -25,7 +25,7 @@ import { assertBusinessStatusMutationAllowed, resolveBusinessStatusProtection } 
 import { getCommitmentLinePaymentCoverage } from '~~/server/utils/agreement-commitment-line-balance'
 import { resolveLatestTargetApprovalEvidence } from '~~/server/utils/business-approval-evidence'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { addMoney, compareMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, parseMoney, type Money } from '~~/shared/utils/money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { rebuildAccountReceivablePaymentOffset } from './account-receivable-recovery'
 import { withPaymentRecoveryErrors } from './payment-recovery-controls'
@@ -175,7 +175,7 @@ export const getAgreementPayment = async (
 
   const payment = await query.executeTakeFirst()
   return payment
-    ? { ...payment, egcs_fc_paymentamount: parseDatabaseMoney(payment.egcs_fc_paymentamount) }
+    ? { ...payment, egcs_fc_paymentamount: parseDatabaseMoney(payment.egcs_fc_paymentamount, payment.egcs_fc_currency) }
     : undefined
 }
 
@@ -442,14 +442,15 @@ export const assertAgreementPaymentCommitmentLine = async (
   db: DbClient,
   agreementId: string,
   paymentId: string,
-  commitmentLineId: string
+  commitmentLineId: string,
+  options: { retainedCommitmentLineId?: string } = {}
 ) => {
   const payment = await getAgreementPayment(db, agreementId, paymentId)
   if (!payment) {
     return await badRequest(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
   }
 
-  const line = await db
+  let lineQuery = db
     .selectFrom('Funding_Case_Agreement_Commitment_Line')
     .innerJoin(
       'Transfer_Payment_Stream_Chart_of_Account',
@@ -482,13 +483,15 @@ export const assertAgreementPaymentCommitmentLine = async (
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-    .executeTakeFirst()
+  lineQuery = lineQuery.forShare('Agency_Chart_of_Account')
+  if (options.retainedCommitmentLineId !== commitmentLineId) lineQuery = lineQuery.where('Agency_Chart_of_Account.egcs_ay_active', '=', true)
+  const line = await lineQuery.executeTakeFirst()
 
   if (!line) {
     return await badRequest(event, 'INVALID_AGREEMENT_PAYMENT_COMMITMENT_LINE', 'apiErrors.agreement.invalid_payment_commitment_line')
   }
 
-  return { ...line, amount: parseDatabaseMoney(line.amount) }
+  return { ...line, amount: parseDatabaseMoney(line.amount, payment.egcs_fc_currency) }
 }
 
 /** Rejects a payment line amount that exceeds the commitment line's unpaid balance. */
@@ -501,16 +504,17 @@ export const assertPaymentLineWithinCommitmentBalance = async (
   options: { lockCommitmentLine?: boolean } = {}
 ) => {
   let lineQuery = db
-    .selectFrom('Funding_Case_Agreement_Commitment_Line')
+    .selectFrom('Funding_Case_Agreement_Commitment_Line as line')
+    .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'line.egcs_fc_commitment')
     .select([
-      'id',
-      databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')
+      'line.id', 'commitment.egcs_fc_currency as currency',
+      databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('egcs_fc_amount')
     ])
-    .where('id', '=', commitmentLineId)
-    .where('_deleted', '=', false)
+    .where('line.id', '=', commitmentLineId)
+    .where('line._deleted', '=', false)
 
   if (options.lockCommitmentLine === true) {
-    lineQuery = lineQuery.forUpdate()
+    lineQuery = lineQuery.forUpdate('line')
   }
 
   const line = await lineQuery
@@ -520,8 +524,9 @@ export const assertPaymentLineWithinCommitmentBalance = async (
     return await badRequest(event, 'AGREEMENT_COMMITMENT_LINE_NOT_FOUND', 'apiErrors.agreement.commitment_line_not_found')
   }
 
+  await assertCurrencyMoneyValues(event, line.currency, [amount])
   const { paidAmount } = await getCommitmentLinePaymentCoverage(db, commitmentLineId, { excludePaymentLineId })
-  const commitmentLineAmount = parseDatabaseMoney(line.egcs_fc_amount)
+  const commitmentLineAmount = parseDatabaseMoney(line.egcs_fc_amount, line.currency)
   if (compareMoney(addMoney(paidAmount, amount), commitmentLineAmount) > 0) {
     return await badRequest(event, 'AGREEMENT_PAYMENT_EXCEEDS_COMMITMENT_BALANCE', 'apiErrors.agreement.payment_exceeds_commitment_balance')
   }
@@ -562,6 +567,7 @@ export const assertAgreementPaymentLineForAgreement = async (
     .where('Funding_Case_Agreement_Payment._deleted', '=', false)
     .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
     .select([
+      'Funding_Case_Agreement_Payment.egcs_fc_currency as currency',
       'Funding_Case_Agreement_Payment_Line.id as id',
       'Funding_Case_Agreement_Payment_Line.egcs_fc_fundingagreementpayment as egcs_fc_fundingagreementpayment',
       'Funding_Case_Agreement_Payment_Line.egcs_fc_fundingagreementcommitmentline as egcs_fc_fundingagreementcommitmentline',
@@ -572,11 +578,12 @@ export const assertAgreementPaymentLineForAgreement = async (
     query = query.forUpdate('Funding_Case_Agreement_Payment_Line')
   }
 
-  return await assertAgreementChildExists(
+  const line = await assertAgreementChildExists(
     event,
     query.executeTakeFirst(),
     ...AGREEMENT_CHILD_ERROR_KEYS.paymentLineNotFound
   )
+  return { ...line, egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount, line.currency) }
 }
 
 /** Locks all candidate payment parents in id order before locking their child payment line. */
@@ -659,7 +666,7 @@ const resolveAgreementPaymentLinePatchTarget = async (
       ? String(patchValues.egcs_fc_fundingagreementcommitmentline)
       : String(existingLine.egcs_fc_fundingagreementcommitmentline),
     nextAmount: patchValues.egcs_fc_amount === undefined
-      ? parseDatabaseMoney(existingLine.egcs_fc_amount)
+      ? parseMoney(existingLine.egcs_fc_amount)
       : patchValues.egcs_fc_amount
   }
 }
@@ -672,9 +679,10 @@ const validateAgreementPaymentLinePatchBalance = async (
   lineId: string,
   nextPaymentId: string,
   nextCommitmentLineId: string,
-  nextAmount: Money
+  nextAmount: Money,
+  retainedCommitmentLineId?: string
 ) => {
-  const commitmentLine = await assertAgreementPaymentCommitmentLine(event, trx, agreementId, nextPaymentId, nextCommitmentLineId)
+  const commitmentLine = await assertAgreementPaymentCommitmentLine(event, trx, agreementId, nextPaymentId, nextCommitmentLineId, { retainedCommitmentLineId })
   if (!hasKey(commitmentLine, 'id')) {
     return commitmentLine
   }
@@ -744,6 +752,8 @@ export const patchAgreementPaymentLine = async (
           return target
         }
 
+        const nextAmount = parseMoney(target.nextAmount)
+        await assertCurrencyMoneyValues(event, await assertAgreementCurrency(event, trx, agreementId), [nextAmount])
         await runExtensionAgreementPaymentMutationGuards(event, trx, {
           operation: 'payment-line.update',
           agreementId,
@@ -759,7 +769,10 @@ export const patchAgreementPaymentLine = async (
           lineId,
           String(target.nextPaymentId),
           String(target.nextCommitmentLineId),
-          target.nextAmount as Money
+          nextAmount,
+          String(target.nextPaymentId) === String(existingLine.egcs_fc_fundingagreementpayment)
+            ? String(existingLine.egcs_fc_fundingagreementcommitmentline)
+            : undefined
         )
         if (!hasKey(balance, 'paidAmount')) {
           return balance
@@ -791,7 +804,7 @@ export const patchAgreementPaymentLine = async (
           String(target.nextPaymentId)
         )
 
-        return { ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) }
+        return { ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, nextAmount.currency) }
       }, {
         paymentRecovery: true,
         authorize: async (trx, _currentContext, authContext) => {
@@ -832,6 +845,9 @@ export const getPaymentLineTotal = async (
   db: DbClient,
   paymentId: string
 ) => {
+  const payment = await db.selectFrom('Funding_Case_Agreement_Payment')
+    .select('egcs_fc_currency').where('id', '=', paymentId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const currency = payment.egcs_fc_currency
   const row = await db
     .selectFrom('Funding_Case_Agreement_Payment_Line')
     .select(databaseMoneyText(sql`COALESCE(SUM(${sql.ref('egcs_fc_amount')}), 0)`).as('total'))
@@ -839,7 +855,7 @@ export const getPaymentLineTotal = async (
     .where('_deleted', '=', false)
     .executeTakeFirst()
 
-  return parseDatabaseMoney(row?.total ?? '0')
+  return parseDatabaseMoney(row?.total ?? '0', currency)
 }
 
 /** Compares active payment-line totals to the payment amount exactly. */
@@ -849,7 +865,7 @@ export const paymentLineTotalMatchesPaymentAmount = async (
 ): Promise<boolean> => {
   const payment = await db
     .selectFrom('Funding_Case_Agreement_Payment')
-    .select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'))
+    .select(['egcs_fc_currency', databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount')])
     .where('id', '=', paymentId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
@@ -857,6 +873,6 @@ export const paymentLineTotalMatchesPaymentAmount = async (
 
   return compareMoney(
     await getPaymentLineTotal(db, paymentId),
-    parseDatabaseMoney(payment.egcs_fc_paymentamount)
+    parseDatabaseMoney(payment.egcs_fc_paymentamount, payment.egcs_fc_currency)
   ) === 0
 }

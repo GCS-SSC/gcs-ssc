@@ -14,9 +14,10 @@ import { createCompletionTransition } from './workflow-runtime'
 import { notFound } from './api-errors'
 
 const validateAccounting = async (db: H3Event['context']['$db'], id: string) => {
+  const currency = (await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_currency').where('id', '=', id).executeTakeFirstOrThrow()).egcs_fc_currency
   const lines = await readJournalVoucherLines(db, id)
   const generated = generateJournalVoucherAdjustments(lines.filter(line => line.egcs_fc_kind === 'original'),
-    lines.filter(line => line.egcs_fc_kind === 'corrected'), { requireAdjustment: true })
+    lines.filter(line => line.egcs_fc_kind === 'corrected'), { requireAdjustment: true }, currency)
   const saved = lines.filter(line => line.egcs_fc_kind === 'adjustment')
   const projection = (rows: typeof generated) => JSON.stringify(rows.map(row => [row.egcs_fc_commitmentline,
     row.egcs_fc_chartofaccount, row.egcs_fc_accountingdimensions, row.egcs_fc_amount]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))

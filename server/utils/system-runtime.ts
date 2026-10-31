@@ -216,7 +216,7 @@ export const retryRuntime = async (
         ? null
         : itemIds.get(String(item.egcs_cn_parentruntimeitem)) as string,
       egcs_cn_kind: item.egcs_cn_kind,
-      egcs_cn_order: Number(item.egcs_cn_order),
+      egcs_cn_order: item.egcs_cn_order,
       egcs_cn_publication: String(item.egcs_cn_publication),
       egcs_cn_publicationkind: item.egcs_cn_publicationkind,
       egcs_cn_publicationversion: String(item.egcs_cn_publicationversion),

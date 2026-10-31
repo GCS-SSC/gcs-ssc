@@ -1,3 +1,4 @@
+import { toAgreementProfileNumericDto } from '~~/server/utils/agreement'
 import { defineEventHandler } from 'h3'
 import { useNitroApp } from 'nitropack/runtime'
 import { isGcsExtensionUserError } from '@gcs-ssc/extensions/server'
@@ -248,7 +249,7 @@ export default defineEventHandler(async event => {
             }
             return await badRequest(event, 'AGREEMENT_NUMBER_EXHAUSTED', 'apiErrors.agreement.number_exhausted')
           }
-          const createdAgreement = await createAgreement()
+          const createdAgreement = toAgreementProfileNumericDto(await createAgreement())
 
           await createPrimaryEntityAssignment(
             trx,

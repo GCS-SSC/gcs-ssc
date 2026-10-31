@@ -1,3 +1,6 @@
+import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
+import { parseCurrencyMoney, type MinorUnits } from '~~/shared/utils/money'
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
@@ -51,11 +54,25 @@ export default defineEventHandler(async event => {
       .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
 
     if (search) {
+      const monetaryMatches = new Map<MinorUnits, Array<typeof CURRENCY_CODES_ENUM[number]>>()
+      for (const currency of CURRENCY_CODES_ENUM) {
+        try {
+          const minorAmount = parseCurrencyMoney(search, currency).amount
+          const currencies = monetaryMatches.get(minorAmount) ?? []
+          currencies.push(currency)
+          monetaryMatches.set(minorAmount, currencies)
+        } catch {
+          // Text queries and fractional minor units are not monetary amount matches.
+        }
+      }
       baseQuery = baseQuery.where(eb =>
         eb.or([
           eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', `%${escapeLikePattern(search)}%`),
           eb(sql<string>`CAST(${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyear')} AS TEXT)`, 'ilike', `%${escapeLikePattern(search)}%`),
-          eb(sql<string>`CAST(${sql.ref('Transfer_Payment_Stream_Budget.egcs_tp_totalbudget')} AS TEXT)`, 'ilike', `%${escapeLikePattern(search)}%`),
+          ...[...monetaryMatches].map(([amount, currencies]) => eb.and([
+            eb('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency', 'in', currencies),
+            eb('Transfer_Payment_Stream_Budget.egcs_tp_totalbudget', '=', sql<MinorUnits>`${amount}::numeric`)
+          ])),
           eb(
             sql<string>`CAST(${sql.ref('Transfer_Payment_Stream_Budget.egcs_tp_overcommitthreshold')} AS TEXT)`,
             'ilike',
@@ -88,8 +105,9 @@ export default defineEventHandler(async event => {
 
     return buildListRouteResponse(items.map(item => ({
       ...item,
-      egcs_tp_totalbudget: parseDatabaseMoney(item.egcs_tp_totalbudget),
-      program_total_budget: parseDatabaseMoney(item.program_total_budget)
+      egcs_tp_overcommitthreshold: parseSafeDecimal(String(item.egcs_tp_overcommitthreshold)),
+      egcs_tp_totalbudget: parseDatabaseMoney(item.egcs_tp_totalbudget, item.egcs_tp_currency),
+      program_total_budget: parseDatabaseMoney(item.program_total_budget, item.egcs_tp_currency)
     })), countResult, countResult, page, limit)
   })
 })

@@ -78,8 +78,8 @@ export default defineEventHandler(async event => {
 
     const exactPayments = payments.map(payment => ({
       ...payment,
-      egcs_fc_paymentamount: parseDatabaseMoney(payment.egcs_fc_paymentamount),
-      line_total: parseDatabaseMoney(payment.line_total)
+      egcs_fc_paymentamount: parseDatabaseMoney(payment.egcs_fc_paymentamount, payment.egcs_fc_currency),
+      line_total: parseDatabaseMoney(payment.line_total, payment.egcs_fc_currency)
     }))
     const paymentsWithState = await withBusinessRecordState(db, 'fundingcasepayment', exactPayments)
     const withRecovery = await Promise.all(paymentsWithState.map(async payment => ({ ...payment, ...await readAccountReceivablePaymentOffset(db, String(payment.id), { liveMemoBalances }) })))

@@ -11,8 +11,8 @@ import type { TableColumnInput } from '~/composables/useTableColumns'
 import { JournalVoucherAllocationSchema, JournalVoucherEditSchema } from '~~/shared/types/schemas/journal-voucher'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
-import { formatMoneyText, sumMoney, subtractMoney, parseMoneyText } from '~~/shared/utils/money'
-import type { Money } from '~~/shared/utils/money'
+import { formatMoneyText, sumMoney, subtractMoney, zeroMoney, compareMoney, negateMoney, parseMoney } from '~~/shared/utils/money'
+import type { Money, MoneyInput } from '~~/shared/utils/money'
 
 definePageMeta({ key: route => route.path, i18n: { paths: { en: '/journal-vouchers/[id]', fr: '/pieces-de-journal/[id]' } } })
 const { t, locale } = useI18n()
@@ -80,7 +80,7 @@ const allocationModal = useCrudModal<JournalVoucherAllocationDraft, JournalVouch
    */
   createState: () => ({
     key: nanoid(), egcs_fc_commitmentline: original.value[0]!.egcs_fc_commitmentline,
-    egcs_fc_chartofaccount: original.value[0]!.egcs_fc_chartofaccount, egcs_fc_amount: '0.00',
+    egcs_fc_chartofaccount: original.value[0]!.egcs_fc_chartofaccount, egcs_fc_amount: zeroMoney(voucher.value!.egcs_fc_currency),
     egcs_fc_accountingdimensions: original.value[0]!.egcs_fc_accountingdimensions.map(dimension => ({ ...dimension })),
     egcs_fc_agreementcodingmatched: original.value[0]!.egcs_fc_agreementcodingmatched
   }),
@@ -88,20 +88,31 @@ const allocationModal = useCrudModal<JournalVoucherAllocationDraft, JournalVouch
 })
 const isEditingAllocation = computed(() => Boolean(state.value?.egcs_fc_allocations.some(line => line.key === allocationModal.selected.value?.key)))
 watch([voucher, selectedTab], () => allocationModal.close())
-const formatAmount = (amount: string) => formatMoneyText(parseMoneyText(amount), locale.value, voucher.value?.egcs_fc_currency ?? 'cad')
+/**
+ * Keeps an invalid allocation draft unavailable without interpreting it as money.
+ * @param amount Retained amount or the current allocation draft.
+ * @returns Currency-formatted money or the unavailable label.
+ */
+const formatAmount = (amount: MoneyInput) => {
+  try {
+    return formatMoneyText(parseMoney(amount), locale.value)
+  } catch {
+    return t('common.not_available')
+  }
+}
 const balances = computed(() => [...new Set(original.value.map(line => line.egcs_fc_commitmentline))].map(commitmentId => {
   const rows = original.value.filter(line => line.egcs_fc_commitmentline === commitmentId)
-  const total = sumMoney(rows.map(line => line.egcs_fc_amount))
+  const total = sumMoney(rows.map(line => line.egcs_fc_amount), voucher.value!.egcs_fc_currency)
   let corrected: Money | null = null
   try {
     corrected = sumMoney((state.value?.egcs_fc_allocations ?? []).filter(line => line.egcs_fc_commitmentline === commitmentId)
-      .map(line => JournalVoucherAllocationSchema.shape.egcs_fc_amount.parse(line.egcs_fc_amount)))
+      .map(line => JournalVoucherAllocationSchema.shape.egcs_fc_amount.parse(line.egcs_fc_amount)), voucher.value!.egcs_fc_currency)
   } catch {
     // Keep invalid input visible without rounding.
   }
   return {
     id: commitmentId, number: rows[0]!.egcs_fc_commitmentlinenumber,
-    delta: corrected === null ? null : subtractMoney(corrected, total), balanced: total === corrected
+    delta: corrected === null ? null : subtractMoney(corrected, total), balanced: corrected !== null && compareMoney(total, corrected) === 0
   }
 }))
 type AccountingRow = { key: string; number: number } & (
@@ -118,9 +129,9 @@ const accountingRows = computed<AccountingRow[]>(() => balances.value.flatMap(ba
   if (balances.value.length > 1) rows.push({ key: `subtotal-${balance.id}`, number: balance.number, kind: 'subtotal', delta: balance.delta, balanced: balance.balanced })
   return rows
 }))
-const balanceTotal = computed(() => balances.value.some(balance => balance.delta === null)
+const balanceTotal = computed(() => !voucher.value || balances.value.some(balance => balance.delta === null)
   ? null
-  : sumMoney(balances.value.map(balance => balance.delta!)))
+  : sumMoney(balances.value.map(balance => balance.delta!), voucher.value!.egcs_fc_currency))
 const allBalanced = computed(() => balances.value.length > 0 && balances.value.every(balance => balance.balanced))
 const originalRowAccent = (cell: { row: { original: AccountingRow } }) => cell.row.original.kind === 'original' ? 'bg-primary/5' : ''
 const accountingColumnDefinitions: TableColumnInput<AccountingRow>[] = [
@@ -321,7 +332,7 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
                   <template #amount-cell="{ row }">
                     <span v-if="row.original.kind !== 'subtotal'" class="font-medium whitespace-nowrap tabular-nums">
                       {{ row.original.kind === 'original'
-                        ? formatAmount(subtractMoney(parseMoneyText('0.00'), row.original.line.egcs_fc_amount))
+                        ? formatAmount(negateMoney(row.original.line.egcs_fc_amount))
                         : `+${formatAmount(row.original.line.egcs_fc_amount)}` }}
                     </span>
                     <span v-else class="font-semibold whitespace-nowrap tabular-nums">

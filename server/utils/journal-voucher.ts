@@ -1,4 +1,5 @@
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { compareMoney } from '~~/shared/utils/money'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Domain helpers expose explicit accounting and authorization contracts. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
@@ -33,6 +34,7 @@ export const authorizeJournalVoucher = async (event: H3Event, journalVoucherId: 
 }
 
 export const readJournalVoucherLines = async (db: Kysely<Database>, journalVoucherId: string) => {
+  const currency = (await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_currency').where('id', '=', journalVoucherId).executeTakeFirstOrThrow()).egcs_fc_currency
   const rows = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher_Line as line')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_chartofaccount')
     .select(['line.id', 'line.egcs_fc_kind', 'line.egcs_fc_commitmentline', 'line.egcs_fc_commitmentlinenumber', 'line.egcs_fc_chartofaccount', 'line.egcs_fc_accountingdimensions',
@@ -41,7 +43,7 @@ export const readJournalVoucherLines = async (db: Kysely<Database>, journalVouch
     .where('line.egcs_fc_journalvoucher', '=', journalVoucherId).where('line._deleted', '=', false)
     .orderBy('line.egcs_fc_commitmentlinenumber').orderBy('line.id').execute()
   return rows.map(row => ({ ...row,
-    egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount),
+    egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, currency),
     egcs_fc_accountingdimensions: TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(row.egcs_fc_accountingdimensions)
   }))
 }
@@ -68,7 +70,7 @@ export const readJournalVoucherCodingChoices = async (db: Kysely<Database>, cont
     .where('a.egcs_ay_organizationagency', '=', context.agencyId).where('a.egcs_ay_fiscalyear', '=', fiscalYearId)
     .where('a.egcs_ay_currency', '=', currency)
     .where('a.egcs_ay_kind', '=', 'commitment')
-    .where('s._deleted', '=', false).where('a._deleted', '=', false).orderBy('s.id').execute()
+    .where('s._deleted', '=', false).where('a._deleted', '=', false).where('a.egcs_ay_active', '=', true).orderBy('s.id').forShare('a').execute()
 
 /** Matches actual coding identities, independently of operational commitment line numbers. */
 export const readJournalVoucherAgreementCoding = async (db: Kysely<Database>, agreementId: string) => {
@@ -158,7 +160,7 @@ export const createJournalVoucher = async (event: H3Event, input: JournalVoucher
     const previous = options.reversalOf ? await readJournalVoucherLines(trx, options.reversalOf) : null
     const replacementNegative = input.egcs_fc_replacementof ? await hasNegativeJournalVoucherCompletion(trx, input.egcs_fc_replacementof) : false
     const allocations = previous
-      ? reverseJournalVoucherAllocations(previous.filter(line => line.egcs_fc_kind === 'original'), previous.filter(line => line.egcs_fc_kind === 'corrected'))
+      ? reverseJournalVoucherAllocations(previous.filter(line => line.egcs_fc_kind === 'original'), previous.filter(line => line.egcs_fc_kind === 'corrected'), source.egcs_fc_currency)
       : { original: input.egcs_fc_replacementof
           ? (await readJournalVoucherLines(trx, input.egcs_fc_replacementof)).filter(line => line.egcs_fc_kind === (replacementNegative ? 'original' : 'corrected'))
           : accountingSource!.allocations, corrected: [] as JournalVoucherAccountingLine[], adjustments: [] as JournalVoucherAccountingLine[] }
@@ -183,11 +185,12 @@ export const editJournalVoucher = async (event: H3Event, id: string, input: Jour
   return await executeFreshAuthorizedAgreementWrite(event, event.context.$db, context.agreementId, context, async trx => {
     const header = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher').selectAll().where('id', '=', id).forUpdate().executeTakeFirstOrThrow()
     await assertAgreementCurrency(event, trx, context.agreementId, header.egcs_fc_currency)
+    await assertCurrencyMoneyValues(event, header.egcs_fc_currency, input.egcs_fc_allocations.map(line => line.egcs_fc_amount))
     const saved = await readJournalVoucherLines(trx, id)
     if (header.egcs_fc_reversalof) {
       const frozen = saved.filter(line => line.egcs_fc_kind === 'corrected')
       const supplied = input.egcs_fc_allocations
-      if (supplied.length !== frozen.length || supplied.some((line, index) => line.egcs_fc_commitmentline !== frozen[index]?.egcs_fc_commitmentline || line.egcs_fc_chartofaccount !== frozen[index]?.egcs_fc_chartofaccount || line.egcs_fc_amount !== frozen[index]?.egcs_fc_amount)) return await journalVoucherError(event, 'JV_REVERSAL_READ_ONLY')
+      if (supplied.length !== frozen.length || supplied.some((line, index) => line.egcs_fc_commitmentline !== frozen[index]?.egcs_fc_commitmentline || line.egcs_fc_chartofaccount !== frozen[index]?.egcs_fc_chartofaccount || compareMoney(line.egcs_fc_amount, frozen[index]!.egcs_fc_amount) !== 0)) return await journalVoucherError(event, 'JV_REVERSAL_READ_ONLY')
       return await trx.updateTable('Funding_Case_Agreement_Journal_Voucher').set({
         egcs_fc_requesteddate: sql<Date>`${input.egcs_fc_requesteddate.toISOString().slice(0, 10)}::date`,
         egcs_fc_narrative_en: input.egcs_fc_narrative_en, egcs_fc_narrative_fr: input.egcs_fc_narrative_fr
@@ -208,7 +211,7 @@ export const editJournalVoucher = async (event: H3Event, id: string, input: Jour
     }
     let adjustments: JournalVoucherAccountingLine[]
     try {
-      adjustments = generateJournalVoucherAdjustments(original, corrected, { requireAdjustment: false })
+      adjustments = generateJournalVoucherAdjustments(original, corrected, { requireAdjustment: false }, header.egcs_fc_currency)
     } catch (error) {
       if (!(error instanceof JournalVoucherAccountingError)) throw error
       return await journalVoucherError(event, error.code)

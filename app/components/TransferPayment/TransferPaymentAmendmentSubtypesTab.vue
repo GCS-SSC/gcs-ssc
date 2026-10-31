@@ -41,6 +41,7 @@ const {
 const columns: TableColumnInput<AmendmentSubtypeRow>[] = [
   { id: 'name', accessorKey: 'egcs_tp_name_en', headerKey: 'common.name' },
   { id: 'type', headerKey: 'transfer_payment.amendment_subtype_type' },
+  { accessorKey: 'egcs_tp_active', headerKey: 'common.active' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -149,6 +150,9 @@ const remove = async (row: AmendmentSubtypeRow) => {
             :label="getBilingualValue(type, 'egcs_tp_name', String(type.id))" />
         </div>
       </template>
+      <template #egcs_tp_active-cell="{ row }">
+        {{ t(row.original.egcs_tp_active ? 'common.yes' : 'common.no') }}
+      </template>
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
           <CommonActionButton
@@ -184,6 +188,7 @@ const remove = async (row: AmendmentSubtypeRow) => {
       @submit="save">
       <template #default="{ state }">
         <TransferPaymentFieldsTransferPaymentAmendmentSubtypeFields
+          :definition-locked="Boolean(state.in_use)"
           :model="state"
           :amendment-types-fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types`"
           amendment-type-field="amendment_type_ids" />

@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { sql } from 'kysely'
@@ -76,11 +77,12 @@ export default defineEventHandler(async event => {
     return {
       items: items.map(item => ({
         ...item,
+        egcs_tp_overcommitthreshold: parseSafeDecimal(String(item.egcs_tp_overcommitthreshold)),
         fiscal_year_currency_display: `${item.fiscal_year_display} (${item.egcs_tp_currency.toUpperCase()})`,
         id: String(item.id),
         egcs_tp_transferpaymentprofile: String(item.egcs_tp_transferpaymentprofile),
         egcs_tp_fiscalyear: String(item.egcs_tp_fiscalyear),
-        egcs_tp_totalbudget: parseDatabaseMoney(item.egcs_tp_totalbudget)
+        egcs_tp_totalbudget: parseDatabaseMoney(item.egcs_tp_totalbudget, item.egcs_tp_currency)
       })),
       total,
       stats: {

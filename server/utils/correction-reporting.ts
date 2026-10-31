@@ -29,6 +29,6 @@ export const correctionCollectionQuery = (db: Kysely<Database>, agreementId: str
 export const correctionCsvCell = (value: unknown): string => {
   const text = value === null || value === undefined ? '' : String(value)
   // Spreadsheet formula-like authored text is exported as literal evidence.
-  const literal = /^[=+\-@\t\r]/.test(text) && !/^-?\d+\.\d{2}$/.test(text) ? `'${text}` : text
+  const literal = /^[=+\-@\t\r]/.test(text) && !/^-?\d+(?:\.\d+)?$/.test(text) ? `'${text}` : text
   return `"${literal.replace(/"/g, '""')}"`
 }

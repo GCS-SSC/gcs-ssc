@@ -2,6 +2,7 @@ import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { badRequest, notFound } from './api-errors'
+import { parseMoney, type Money } from '~~/shared/utils/money'
 
 /**
  * Reads the immutable denomination of the owning live Agreement.
@@ -32,4 +33,22 @@ export const assertAgreementCurrency = async (
   if (!currency) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
   if (requestedCurrency !== undefined && currency !== requestedCurrency) return await badRequest(event, 'AGREEMENT_CURRENCY_MISMATCH', 'apiErrors.agreement.currency_mismatch')
   return currency
+}
+
+/**
+ * Rejects money denominated outside the freshly resolved financial owner.
+ * @param event - Authorized request used for localized validation.
+ * @param currency - Immutable denomination read inside the owning transaction.
+ * @param values - Validated request amounts, including inherited child fields.
+ */
+export const assertCurrencyMoneyValues = async (
+  event: H3Event, currency: string, values: Iterable<Money>
+): Promise<void> => {
+  try {
+    for (const value of values) {
+      if (parseMoney(value).currency !== currency.toUpperCase()) throw new TypeError('Money currency does not match its owner')
+    }
+  } catch {
+    await badRequest(event, 'INVALID_CURRENCY_AMOUNT', 'validation.invalid_number')
+  }
 }

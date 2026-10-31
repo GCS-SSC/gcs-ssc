@@ -1,9 +1,7 @@
 import { sql, type Kysely } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
-import { compareMoney, parseMoneyText, subtractMoney } from '~~/shared/utils/money'
+import { compareMoney, zeroMoney, subtractMoney } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
-
-const ZERO = parseMoneyText('0.00')
 
 /**
  * Adds actual Claim AR receipts to budget-reduction credit without counting applied plans twice.
@@ -16,6 +14,7 @@ const ZERO = parseMoneyText('0.00')
 export const readAgreementBudgetRecoveryCredits = async (
   db: Kysely<Database>, agreementId: string, currency: Currency_Codes
 ) => {
+  const zero = zeroMoney(currency)
   const offsets = sql`COALESCE((SELECT SUM(application.egcs_fc_amount)
         FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
         JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
@@ -57,9 +56,9 @@ export const readAgreementBudgetRecoveryCredits = async (
     FROM source
   `.execute(db)).rows
   return rows.flatMap(row => {
-    const additional = subtractMoney(parseDatabaseMoney(row.recovered), parseDatabaseMoney(row.applied))
-    return compareMoney(additional, ZERO) > 0
-      ? [{ claimId: row.claimId, fiscalYearId: row.fiscalYearId, amount: subtractMoney(ZERO, additional) }]
+    const additional = subtractMoney(parseDatabaseMoney(row.recovered, currency), parseDatabaseMoney(row.applied, currency))
+    return compareMoney(additional, zero) > 0
+      ? [{ claimId: row.claimId, fiscalYearId: row.fiscalYearId, amount: subtractMoney(zero, additional) }]
       : []
   })
 }

@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { captureAgreementPaymentEvidence } from '~~/server/utils/agreement-payment-evidence'
 import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -29,7 +29,8 @@ export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementPaymentCreateSchema)
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext, auth) => {
-    await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+    const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+    await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_paymentamount])
     await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency })
     const commitment = await resolveActiveAgreementPaymentCommitmentByType(
       event,
@@ -115,7 +116,7 @@ export default defineEventHandler(async event => {
       .executeTakeFirstOrThrow()
     const exactCreatedPayment = {
       ...createdPayment,
-      egcs_fc_paymentamount: parseDatabaseMoney(createdPayment.egcs_fc_paymentamount)
+      egcs_fc_paymentamount: parseDatabaseMoney(createdPayment.egcs_fc_paymentamount, createdPayment.egcs_fc_currency)
     }
 
     await createPrimaryEntityAssignment(trx, 'fundingcasepayment', String(createdPayment.id), creatorId)

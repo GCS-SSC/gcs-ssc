@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementCommitmentPatchSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementCommitmentEditable,
@@ -61,7 +61,8 @@ export default defineEventHandler(async event => {
         return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
       }
 
-      await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? editableCommitment.egcs_fc_currency)
+      const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? editableCommitment.egcs_fc_currency)
+      if (patchValues.egcs_fc_totalamount) await assertCurrencyMoneyValues(event, currency, [patchValues.egcs_fc_totalamount])
 
       if (patchValues.egcs_fc_type) {
         const commitmentType = await assertCommitmentTypeBelongsToAgreementStream(
@@ -73,7 +74,7 @@ export default defineEventHandler(async event => {
         if (!commitmentType || !('id' in commitmentType)) return commitmentType
       }
 
-      const nextAmount = patchValues.egcs_fc_totalamount ?? parseDatabaseMoney(editableCommitment.egcs_fc_totalamount)
+      const nextAmount = patchValues.egcs_fc_totalamount ?? editableCommitment.egcs_fc_totalamount
       await assertAgreementCommitmentTotalWithinProgramFunding(event, trx, agreementId, childId, nextAmount, { replaceTotal: true })
       const allocated = await allocateAgreementCommitment(event, trx, { agreementId, agencyId: currentContext.agencyId, streamId: currentContext.streamId,
         commitmentId: childId, commitmentTypeId: patchValues.egcs_fc_type ?? editableCommitment.egcs_fc_type,
@@ -81,7 +82,7 @@ export default defineEventHandler(async event => {
       if (!allocated) {
         const lines = await trx.selectFrom('Funding_Case_Agreement_Commitment_Line').select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount'))
           .where('egcs_fc_commitment', '=', childId).where('_deleted', '=', false).execute()
-        if (compareMoney(sumMoney(lines.map(line => parseDatabaseMoney(line.amount))), nextAmount) > 0) {
+        if (compareMoney(sumMoney(lines.map(line => parseDatabaseMoney(line.amount, currency)), currency), nextAmount) > 0) {
           return await badRequest(event, 'AGREEMENT_COMMITMENT_EXCEEDS_TOTAL', 'apiErrors.agreement.invalid_coding_allocation')
         }
       }
@@ -98,7 +99,7 @@ export default defineEventHandler(async event => {
         .executeTakeFirstOrThrow()
 
       await syncAgreementCommitmentEditingStatus(trx, childId)
-      return { ...updated, egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount) }
+      return { ...updated, egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount, updated.egcs_fc_currency) }
     })
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)

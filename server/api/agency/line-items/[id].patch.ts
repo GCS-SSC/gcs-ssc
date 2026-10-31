@@ -1,3 +1,4 @@
+import { projectAgencyCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { validateAgencyBudgetCalculation } from '~~/server/utils/agency-budget-calculation'
 import { AgencyCostCategoryLineItemPatchSchema } from '~~/shared/types/schemas'
@@ -37,5 +38,5 @@ export default defineEventHandler(async event => {
   }
 
   if (!result) return await notFound(event, 'LINE_ITEM_NOT_FOUND', 'apiErrors.agency.line_item_not_found')
-  return result
+  return projectAgencyCostLineItem(result)
 })

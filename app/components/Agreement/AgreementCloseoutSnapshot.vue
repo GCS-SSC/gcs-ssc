@@ -12,6 +12,9 @@ const { t, locale } = useI18n()
 const statusCatalog = useStatusCatalog()
 void statusCatalog.load()
 const { formatDate } = useDateHelpers({ formatterOptions: { dateStyle: 'medium', timeStyle: 'short' } })
+const supportedSnapshot = computed(() => snapshot.egcs_fc_snapshotschemaversion === 2
+  && snapshot.egcs_fc_packet !== null && typeof snapshot.egcs_fc_packet === 'object'
+  && !Array.isArray(snapshot.egcs_fc_packet) && snapshot.egcs_fc_packet.schemaVersion === 2)
 const packet = computed(() => snapshot.egcs_fc_packet as unknown as AgreementCloseoutReadiness)
 const blockerStatusLabel = (blocker: CloseoutBlocker): string => {
   if (blocker.category === 'workflow') return t(`enums.runtime_state.${blocker.status}`)
@@ -24,6 +27,7 @@ const blockerLabel = (blocker: CloseoutBlocker): string =>
 
 <template>
   <CommonWorkflowPacket
+    v-if="supportedSnapshot"
     :title="t('agreement.closeout.snapshot_captured', { date: formatDate(snapshot.egcs_fc_capturedat) })"
     :packet-id="String(snapshot.id)"
     icon="i-lucide-shield-check"
@@ -74,4 +78,7 @@ const blockerLabel = (blocker: CloseoutBlocker): string =>
       </p>
     </CommonSection>
   </CommonWorkflowPacket>
+  <p v-else class="text-sm text-muted">
+    {{ t('common.not_available') }}
+  </p>
 </template>

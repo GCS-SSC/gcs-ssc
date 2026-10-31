@@ -7,21 +7,11 @@ import { authorize } from '~~/server/utils/authorize'
 import { notFound, throwApiError } from '~~/server/utils/api-errors'
 import { throwIfMappedConstraintError } from '~~/server/utils/database-constraint-errors'
 import { hasCorrectionSchema } from './correction-schema'
+import { BUSINESS_STATUS_REGISTRY } from './business-status-runtime'
 
-const BUSINESS_STATUS_TABLES = [
-  'Funding_Case_Agreement_Profile',
-  'Funding_Case_Agreement_Amendment',
-  'Funding_Case_Agreement_Closeout',
-  'Funding_Case_Agreement_Claim',
-  'Funding_Case_Agreement_Claim_Reconcile',
-  'Funding_Case_Agreement_Commitment',
-  'Funding_Case_Agreement_Payment',
-  'Funding_Case_Agreement_Correction',
-  'Funding_Case_Agreement_Account_Receivable',
-  'Funding_Case_Account_Receivable_Credit_Memo',
-  'Funding_Case_Agreement_Forecast',
-  'Funding_Case_Agreement_Monitor'
-] as const
+const BUSINESS_STATUS_TABLES = [...new Set(Object.values(BUSINESS_STATUS_REGISTRY)
+  .map(entry => entry.table)
+  .filter(table => table !== 'Funding_Case_Intake_Profile'))]
 
 type StatusAdministrationAction = 'update' | 'delete'
 

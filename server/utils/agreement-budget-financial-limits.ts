@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import { moneyToCents, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, compareScaledMoney, parseCurrencyMoney, parseDecimalText, zeroMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 
@@ -17,7 +17,7 @@ type BudgetFinancialLimitLine = {
 }
 
 type BudgetFinancialLimits = {
-  maxPerProponent: Money
+  maxPerProponent: string
   supportRatio: string
   stackingRatio: string
 }
@@ -34,35 +34,50 @@ export class AgreementBudgetFinancialLimitError extends Error {
   }
 }
 
-const ratioHundredths = (ratio: string): bigint => {
-  const match = /^(0|1)(?:\.(\d{1,2}))?$/.exec(ratio)
-  if (!match?.[1]) throw new TypeError('Financial limit ratio must be between zero and one with at most two decimal places.')
-  const scaled = BigInt(match[1]) * BigInt(100) + BigInt((match[2] ?? '').padEnd(2, '0'))
-  if (scaled > BigInt(100)) throw new RangeError('Financial limit ratio exceeds one.')
-  return scaled
+/** A denomination-neutral configured cap cannot be expressed in the Agreement's currency. */
+export class AgreementBudgetFinancialLimitConfigurationError extends Error {
+  constructor() {
+    super('The configured financial limit is not representable in the Agreement currency.')
+    this.name = 'AgreementBudgetFinancialLimitConfigurationError'
+  }
+}
+
+const checkedRatio = (ratio: string) => {
+  if (!/^(?:0(?:\.\d{1,2})?|1(?:\.0{1,2})?)$/.test(ratio)) {
+    throw new TypeError('Financial limit ratio must be between zero and one with at most two decimal places.')
+  }
+  return parseDecimalText(ratio)
 }
 
 export const findAgreementBudgetFinancialLimitViolation = (
   limits: BudgetFinancialLimits,
-  lines: BudgetFinancialLimitLine[]
+  lines: BudgetFinancialLimitLine[],
+  currency: string
 ): AgreementBudgetFinancialLimitViolation | null => {
-  const supportRatio = ratioHundredths(limits.supportRatio)
-  const stackingRatio = ratioHundredths(limits.stackingRatio)
-  const maxPerProponent = moneyToCents(limits.maxPerProponent)
-  const perProponent = new Map<string, bigint>()
-  let stacking = BigInt(0)
-  let totalCost = BigInt(0)
-  for (const line of lines) {
-    const program = moneyToCents(line.programFunding)
-    const costSharing = line.costSharingFunding.reduce((sum, amount) => sum + moneyToCents(amount), BigInt(0))
-    if (program * BigInt(100) > (program + costSharing) * supportRatio) return { kind: 'support', lineId: line.id }
-    const proponentFunding = (perProponent.get(line.proponentId) ?? BigInt(0)) + program
-    perProponent.set(line.proponentId, proponentFunding)
-    if (proponentFunding > maxPerProponent) return { kind: 'proponent', proponentId: line.proponentId, lineId: line.id }
-    stacking += program + line.stackingFunding.reduce((sum, amount) => sum + moneyToCents(amount), BigInt(0))
-    totalCost += moneyToCents(line.totalAmount)
+  const supportRatio = checkedRatio(limits.supportRatio)
+  const stackingRatio = checkedRatio(limits.stackingRatio)
+  const one = parseDecimalText('1')
+  const zero = zeroMoney(currency)
+  let maxPerProponent: Money
+  try {
+    maxPerProponent = parseCurrencyMoney(limits.maxPerProponent, currency)
+  } catch {
+    throw new AgreementBudgetFinancialLimitConfigurationError()
   }
-  return stacking * BigInt(100) > totalCost * stackingRatio ? { kind: 'stacking' } : null
+  const perProponent = new Map<string, Money>()
+  let stacking = zero
+  let totalCost = zero
+  for (const line of lines) {
+    const program = line.programFunding
+    const costSharing = sumMoney(line.costSharingFunding, currency)
+    if (compareScaledMoney(program, one, addMoney(program, costSharing), supportRatio) > 0) return { kind: 'support', lineId: line.id }
+    const proponentFunding = addMoney(perProponent.get(line.proponentId) ?? zero, program)
+    perProponent.set(line.proponentId, proponentFunding)
+    if (compareMoney(proponentFunding, maxPerProponent) > 0) return { kind: 'proponent', proponentId: line.proponentId, lineId: line.id }
+    stacking = sumMoney([stacking, program, ...line.stackingFunding], currency)
+    totalCost = addMoney(totalCost, line.totalAmount)
+  }
+  return compareScaledMoney(stacking, one, totalCost, stackingRatio) > 0 ? { kind: 'stacking' } : null
 }
 
 /**
@@ -90,7 +105,7 @@ export const assertAgreementBudgetFinancialLimits = async (
   if (!limits) return
   const rows = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item as line')
     .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as year', 'year.id', 'line.egcs_fc_fundingagreementbudgetfiscalyear')
-    .select(['line.id', 'line.egcs_fc_applicantrecipient as proponentId',
+    .select(['line.id', 'line.egcs_fc_applicantrecipient as proponentId', 'line.egcs_fc_currency as currency',
       databaseMoneyText(sql.ref('line.egcs_fc_totalamount')).as('totalAmount'),
       databaseMoneyText(sql.ref('line.egcs_fc_programfunding')).as('programFunding')])
     .where('line.egcs_fc_fundingagreement', '=', agreementId)
@@ -98,16 +113,18 @@ export const assertAgreementBudgetFinancialLimits = async (
     .where('year.egcs_fc_budgetversion', '=', versionId)
     .where('line._deleted', '=', false).where('year._deleted', '=', false)
     .orderBy('line.id').execute()
+  const agreement = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_currency')
+    .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const funding = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, rows.map(row => String(row.id))))
-  const violation = findAgreementBudgetFinancialLimitViolation({ ...limits, maxPerProponent: parseDatabaseMoney(limits.maxPerProponent) }, rows.map(row => {
+  const violation = findAgreementBudgetFinancialLimitViolation({ ...limits, maxPerProponent: limits.maxPerProponent }, rows.map(row => {
     const sources = funding.get(String(row.id)) ?? []
     return {
       ...row,
-      totalAmount: parseDatabaseMoney(row.totalAmount),
-      programFunding: parseDatabaseMoney(row.programFunding),
+      totalAmount: parseDatabaseMoney(row.totalAmount, row.currency),
+      programFunding: parseDatabaseMoney(row.programFunding, row.currency),
       stackingFunding: sources.filter(source => source.funding_type_instacking).map(source => source.egcs_fc_amount),
       costSharingFunding: sources.filter(source => source.funding_type_incostsharing).map(source => source.egcs_fc_amount)
     }
-  }))
+  }), agreement.egcs_fc_currency)
   if (violation) throw new AgreementBudgetFinancialLimitError(violation)
 }

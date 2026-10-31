@@ -344,8 +344,8 @@ const cloneBudgetVersionRows = async (
         egcs_fc_allowpercentageoverride: line.egcs_fc_allowpercentageoverride,
         egcs_fc_costsubsection: line.egcs_fc_costsubsection,
         egcs_fc_description: line.egcs_fc_description,
-        egcs_fc_totalamount: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_totalamount)),
-        egcs_fc_programfunding: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_programfunding)),
+        egcs_fc_totalamount: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)),
+        egcs_fc_programfunding: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_programfunding, line.egcs_fc_currency)),
         egcs_fc_currency: line.egcs_fc_currency,
         _deleted: false
       }).returning('id').executeTakeFirstOrThrow()

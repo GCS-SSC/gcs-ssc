@@ -1,8 +1,8 @@
+import { compareMoney, minMoney, subtractMoney, zeroMoney } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc -- Extension accounting choices retain the host's source and paid-capacity evidence. */
 import { sql, type Transaction } from 'kysely'
 import type { Database, JsonValue } from '~~/shared/types/database'
 import type { AgreementCodingAllocation } from './agreement-coding-allocator'
-import { moneyFromCents, moneyToCents, subtractMoney } from '~~/shared/utils/money'
 import { accountReceivableSourceUsage } from './account-receivable-context'
 import { databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { readAccountReceivableLines, readAccountReceivableCoding, allocateRetainedAccountReceivableCoding, validateAccountReceivableBasis } from './account-receivable'
@@ -12,22 +12,23 @@ export const applyAllocatedAccountReceivableCoding = async (trx: Transaction<Dat
   if (first && 'allocationPolicy' in first) await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({
     egcs_fc_allocationevidence: sql<JsonValue>`${JSON.stringify({ scope: 'stream', policy: first.allocationPolicy ?? null, accounts: allocations.map(({ amount: _amount, allocationPolicy: _policy, ...account }) => account) })}::jsonb`
   }).where('id', '=', id).execute()
-  const debt = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_applicantrecipient').where('id', '=', id).executeTakeFirstOrThrow()
+  const debt = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_applicantrecipient', 'egcs_fc_currency']).where('id', '=', id).executeTakeFirstOrThrow()
+  const currency = debt.egcs_fc_currency
   const sources = await readAccountReceivableLines(trx, id)
   const coding = await readAccountReceivableCoding(trx, id)
   const capacities = await Promise.all(sources.map(async source => {
     const used = await trx.selectNoFrom(accountReceivableSourceUsage(String(source.egcs_fc_fundingagreement), source.egcs_fc_sourcekey, id, { applicantRecipientId: String(debt.egcs_fc_applicantrecipient) }).as('amount')).executeTakeFirstOrThrow()
-    return { source, remaining: moneyToCents(subtractMoney(source.egcs_fc_sourceamount, parseDatabaseMoney(used.amount))) }
+    return { source, remaining: subtractMoney(source.egcs_fc_sourceamount, parseDatabaseMoney(used.amount, currency)) }
   }))
   await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Coding').set({ _deleted: true }).where('egcs_fc_receivable', '=', id).execute()
   await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Line').set({ _deleted: true }).where('egcs_fc_receivable', '=', id).execute()
   for (const allocation of allocations) {
-    let remaining = moneyToCents(allocation.amount)
+    let remaining = allocation.amount
     for (const capacity of capacities) {
-      if (remaining === BigInt(0)) break
-      if (capacity.remaining <= BigInt(0)) continue
-      const applied = remaining < capacity.remaining ? remaining : capacity.remaining
-      const amount = moneyFromCents(applied)
+      if (compareMoney(remaining, zeroMoney(currency)) === 0) break
+      if (compareMoney(capacity.remaining, zeroMoney(currency)) <= 0) continue
+      const applied = minMoney([remaining, capacity.remaining], currency)
+      const amount = applied
       const { id: sourceId, ...source } = capacity.source
       const line = await trx.insertInto('Funding_Case_Agreement_Account_Receivable_Line').values({ ...source,
         egcs_fc_amount: databaseMoneyValue(amount), egcs_fc_sourceamount: databaseMoneyValue(source.egcs_fc_sourceamount),
@@ -35,7 +36,7 @@ export const applyAllocatedAccountReceivableCoding = async (trx: Transaction<Dat
         egcs_fc_accountreceivableaccountingdimensions: sql`${JSON.stringify(allocation.accountingDimensions)}::jsonb`,
         egcs_fc_evidence: sql`${JSON.stringify(source.egcs_fc_evidence)}::jsonb`, _deleted: false }).returning('id').executeTakeFirstOrThrow()
       const sourceCoding = coding.filter(row => String(row.egcs_fc_receivableline) === String(sourceId))
-      const split = allocateRetainedAccountReceivableCoding(amount, sourceCoding.map(row => ({ id: String(row.id), basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })))
+      const split = allocateRetainedAccountReceivableCoding(amount, sourceCoding.map(row => ({ id: String(row.id), basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })), currency)
       for (const partition of split) {
         const { id: _codingId, ...retained } = sourceCoding.find(row => String(row.id) === partition.id)!
         await trx.insertInto('Funding_Case_Agreement_Account_Receivable_Coding').values({ ...retained,
@@ -43,10 +44,10 @@ export const applyAllocatedAccountReceivableCoding = async (trx: Transaction<Dat
           egcs_fc_paidbasis: databaseMoneyValue(retained.egcs_fc_paidbasis), egcs_fc_sharedpaidbasis: databaseMoneyValue(retained.egcs_fc_sharedpaidbasis),
           egcs_fc_accountingdimensions: sql`${JSON.stringify(retained.egcs_fc_accountingdimensions)}::jsonb`, _deleted: false }).execute()
       }
-      remaining -= applied
-      capacity.remaining -= applied
+      remaining = subtractMoney(remaining, applied)
+      capacity.remaining = subtractMoney(remaining, applied)
     }
-    if (remaining !== BigInt(0)) throw new Error('AR_SOURCE_CAPACITY')
+    if (compareMoney(remaining, zeroMoney(currency)) !== 0) throw new Error('AR_SOURCE_CAPACITY')
   }
   await validateAccountReceivableBasis(trx, id)
 }

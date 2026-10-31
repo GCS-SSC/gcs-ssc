@@ -1,3 +1,4 @@
+import { majorMoneyText } from '~~/shared/utils/money'
 import { defineEventHandler, getRouterParam, setHeader } from 'h3'
 import { useTranslation } from '@intlify/h3'
 import { authorizeCorrectionAgreement, readCorrectionLines } from '~~/server/utils/correction'
@@ -20,7 +21,7 @@ export default defineEventHandler(async event => {
       if (input.egcs_fc_agencyfiscalyear && String(line.egcs_fc_agencyfiscalyear) !== input.egcs_fc_agencyfiscalyear) continue
       csv.push([formatCorrectionReference(row), t(`correction.outcomes.${row.egcs_fc_outcome}`),
         line.egcs_fc_fiscalyeardisplay, line.egcs_fc_commitmentlinenumber, row.egcs_fc_currency,
-        line.egcs_fc_adjustment, french ? row.egcs_fc_narrative_fr || row.egcs_fc_narrative_en : row.egcs_fc_narrative_en || row.egcs_fc_narrative_fr,
+        majorMoneyText(line.egcs_fc_adjustment), french ? row.egcs_fc_narrative_fr || row.egcs_fc_narrative_en : row.egcs_fc_narrative_en || row.egcs_fc_narrative_fr,
         row.egcs_fc_createdby, row.egcs_fc_terminalby, row.egcs_fc_terminalat, row.egcs_fc_postingruntime])
     }
   }

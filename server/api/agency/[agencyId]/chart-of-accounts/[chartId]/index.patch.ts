@@ -32,12 +32,13 @@ export default defineEventHandler(async event => {
       if (body.egcs_ay_kind !== undefined && body.egcs_ay_kind !== current.egcs_ay_kind) {
         return await badRequest(event, 'AGENCY_CHART_KIND_IMMUTABLE', 'apiErrors.agency.chart_kind_immutable')
       }
-      if (body.egcs_ay_commitmentchartofaccount !== undefined) await assertAgencyCreditMemoCommitmentChart(event, trx, {
+      if (body.egcs_ay_commitmentchartofaccount !== undefined && body.egcs_ay_commitmentchartofaccount !== current.egcs_ay_commitmentchartofaccount) await assertAgencyCreditMemoCommitmentChart(event, trx, {
         agencyId, fiscalYearId: String(current.egcs_ay_fiscalyear), currency: current.egcs_ay_currency, kind: current.egcs_ay_kind,
         commitmentChartId: body.egcs_ay_commitmentchartofaccount })
-      if (!body.egcs_ay_accountingdimensions && body.egcs_ay_commitmentchartofaccount === undefined) return current
+      if (!body.egcs_ay_accountingdimensions && body.egcs_ay_commitmentchartofaccount === undefined && body.egcs_ay_active === undefined) return current
       return await trx.updateTable('Agency_Chart_of_Account').set({
         ...(body.egcs_ay_accountingdimensions ? { egcs_ay_accountingdimensions: sql`${JSON.stringify(body.egcs_ay_accountingdimensions)}::jsonb` } : {}),
+        ...(body.egcs_ay_active !== undefined ? { egcs_ay_active: body.egcs_ay_active } : {}),
         ...(body.egcs_ay_commitmentchartofaccount !== undefined ? { egcs_ay_commitmentchartofaccount: body.egcs_ay_commitmentchartofaccount } : {})
       }).where('id', '=', chartId).where('egcs_ay_organizationagency', '=', agencyId).returningAll().executeTakeFirstOrThrow()
     })

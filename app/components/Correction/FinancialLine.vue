@@ -2,23 +2,23 @@
 import { computed } from 'vue'
 import type { TransferPaymentStreamChartOfAccountDimension } from '~~/shared/types/schemas/transfer-payment'
 import { formatAccountingDimension } from '~~/shared/utils/accounting-dimensions'
-import { formatMoneyText, parseMoneyText, sumMoney } from '~~/shared/utils/money'
+import { formatMoneyText, compareMoney, zeroMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 const { line, currency, correctedPaid, remaining, invalid = false } = defineProps<{
   line: {
     egcs_fc_commitmentlinenumber: string | number
     egcs_fc_fiscalyeardisplay: string
     egcs_fc_accountingdimensions: TransferPaymentStreamChartOfAccountDimension[]
-    egcs_fc_originalpaid: string | null
-    egcs_fc_jveffect: string | null
-    egcs_fc_priorcorrections: string | null
-    egcs_fc_arrecoveries?: string | null
-    egcs_fc_adjustment: string | null
-    egcs_fc_commitmentamount: string | null
+    egcs_fc_originalpaid: Money | null
+    egcs_fc_jveffect: Money | null
+    egcs_fc_priorcorrections: Money | null
+    egcs_fc_arrecoveries: Money | null
+    egcs_fc_adjustment: Money | null
+    egcs_fc_commitmentamount: Money | null
   }
   currency: string
-  correctedPaid: string | null
-  remaining: string | null
+  correctedPaid: Money | null
+  remaining: Money | null
   invalid?: boolean
 }>()
 const { t, locale } = useI18n()
@@ -27,12 +27,12 @@ const primaryCoding = computed(() => {
   return dimension ? formatAccountingDimension(dimension, locale.value === 'fr' ? 'fr' : 'en') : t('common.not_available')
 })
 const recordedPaid = computed(() => {
-  const components = [line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries ?? '0.00']
-  return components.every(value => value !== null) ? sumMoney(components.map(value => parseMoneyText(value!))) : null
+  const components = [line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries]
+  return components.every(value => value !== null) ? sumMoney(components.filter((value): value is Money => value !== null), currency) : null
 })
-const amount = (value: string | null) => value === null
+const amount = (value: Money | null) => value === null
   ? t('common.not_available')
-  : formatMoneyText(parseMoneyText(value), locale.value, currency)
+  : formatMoneyText(value, locale.value)
 </script>
 
 <template>
@@ -81,7 +81,7 @@ const amount = (value: string | null) => value === null
             {{ amount(line.egcs_fc_priorcorrections) }}
           </dd>
         </div>
-        <div v-if="line.egcs_fc_arrecoveries && line.egcs_fc_arrecoveries !== '0.00'">
+        <div v-if="line.egcs_fc_arrecoveries && compareMoney(line.egcs_fc_arrecoveries, zeroMoney(currency)) !== 0">
           <dt class="text-muted">
             {{ t('agreement.financial_summary.ar_recoveries') }}
           </dt>

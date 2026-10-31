@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- typed publication adapter */
 import type { Kysely, Selectable, Transaction } from 'kysely'
 import type { PublicationKind } from '~~/shared/constants/system-lifecycle'
@@ -145,7 +146,7 @@ export const buildReviewSetupPublication = async (
       reviewType: member.egcs_cn_reviewtype,
       schema,
       failOnChecklistFailure: member.egcs_cn_failonchecklistfailure === true,
-      failureThreshold: member.egcs_cn_failurethreshold === null ? null : Number(member.egcs_cn_failurethreshold),
+      failureThreshold: member.egcs_cn_failurethreshold === null ? null : parseSafeDecimal(String(member.egcs_cn_failurethreshold)),
       ...(member.egcs_cn_defaultgroup ? { defaultGroupId: String(member.egcs_cn_defaultgroup) } : {}),
       ...(approval ? { approval } : {})
     }

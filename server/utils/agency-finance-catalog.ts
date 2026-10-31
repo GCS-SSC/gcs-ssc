@@ -26,6 +26,7 @@ export const findEligibleAgencyChart = async (
     .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agencyId)
     .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Agency_Chart_of_Account._deleted', '=', false)
+    .where('Agency_Chart_of_Account.egcs_ay_active', '=', true)
     .where('Agency_Fiscal_Year._deleted', '=', false)
     .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
     .where('Transfer_Payment_Stream_Budget._deleted', '=', false)

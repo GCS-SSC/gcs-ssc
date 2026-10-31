@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { Money } from '~~/shared/utils/money'
 import type { ProponentAccountReceivableRow } from '~~/shared/types/account-receivable-proponent'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -20,8 +21,8 @@ const columns: TableColumnInput<ProponentAccountReceivableRow>[] = [
   { id: 'method', headerKey: 'account_receivable.recovery_kind' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const amount = (value: string, currency: string) =>
-  formatAccountReceivableAmount(value, locale.value, currency) ?? t('common.not_available')
+const amount = (value: Money) =>
+  formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 </script>
 
 <template>
@@ -52,8 +53,8 @@ const amount = (value: string, currency: string) =>
         </template>
         <template #amount-cell="{ row }">
           <div class="flex flex-col gap-1 tabular-nums">
-            <span class="text-sm font-semibold">{{ amount(row.original.egcs_fc_approvedamount, row.original.egcs_fc_currency) }}</span>
-            <span class="text-xs text-muted">{{ t('account_receivable.original_amount') }}: {{ amount(row.original.egcs_fc_originalamount, row.original.egcs_fc_currency) }}</span>
+            <span class="text-sm font-semibold">{{ amount(row.original.egcs_fc_approvedamount) }}</span>
+            <span class="text-xs text-muted">{{ t('account_receivable.original_amount') }}: {{ amount(row.original.egcs_fc_originalamount) }}</span>
           </div>
         </template>
         <template #type-cell="{ row }">

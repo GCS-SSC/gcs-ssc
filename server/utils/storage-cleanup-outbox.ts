@@ -5,6 +5,7 @@ import { deleteProviderObject, resolveAgencyStorageProvider } from './file-stora
 import type { GcsFileStorageProviderManagedMetadataAdapter, GcsFileStorageTarget } from '@gcs-ssc/extensions/server'
 import { createFileStorageSecretReader } from './file-storage-extensions'
 import { runBoundedExtensionOperation } from './extension-admission'
+import { observeStorageMetadataMutation, releaseStorageMetadataAfterSettlement } from './storage-metadata-settlement'
 
 const BASE_RETRY_MS = 30_000
 const MAX_RETRY_MS = 30 * 60_000
@@ -56,10 +57,15 @@ export const processStorageCleanupBatch = async (
     const [job] = await claimStorageCleanupJobs(db, workerId, 1, 610_000, jobNow)
     if (!job) break
     claimed++
+    let mutation: ReturnType<typeof observeStorageMetadataMutation> | undefined
     try {
       const provider = await resolveAgencyStorageProvider(db, String(job.agency_id), job.provider_key)
       if (!provider) throw new Error('Recorded storage provider is unavailable')
       if (job.operation === 'restore_metadata') {
+        // A dispatched mutation cannot be reclaimed until its actual promise settles.
+        await db.updateTable('storage_cleanup_outbox').set({ lease_expires_at: null })
+          .where('id', '=', String(job.id)).where('status', '=', 'processing')
+          .where('lease_owner', '=', workerId).execute()
         await db.transaction().execute(async trx => {
           // The interactive writer holds this same object row through provider I/O and commit.
           await trx.selectFrom('Common_Attachment').select('id')
@@ -78,14 +84,15 @@ export const processStorageCleanupBatch = async (
           const adapter = provider.adapter as GcsFileStorageProviderManagedMetadataAdapter
           await runBoundedExtensionOperation('storage:restore-metadata', async signal => {
             if (signal.aborted) throw signal.reason
-            await adapter.updateProviderMetadata({
+            mutation = observeStorageMetadataMutation(adapter.updateProviderMetadata({
               signal,
               objectId: job.object_id, locator: job.locator as Record<string, never>,
               agencyId: String(job.agency_id), purpose: job.purpose as 'attachment',
               target: payload.target, agencyConfig: provider.config,
               secrets: createFileStorageSecretReader(trx, provider.extension.key, String(job.agency_id), process.env.GCS_EXTENSION_SECRETS_KEY ?? ''),
               contractVersion: payload.contractVersion, metadata: payload.metadata
-            })
+            }))
+            await mutation.promise
           })
           await completeReservedStorageCleanup(trx, String(job.id), workerId)
         })
@@ -105,13 +112,14 @@ export const processStorageCleanupBatch = async (
     } catch (error: unknown) {
       const attempts = job.attempt_count + 1
       const retryNow = now ?? new Date()
-      await db.updateTable('storage_cleanup_outbox').set({
+      const retry = async () => await db.updateTable('storage_cleanup_outbox').set({
         status: 'pending', attempt_count: attempts,
         next_attempt_at: new Date(retryNow.getTime() + Math.min(MAX_RETRY_MS, BASE_RETRY_MS * 2 ** Math.min(attempts - 1, 6))),
         lease_owner: null, lease_expires_at: null, updated_at: retryNow,
         last_error: (error instanceof Error ? error.message : String(error)).slice(0, 1000)
       }).where('id', '=', String(job.id)).where('status', '=', 'processing')
         .where('lease_owner', '=', workerId).execute()
+      await releaseStorageMetadataAfterSettlement(mutation, retry)
       retried++
     }
   }
@@ -133,11 +141,11 @@ export const storageCleanupLocator = (locator: unknown): JsonValue => locator as
 
 export const reserveStorageMetadataRestoration = async (
   db: Kysely<Database>, workerId: string, request: StorageCleanupRequest,
-  payload: JsonValue, leaseMs = 300_000
+  payload: JsonValue
 ): Promise<string> => await db.transaction().execute(async trx => String((await trx
   .insertInto('storage_cleanup_outbox').values({
     ...request, operation: 'restore_metadata', payload, status: 'processing',
-    lease_owner: workerId, lease_expires_at: new Date(Date.now() + leaseMs)
+    lease_owner: workerId, lease_expires_at: null
   }).returning('id').executeTakeFirstOrThrow()).id))
 
 export const completeReservedStorageCleanup = async (
@@ -167,4 +175,19 @@ export const supersedeStorageMetadataRestorations = async (
   }).where('provider_key', '=', request.provider_key).where('agency_id', '=', request.agency_id)
     .where('object_id', '=', request.object_id).where('operation', '=', 'restore_metadata')
     .where('id', '!=', currentReservationId).where('status', 'in', ['pending', 'processing']).execute()
+}
+
+/**
+ * Requires the same Attachment lock as provider metadata reads and writes.
+ * @param trx Transaction holding the object lock.
+ * @param request Exact recorded provider object identity.
+ */
+export const assertStorageMetadataRestored = async (
+  trx: Transaction<Database>, request: Pick<StorageCleanupRequest, 'provider_key' | 'agency_id' | 'object_id'>
+): Promise<void> => {
+  const unresolved = await trx.selectFrom('storage_cleanup_outbox').select('id')
+    .where('provider_key', '=', request.provider_key).where('agency_id', '=', request.agency_id)
+    .where('object_id', '=', request.object_id).where('operation', '=', 'restore_metadata')
+    .where('status', '!=', 'completed').executeTakeFirst()
+  if (unresolved) throw new Error('Provider metadata restoration must finish before another metadata edit')
 }

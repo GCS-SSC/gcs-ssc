@@ -1,3 +1,4 @@
+import { assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { z } from 'zod'
@@ -37,6 +38,12 @@ export default defineEventHandler(async event => {
       const context = await requireFreshAuthContext(event, trx)
       await assertFundingHistoryExistsForRecipient(event, historyId, applicantRecipientId, trx, true)
       const currentRecipientIds = await listFundingHistoryRecipientIds(historyId, trx)
+      // Serialize every recipient's exact-assignment check with roster changes.
+      const recipientIdsToLock = [...new Set([...currentRecipientIds, ...(validated.recipientIds ?? [])])]
+      await trx.selectFrom('Applicant_Recipient_Profile')
+        .where('id', 'in', recipientIdsToLock)
+        .where('_deleted', '=', false)
+        .select('id').orderBy('id').forUpdate().execute()
       await authorizeWithFreshAuthContext(event, context, 'applicant_recipient', 'update', async () => {
         await assertFundingHistoryRecipientAccess(event, context, currentRecipientIds, 'update', trx)
         return { bypass: true }
@@ -62,8 +69,9 @@ export default defineEventHandler(async event => {
         .forUpdate()
         .executeTakeFirstOrThrow()
       const merged = await parseI18n(event, FundingHistoryExternalCreateSchema, {
-        ...currentHistory, recipientIds: currentRecipientIds, ...validated
+        ...currentHistory, egcs_ar_fundingamount: parseDatabaseMoney(currentHistory.egcs_ar_fundingamount, currentHistory.egcs_ar_currency), recipientIds: currentRecipientIds, ...validated
       })
+      await assertCurrencyMoneyValues(event, merged.egcs_ar_currency, [merged.egcs_ar_fundingamount])
       const identityChanged = [
         'egcs_ar_agencyname_en',
         'egcs_ar_agencyname_fr',
@@ -181,7 +189,7 @@ export default defineEventHandler(async event => {
             ])
             .executeTakeFirstOrThrow()
       const { exactFundingAmount, ...updatedValues } = updated
-      return { ...updatedValues, egcs_ar_fundingamount: parseDatabaseMoney(exactFundingAmount) }
+      return { ...updatedValues, egcs_ar_fundingamount: parseDatabaseMoney(exactFundingAmount, updatedValues.egcs_ar_currency) }
     })
   } catch (error: unknown) {
     await throwIfFundingHistoryConstraintError(event, error)

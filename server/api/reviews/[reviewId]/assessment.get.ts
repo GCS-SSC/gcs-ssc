@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import type { PublishedReviewSchemaDefinition, ReviewSchemaContentSource } from '~~/server/utils/review-schema-versioning'
@@ -128,7 +129,7 @@ export default defineEventHandler(async event => {
   const egcsCnReviewAlignment = review.egcs_cn_reviewalignment === true
   const egcsCnReviewAlignResult = review.egcs_cn_reviewalignresult === null || review.egcs_cn_reviewalignresult === undefined
     ? null
-    : Number(review.egcs_cn_reviewalignresult)
+    : parseSafeDecimal(String(review.egcs_cn_reviewalignresult))
   const egcsCnReviewAlignmentNarrative = review.egcs_cn_reviewalignmentnarrative ?? ''
 
   const [responses, outcomes, customOutcomes, totalAdditionalReviewerCount, pendingAdditionalReviewerCount] = await Promise.all([
@@ -180,7 +181,7 @@ export default defineEventHandler(async event => {
       section: answer.section,
       subsection: answer.subsection,
       question: answer.question,
-      value: answer.value === null || answer.value === undefined ? null : Number(answer.value),
+      value: answer.value === null || answer.value === undefined ? null : parseSafeDecimal(String(answer.value)),
       comment: answer.comment ?? ''
     })),
     outcomes: outcomes.map(outcome => ({
@@ -225,7 +226,7 @@ export default defineEventHandler(async event => {
     attempt: Number(review.attempt),
     previousRuntimeId: review.previousRuntimeId === null ? null : String(review.previousRuntimeId),
     publicationVersionId: String(review.publicationVersionId),
-    egcs_cn_reviewresult: Number(review.egcs_cn_reviewresult),
+    egcs_cn_reviewresult: parseSafeDecimal(String(review.egcs_cn_reviewresult ?? 0)),
     egcs_cn_reviewset: String(review.egcs_cn_reviewset),
     egcs_cn_reviewschema: String(review.egcs_cn_reviewschema),
     egcs_cn_helpers: review.egcs_cn_helpers,

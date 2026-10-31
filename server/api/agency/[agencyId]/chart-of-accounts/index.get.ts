@@ -35,6 +35,7 @@ export default defineEventHandler(async event => {
     }
     return await fetchAgencyScopedList({
       items: filtered.selectAll('Agency_Chart_of_Account').select('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display')
+        .select(sql<boolean>`agency_chart_is_in_use("Agency_Chart_of_Account".id)`.as('is_in_use'))
         .orderBy('Agency_Chart_of_Account.id').limit(limit).offset((page - 1) * limit).execute(),
       filteredCount: filtered.select(eb => eb.fn.count('Agency_Chart_of_Account.id').as('total')).executeTakeFirst(),
       scopedCount: scoped.select(eb => eb.fn.count('Agency_Chart_of_Account.id').as('total')).executeTakeFirst(),

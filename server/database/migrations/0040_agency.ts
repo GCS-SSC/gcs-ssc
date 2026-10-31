@@ -148,6 +148,7 @@ CREATE UNIQUE INDEX ay_uq_approval_behalf_name_en_normalized ON "Agency_Approval
 CREATE UNIQUE INDEX ay_uq_approval_behalf_name_fr_normalized ON "Agency_Approval_Behalf_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
 
 CREATE TABLE "Agency_Chart_of_Account" (
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
   "egcs_ay_commitmentchartofaccount" bigint,
   "id" bigint DEFAULT nextval('"Agency_Chart_of_Account_id_seq"'::regclass) NOT NULL,
   "egcs_ay_kind" character varying(32) DEFAULT 'commitment'::character varying NOT NULL,
@@ -563,6 +564,8 @@ AS $function$
         SELECT 1 FROM "Agency_Chart_of_Account" commitment
         WHERE commitment.id = NEW.egcs_ay_commitmentchartofaccount
           AND commitment.egcs_ay_kind = 'commitment' AND NOT commitment._deleted
+          AND (commitment.egcs_ay_active OR (TG_OP='UPDATE' AND NOT OLD._deleted
+            AND OLD.egcs_ay_commitmentchartofaccount IS NOT DISTINCT FROM NEW.egcs_ay_commitmentchartofaccount))
           AND commitment.egcs_ay_organizationagency = NEW.egcs_ay_organizationagency
           AND commitment.egcs_ay_fiscalyear = NEW.egcs_ay_fiscalyear
           AND commitment.egcs_ay_currency = NEW.egcs_ay_currency
@@ -642,6 +645,35 @@ AS $function$
         OR NOT EXISTS (SELECT 1 FROM "Agency_Cost_Category" WHERE id = NEW.egcs_ay_sourcecategory AND NOT _deleted AND egcs_ay_organizationagency = owner_id)
         OR EXISTS (SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted AND egcs_ay_organizationcostcategory = NEW.egcs_ay_sourcecategory AND egcs_ay_calculationmode <> 'manual' AND id <> NEW.id)
       ) THEN RAISE EXCEPTION 'Invalid percentage source category' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
+      RETURN NEW;
+    END $function$;
+
+CREATE FUNCTION agency_chart_is_in_use(chart_id bigint)
+ RETURNS boolean
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" WHERE egcs_ay_commitmentchartofaccount=chart_id) THEN RETURN true; END IF;
+      IF to_regclass('"Transfer_Payment_Stream_Chart_of_Account"') IS NOT NULL THEN
+        IF EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" WHERE egcs_tp_agencychartofaccount=chart_id) THEN RETURN true; END IF;
+      END IF;
+      IF to_regclass('"Funding_Case_Agreement_Account_Receivable_Line"') IS NOT NULL THEN
+        IF EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE egcs_fc_accountreceivablechartofaccount=chart_id) THEN RETURN true; END IF;
+      END IF;
+      RETURN false;
+    END $function$;
+
+CREATE FUNCTION protect_used_agency_chart()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF (NEW.egcs_ay_accountingdimensions IS DISTINCT FROM OLD.egcs_ay_accountingdimensions
+          OR NEW.egcs_ay_commitmentchartofaccount IS DISTINCT FROM OLD.egcs_ay_commitmentchartofaccount
+          OR (NEW._deleted AND NOT OLD._deleted)) AND agency_chart_is_in_use(OLD.id) THEN
+        RAISE EXCEPTION 'Used accounting lines are immutable; deactivate instead'
+          USING ERRCODE='23514', CONSTRAINT='ay_chk_chart_in_use';
+      END IF;
       RETURN NEW;
     END $function$;
 
@@ -774,6 +806,7 @@ CREATE TRIGGER guard_referenced_proponent_subtype BEFORE UPDATE ON "Agency_Appli
 CREATE TRIGGER protect_workflow_profile_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_ay_organizationagency ON "Agency_Applicant_Recipient_Subtype" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references();
 
 CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency, egcs_ay_kind ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_chart_currency();
+CREATE TRIGGER protect_used_agency_chart BEFORE UPDATE ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_used_agency_chart();
 CREATE TRIGGER validate_credit_memo_commitment_chart_link BEFORE INSERT OR UPDATE ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_credit_memo_commitment_chart_link();
 
 CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();

@@ -2,9 +2,9 @@ import type { H3Event } from 'h3'
 import { sql, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { FundingCaseAgreementForecastBreakdownPatch } from '~~/shared/types/schemas'
-import { isNumeric19Money, sumMoney } from '~~/shared/utils/money'
+import { compareMoney, isPersistableMoney, sumMoney } from '~~/shared/utils/money'
 import { badRequest, throwApiError } from './api-errors'
-import { assertAgreementCurrency } from './agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from './agreement-currency'
 import { budgetLineItemStableId } from './agreement-budget-lineage'
 import { assertAgreementForecastBudgetLineItem, assertAgreementForecastEditable } from './agreement-forecast'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
@@ -69,13 +69,17 @@ export const saveAgreementForecastBreakdown = async (
   for (const row of fundingRows) {
     const key = String(row.egcs_fc_forecastlineitem)
     const amounts = fundingByLine.get(key) ?? []
-    amounts.push({ egcs_fc_fundingsubtype: String(row.egcs_fc_fundingsubtype), egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) })
+    amounts.push({ egcs_fc_fundingsubtype: String(row.egcs_fc_fundingsubtype), egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, currency) })
     fundingByLine.set(key, amounts)
   }
   const references = new Map<string, { id: string }>()
   const savedCells = []
 
   for (const cell of changes.cells) {
+    await assertCurrencyMoneyValues(event, currency, [
+      cell.egcs_fc_amount, ...(cell.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount),
+      ...(cell.expected ? [cell.expected.egcs_fc_amount, ...(cell.expected.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)] : [])
+    ])
     const occupants = rowsByCell.get(`${cell.egcs_fc_fundingagreementbudgetlineitem}:${cell.egcs_fc_month}`) ?? []
     const existing = occupants[0]
     const existingSources = existing ? fundingByLine.get(String(existing.id)) ?? [] : []
@@ -83,11 +87,11 @@ export const saveAgreementForecastBreakdown = async (
     if (occupants.length > 1 || (cell.expected === null
       ? existing !== undefined
       : !existing || String(existing.id) !== cell.expected.id
-        || parseDatabaseMoney(existing.egcs_fc_amount) !== cell.expected.egcs_fc_amount)
+        || compareMoney(parseDatabaseMoney(existing.egcs_fc_amount, currency), cell.expected.egcs_fc_amount) !== 0)
       || (cell.egcs_fc_fundingsources !== undefined && cell.expected !== null
         && (!expectedSources || existingSources.length !== expectedSources.length
           || existingSources.some(source => !expectedSources.some(expected => expected.egcs_fc_fundingsubtype === source.egcs_fc_fundingsubtype
-            && expected.egcs_fc_amount === source.egcs_fc_amount))))) {
+            && compareMoney(expected.egcs_fc_amount, source.egcs_fc_amount) === 0))))) {
       return await throwApiError(event, {
         statusCode: 409,
         code: 'AGREEMENT_FORECAST_BREAKDOWN_CONFLICT',
@@ -107,11 +111,15 @@ export const saveAgreementForecastBreakdown = async (
     if (existing && existing.egcs_fc_currency !== currency) {
       return await badRequest(event, 'AGREEMENT_CURRENCY_MISMATCH', 'apiErrors.agreement.currency_mismatch')
     }
-    const total = sumMoney([
+    await assertCurrencyMoneyValues(event, currency, [
       cell.egcs_fc_amount,
       ...(cell.egcs_fc_fundingsources ?? existingSources).map(source => source.egcs_fc_amount)
     ])
-    if (!isNumeric19Money(total)) {
+    const total = sumMoney([
+      cell.egcs_fc_amount,
+      ...(cell.egcs_fc_fundingsources ?? existingSources).map(source => source.egcs_fc_amount)
+    ], currency)
+    if (!isPersistableMoney(total)) {
       return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_MISMATCH', 'apiErrors.agreement.funding_breakdown_required')
     }
     const values = {

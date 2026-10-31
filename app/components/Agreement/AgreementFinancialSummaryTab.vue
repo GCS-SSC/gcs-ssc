@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useAgreementOverview } from '~/composables/useAgreementOverview'
-import { compareMoney, formatMoneyText, moneyToCents, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, moneyToMinorUnits, zeroMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 type MonthlyAmounts = [Money, Money, Money, Money, Money, Money, Money, Money, Money, Money, Money, Money]
 type QuarterKey = 'q1' | 'q2' | 'q3' | 'q4'
@@ -71,7 +71,6 @@ const QUARTERS: Array<{ key: QuarterKey, months: number[] }> = [
   { key: 'q3', months: [6, 7, 8] },
   { key: 'q4', months: [9, 10, 11] }
 ]
-const ZERO_MONEY = parseMoney('0')
 const ROW_TONES: Record<RowType, { row: string, sticky: string, chip: string }> = {
   forecast: {
     row: 'bg-sky-50/60 dark:bg-sky-950/20',
@@ -146,10 +145,10 @@ const toggleQuarter = (quarter: QuarterKey) => {
 const periodLabel = (period: SummaryPeriod): string => period.month === null
   ? t(`agreement.forecasts.quarters.${period.quarter}`)
   : monthLabel(period.month)
-const periodAmount = (amounts: MonthlyAmounts | undefined | null, period: SummaryPeriod): Money | null =>
-  amounts ? sumMoney(period.months.map(month => amounts[month] ?? ZERO_MONEY)) : null
+const periodAmount = (amounts: MonthlyAmounts | undefined | null, period: SummaryPeriod, currency: string): Money | null =>
+  amounts ? sumMoney(period.months.map(month => amounts[month] ?? zeroMoney(currency)), currency) : null
 const linePeriodAmount = (line: FinancialLine, measure: Measure, period: SummaryPeriod): Money | null =>
-  measure === 'budget' ? null : periodAmount(line[measure], period)
+  measure === 'budget' ? null : periodAmount(line[measure], period, line.currency)
 const visibleMeasures = computed(() => MEASURES.filter(measure => visibleRowTypes.value.includes(measure)))
 const showPayments = computed(() => visibleRowTypes.value.includes('payments'))
 /**
@@ -180,7 +179,7 @@ const monthLabel = (month: number): string => {
   const key = MONTH_KEYS[month]
   return key ? t(`agreement.forecasts.months.${key}`) : t('common.unavailable')
 }
-const formatMoney = (value: Money, currency: string): string => formatMoneyText(value, locale.value, currency.toUpperCase())
+const formatMoney = (value: Money): string => formatMoneyText(value, locale.value)
 const lineName = (line: FinancialLine): string => locale.value === 'fr'
   ? line.nameFr || line.nameEn
   : line.nameEn || line.nameFr
@@ -188,13 +187,14 @@ const categoryName = (line: FinancialLine): string => locale.value === 'fr'
   ? line.categoryNameFr || line.categoryNameEn
   : line.categoryNameEn || line.categoryNameFr
 const yearAmount = (line: FinancialLine, measure: Measure): Money | null =>
-  measure === 'budget' ? line.budget : line[measure] ? sumMoney(line[measure]) : null
-const displayMonthlyAmount = (value: Money | null, currency: string): string =>
-  value === null || value === ZERO_MONEY ? t('agreement.financial_summary.not_allocated_short') : formatMoney(value, currency)
-const displayYearAmount = (value: Money | null, currency: string): string =>
-  value === null ? t('agreement.financial_summary.not_allocated_short') : formatMoney(value, currency)
+  measure === 'budget' ? line.budget : line[measure] ? sumMoney(line[measure], line.currency) : null
+const isZeroAmount = (value: Money | null): boolean => value !== null && compareMoney(value, zeroMoney(value.currency)) === 0
+const displayMonthlyAmount = (value: Money | null): string =>
+  value === null || isZeroAmount(value) ? t('agreement.financial_summary.not_allocated_short') : formatMoney(value)
+const displayYearAmount = (value: Money | null): string =>
+  value === null ? t('agreement.financial_summary.not_allocated_short') : formatMoney(value)
 const adjustedPaid = (group: CurrencySummary): MonthlyAmounts => group.correctedRecordedPaid ?? group.paid
-const paidYearTotal = (group: CurrencySummary): Money => sumMoney(adjustedPaid(group))
+const paidYearTotal = (group: CurrencySummary): Money => sumMoney(adjustedPaid(group), group.currency)
 const paymentsInPeriod = (group: CurrencySummary, period: SummaryPeriod): FinancialPayment[] =>
   group.payments.filter(payment => period.months.includes(payment.month))
 const paymentPeriod = (payment: FinancialPayment): string =>
@@ -203,13 +203,13 @@ const forecastSourceLabel = (source: FinancialYear['forecastSource']): string =>
   const status = t(`agreement.financial_summary.forecast_source.${source.status}`)
   return source.version ? `${status} · ${t('agreement.financial_summary.forecast_version', { version: source.version })}` : status
 }
-const hasBudgetScale = (progress: FinancialProgress): boolean => moneyToCents(progress.annualBudget) > BigInt(0)
-const hasAmountsWithoutBudget = (progress: FinancialProgress): boolean => !hasBudgetScale(progress) && (
-  compareMoney(progress.reconciledTotal, ZERO_MONEY) > 0
-  || (progress.annualForecast !== null && compareMoney(progress.annualForecast, ZERO_MONEY) > 0)
+const hasBudgetScale = (progress: FinancialProgress, currency: string): boolean => compareMoney(progress.annualBudget, zeroMoney(currency)) > 0
+const hasAmountsWithoutBudget = (progress: FinancialProgress, currency: string): boolean => !hasBudgetScale(progress, currency) && (
+  compareMoney(progress.reconciledTotal, zeroMoney(currency)) > 0
+  || (progress.annualForecast !== null && compareMoney(progress.annualForecast, zeroMoney(currency)) > 0)
 )
-const hasPositiveForecastTotal = (progress: FinancialProgress): boolean =>
-  progress.annualForecast !== null && moneyToCents(progress.annualForecast) > BigInt(0)
+const hasPositiveForecastTotal = (progress: FinancialProgress, currency: string): boolean =>
+  progress.annualForecast !== null && compareMoney(progress.annualForecast, zeroMoney(currency)) > 0
 /**
  * Caps a monetary amount at the visual budget scale without changing its displayed value.
  * @param amount - Exact amount to position.
@@ -218,16 +218,18 @@ const hasPositiveForecastTotal = (progress: FinancialProgress): boolean =>
  */
 const trackPercent = (amount: Money | null, budget: Money): number => {
   if (amount === null) return 0
-  const denominator = moneyToCents(budget)
+  // Only bounded presentation ratios become numbers; authoritative amounts stay exact.
+  const comparison = compareMoney(amount, budget)
+  const denominator = moneyToMinorUnits(budget)
   if (denominator <= BigInt(0)) return 0
-  const cents = moneyToCents(amount)
-  const clipped = cents < BigInt(0) ? BigInt(0) : cents > denominator ? denominator : cents
+  const minorUnits = moneyToMinorUnits(amount)
+  const clipped = minorUnits < BigInt(0) ? BigInt(0) : comparison > 0 ? denominator : minorUnits
   return Number(clipped * BigInt(10000) / denominator) / 100
 }
 /**
  * Formats a ratio as a localized percentage with one decimal place.
- * @param numerator - Exact numerator in cents.
- * @param denominator - Exact denominator in cents.
+ * @param numerator - Exact numerator in owning-currency minor units.
+ * @param denominator - Exact denominator in owning-currency minor units.
  * @returns Localized percentage, or null when no ratio exists.
  */
 const percentText = (numerator: bigint, denominator: bigint): string | null => {
@@ -240,47 +242,46 @@ const percentText = (numerator: bigint, denominator: bigint): string | null => {
 /**
  * Describes the annual forecast's exact relationship to budget.
  * @param progress - Currency-specific pacing values.
- * @param currency - Currency used for formatted amounts.
  * @returns Localized comparison, or null without an active forecast.
  */
-const budgetComparison = (progress: FinancialProgress, currency: string): string | null => {
+const budgetComparison = (progress: FinancialProgress): string | null => {
   if (progress.annualForecast === null) return null
   const comparison = compareMoney(progress.annualForecast, progress.annualBudget)
-  if (comparison < 0) return t('agreement.financial_summary.pacing.unforecast_budget', { amount: formatMoney(subtractMoney(progress.annualBudget, progress.annualForecast), currency) })
-  if (comparison > 0) return t('agreement.financial_summary.pacing.forecast_above_budget', { amount: formatMoney(subtractMoney(progress.annualForecast, progress.annualBudget), currency) })
+  if (comparison < 0) return t('agreement.financial_summary.pacing.unforecast_budget', { amount: formatMoney(subtractMoney(progress.annualBudget, progress.annualForecast)) })
+  if (comparison > 0) return t('agreement.financial_summary.pacing.forecast_above_budget', { amount: formatMoney(subtractMoney(progress.annualForecast, progress.annualBudget)) })
   return t('agreement.financial_summary.pacing.forecast_matches_budget')
 }
 /**
  * Describes reconciled spending against the active forecast at the cutoff month.
  * @param progress - Currency-specific pacing values.
- * @param currency - Currency used for formatted amounts.
  * @returns Localized comparison, or null without comparable values.
  */
-const reconciliationComparison = (progress: FinancialProgress, currency: string): string | null => {
+const reconciliationComparison = (progress: FinancialProgress): string | null => {
   if (progress.latestReconciledMonth === null || progress.forecastToReconciliation === null) return null
   const comparison = compareMoney(progress.reconciledTotal, progress.forecastToReconciliation)
   const month = monthLabel(progress.latestReconciledMonth)
-  if (comparison < 0) return t('agreement.financial_summary.pacing.reconciled_below_forecast', { month, amount: formatMoney(subtractMoney(progress.forecastToReconciliation, progress.reconciledTotal), currency) })
-  if (comparison > 0) return t('agreement.financial_summary.pacing.reconciled_above_forecast', { month, amount: formatMoney(subtractMoney(progress.reconciledTotal, progress.forecastToReconciliation), currency) })
+  if (comparison < 0) return t('agreement.financial_summary.pacing.reconciled_below_forecast', { month, amount: formatMoney(subtractMoney(progress.forecastToReconciliation, progress.reconciledTotal)) })
+  if (comparison > 0) return t('agreement.financial_summary.pacing.reconciled_above_forecast', { month, amount: formatMoney(subtractMoney(progress.reconciledTotal, progress.forecastToReconciliation)) })
   return t('agreement.financial_summary.pacing.reconciled_matches_forecast', { month })
 }
-const exceedsBudget = (progress: FinancialProgress): boolean => hasBudgetScale(progress) && (
+const exceedsBudget = (progress: FinancialProgress, currency: string): boolean => hasBudgetScale(progress, currency) && (
   compareMoney(progress.reconciledTotal, progress.annualBudget) > 0
   || (progress.forecastToReconciliation !== null && compareMoney(progress.forecastToReconciliation, progress.annualBudget) > 0)
 )
 /**
  * Finds the highest positive monthly forecast amount.
  * @param progress - Currency-specific pacing values.
+ * @param currency - Owning currency for empty monthly values.
  * @returns Fiscal month index, or null when all months are nonpositive.
  */
-const peakMonth = (progress: FinancialProgress): number | null => {
+const peakMonth = (progress: FinancialProgress, currency: string): number | null => {
   if (!progress.monthlyForecast) return null
   let peakIndex: number | null = null
-  let peakCents = BigInt(0)
+  let peakAmount = zeroMoney(currency)
   for (const month of MONTHS) {
-    const cents = moneyToCents(progress.monthlyForecast[month] ?? ZERO_MONEY)
-    if (cents > peakCents) {
-      peakCents = cents
+    const amount = progress.monthlyForecast[month] ?? zeroMoney(currency)
+    if (compareMoney(amount, peakAmount) > 0) {
+      peakAmount = amount
       peakIndex = month
     }
   }
@@ -290,40 +291,43 @@ const peakMonth = (progress: FinancialProgress): number | null => {
  * Scales one month against the peak positive forecast month for its mini-bar.
  * @param progress - Currency-specific pacing values.
  * @param month - Fiscal month index.
+ * @param currency - Owning currency for empty monthly values.
  * @returns Bar height from zero through one hundred percent.
  */
-const distributionHeight = (progress: FinancialProgress, month: number): number => {
+const distributionHeight = (progress: FinancialProgress, month: number, currency: string): number => {
   if (!progress.monthlyForecast) return 0
-  const peakIndex = peakMonth(progress)
+  const peakIndex = peakMonth(progress, currency)
   if (peakIndex === null) return 0
-  const peak = moneyToCents(progress.monthlyForecast[peakIndex] ?? ZERO_MONEY)
-  const cents = moneyToCents(progress.monthlyForecast[month] ?? ZERO_MONEY)
-  if (peak <= BigInt(0) || cents <= BigInt(0)) return 0
-  return Number(cents * BigInt(10000) / peak) / 100
+  const peak = moneyToMinorUnits(progress.monthlyForecast[peakIndex] ?? zeroMoney(currency))
+  const minorUnits = moneyToMinorUnits(progress.monthlyForecast[month] ?? zeroMoney(currency))
+  if (peak <= BigInt(0) || minorUnits <= BigInt(0)) return 0
+  return Number(minorUnits * BigInt(10000) / peak) / 100
 }
 /**
  * Positions an even monthly share on the same scale as the forecast mini-bars.
  * @param progress - Currency-specific pacing values.
+ * @param currency - Owning currency for empty monthly values.
  * @returns Reference-line height from zero through one hundred percent.
  */
-const evenReferenceHeight = (progress: FinancialProgress): number => {
-  if (!progress.monthlyForecast || !hasPositiveForecastTotal(progress)) return 0
-  const peakIndex = peakMonth(progress)
+const evenReferenceHeight = (progress: FinancialProgress, currency: string): number => {
+  if (!progress.monthlyForecast || progress.annualForecast === null || !hasPositiveForecastTotal(progress, currency)) return 0
+  const peakIndex = peakMonth(progress, currency)
   if (peakIndex === null) return 0
-  const peak = moneyToCents(progress.monthlyForecast[peakIndex] ?? ZERO_MONEY)
+  const peak = moneyToMinorUnits(progress.monthlyForecast[peakIndex] ?? zeroMoney(currency))
   if (peak <= BigInt(0)) return 0
-  const scaled = moneyToCents(progress.annualForecast as Money) * BigInt(10000) / (BigInt(12) * peak)
+  const scaled = moneyToMinorUnits(progress.annualForecast) * BigInt(10000) / (BigInt(12) * peak)
   return Number(scaled > BigInt(10000) ? BigInt(10000) : scaled) / 100
 }
 /**
  * Calculates the peak month's share of the annual active forecast.
  * @param progress - Currency-specific pacing values.
+ * @param currency - Owning currency for empty monthly values.
  * @returns Localized percentage, or null without a positive annual forecast.
  */
-const peakShare = (progress: FinancialProgress): string | null => {
-  const peakIndex = peakMonth(progress)
+const peakShare = (progress: FinancialProgress, currency: string): string | null => {
+  const peakIndex = peakMonth(progress, currency)
   if (peakIndex === null || !progress.monthlyForecast || progress.annualForecast === null) return null
-  return percentText(moneyToCents(progress.monthlyForecast[peakIndex] ?? ZERO_MONEY), moneyToCents(progress.annualForecast))
+  return percentText(moneyToMinorUnits(progress.monthlyForecast[peakIndex] ?? zeroMoney(currency)), moneyToMinorUnits(progress.annualForecast))
 }
 </script>
 
@@ -412,7 +416,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
                     {{ t('agreement.financial_summary.pacing.annual_budget') }}
                   </dt>
                   <dd class="mt-1 font-semibold tabular-nums text-highlighted">
-                    {{ formatMoney(group.progress.annualBudget, group.currency) }}
+                    {{ formatMoney(group.progress.annualBudget) }}
                   </dd>
                 </div>
                 <div>
@@ -420,7 +424,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
                     {{ t('agreement.financial_summary.pacing.reconciled_total') }}
                   </dt>
                   <dd class="mt-1 font-semibold tabular-nums text-highlighted">
-                    {{ formatMoney(group.progress.reconciledTotal, group.currency) }}
+                    {{ formatMoney(group.progress.reconciledTotal) }}
                   </dd>
                 </div>
                 <div>
@@ -428,7 +432,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
                     {{ group.progress.latestReconciledMonth === null ? t('agreement.financial_summary.pacing.forecast_to_cutoff') : t('agreement.financial_summary.pacing.forecast_through_month', { month: monthLabel(group.progress.latestReconciledMonth) }) }}
                   </dt>
                   <dd class="mt-1 font-semibold tabular-nums text-highlighted">
-                    {{ group.progress.forecastToReconciliation === null ? t('common.not_available') : formatMoney(group.progress.forecastToReconciliation, group.currency) }}
+                    {{ group.progress.forecastToReconciliation === null ? t('common.not_available') : formatMoney(group.progress.forecastToReconciliation) }}
                   </dd>
                 </div>
                 <div>
@@ -436,16 +440,16 @@ const peakShare = (progress: FinancialProgress): string | null => {
                     {{ t('agreement.financial_summary.pacing.annual_forecast') }}
                   </dt>
                   <dd class="mt-1 font-semibold tabular-nums text-highlighted">
-                    {{ group.progress.annualForecast === null ? t('common.not_available') : formatMoney(group.progress.annualForecast, group.currency) }}
+                    {{ group.progress.annualForecast === null ? t('common.not_available') : formatMoney(group.progress.annualForecast) }}
                   </dd>
                 </div>
               </dl>
-              <div v-if="hasBudgetScale(group.progress)" class="space-y-2" data-testid="financial-summary-progress-track">
+              <div v-if="hasBudgetScale(group.progress, group.currency)" class="space-y-2" data-testid="financial-summary-progress-track">
                 <div
                   role="img"
                   :aria-label="group.progress.forecastToReconciliation === null
-                    ? t('agreement.financial_summary.pacing.track_reconciled_aria', { reconciled: formatMoney(group.progress.reconciledTotal, group.currency), budget: formatMoney(group.progress.annualBudget, group.currency) })
-                    : t('agreement.financial_summary.pacing.track_with_forecast_aria', { reconciled: formatMoney(group.progress.reconciledTotal, group.currency), forecast: formatMoney(group.progress.forecastToReconciliation, group.currency), budget: formatMoney(group.progress.annualBudget, group.currency) })"
+                    ? t('agreement.financial_summary.pacing.track_reconciled_aria', { reconciled: formatMoney(group.progress.reconciledTotal), budget: formatMoney(group.progress.annualBudget) })
+                    : t('agreement.financial_summary.pacing.track_with_forecast_aria', { reconciled: formatMoney(group.progress.reconciledTotal), forecast: formatMoney(group.progress.forecastToReconciliation), budget: formatMoney(group.progress.annualBudget) })"
                   class="relative h-3 rounded-full bg-elevated">
                   <div class="h-full rounded-full bg-teal-500" :style="{ width: `${trackPercent(group.progress.reconciledTotal, group.progress.annualBudget)}%` }" />
                   <div
@@ -457,14 +461,14 @@ const peakShare = (progress: FinancialProgress): string | null => {
                   <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-sm bg-teal-500" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.reconciled_fill') }}</span>
                   <span v-if="group.progress.forecastToReconciliation !== null" class="inline-flex items-center gap-1.5"><span class="h-3 w-0.5 bg-sky-700 dark:bg-sky-300" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.forecast_marker') }}</span>
                 </div>
-                <p v-if="exceedsBudget(group.progress)" class="text-xs text-muted">
+                <p v-if="exceedsBudget(group.progress, group.currency)" class="text-xs text-muted">
                   {{ t('agreement.financial_summary.pacing.over_budget') }}
                 </p>
               </div>
               <p v-else class="text-xs text-muted">
                 {{ t('agreement.financial_summary.pacing.zero_budget') }}
               </p>
-              <p v-if="hasAmountsWithoutBudget(group.progress)" class="text-xs text-muted">
+              <p v-if="hasAmountsWithoutBudget(group.progress, group.currency)" class="text-xs text-muted">
                 {{ t('agreement.financial_summary.pacing.amounts_without_budget') }}
               </p>
               <p v-if="group.progress.latestReconciledMonth === null" class="text-xs text-muted">
@@ -473,24 +477,24 @@ const peakShare = (progress: FinancialProgress): string | null => {
               <p v-else-if="group.progress.annualForecast === null" class="text-xs text-muted">
                 {{ t('agreement.financial_summary.pacing.no_active_forecast') }}
               </p>
-              <p v-else-if="reconciliationComparison(group.progress, group.currency)" class="text-xs text-muted">
-                {{ reconciliationComparison(group.progress, group.currency) }}
+              <p v-else-if="reconciliationComparison(group.progress)" class="text-xs text-muted">
+                {{ reconciliationComparison(group.progress) }}
               </p>
-              <p v-if="budgetComparison(group.progress, group.currency)" class="text-xs text-muted">
-                {{ budgetComparison(group.progress, group.currency) }}
+              <p v-if="budgetComparison(group.progress)" class="text-xs text-muted">
+                {{ budgetComparison(group.progress) }}
               </p>
             </div>
             <div class="min-w-0 border-t border-default pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6" data-testid="financial-summary-distribution">
               <h5 class="text-sm font-medium text-highlighted">
                 {{ t('agreement.financial_summary.pacing.distribution_title') }}
               </h5>
-              <template v-if="group.progress.monthlyForecast && peakMonth(group.progress) !== null">
+              <template v-if="group.progress.monthlyForecast && peakMonth(group.progress, group.currency) !== null">
                 <div class="mt-4">
                   <div class="relative h-14">
-                    <div v-if="hasPositiveForecastTotal(group.progress)" class="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-amber-500" :style="{ bottom: `${evenReferenceHeight(group.progress)}%` }" aria-hidden="true" />
+                    <div v-if="hasPositiveForecastTotal(group.progress, group.currency)" class="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-amber-500" :style="{ bottom: `${evenReferenceHeight(group.progress, group.currency)}%` }" aria-hidden="true" />
                     <div class="grid h-full grid-cols-12 gap-0.5" aria-hidden="true">
                       <div v-for="month in MONTHS" :key="month" class="flex min-w-0 items-end rounded-sm bg-elevated/70">
-                        <div class="w-full rounded-t-sm bg-sky-500 dark:bg-sky-400" :style="{ height: `${distributionHeight(group.progress, month)}%` }" />
+                        <div class="w-full rounded-t-sm bg-sky-500 dark:bg-sky-400" :style="{ height: `${distributionHeight(group.progress, month, group.currency)}%` }" />
                       </div>
                     </div>
                   </div>
@@ -500,16 +504,16 @@ const peakShare = (progress: FinancialProgress): string | null => {
                 </div>
                 <ul class="sr-only">
                   <li v-for="month in MONTHS" :key="month">
-                    {{ monthLabel(month) }}: {{ formatMoney(group.progress.monthlyForecast?.[month] ?? ZERO_MONEY, group.currency) }}
+                    {{ monthLabel(month) }}: {{ formatMoney(group.progress.monthlyForecast?.[month] ?? zeroMoney(group.currency)) }}
                   </li>
                 </ul>
                 <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-                  <span v-if="hasPositiveForecastTotal(group.progress)" class="inline-flex items-center gap-1.5"><span class="w-4 border-t border-dashed border-amber-500" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.even_month_reference') }}</span>
-                  <span v-if="peakMonth(group.progress) !== null && peakShare(group.progress)">
-                    {{ t('agreement.financial_summary.pacing.peak_month', { month: monthLabel(peakMonth(group.progress) as number), share: peakShare(group.progress) }) }}
+                  <span v-if="hasPositiveForecastTotal(group.progress, group.currency)" class="inline-flex items-center gap-1.5"><span class="w-4 border-t border-dashed border-amber-500" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.even_month_reference') }}</span>
+                  <span v-if="peakMonth(group.progress, group.currency) !== null && peakShare(group.progress, group.currency)">
+                    {{ t('agreement.financial_summary.pacing.peak_month', { month: monthLabel(peakMonth(group.progress, group.currency) as number), share: peakShare(group.progress, group.currency) }) }}
                   </span>
                 </div>
-                <p v-if="!hasPositiveForecastTotal(group.progress)" class="mt-2 text-xs text-muted">
+                <p v-if="!hasPositiveForecastTotal(group.progress, group.currency)" class="mt-2 text-xs text-muted">
                   {{ t('agreement.financial_summary.pacing.no_positive_forecast_total') }}
                 </p>
               </template>
@@ -565,14 +569,14 @@ const peakShare = (progress: FinancialProgress): string | null => {
                   {{ t(`agreement.financial_summary.measures.${measure}`) }}
                 </th>
                 <td v-for="period in visiblePeriods" :key="period.id" :data-month="period.month" :data-quarter="period.month === null ? period.quarter : undefined" class="border-t border-l border-default px-3 py-2 text-right tabular-nums" :class="measure === 'budget' ? 'text-muted' : 'text-highlighted'">
-                  <span v-if="linePeriodAmount(line, measure, period) === ZERO_MONEY">
+                  <span v-if="isZeroAmount(linePeriodAmount(line, measure, period))">
                     <span aria-hidden="true">{{ t('agreement.financial_summary.not_allocated_short') }}</span>
-                    <span class="sr-only">{{ formatMoney(ZERO_MONEY, group.currency) }}</span>
+                    <span class="sr-only">{{ formatMoney(zeroMoney(group.currency)) }}</span>
                   </span>
-                  <span v-else>{{ displayMonthlyAmount(linePeriodAmount(line, measure, period), group.currency) }}</span>
+                  <span v-else>{{ displayMonthlyAmount(linePeriodAmount(line, measure, period)) }}</span>
                 </td>
                 <td class="border-t border-l border-default px-3 py-2 text-right font-semibold tabular-nums text-highlighted">
-                  {{ displayYearAmount(yearAmount(line, measure), group.currency) }}
+                  {{ displayYearAmount(yearAmount(line, measure)) }}
                 </td>
               </tr>
             </tbody>
@@ -590,20 +594,20 @@ const peakShare = (progress: FinancialProgress): string | null => {
                   <span class="block text-xs font-normal text-muted">{{ t('agreement.financial_summary.lump_sum_note') }}</span>
                 </th>
                 <td v-for="period in visiblePeriods" :key="period.id" :data-month="period.month" :data-quarter="period.month === null ? period.quarter : undefined" class="border-t-2 border-l border-default px-3 py-3 text-right align-top tabular-nums">
-                  <span class="font-semibold text-highlighted">{{ displayMonthlyAmount(periodAmount(adjustedPaid(group), period), group.currency) }}</span>
+                  <span class="font-semibold text-highlighted">{{ displayMonthlyAmount(periodAmount(adjustedPaid(group), period, group.currency)) }}</span>
                   <details v-if="paymentsInPeriod(group, period).length > 0" class="mt-1 text-left text-xs text-muted">
                     <summary class="cursor-pointer whitespace-nowrap">
                       {{ t(paymentsInPeriod(group, period).length === 1 ? 'agreement.financial_summary.payment_count_one' : 'agreement.financial_summary.payment_count', { count: paymentsInPeriod(group, period).length }) }}
                     </summary>
                     <ul class="mt-1 space-y-1">
                       <li v-for="payment in paymentsInPeriod(group, period)" :key="payment.id" class="whitespace-nowrap">
-                        {{ paymentPeriod(payment) }}: {{ formatMoney(payment.amount, group.currency) }}
+                        {{ paymentPeriod(payment) }}: {{ formatMoney(payment.amount) }}
                       </li>
                     </ul>
                   </details>
                 </td>
                 <td class="border-t-2 border-l border-default px-3 py-3 text-right font-bold tabular-nums text-primary">
-                  {{ formatMoney(paidYearTotal(group), group.currency) }}
+                  {{ formatMoney(paidYearTotal(group)) }}
                 </td>
               </tr>
             </tfoot>

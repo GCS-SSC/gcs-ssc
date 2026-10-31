@@ -17,7 +17,12 @@ const asRecord = (value: JsonValue | undefined): PacketRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as PacketRecord : {}
 const asRecords = (value: JsonValue | undefined): PacketRecord[] =>
   Array.isArray(value) ? value.map(asRecord) : []
-const packet = computed(() => asRecord(submission.egcs_fc_packet))
+const capturedPacket = computed(() => asRecord(submission.egcs_fc_packet))
+const supportedPacket = computed(() => capturedPacket.value.schemaVersion === 4
+  && Object.hasOwn(capturedPacket.value, 'risk')
+  && (capturedPacket.value.risk === null
+    || (typeof capturedPacket.value.risk === 'object' && !Array.isArray(capturedPacket.value.risk))))
+const packet = computed<PacketRecord>(() => supportedPacket.value ? capturedPacket.value : {})
 const agreement = computed(() => packet.value.agreement == null ? null : asRecord(packet.value.agreement))
 const amendment = computed(() => packet.value.amendment == null ? null : asRecord(packet.value.amendment))
 const risk = computed(() => packet.value.risk == null ? null : asRecord(packet.value.risk))
@@ -55,14 +60,10 @@ const display = (value: JsonValue | undefined): string => {
   if (typeof value === 'object') return bilingual(value)
   return String(value)
 }
-const toAmount = (value: JsonValue | undefined): Money | undefined => {
-  if (value === null || value === undefined || value === '') return undefined
-  if (typeof value !== 'string' && typeof value !== 'number') return undefined
-  try {
-    return parseMoney(value)
-  } catch {
-    return undefined
-  }
+const packetMoney = (value: JsonValue | undefined, currency: JsonValue | undefined): Money => {
+  const amount = parseMoney(value)
+  if (typeof currency !== 'string' || amount.currency !== currency.toUpperCase()) throw new TypeError('Captured money currency does not match its retained owner.')
+  return amount
 }
 const registryLabel = (registry: PacketRecord): string =>
   `${t(`enums.registry_type.${display(registry.type)}`)}: ${display(registry.number)}`
@@ -123,67 +124,71 @@ const riskFields = computed<DisplayField[]>(() => risk.value
           ])
     ]
   : [])
-const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() => {
-  const fiscalYearIdByDisplay = new Map<string, string>()
-  const mappedFiscalYears = fiscalYears.value.map((fiscalYear, index) => {
-    const id = `packet-fiscal-year-${index}`
-    fiscalYearIdByDisplay.set(display(fiscalYear.display), id)
-    return { id, egcs_fc_fiscalyear: id, fiscal_year_display: display(fiscalYear.display) }
-  })
-  return {
-    proponents: [],
-    fiscalYears: mappedFiscalYears,
-    lineItems: lineItems.value.map((line, index) => {
-      const fiscalYearId = fiscalYearIdByDisplay.get(display(line.fiscalYear)) ?? `packet-fiscal-year-missing-${index}`
-      const category = asRecord(line.organizationCostCategory)
-      const item = asRecord(line.lineItem)
-      const applicantRecipient = asRecord(line.applicantRecipient)
-      const applicantRecipientName = asRecord(applicantRecipient.name)
-      const fundingSources = asRecords(line.fundingSources).map((source, sourceIndex) => {
-        const typeName = asRecord(source.fundingType)
-        const subtypeName = asRecord(source.fundingSubtype)
-        const description = asRecord(source.description)
+const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow | null>(() => {
+  try {
+    const fiscalYearIdByDisplay = new Map<string, string>()
+    const mappedFiscalYears = fiscalYears.value.map((fiscalYear, index) => {
+      const id = `packet-fiscal-year-${index}`
+      fiscalYearIdByDisplay.set(display(fiscalYear.display), id)
+      return { id, egcs_fc_fiscalyear: id, fiscal_year_display: display(fiscalYear.display) }
+    })
+    return {
+      proponents: [],
+      fiscalYears: mappedFiscalYears,
+      lineItems: lineItems.value.map((line, index) => {
+        const fiscalYearId = fiscalYearIdByDisplay.get(display(line.fiscalYear)) ?? `packet-fiscal-year-missing-${index}`
+        const category = asRecord(line.organizationCostCategory)
+        const item = asRecord(line.lineItem)
+        const applicantRecipient = asRecord(line.applicantRecipient)
+        const applicantRecipientName = asRecord(applicantRecipient.name)
+        const fundingSources = asRecords(line.fundingSources).map((source, sourceIndex) => {
+          const typeName = asRecord(source.fundingType)
+          const subtypeName = asRecord(source.fundingSubtype)
+          const description = asRecord(source.description)
+          return {
+            id: `packet-funding-${index}-${sourceIndex}`,
+            egcs_fc_fundingsubtype: `packet-subtype-${index}-${sourceIndex}`,
+            egcs_fc_amount: packetMoney(source.amount, line.currency),
+            egcs_fc_description_en: String(description.en ?? ''),
+            egcs_fc_description_fr: String(description.fr ?? ''),
+            funding_type_name_en: String(typeName.en ?? ''),
+            funding_type_name_fr: String(typeName.fr ?? ''),
+            funding_subtype_name_en: String(subtypeName.en ?? ''),
+            funding_subtype_name_fr: String(subtypeName.fr ?? ''),
+            funding_type_instacking: Boolean(source.inStacking),
+            funding_type_incostsharing: Boolean(source.inCostSharing)
+          }
+        })
         return {
-          id: `packet-funding-${index}-${sourceIndex}`,
-          egcs_fc_fundingsubtype: `packet-subtype-${index}-${sourceIndex}`,
-          egcs_fc_amount: toAmount(source.amount) ?? parseMoney('0'),
-          egcs_fc_description_en: String(description.en ?? ''),
-          egcs_fc_description_fr: String(description.fr ?? ''),
-          funding_type_name_en: String(typeName.en ?? ''),
-          funding_type_name_fr: String(typeName.fr ?? ''),
-          funding_subtype_name_en: String(subtypeName.en ?? ''),
-          funding_subtype_name_fr: String(subtypeName.fr ?? ''),
-          funding_type_instacking: Boolean(source.inStacking),
-          funding_type_incostsharing: Boolean(source.inCostSharing)
+          id: `packet-line-${index}`,
+          fiscal_year_id: fiscalYearId,
+          fiscal_year_display: display(line.fiscalYear),
+          egcs_fc_fundingagreementbudgetfiscalyear: fiscalYearId,
+          egcs_fc_applicantrecipient: String(applicantRecipient.id ?? ''),
+          applicant_recipient_name_en: String(applicantRecipientName.en ?? ''),
+          applicant_recipient_name_fr: String(applicantRecipientName.fr ?? ''),
+          egcs_fc_organizationcostcategory: `packet-category-${index}`,
+          organization_cost_category_name_en: String(category.en ?? ''),
+          organization_cost_category_name_fr: String(category.fr ?? ''),
+          line_item_name_en: String(item.en ?? ''),
+          line_item_name_fr: String(item.fr ?? ''),
+          egcs_fc_calculationmode: (line.calculationMode ?? 'manual') as FundingCaseAgreementBudgetLineItemRow['egcs_fc_calculationmode'],
+          calculation_source_name_en: String(asRecord(line.sourceCategory).en ?? ''),
+          calculation_source_name_fr: String(asRecord(line.sourceCategory).fr ?? ''),
+          egcs_fc_percentage: typeof line.percentage === 'string' ? Number(line.percentage) : null,
+          egcs_fc_sourcecategory: line.sourceCategoryId == null ? null : String(line.sourceCategoryId),
+          egcs_fc_allowpercentageoverride: Boolean(line.allowPercentageOverride),
+          egcs_fc_costsubsection: display(line.costSubsection),
+          egcs_fc_description: display(line.description),
+          egcs_fc_totalamount: packetMoney(line.totalAmount, line.currency),
+          egcs_fc_programfunding: packetMoney(line.programFunding, line.currency),
+          egcs_fc_fundingsources: fundingSources,
+          egcs_fc_currency: packetMoney(line.totalAmount, line.currency).currency.toLowerCase() as FundingCaseAgreementBudgetLineItemRow['egcs_fc_currency']
         }
       })
-      return {
-        id: `packet-line-${index}`,
-        fiscal_year_id: fiscalYearId,
-        fiscal_year_display: display(line.fiscalYear),
-        egcs_fc_fundingagreementbudgetfiscalyear: fiscalYearId,
-        egcs_fc_applicantrecipient: String(applicantRecipient.id ?? ''),
-        applicant_recipient_name_en: String(applicantRecipientName.en ?? ''),
-        applicant_recipient_name_fr: String(applicantRecipientName.fr ?? ''),
-        egcs_fc_organizationcostcategory: `packet-category-${index}`,
-        organization_cost_category_name_en: String(category.en ?? ''),
-        organization_cost_category_name_fr: String(category.fr ?? ''),
-        line_item_name_en: String(item.en ?? ''),
-        line_item_name_fr: String(item.fr ?? ''),
-        egcs_fc_calculationmode: (line.calculationMode ?? 'manual') as FundingCaseAgreementBudgetLineItemRow['egcs_fc_calculationmode'],
-        calculation_source_name_en: String(asRecord(line.sourceCategory).en ?? ''),
-        calculation_source_name_fr: String(asRecord(line.sourceCategory).fr ?? ''),
-        egcs_fc_percentage: typeof line.percentage === 'string' ? Number(line.percentage) : null,
-        egcs_fc_sourcecategory: line.sourceCategoryId == null ? null : String(line.sourceCategoryId),
-        egcs_fc_allowpercentageoverride: Boolean(line.allowPercentageOverride),
-        egcs_fc_costsubsection: display(line.costSubsection),
-        egcs_fc_description: display(line.description),
-        egcs_fc_totalamount: toAmount(line.totalAmount) ?? parseMoney('0'),
-        egcs_fc_programfunding: toAmount(line.programFunding) ?? parseMoney('0'),
-        egcs_fc_fundingsources: fundingSources,
-        egcs_fc_currency: String(line.currency || 'cad') as FundingCaseAgreementBudgetLineItemRow['egcs_fc_currency']
-      }
-    })
+    }
+  } catch {
+    return null
   }
 })
 const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => activities.value.map((activity, index) => {
@@ -226,6 +231,9 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
     :captured-label="t('workflow.packet.submitted_at', { date: formatDate(submission.egcs_fc_submittedat) })"
     :hash-label="t('workflow.packet.hash')"
     :hash="submission.egcs_fc_canonicalhash">
+    <p v-if="!supportedPacket" class="text-sm text-muted">
+      {{ t('common.not_available') }}
+    </p>
     <CommonSection v-if="agreement" :title="t('workflow.packet.agreement')" :badge="sectionBadge('agreement')">
       <dl class="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-3">
         <div v-for="field in agreementFields" :key="field.key">
@@ -327,6 +335,7 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
 
     <CommonSection v-if="hasBudget" :title="t('workflow.packet.budget')" :badge="sectionBadge('budget')" :grid-cols="1">
       <AgreementBudgetTab
+        v-if="packetBudgetOverview"
         agreement-id="packet"
         embedded
         static-mode
@@ -338,6 +347,9 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
         :can-delete-fiscal-year="false"
         :agreement-proponent-count="proponents.length"
         :snapshot-overview="packetBudgetOverview" />
+      <p v-else class="text-sm text-muted">
+        {{ t('common.not_available') }}
+      </p>
     </CommonSection>
 
     <CommonSection v-if="hasActivities" :title="t('workflow.packet.activities')" :badge="sectionBadge('activities')" :grid-cols="1">

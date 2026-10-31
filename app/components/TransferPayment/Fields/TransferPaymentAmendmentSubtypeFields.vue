@@ -11,6 +11,7 @@ interface AmendmentTypeOption {
 const model = defineModel<Partial<TransferPaymentAmendmentSubtypes> & { tempAmendmentTypeIds?: string[] }>('model', { required: true })
 
 const {
+  definitionLocked = false,
   amendmentTypes = [],
   amendmentTypesFetchUrl,
   namePrefix = '',
@@ -19,6 +20,7 @@ const {
 } = defineProps<{
   amendmentTypes?: AmendmentTypeOption[]
   amendmentTypesFetchUrl?: string
+  definitionLocked?: boolean
   namePrefix?: string
   amendmentTypeField?: string
   amendmentTypeValueKey?: string
@@ -41,6 +43,7 @@ const updateAmendmentTypeIds = (value: string[]) => {
     <CommonServerLookupSelect
       v-if="amendmentTypesFetchUrl"
       multiple
+      :disabled="definitionLocked"
       :limit="100"
       :values="amendmentTypeIds()"
       :fetch-url="amendmentTypesFetchUrl"
@@ -51,6 +54,7 @@ const updateAmendmentTypeIds = (value: string[]) => {
       @update:values="updateAmendmentTypeIds" />
     <CommonBilingualMultiSelectMenu
       v-else
+      :disabled="definitionLocked"
       :model-value="amendmentTypeIds()"
       :items="amendmentTypes"
       :value-key="amendmentTypeValueKey"
@@ -60,15 +64,18 @@ const updateAmendmentTypeIds = (value: string[]) => {
       @update:model-value="updateAmendmentTypeIds" />
   </UFormField>
   <UFormField :label="t('transfer_payment.amendment_subtype_name_en')" :name="field('egcs_tp_name_en')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
-    <UInput v-model="model.egcs_tp_name_en" />
+    <UInput v-model="model.egcs_tp_name_en" :disabled="definitionLocked" />
   </UFormField>
   <UFormField :label="t('transfer_payment.amendment_subtype_name_fr')" :name="field('egcs_tp_name_fr')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
-    <UInput v-model="model.egcs_tp_name_fr" />
+    <UInput v-model="model.egcs_tp_name_fr" :disabled="definitionLocked" />
   </UFormField>
   <UFormField :label="t('transfer_payment.amendment_subtype_description_en')" :name="field('egcs_tp_description_en')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
-    <CommonTextarea v-model="model.egcs_tp_description_en" :rows="2" />
+    <CommonTextarea v-model="model.egcs_tp_description_en" :disabled="definitionLocked" :rows="2" />
   </UFormField>
   <UFormField :label="t('transfer_payment.amendment_subtype_description_fr')" :name="field('egcs_tp_description_fr')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
-    <CommonTextarea v-model="model.egcs_tp_description_fr" :rows="2" />
+    <CommonTextarea v-model="model.egcs_tp_description_fr" :disabled="definitionLocked" :rows="2" />
+  </UFormField>
+  <UFormField :label="t('common.active')" :name="field('egcs_tp_active')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
+    <USwitch :model-value="model.egcs_tp_active ?? true" @update:model-value="model.egcs_tp_active = $event" />
   </UFormField>
 </template>

@@ -9,7 +9,7 @@ import type {
   FundingHistorySimilarityWarning,
   VisibleFundingHistoryRow
 } from '~/types/funding-history'
-import { compareMoney, formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, parseMoney, zeroMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
 const {
   applicantRecipientId,
@@ -31,9 +31,8 @@ const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
 const { items: allCurrencyOptions } = useEnumSelectOptions({ name: () => 'currency_codes' })
-const currencyOptions = computed(() => allCurrencyOptions.value.filter(option => option.value !== 'all'))
-const ZERO_MONEY = parseMoney('0')
-const tryParseMoney = (value: string | undefined): Money | null => {
+const currencyOptions = allCurrencyOptions
+const tryParseMoney = (value: MoneyInput): Money | null => {
   if (value === undefined) return null
   try {
     return parseMoney(value)
@@ -93,7 +92,7 @@ const stateFromHistory = (item: VisibleFundingHistoryRow): FundingHistoryFormSta
   egcs_ar_description_fr: item.descriptionFr || undefined,
   egcs_ar_startdate: dateInputValue(item.startDate),
   egcs_ar_enddate: dateInputValue(item.endDate),
-  egcs_ar_fundingamount: item.totals[0]?.amount ?? '0.00',
+  egcs_ar_fundingamount: item.totals[0]?.amount,
   egcs_ar_currency: item.totals[0]?.currency || 'cad',
   confirmations: []
 })
@@ -157,7 +156,7 @@ const validateState = (data: FundingHistoryFormState, onlyStep?: FundingHistoryS
       addError(result, 'egcs_ar_enddate', 'applicant_recipient.funding_history.validation.end_date')
     }
     const fundingAmount = tryParseMoney(data.egcs_ar_fundingamount)
-    if (fundingAmount === null || compareMoney(fundingAmount, ZERO_MONEY) < 0) {
+    if (fundingAmount === null || fundingAmount.currency !== data.egcs_ar_currency?.toUpperCase() || compareMoney(fundingAmount, zeroMoney(fundingAmount.currency)) < 0) {
       addError(result, 'egcs_ar_fundingamount', 'applicant_recipient.funding_history.validation.amount')
     }
     if (!data.egcs_ar_currency) addError(result, 'egcs_ar_currency')
@@ -204,7 +203,7 @@ const payload = (data: FundingHistoryFormState) => ({
 const formatFundingAmount = (data: FundingHistoryFormState): string => {
   const amount = tryParseMoney(data.egcs_ar_fundingamount)
   if (amount === null || !data.egcs_ar_currency) return t('common.none')
-  return formatMoneyText(amount, locale.value, data.egcs_ar_currency.toUpperCase())
+  return formatMoneyText(amount, locale.value)
 }
 
 type FundingHistoryPayload = ReturnType<typeof payload>

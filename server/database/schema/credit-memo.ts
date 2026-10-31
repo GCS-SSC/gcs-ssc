@@ -131,6 +131,8 @@ export const installCreditMemoFunctions = async (db: Kysely<Database>): Promise<
       SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
       IF debt.id IS NULL OR debt._deleted OR debt.egcs_fc_outcome<>'posted' OR debt.egcs_fc_linkedreceivable IS NOT NULL OR debt.egcs_fc_pool<>memo.egcs_fc_pool
         OR stream_id IS NULL OR account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
+        OR (NOT account.egcs_ay_active AND jsonb_typeof(memo.egcs_fc_allocationevidence) IS DISTINCT FROM 'object'
+          AND (TG_OP='INSERT' OR OLD.egcs_fc_creditmemochartofaccount IS DISTINCT FROM NEW.egcs_fc_creditmemochartofaccount))
         OR account.egcs_ay_organizationagency<>memo.egcs_fc_agency OR account.egcs_ay_currency<>memo.egcs_fc_currency
           OR (NEW.egcs_fc_commitmentchartofaccount IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" linked
             WHERE linked.id=NEW.egcs_fc_commitmentchartofaccount AND linked.egcs_ay_kind='commitment'

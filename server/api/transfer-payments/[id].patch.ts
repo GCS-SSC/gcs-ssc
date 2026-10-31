@@ -1,3 +1,4 @@
+import { badRequest } from '~~/server/utils/api-errors'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { dateOnlySql } from '~~/server/utils/database-date'
 import { z } from 'zod'
@@ -6,9 +7,7 @@ import type { Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
-import { throwIfMappedConstraintError } from '~~/server/utils/database-constraint-errors'
 import {
-  executeFreshAuthorizedTransferPaymentAgencyTransfer,
   executeFreshAuthorizedTransferPaymentWrite
 } from '~~/server/utils/transfer-payment-write-transaction'
 
@@ -43,8 +42,10 @@ export default defineEventHandler(async event => {
   }
   const validated = await readValidatedBodyI18n(event, PatchSchema)
   const { egcs_tp_agency: _ignoredAgency, ...safeUpdate } = validated
-  const transferRequested = Boolean(validated.egcs_tp_agency && String(validated.egcs_tp_agency) !== access.agencyId)
-  if (Object.keys(safeUpdate).length === 0 && !transferRequested) {
+  if (validated.egcs_tp_agency !== undefined && String(validated.egcs_tp_agency) !== access.agencyId) {
+    return await badRequest(event, 'TRANSFER_PAYMENT_AGENCY_IMMUTABLE', 'apiErrors.transfer_payment.agency_immutable')
+  }
+  if (Object.keys(safeUpdate).length === 0) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }
 
@@ -63,14 +64,6 @@ export default defineEventHandler(async event => {
     if (!currentProfile) {
       return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
     }
-    if (
-      validated.egcs_tp_agency
-      && String(validated.egcs_tp_agency) !== String(currentProfile.egcs_tp_agency)
-      && String(validated.egcs_tp_agency) === access.agencyId
-    ) {
-      return await badRequest(event, 'TRANSFER_PAYMENT_PROFILE_SCOPE_CHANGED', 'apiErrors.transfer_payment.profile_scope_changed')
-    }
-
     const startDate = validated.egcs_tp_datestart ?? currentProfile.egcs_tp_datestart
     const endDate = validated.egcs_tp_dateend ?? currentProfile.egcs_tp_dateend
     if (startDate > endDate) {
@@ -86,8 +79,7 @@ export default defineEventHandler(async event => {
       .set({
         ...safeUpdate,
         ...(validated.egcs_tp_datestart !== undefined ? { egcs_tp_datestart: dateOnlySql(validated.egcs_tp_datestart) } : {}),
-        ...(validated.egcs_tp_dateend !== undefined ? { egcs_tp_dateend: dateOnlySql(validated.egcs_tp_dateend) } : {}),
-        ...(transferRequested ? { egcs_tp_agency: String(validated.egcs_tp_agency) } : {})
+        ...(validated.egcs_tp_dateend !== undefined ? { egcs_tp_dateend: dateOnlySql(validated.egcs_tp_dateend) } : {})
       })
       .where('id', '=', id)
       .where('_deleted', '=', false)
@@ -96,20 +88,6 @@ export default defineEventHandler(async event => {
   }
 
   try {
-    if (transferRequested) {
-      try {
-        return await executeFreshAuthorizedTransferPaymentAgencyTransfer(
-          event, db, id, access.agencyId, String(validated.egcs_tp_agency), update
-        )
-      } catch (error: unknown) {
-        return await throwIfMappedConstraintError(event, error, ['23514'], {
-          agreement_financial_id_invalid: {
-            code: 'AGREEMENT_FINANCIAL_ID_INVALID',
-            key: 'apiErrors.agreement.invalid_financial_id'
-          }
-        })
-      }
-    }
     return await executeFreshAuthorizedTransferPaymentWrite(
       event, db, id, access.agencyId, 'update', update
     )

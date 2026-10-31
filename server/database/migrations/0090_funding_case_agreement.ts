@@ -1,3 +1,5 @@
+import { installMonetaryTableGuards } from '../schema/currency-money'
+import { installAmendmentCatalogIntegrity } from '../schema/amendment-catalog-integrity'
 import { sql, type Kysely } from 'kysely'
 import { ACCOUNT_RECEIVABLE_CLAIM_REDUCTION_SQL } from '../schema/account-receivable-adjustment'
 import { installCreditMemoFunctions } from '../schema/credit-memo'
@@ -95,7 +97,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
   "egcs_fc_allocationevidence" jsonb,
   "id" bigint NOT NULL,
   "egcs_fc_receivables" jsonb DEFAULT '[]'::jsonb NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_receivables" CHECK (jsonb_typeof(egcs_fc_receivables)='array'),
-  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_totalamount" CHECK (egcs_fc_totalamount >= 0),
+  "egcs_fc_totalamount" numeric DEFAULT 0 NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_totalamount" CHECK (egcs_fc_totalamount >= 0),
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_agency" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
@@ -103,7 +105,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
   "egcs_fc_currency" currency_codes NOT NULL,
   "egcs_fc_number" integer NOT NULL,
   "egcs_fc_receiveddate" date NOT NULL,
-  "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_amount" numeric DEFAULT 0 NOT NULL,
   "egcs_fc_reason" text DEFAULT ''::text NOT NULL,
   "egcs_fc_createdby" bigint NOT NULL,
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
@@ -145,7 +147,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
   "egcs_fc_commitmentchartofaccount" bigint CONSTRAINT "fc_fk_receivable_credit_memo_line_commitmentchartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemochartofaccount" bigint NOT NULL CONSTRAINT "fc_fk_receivable_credit_memo_line_creditmemochartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemoaccountingdimensions" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_line_amount" CHECK (egcs_fc_amount > 0),
+  "egcs_fc_amount" numeric NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_line_amount" CHECK (egcs_fc_amount > 0),
   "_deleted" boolean DEFAULT false NOT NULL
 );
 
@@ -157,7 +159,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_id_seq"'::regclass) NOT NULL,
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_pkey" PRIMARY KEY (id),
@@ -175,7 +177,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" (
   "egcs_fc_creditmemochartofaccount" bigint NOT NULL CONSTRAINT "fc_fk_receivable_offset_memo_line_creditmemochartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemoaccountingdimensions" jsonb NOT NULL,
   "egcs_fc_commitmentchartofaccount" bigint CONSTRAINT "fc_fk_receivable_offset_memo_line_commitmentchartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
-  "egcs_fc_amount" numeric(19,2) NOT NULL CONSTRAINT "fc_chk_receivable_offset_memo_line_amount" CHECK (egcs_fc_amount > 0),
+  "egcs_fc_amount" numeric NOT NULL CONSTRAINT "fc_chk_receivable_offset_memo_line_amount" CHECK (egcs_fc_amount > 0),
   "_deleted" boolean DEFAULT false NOT NULL CONSTRAINT "fc_chk_receivable_offset_memo_line_notdeleted" CHECK (_deleted = false),
   CONSTRAINT fc_uq_ar_offset_line_number UNIQUE (egcs_fc_offsetmemo, egcs_fc_linenumber),
   CONSTRAINT fc_uq_ar_offset_line_account UNIQUE (egcs_fc_offsetmemo, egcs_fc_creditmemochartofaccount)
@@ -186,7 +188,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" (
   "egcs_fc_offsetmemo" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_fc_recovery" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_Application_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_receivable_offset_memo_application_amount" CHECK ((egcs_fc_amount > (0)::numeric)),
   CONSTRAINT "fc_chk_receivable_offset_memo_application_notdeleted" CHECK ((_deleted = false))
@@ -209,7 +211,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Recovery" (
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Recovery_id_seq"'::regclass) NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
   "egcs_fc_payment" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "egcs_fc_outcome" character varying(16) DEFAULT 'open'::character varying NOT NULL,
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
   "egcs_fc_postedat" timestamp with time zone,
@@ -232,7 +234,7 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable" (
   "egcs_fc_allocationevidence" jsonb,
   "id" bigint NOT NULL,
   "egcs_fc_entitytype" text DEFAULT 'fundingcaseaccountreceivable' NOT NULL,
-  "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_amount" numeric DEFAULT 0 NOT NULL,
   "egcs_fc_agencyfinancialid" bigint,
   "egcs_fc_financialsystemid" text DEFAULT '' NOT NULL,
   "egcs_fc_fundingagreement" bigint NOT NULL,
@@ -247,7 +249,7 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable" (
   "egcs_fc_monitorrequired" boolean NOT NULL,
   "egcs_fc_advancepaymentrelated" boolean NOT NULL,
   "egcs_fc_claimrelated" boolean NOT NULL,
-  "egcs_fc_fiscaloutstanding" numeric(19,2),
+  "egcs_fc_fiscaloutstanding" numeric,
   "egcs_fc_recoverymethod" character varying(32),
   "egcs_fc_recipientpreference" character varying(32),
   "egcs_fc_preferenceoverride_en" text DEFAULT ''::text NOT NULL,
@@ -308,9 +310,9 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Coding" (
   "egcs_fc_agencyfiscalyear" bigint NOT NULL,
   "egcs_fc_periodstart" integer NOT NULL,
   "egcs_fc_periodend" integer NOT NULL,
-  "egcs_fc_paidbasis" numeric(19,2) NOT NULL,
-  "egcs_fc_sharedpaidbasis" numeric(19,2) NOT NULL,
-  "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_paidbasis" numeric NOT NULL,
+  "egcs_fc_sharedpaidbasis" numeric NOT NULL,
+  "egcs_fc_amount" numeric DEFAULT 0 NOT NULL,
   "egcs_fc_accountingdimensions" jsonb NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_uq_ar_coding_basis" UNIQUE (egcs_fc_receivableline, egcs_fc_commitmentline, egcs_fc_chartofaccount, egcs_fc_periodstart, egcs_fc_periodend),
@@ -336,8 +338,8 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Line" (
   "egcs_fc_payment" bigint,
   "egcs_fc_periodstart" integer NOT NULL,
   "egcs_fc_periodend" integer NOT NULL,
-  "egcs_fc_sourceamount" numeric(19,2) NOT NULL,
-  "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_sourceamount" numeric NOT NULL,
+  "egcs_fc_amount" numeric DEFAULT 0 NOT NULL,
   "egcs_fc_evidence" jsonb NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_uq_ar_line_identity" UNIQUE (id, egcs_fc_receivable, egcs_fc_fundingagreement),
@@ -464,7 +466,7 @@ CREATE TABLE "Funding_Case_Agreement_Approval_Submission" (
   CONSTRAINT "fc_uq_agreement_approval_submission_workflowrun" UNIQUE (egcs_fc_workflowrun),
   CONSTRAINT "Funding_Case_Agreement_Approval_Submission_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_approvalsubmissionhash" CHECK (((egcs_fc_canonicalhash)::text ~ '^[0-9a-f]{64}$'::text)),
-  CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion IN (2, 3)))
+  CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion = 4))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" (
@@ -493,8 +495,8 @@ CREATE TABLE "Funding_Case_Agreement_Budget_Line_Item" (
   "egcs_fc_organizationcostcategory" bigint NOT NULL,
   "egcs_fc_costsubsection" character varying(255) NOT NULL,
   "egcs_fc_description" text NOT NULL,
-  "egcs_fc_totalamount" numeric(19,2) NOT NULL,
-  "egcs_fc_programfunding" numeric(19,2) NOT NULL,
+  "egcs_fc_totalamount" numeric NOT NULL,
+  "egcs_fc_programfunding" numeric NOT NULL,
   "egcs_fc_currency" currency_codes NOT NULL,
   "egcs_fc_calculationmode" character varying(16) DEFAULT 'manual'::character varying NOT NULL,
   "egcs_fc_sourcecategory" bigint,
@@ -518,7 +520,7 @@ CREATE TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" (
   "id" bigint DEFAULT nextval('"Funding_Case_Agreement_Budget_Line_Item_Funding_id_seq"'::regclass) NOT NULL,
   "egcs_fc_budgetlineitem" bigint NOT NULL,
   "egcs_fc_fundingsubtype" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "egcs_fc_description_en" character varying(255),
   "egcs_fc_description_fr" character varying(255),
   "_deleted" boolean DEFAULT false NOT NULL,
@@ -576,10 +578,10 @@ CREATE TABLE "Funding_Case_Agreement_Claim_Line_Item" (
   "egcs_fc_submittedcostsubsection" text,
   "egcs_fc_submittedlineitem" text,
   "egcs_fc_description" text NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "egcs_fc_currency" currency_codes NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  "egcs_fc_totalamount" numeric(19,2) NOT NULL,
+  "egcs_fc_totalamount" numeric NOT NULL,
   CONSTRAINT "fc_unq_claimlineidclaim" UNIQUE (id, egcs_fc_fundingagreementclaim),
   CONSTRAINT "Funding_Case_Agreement_Claim_Line_Item_pkey" PRIMARY KEY (id)
 );
@@ -590,7 +592,7 @@ CREATE TABLE "Funding_Case_Agreement_Claim_Line_Item_Funding" (
   "id" bigint DEFAULT nextval('"Funding_Case_Agreement_Claim_Line_Item_Funding_id_seq"'::regclass) NOT NULL,
   "egcs_fc_claimlineitem" bigint NOT NULL,
   "egcs_fc_fundingsubtype" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Claim_Line_Item_Funding_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_agreement_claim_lineitem_funding_amount" CHECK ((egcs_fc_amount >= (0)::numeric))
@@ -617,8 +619,8 @@ CREATE TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" (
   "egcs_fc_fundingagreementclaimreconcile" bigint NOT NULL,
   "egcs_fc_fundingagreementclaim" bigint NOT NULL,
   "egcs_fc_lineitem" bigint NOT NULL,
-  "egcs_fc_reconciled" numeric(19,2) NOT NULL,
-  "egcs_fc_sampled" numeric(19,2),
+  "egcs_fc_reconciled" numeric NOT NULL,
+  "egcs_fc_sampled" numeric,
   "egcs_fc_rationale" text,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Claim_Reconcile_Line_Item_pkey" PRIMARY KEY (id)
@@ -654,12 +656,12 @@ CREATE TABLE "Funding_Case_Agreement_Closeout_Snapshot" (
   CONSTRAINT "fc_uq_agreement_closeout_snapshot_workflowrun" UNIQUE (egcs_fc_workflowrun),
   CONSTRAINT "Funding_Case_Agreement_Closeout_Snapshot_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_closeoutsnapshothash" CHECK (((egcs_fc_canonicalhash)::text ~ '^[0-9a-f]{64}$'::text)),
-  CONSTRAINT "fc_chk_closeoutsnapshotversion" CHECK ((egcs_fc_snapshotschemaversion = 1))
+  CONSTRAINT "fc_chk_closeoutsnapshotversion" CHECK ((egcs_fc_snapshotschemaversion = 2))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Commitment" (
   "id" bigint NOT NULL,
-  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CONSTRAINT "fc_chk_agreement_commitment_totalamount" CHECK (egcs_fc_totalamount >= 0),
+  "egcs_fc_totalamount" numeric DEFAULT 0 NOT NULL CONSTRAINT "fc_chk_agreement_commitment_totalamount" CHECK (egcs_fc_totalamount >= 0),
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_transferpaymentstream" bigint NOT NULL,
   "egcs_fc_type" bigint NOT NULL,
@@ -683,7 +685,7 @@ CREATE TABLE "Funding_Case_Agreement_Commitment_Line" (
   "egcs_fc_transferpaymentstream" bigint NOT NULL,
   "egcs_fc_commitmentlinenumber" smallint NOT NULL,
   "egcs_fc_transferpaymentstreamchartofaccount" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_chk_commitmentlineamountnonnegative" CHECK (egcs_fc_amount >= (0)::numeric),
   CONSTRAINT "fc_unq_commitmentlineidcommitment" UNIQUE (id, egcs_fc_commitment),
@@ -744,7 +746,7 @@ CREATE TABLE "Funding_Case_Agreement_Correction_Adjustment" (
   "egcs_fc_commitmentline" bigint NOT NULL,
   "egcs_fc_chartofaccount" bigint NOT NULL,
   "egcs_fc_agencyfiscalyear" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Correction_Adjustment_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_agreement_correction_adjustment_amount" CHECK ((egcs_fc_amount <> (0)::numeric))
@@ -764,13 +766,13 @@ CREATE TABLE "Funding_Case_Agreement_Correction_Line" (
   "egcs_fc_agencyfiscalyear" bigint NOT NULL,
   "egcs_fc_fiscalyeardisplay" text NOT NULL,
   "egcs_fc_accountingdimensions" jsonb NOT NULL,
-  "egcs_fc_commitmentamount" numeric(19,2) NOT NULL,
-  "egcs_fc_originalpaid" numeric(19,2) NOT NULL,
-  "egcs_fc_jveffect" numeric(19,2) NOT NULL,
-  "egcs_fc_priorcorrections" numeric(19,2) NOT NULL,
-  "egcs_fc_adjustment" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_commitmentamount" numeric NOT NULL,
+  "egcs_fc_originalpaid" numeric NOT NULL,
+  "egcs_fc_jveffect" numeric NOT NULL,
+  "egcs_fc_priorcorrections" numeric NOT NULL,
+  "egcs_fc_adjustment" numeric DEFAULT 0 NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  "egcs_fc_arrecoveries" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_arrecoveries" numeric DEFAULT 0 NOT NULL,
   CONSTRAINT "fc_uq_correction_line_root" UNIQUE (id, egcs_fc_correction, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Correction_Line_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_agreement_correction_line_accountingdimensions" CHECK ((jsonb_typeof(egcs_fc_accountingdimensions) = 'array'::text)),
@@ -831,10 +833,10 @@ CREATE TABLE "Funding_Case_Agreement_Forecast_Line_Item" (
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_fundingagreementbudgetlineitem" bigint NOT NULL,
   "egcs_fc_month" smallint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "egcs_fc_currency" currency_codes NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  "egcs_fc_totalamount" numeric(19,2) NOT NULL,
+  "egcs_fc_totalamount" numeric NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Forecast_Line_Item_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_forecastlineitemmonth" CHECK (((egcs_fc_month >= 0) AND (egcs_fc_month <= 11)))
 );
@@ -845,7 +847,7 @@ CREATE TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" (
   "id" bigint DEFAULT nextval('"Funding_Case_Agreement_Forecast_Line_Item_Funding_id_seq"'::regclass) NOT NULL,
   "egcs_fc_forecastlineitem" bigint NOT NULL,
   "egcs_fc_fundingsubtype" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Forecast_Line_Item_Funding_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_agreement_forecast_lineitem_funding_amount" CHECK ((egcs_fc_amount >= (0)::numeric))
@@ -916,7 +918,7 @@ CREATE TABLE "Funding_Case_Agreement_Journal_Voucher_Line" (
   "egcs_fc_kind" character varying(16) NOT NULL,
   "egcs_fc_chartofaccount" bigint NOT NULL,
   "egcs_fc_accountingdimensions" jsonb NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Journal_Voucher_Line_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_jv_line_amount" CHECK ((((egcs_fc_kind)::text = 'adjustment'::text) OR (egcs_fc_amount >= (0)::numeric))),
@@ -1068,7 +1070,7 @@ CREATE TABLE "Funding_Case_Agreement_Payment" (
   "egcs_fc_paymenttype" payment_type NOT NULL,
   "egcs_fc_periodstart" smallint NOT NULL,
   "egcs_fc_periodend" smallint NOT NULL,
-  "egcs_fc_paymentamount" numeric(19,2) NOT NULL,
+  "egcs_fc_paymentamount" numeric NOT NULL,
   "egcs_fc_currency" currency_codes DEFAULT 'cad'::currency_codes NOT NULL,
   "egcs_fc_evidence" jsonb,
   "egcs_fc_comment" text,
@@ -1076,7 +1078,7 @@ CREATE TABLE "Funding_Case_Agreement_Payment" (
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_fc_applicantrecipient" bigint NOT NULL,
   CONSTRAINT "fc_chk_paymentevidence" CHECK (egcs_fc_evidence IS NULL OR
-    (jsonb_typeof(egcs_fc_evidence) = 'object' AND egcs_fc_evidence->>'version' = '1'
+    (jsonb_typeof(egcs_fc_evidence) = 'object' AND egcs_fc_evidence->>'version' = '2'
      AND jsonb_typeof(egcs_fc_evidence->'capturedAt') = 'string'
      AND jsonb_typeof(egcs_fc_evidence->'selection') = 'object'
      AND jsonb_typeof(egcs_fc_evidence->'financialInputs') = 'object'
@@ -1097,7 +1099,7 @@ CREATE TABLE "Funding_Case_Agreement_Payment_Line" (
   "egcs_fc_fundingagreementpayment" bigint NOT NULL,
   "egcs_fc_fundingagreementcommitment" bigint NOT NULL,
   "egcs_fc_fundingagreementcommitmentline" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
+  "egcs_fc_amount" numeric NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Payment_Line_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_paymentlineamountpositive" CHECK ((egcs_fc_amount > (0)::numeric))
@@ -2172,7 +2174,7 @@ AS $function$
             OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
               JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.egcs_fc_transferpaymentstream=selection.egcs_tp_transferpaymentstream
               WHERE agreement.id=root.egcs_fc_fundingagreement AND selection.egcs_tp_agencychartofaccount=ar_account.id AND NOT selection._deleted)
-            OR (ar_account._deleted AND (TG_OP='INSERT' OR OLD.egcs_fc_accountreceivablechartofaccount IS DISTINCT FROM NEW.egcs_fc_accountreceivablechartofaccount)) THEN
+            OR ((ar_account._deleted OR NOT ar_account.egcs_ay_active) AND (TG_OP='INSERT' OR OLD.egcs_fc_accountreceivablechartofaccount IS DISTINCT FROM NEW.egcs_fc_accountreceivablechartofaccount)) THEN
             RAISE EXCEPTION 'AR financial line requires its Agency fiscal year currency Accounts Receivable Chart' USING ERRCODE = '23514';
           END IF;
           IF TG_OP = 'UPDATE' AND OLD.egcs_fc_accountreceivablechartofaccount IS NOT DISTINCT FROM NEW.egcs_fc_accountreceivablechartofaccount THEN
@@ -2431,7 +2433,7 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
         SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id=memo.egcs_fc_receivable;
         SELECT egcs_fc_transferpaymentstream INTO stream_id FROM "Funding_Case_Agreement_Profile" WHERE id=debt.egcs_fc_fundingagreement;
         SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
-        IF account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
+        IF account.id IS NULL OR account._deleted OR NOT account.egcs_ay_active OR account.egcs_ay_kind<>'credit_memo'
           OR (jsonb_typeof(memo.egcs_fc_allocationevidence) IS DISTINCT FROM 'object' AND account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear) OR account.egcs_ay_currency<>debt.egcs_fc_currency
           OR account.egcs_ay_organizationagency<>(SELECT egcs_fc_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id=memo.egcs_fc_pool)
           OR (NEW.egcs_fc_commitmentchartofaccount IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" linked
@@ -2953,6 +2955,15 @@ AS $function$
       END IF;
       RETURN NEW;
     END $function$;
+CREATE FUNCTION guard_reconciliation_claim_immutable() RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+  IF NEW.egcs_fc_fundingagreementclaim IS DISTINCT FROM OLD.egcs_fc_fundingagreementclaim THEN
+    RAISE EXCEPTION 'Reconciliation Claim cannot change' USING ERRCODE = '23514', CONSTRAINT = 'fc_reconcile_claim_immutable';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
 END $baseline$`.execute(db)
   await installCreditMemoFunctions(db)
   await installCommitmentCodingFunctions(db)
@@ -3519,6 +3530,8 @@ CREATE TRIGGER zz_guard_agreement_financial_currency BEFORE INSERT OR UPDATE ON 
 
 CREATE TRIGGER trg_validate_agreement_line_funding_agency BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Claim_Line_Item_Funding" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_agreement_line_funding_agency();
 
+CREATE TRIGGER guard_reconciliation_claim_immutable BEFORE UPDATE OF egcs_fc_fundingagreementclaim ON "Funding_Case_Agreement_Claim_Reconcile" FOR EACH ROW EXECUTE FUNCTION guard_reconciliation_claim_immutable();
+
 CREATE CONSTRAINT TRIGGER trg_enforce_fundingclaimreconcile_assignment_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Claim_Reconcile" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingclaimreconcile');
 
 CREATE TRIGGER trg_register_fundingclaimreconcile BEFORE INSERT ON "Funding_Case_Agreement_Claim_Reconcile" FOR EACH ROW EXECUTE FUNCTION register_entity('fundingclaimreconcile');
@@ -3685,4 +3698,6 @@ CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseagreement_status_agency AFTER 
 
 CREATE TRIGGER trg_validate_agreement_revision BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Revision" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_agreement_revision();
 END $baseline$`.execute(db)
+  await installAmendmentCatalogIntegrity(db)
+  await installMonetaryTableGuards(db, 'agreement')
 }

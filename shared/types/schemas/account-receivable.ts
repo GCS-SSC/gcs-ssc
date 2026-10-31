@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import { PositivePostgresBigintIdSchema as DatabaseIdSchema } from './common'
 import { RequiredDateSchema } from './form-input'
-import { MoneySchema, PositiveMoneySchema } from './money'
-import { isCanonicalMoney, moneyToCents } from '../../utils/money'
+import { MoneySchema, PositiveMoneySchema, validateMoneyCurrency } from './money'
+import { isCanonicalMoney } from '../../utils/money'
 
 import { ACCOUNT_RECEIVABLE_RECOVERY_METHOD_ENUM, CURRENCY_CODES_ENUM } from '../../constants/enums'
 
@@ -67,7 +67,7 @@ export const AccountReceivableLineEditSchema = z.object({
   egcs_fc_amount: MoneySchema,
   egcs_fc_accountreceivablechartofaccount: DatabaseIdSchema.nullable().default(null)
 }).strict().superRefine((input, ctx) => {
-  if (isCanonicalMoney(input.egcs_fc_amount) && moneyToCents(input.egcs_fc_amount) !== BigInt(0)
+  if (isCanonicalMoney(input.egcs_fc_amount) && input.egcs_fc_amount.amount !== '0'
     && !input.egcs_fc_accountreceivablechartofaccount) {
     ctx.addIssue({ code: 'custom', path: ['egcs_fc_accountreceivablechartofaccount'], message: 'validation.required' })
   }
@@ -89,7 +89,7 @@ export const AccountReceivableEditSchema = z.object({
   }
 })
 
-export const AccountReceivableCreditMemoCreateSchema = z.object({
+export const AccountReceivableCreditMemoCreateBaseSchema = z.object({
   egcs_fc_receivable: DatabaseIdSchema,
   egcs_fc_receivables: z.array(DatabaseIdSchema).min(1, { error: 'validation.required' }).max(100).optional(),
   egcs_fc_totalamount: PositiveMoneySchema,
@@ -99,6 +99,10 @@ export const AccountReceivableCreditMemoCreateSchema = z.object({
   egcs_fc_receiveddate: RequiredDateSchema,
   egcs_fc_reason: z.string().max(10000).default('')
 }).strict()
+
+export const AccountReceivableCreditMemoCreateSchema = AccountReceivableCreditMemoCreateBaseSchema.superRefine((input, ctx) => {
+  validateMoneyCurrency(input.egcs_fc_totalamount, input.egcs_fc_currency, ctx, ['egcs_fc_totalamount'])
+})
 
 export const AccountReceivableCreditMemoEditSchema = AccountReceivableCreditMemoCreateSchema
 export type AccountReceivableCreate = z.infer<typeof AccountReceivableCreateSchema>
@@ -121,7 +125,7 @@ export const AccountReceivableLinePatchSchema = z.object({
   egcs_fc_amount: MoneySchema,
   egcs_fc_accountreceivablechartofaccount: DatabaseIdSchema.nullable().default(null)
 }).strict().superRefine((input, ctx) => {
-  if (isCanonicalMoney(input.egcs_fc_amount) && moneyToCents(input.egcs_fc_amount) !== BigInt(0) && !input.egcs_fc_accountreceivablechartofaccount) {
+  if (isCanonicalMoney(input.egcs_fc_amount) && input.egcs_fc_amount.amount !== '0' && !input.egcs_fc_accountreceivablechartofaccount) {
     ctx.addIssue({ code: 'custom', path: ['egcs_fc_accountreceivablechartofaccount'], message: 'validation.required' })
   }
 })

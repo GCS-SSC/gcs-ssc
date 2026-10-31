@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { parseMoney, type Money } from '~~/shared/utils/money'
 import type { JsonValue } from '~~/shared/types/database'
 import type { TransferPaymentStreamChartOfAccountDimension } from '~~/shared/types/schemas/transfer-payment'
 import { formatCorrectionReference } from '~~/shared/utils/correction'
@@ -15,6 +16,7 @@ type PacketRecord = Record<string, JsonValue>
 const asRecord = (value: JsonValue | undefined): PacketRecord => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as PacketRecord : {}
 const asRecords = (value: JsonValue | undefined): PacketRecord[] => Array.isArray(value) ? value.map(asRecord) : []
 const packet = computed(() => asRecord(submission.egcs_fc_packet))
+const supportedPacket = computed(() => packet.value.schemaVersion === 2)
 const header = computed(() => asRecord(packet.value.correction))
 const reference = computed(() => typeof header.value.egcs_fc_agreementnumber === 'string' && typeof header.value.egcs_fc_number === 'number'
   ? formatCorrectionReference({ egcs_fc_agreementnumber: header.value.egcs_fc_agreementnumber, egcs_fc_number: header.value.egcs_fc_number })
@@ -23,7 +25,19 @@ const lines = computed(() => asRecords(packet.value.lines))
 const sources = computed(() => asRecords(packet.value.sources))
 const attachments = computed(() => asRecords(packet.value.attachments))
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
-const money = (value: JsonValue | undefined) => typeof value === 'string' ? value : null
+/**
+ * Reads currency-bearing money only from the current captured evidence.
+ * @param value - Exact amount captured in the packet.
+ * @param currency - Retained denomination of the owning Correction or source.
+ * @returns Validated money, or null when captured money is unavailable.
+ */
+const money = (value: JsonValue | undefined, currency = header.value.egcs_fc_currency): Money | null => {
+  try {
+    const amount = parseMoney(value)
+    if (typeof currency !== 'string' || amount.currency !== currency.toUpperCase()) return null
+    return amount
+  } catch { return null }
+}
 const dimensions = (value: JsonValue | undefined) => asRecords(value) as unknown as TransferPaymentStreamChartOfAccountDimension[]
 const financialLines = computed(() => lines.value.map(line => ({
   id: text(line.id),
@@ -33,7 +47,7 @@ const financialLines = computed(() => lines.value.map(line => ({
   egcs_fc_originalpaid: money(line.egcs_fc_originalpaid),
   egcs_fc_jveffect: money(line.egcs_fc_jveffect),
   egcs_fc_priorcorrections: money(line.egcs_fc_priorcorrections),
-  egcs_fc_arrecoveries: money(line.egcs_fc_arrecoveries) ?? '0.00',
+  egcs_fc_arrecoveries: money(line.egcs_fc_arrecoveries),
   egcs_fc_adjustment: money(line.egcs_fc_adjustment),
   egcs_fc_commitmentamount: money(line.egcs_fc_commitmentamount),
   egcs_fc_correctedpaid: money(line.egcs_fc_correctedpaid),
@@ -53,7 +67,7 @@ const sourcePayments = computed(() => sources.value.map(source => {
       allocations: asRecords(evidence.allocations).map(allocation => ({
         egcs_fc_commitmentlinenumber: text(allocation.egcs_fc_commitmentlinenumber),
         egcs_fc_accountingdimensions: dimensions(allocation.egcs_fc_accountingdimensions),
-        egcs_fc_amount: money(allocation.egcs_fc_amount)
+        egcs_fc_amount: money(allocation.egcs_fc_amount, sourceHeader.egcs_fc_currency)
       }))
     }
   }
@@ -62,7 +76,7 @@ const attachmentName = (attachment: PacketRecord) => text(locale.value === 'fr' 
 </script>
 
 <template>
-  <CommonWorkflowPacket :title="t('correction.packet.title')" :packet-id="`correction-${text(header.id)}-${submission.egcs_fc_canonicalhash}`" :captured-label="`${t('correction.packet.captured')}: ${formatDate(submission.egcs_fc_submittedat)}`" :hash="submission.egcs_fc_canonicalhash" :hash-label="t('workflow.packet.hash')">
+  <CommonWorkflowPacket v-if="supportedPacket" :title="t('correction.packet.title')" :packet-id="`correction-${text(header.id)}-${submission.egcs_fc_canonicalhash}`" :captured-label="`${t('correction.packet.captured')}: ${formatDate(submission.egcs_fc_submittedat)}`" :hash="submission.egcs_fc_canonicalhash" :hash-label="t('workflow.packet.hash')">
     <template #summary>
       <p class="font-semibold">
         {{ reference }}
@@ -113,4 +127,7 @@ const attachmentName = (attachment: PacketRecord) => text(locale.value === 'fr' 
       </p>
     </CommonSection>
   </CommonWorkflowPacket>
+  <p v-else class="text-sm text-muted">
+    {{ t('common.not_available') }}
+  </p>
 </template>

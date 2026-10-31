@@ -26,11 +26,11 @@ import {
 import {
   compareMoney,
   formatMoneyText,
-  moneyFromCents,
-  moneyToCents,
-  parseMoney,
+  absMoney,
+  zeroMoney,
   sumMoney,
-  type Money
+  type Money,
+  type MoneyInput
 } from '~~/shared/utils/money'
 
 type LookupItem = {
@@ -76,7 +76,7 @@ type BudgetLeafRow = {
 
 type GroupedBudgetRow = GroupedTableRow<BudgetLeafRow>
 type BudgetFundingSource = FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources'][number]
-type FundingSourceEdit = { lineId: string, originalSubtype: string | null, source: BudgetFundingSource }
+type FundingSourceEdit = { lineId: string, originalSubtype: string | null, source: Omit<BudgetFundingSource, 'egcs_fc_amount'> & { egcs_fc_amount: MoneyInput } }
 
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 const COST_CATEGORY_GROUP_COLUMN_ID = 'costCategoryGroup'
@@ -468,12 +468,18 @@ const getSingleCurrency = (currencies: Array<string | undefined>): string | unde
 
   return normalizedCurrencies.length === 1 ? normalizedCurrencies[0] : undefined
 }
-const ZERO_MONEY = parseMoney('0')
+const requireBudgetCurrency = (row: BudgetLeafRow): string => {
+  const currency = row.currency ?? row.totalAmount?.currency ?? row.programFunding?.currency
+  if (!currency) throw new TypeError('A budget amount requires its owning currency.')
+  return currency
+}
 const getRowAmount = (row: BudgetLeafRow, key: 'totalAmount' | 'programFunding' | 'otherFunding'): Money =>
-  key === 'otherFunding' ? getOtherFundingTotal(row) : row[key] ?? ZERO_MONEY
-const getTableTotal = (key: 'totalAmount' | 'programFunding' | 'otherFunding') =>
-  sumMoney(realTableRows.value.map(row => getRowAmount(row, key)))
+  key === 'otherFunding' ? getOtherFundingTotal(row) : row[key] ?? zeroMoney(requireBudgetCurrency(row))
 const tableTotalCurrency = computed(() => getSingleCurrency(realTableRows.value.map(row => row.currency)))
+const getTableTotal = (key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
+  const currency = tableTotalCurrency.value
+  return currency ? sumMoney(realTableRows.value.map(row => getRowAmount(row, key)), currency) : undefined
+}
 
 const {
   expandedRows,
@@ -547,36 +553,15 @@ const updateTableExpandedRows = (value: Updater<ExpandedState>) => {
 const isFiscalYearGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, FISCAL_YEAR_GROUP_COLUMN_ID)
 const isCostCategoryGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, COST_CATEGORY_GROUP_COLUMN_ID)
 const isCostSubsectionGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, COST_SUBSECTION_GROUP_COLUMN_ID)
-const getGroupedRowSum = (row: GroupedBudgetRow, key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
-  return sumMoney(getRealLeafRows(row).map(leafRow => getRowAmount(leafRow.original, key)))
-}
 const getGroupedRowCurrency = (row: GroupedBudgetRow) =>
   getSingleCurrency(getRealLeafRows(row).map(leafRow => leafRow.original.currency))
-const formatGroupedMoney = (row: GroupedBudgetRow, key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
-  const leafRows = getRealLeafRows(row)
-
-  if (leafRows.length === 0) {
-    return '—'
-  }
-
-  const total = getGroupedRowSum(row, key)
+const getGroupedRowSum = (row: GroupedBudgetRow, key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
   const currency = getGroupedRowCurrency(row)
-
-  if (!currency) {
-    return total
-  }
-
-  return formatMoney(total, currency)
+  return currency ? sumMoney(getRealLeafRows(row).map(leafRow => getRowAmount(leafRow.original, key)), currency) : undefined
 }
-const formatTableTotalMoney = (key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
-  const total = getTableTotal(key)
+const formatGroupedMoney = (row: GroupedBudgetRow, key: 'totalAmount' | 'programFunding' | 'otherFunding') => formatMoney(getGroupedRowSum(row, key))
+const formatTableTotalMoney = (key: 'totalAmount' | 'programFunding' | 'otherFunding') => formatMoney(getTableTotal(key))
 
-  if (!tableTotalCurrency.value) {
-    return total
-  }
-
-  return formatMoney(total, tableTotalCurrency.value)
-}
 const getFiscalYearById = (id: string) => fiscalYears.value.find((fiscalYear: FundingCaseAgreementBudgetFiscalYearRow) => String(fiscalYear.id) === String(id))
 const getLineItemById = (id: string) => lineItems.value.find((lineItem: FundingCaseAgreementBudgetLineItemRow) => lineItem.id === id)
 
@@ -798,7 +783,7 @@ const openCreateFundingSource = (row: BudgetLeafRow) => openBudgetAction('update
   fundingSourceModal.openUpdate({
     lineId: row.lineItemId,
     originalSubtype: null,
-    source: { egcs_fc_fundingsubtype: '', egcs_fc_amount: ZERO_MONEY, egcs_fc_description_en: '', egcs_fc_description_fr: '' }
+    source: { egcs_fc_fundingsubtype: '', egcs_fc_amount: zeroMoney(requireBudgetCurrency(row)), egcs_fc_description_en: '', egcs_fc_description_fr: '' }
   })
 })
 const persistFundingSource = async (lineId: string, originalSubtype: string | null, replacement: BudgetFundingSource | null, current: () => boolean) => {
@@ -825,7 +810,7 @@ const saveFundingSource = async () => {
   if (!fundingSourcePending.begin(session)) return
   try {
     if (!current() || (actionTarget && !await check('update', 'budget-line', current)) || !current()) return
-    if (!await persistFundingSource(selected.lineId, selected.originalSubtype, selected.source, current)) return
+    if (!await persistFundingSource(selected.lineId, selected.originalSubtype, { ...selected.source, ...FundingCaseAgreementFundingSourceSchema.parse(selected.source) }, current)) return
     if (!fundingSourceModal.closeSession(session)) return
     await refreshOverview()
     if (generation !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
@@ -861,23 +846,14 @@ const deleteFundingSource = async (row: BudgetLeafRow) => {
   }
 }
 
-const getOtherFundingTotal = (row: BudgetLeafRow) => sumMoney([
-  ...(row.fundingSources ?? []).map(source => source.egcs_fc_amount)
-])
-
-const formatMoney = (value?: Money, currency?: string) => {
-  if (value === undefined || currency === undefined) {
-    return '—'
-  }
-
-  return formatMoneyText(value, locale.value, currency.toUpperCase())
-}
-const formatSignedBudgetDifference = (value: Money, currency: string) => {
-  const cents = moneyToCents(value)
-  const formatted = formatMoney(moneyFromCents(cents < BigInt(0) ? -cents : cents), currency)
-  if (compareMoney(value, ZERO_MONEY) > 0) return `+${formatted}`
-  if (compareMoney(value, ZERO_MONEY) < 0) return `-${formatted}`
-  return formatted
+const getOtherFundingTotal = (row: BudgetLeafRow) => sumMoney(
+  (row.fundingSources ?? []).map(source => source.egcs_fc_amount), requireBudgetCurrency(row)
+)
+const formatMoney = (value?: Money) => value === undefined ? '—' : formatMoneyText(value, locale.value)
+const formatSignedBudgetDifference = (value: Money) => {
+  const formatted = formatMoney(absMoney(value))
+  const sign = compareMoney(value, zeroMoney(value.currency))
+  return sign > 0 ? `+${formatted}` : sign < 0 ? `-${formatted}` : formatted
 }
 </script>
 
@@ -1033,7 +1009,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
           {{ formatGroupedMoney(row as GroupedBudgetRow, 'totalAmount') }}
         </span>
         <span v-else-if="!row.original.isPlaceholder && !row.original.fundingKind" class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(row.original.totalAmount, row.original.currency) }}
+          {{ formatMoney(row.original.totalAmount) }}
         </span>
         <span v-else>&nbsp;</span>
       </template>
@@ -1043,7 +1019,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
           {{ formatGroupedMoney(row as GroupedBudgetRow, 'programFunding') }}
         </span>
         <span v-else-if="!row.original.isPlaceholder && row.original.fundingKind !== 'other'" class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(row.original.programFunding, row.original.currency) }}
+          {{ formatMoney(row.original.programFunding) }}
         </span>
         <span v-else>&nbsp;</span>
       </template>
@@ -1054,7 +1030,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         </span>
         <div v-else-if="!row.original.isPlaceholder && row.original.fundingKind !== 'program'" class="space-y-1">
           <span class="font-medium text-zinc-700 dark:text-zinc-200">
-            {{ formatMoney(getOtherFundingTotal(row.original), row.original.currency) }}
+            {{ formatMoney(getOtherFundingTotal(row.original)) }}
           </span>
         </div>
         <span v-else>&nbsp;</span>
@@ -1185,7 +1161,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       class="mt-4"
       color="info"
       icon="i-lucide-chart-no-axes-combined"
-      :title="t('agreement.amendments.budget_difference_notice', { amount: formatSignedBudgetDifference(budgetDifference.difference, budgetDifference.currency) })" />
+      :title="t('agreement.amendments.budget_difference_notice', { amount: formatSignedBudgetDifference(budgetDifference.difference) })" />
 
     <UModal
       v-if="selectedFiscalYear"
@@ -1296,7 +1272,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                   :currency="selectedLineItem.egcs_fc_currency"
                   :model-value="selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual' ? calculationPreview : selectedLineItem.egcs_fc_programfunding"
                   :readonly="Boolean(selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual')"
-                  @update:model-value="selectedLineItem.egcs_fc_programfunding = String($event)" />
+                  @update:model-value="selectedLineItem.egcs_fc_programfunding = $event" />
               </UFormField>
             </div>
             <AgreementFundingSourcesEditor

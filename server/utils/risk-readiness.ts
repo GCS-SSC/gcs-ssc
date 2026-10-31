@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- Shared exact-target risk readiness and immutable submission capture. */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -59,18 +60,19 @@ export const getRiskReadiness = async (
     .where('egcs_cn_state', 'in', ['pending', 'active', 'awaiting_action', 'paused'])
     .where('_deleted', '=', false).executeTakeFirst()
   const workflowManaged = Boolean(selected || active)
-  const manualScore = amendment?.egcs_fc_proposedriskscore
+  const manualScore = amendment?.egcs_fc_proposedriskscore ?? null
+  const parsedManualScore = manualScore === null ? null : parseSafeDecimal(String(manualScore))
   const manualRating = !workflowManaged && amendment?.egcs_fc_changerisk && manualScore !== null
     ? await db.selectFrom('Transfer_Payment_Stream_Risk_Rating').select('id')
         .where('egcs_tp_transferpaymentstream', '=', streamId)
-        .where('egcs_tp_riskscore', '=', Number(manualScore)).where('_deleted', '=', false).execute()
+        .where('egcs_tp_riskscore', '=', String(parsedManualScore)).where('_deleted', '=', false).execute()
     : []
   const retainedCalculation = !workflowManaged && amendment?.egcs_fc_changerisk
     && manualScore !== null && manualRating.length !== 1 && success
     ? await resolveLatestRiskRating(db, { ...target, runtimeId: String(success.id) })
     : null
   const hasManualRating = manualRating.length === 1
-    || retainedCalculation?.mappedRating?.score === Number(manualScore)
+    || retainedCalculation?.mappedRating?.score === parsedManualScore
   const blocker = required && !success
     ? 'risk_workflow_required'
     : !workflowManaged && amendment?.egcs_fc_changerisk && (manualScore === null || !hasManualRating)
@@ -110,7 +112,7 @@ export const readSubmissionRisk = async (
   const { amendment, agreement, streamId } = await readTarget(db, target)
   const enabled = amendment ? readiness.workflowManaged || amendment.egcs_fc_changerisk : readiness.workflowManaged
   const proposedScore = amendment ? amendment.egcs_fc_proposedriskscore : agreement.egcs_fc_riskscore
-  const score = proposedScore === null ? null : Number(proposedScore)
+  const score = proposedScore == null ? null : parseSafeDecimal(String(proposedScore))
   const calculation = readiness.successfulRuntimeId
     ? await resolveLatestRiskRating(db, { ...target, runtimeId: readiness.successfulRuntimeId })
     : null
@@ -127,13 +129,13 @@ export const readSubmissionRisk = async (
   if (!rating && score !== null) {
     let ratingQuery = db.selectFrom('Transfer_Payment_Stream_Risk_Rating')
       .select(['id', 'egcs_tp_riskscore', 'egcs_tp_name_en', 'egcs_tp_name_fr'])
-      .where('egcs_tp_transferpaymentstream', '=', streamId).where('egcs_tp_riskscore', '=', score)
+      .where('egcs_tp_transferpaymentstream', '=', streamId).where('egcs_tp_riskscore', '=', String(score))
       .where('_deleted', '=', false).orderBy('id', 'asc')
     if (lockRows) ratingQuery = ratingQuery.forShare()
     const rows = await ratingQuery.execute()
     if (rows.length === 1) {
       const row = rows[0]!
-      rating = { id: String(row.id), score: Number(row.egcs_tp_riskscore),
+      rating = { id: String(row.id), score: parseSafeDecimal(String(row.egcs_tp_riskscore)),
         label: { en: row.egcs_tp_name_en, fr: row.egcs_tp_name_fr } }
     }
   }

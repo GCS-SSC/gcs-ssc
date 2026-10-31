@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Money } from '~~/shared/utils/money'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ProponentCreditMemoRow } from '~~/shared/types/account-receivable-proponent'
@@ -116,8 +117,8 @@ const columns: TableColumnInput<ProponentCreditMemoRow>[] = [
   { id: 'received', headerKey: 'account_receivable.received_date' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const amount = (value: string, currency: string) =>
-  formatAccountReceivableAmount(value, locale.value, currency) ?? t('common.not_available')
+const amount = (value: Money) =>
+  formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 /**
  * Opens a cash memo or the Payment that generated an automatic offset memo.
  * @param memo - Independently authorized collection row.
@@ -180,16 +181,16 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
               <ULink :to="localePath(appRouteLocations.agreementPaymentDetail(application.egcs_fc_fundingagreement, application.egcs_fc_payment))" class="text-sm font-semibold hover:text-primary">
                 {{ t('account_receivable.payment_reference', { reference: application.egcs_fc_payment }) }}
               </ULink>
-              <span class="text-xs text-muted tabular-nums">{{ amount(application.egcs_fc_amount, row.original.egcs_fc_currency) }} · {{ t(`account_receivable.recovery_outcomes.${application.egcs_fc_outcome}`) }}</span>
+              <span class="text-xs text-muted tabular-nums">{{ amount(application.egcs_fc_amount) }} · {{ t(`account_receivable.recovery_outcomes.${application.egcs_fc_outcome}`) }}</span>
             </div>
           </div>
           <span v-else class="text-sm text-muted">{{ t('common.none') }}</span>
         </template>
         <template #amount-cell="{ row }">
           <span v-if="row.original.egcs_fc_kind === 'automatic'" class="text-sm font-semibold tabular-nums">
-            {{ t('account_receivable.credit_memo_applied') }}: {{ amount(row.original.egcs_fc_amount, row.original.egcs_fc_currency) }}
+            {{ t('account_receivable.credit_memo_applied') }}: {{ amount(row.original.egcs_fc_amount) }}
           </span>
-          <span v-else class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_amount, row.original.egcs_fc_currency) }}</span>
+          <span v-else class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_amount) }}</span>
         </template>
         <template #received-cell="{ row }">
           {{ formatDate(row.original.egcs_fc_kind === 'cash' ? row.original.egcs_fc_receiveddate : row.original.egcs_fc_createdat) }}

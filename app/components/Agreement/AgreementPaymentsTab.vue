@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- Payment table callbacks are exercised by focused component tests. */
@@ -20,7 +21,7 @@ import type {
   FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
-import { compareMoney, formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, isCanonicalMoney, parseMoney, zeroMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 import type { GcsPaymentAmountCalculatorResult } from '@gcs-ssc/extensions/ui'
 import type { Currency_Codes } from '~~/shared/types/database'
 import type { PaymentOffsetPreview } from '~~/shared/types/account-receivable'
@@ -34,7 +35,7 @@ type PaymentWizardForm = FundingCaseAgreementPaymentForm & {
   egcs_fc_offsetplanhash?: string
   egcs_fc_offsetcreditmemos?: Array<{
     egcs_fc_key: string
-    egcs_fc_lines: Array<{ egcs_fc_codingaccount?: string; egcs_fc_amount: string }>
+    egcs_fc_lines: Array<{ egcs_fc_codingaccount?: string; egcs_fc_amount: MoneyInput }>
   }>
 }
 type PaymentWizardStep = 'payment' | 'credit-memos' | 'review'
@@ -42,7 +43,6 @@ type PaymentWizardStep = 'payment' | 'credit-memos' | 'review'
 type PaymentCalculatorResult = GcsPaymentAmountCalculatorResult
 
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
-const ZERO_MONEY = parseMoney('0')
 
 const { agreementId, currency: agreementCurrency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
   agreementId: string
@@ -52,6 +52,7 @@ const { agreementId, currency: agreementCurrency, canCreate, canCreateRole = und
   canUpdate: boolean
   canDelete: boolean
 }>()
+const zeroAmount = computed(() => zeroMoney(agreementCurrency))
 const agreementIdRef = computed(() => agreementId)
 let recordActionGeneration = 0
 const pendingRecordActions = ref<Map<string, symbol>>(new Map())
@@ -177,8 +178,8 @@ const validatePayment = withFormRequirements(async (state: PaymentWizardForm) =>
       name: `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`, message: t('agreement.payments.wizard.duplicate_coding')
     })
     try {
-      if (expected && compareMoney(sumMoney(memo.egcs_fc_lines.map(line => parseMoney(line.egcs_fc_amount))), expected) !== 0) errors.push({
-        name: `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`, message: t('agreement.payments.wizard.coding_total', { amount: formatMoney(expected, agreementCurrency.toUpperCase()) })
+      if (expected && compareMoney(sumMoney(memo.egcs_fc_lines.map(line => parseMoney(line.egcs_fc_amount)), agreementCurrency), expected) !== 0) errors.push({
+        name: `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`, message: t('agreement.payments.wizard.coding_total', { amount: formatMoney(expected) })
       })
     } catch {
       // The schema keeps invalid money on its individual field.
@@ -248,7 +249,7 @@ const changePaymentStep = async (step: string) => {
 }
 const addMemoCodingLine = (memoIndex: number) => {
   if (isSavingPayment.value) return
-  selectedPayment.value?.egcs_fc_offsetcreditmemos?.[memoIndex]?.egcs_fc_lines.push({ egcs_fc_amount: '' })
+  selectedPayment.value?.egcs_fc_offsetcreditmemos?.[memoIndex]?.egcs_fc_lines.push({ egcs_fc_amount: undefined })
 }
 const paymentCalculatorResult: Ref<PaymentCalculatorResult | null> = ref(null)
 const hasManualPaymentAmount: Ref<boolean> = ref(false)
@@ -298,10 +299,10 @@ const tableRows = computed<FundingCaseAgreementPaymentRow[]>(() => (overview.val
     row.egcs_fc_comment,
     row.egcs_fc_paymentamount,
     row.line_count
-  ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch.value))
+  ].some(value => isCanonicalMoney(value) ? moneyMatchesSearch(value, normalizedSearch.value, locale.value) : String(value ?? '').toLowerCase().includes(normalizedSearch.value))
 }))
 
-const formatMoney = (value: Money, currency = 'CAD') => formatMoneyText(value, locale.value, currency)
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value)
 const getMonthLabel = (month: number) => t(`agreement.payments.months.${MONTH_KEYS[month]}`)
 const getPeriodLabel = (periodStart: number, periodEnd: number) => `${getMonthLabel(periodStart)} - ${getMonthLabel(periodEnd)}`
 
@@ -437,28 +438,20 @@ const paymentCalculatorModel = computed(() => ({
   amount: selectedPayment.value?.egcs_fc_paymentamount
 }))
 
-const paymentCalculatorCeiling = computed(() => {
-  const ceiling = paymentCalculatorResult.value?.ceilingAmount
-  if (typeof ceiling !== 'string') {
-    return null
-  }
-  return ceiling
-})
 const paymentCalculatorCeilingMoney = computed<Money | null>(() => {
-  const ceiling = paymentCalculatorCeiling.value
-  if (ceiling === null) return null
   try {
-    return parseMoney(ceiling)
+    const ceiling = paymentCalculatorResult.value?.ceilingAmount
+    if (ceiling === undefined) return null
+    const money = parseMoney(ceiling)
+    return money.currency === agreementCurrency.toUpperCase() ? money : null
   } catch {
     return null
   }
 })
-const paymentCalculatorCurrency = computed(() => agreementCurrency.toUpperCase())
-
 const isPaymentAboveCalculatorCeiling = computed(() => {
   const ceiling = paymentCalculatorCeilingMoney.value
   const amount = selectedPayment.value?.egcs_fc_paymentamount
-  if (!ceiling || typeof amount !== 'string') return false
+  if (!ceiling || amount == null) return false
   try {
     return compareMoney(parseMoney(amount), ceiling) > 0
   } catch {
@@ -469,17 +462,13 @@ const isPaymentAboveCalculatorCeiling = computed(() => {
 watch(
   () => paymentCalculatorResult.value?.suggestedAmount,
   suggestedAmount => {
-    if (!selectedPayment.value || selectedPayment.value.id || hasManualPaymentAmount.value) {
-      return
-    }
-    if (typeof suggestedAmount !== 'string') {
-      return
-    }
+    if (!selectedPayment.value || selectedPayment.value.id || hasManualPaymentAmount.value || suggestedAmount === undefined) return
     try {
       const suggestion = parseMoney(suggestedAmount)
+      if (suggestion.currency !== agreementCurrency.toUpperCase()) return
       const currentAmount = selectedPayment.value.egcs_fc_paymentamount
-      let useSuggestion = currentAmount === undefined || currentAmount === ''
-      if (!useSuggestion && lastSuggestedPaymentAmount !== null && typeof currentAmount === 'string') {
+      let useSuggestion = currentAmount === undefined
+      if (!useSuggestion && lastSuggestedPaymentAmount !== null && currentAmount !== null) {
         try {
           useSuggestion = compareMoney(parseMoney(currentAmount), lastSuggestedPaymentAmount) === 0
         } catch {
@@ -489,7 +478,7 @@ watch(
       if (useSuggestion) selectedPayment.value.egcs_fc_paymentamount = suggestion
       lastSuggestedPaymentAmount = suggestion
     } catch {
-      // The extension result remains visible, but invalid money never enters the host form contract.
+      // Invalid extension results never enter the host form contract.
     }
   }
 )
@@ -501,7 +490,7 @@ const handlePaymentCalculatorResult = (result: Record<string, unknown>) => {
   paymentCalculatorResult.value = result as PaymentCalculatorResult
 }
 
-const handlePaymentAmountInput = (amount: string) => {
+const handlePaymentAmountInput = (amount: MoneyInput) => {
   if (!selectedPayment.value) return
   hasManualPaymentAmount.value = true
   selectedPayment.value.egcs_fc_paymentamount = amount
@@ -700,21 +689,21 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
             <dt class="inline text-muted">
               {{ t('agreement.payments.gross') }}:
             </dt><dd class="ml-1 inline font-medium tabular-nums">
-              {{ formatMoney(row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
+              {{ formatMoney(row.original.egcs_fc_paymentamount) }}
             </dd>
           </div>
           <div v-if="hasPaymentOffset(row.original.egcs_fc_offsetamount)">
             <dt class="inline text-muted">
               {{ t('agreement.payments.offset') }}:
             </dt><dd class="ml-1 inline tabular-nums">
-              {{ formatMoney(row.original.egcs_fc_offsetamount ?? ZERO_MONEY, row.original.egcs_fc_currency.toUpperCase()) }}
+              {{ formatMoney(row.original.egcs_fc_offsetamount ?? zeroAmount) }}
             </dd>
           </div>
           <div>
             <dt class="inline text-muted">
               {{ t('agreement.payments.net') }}:
             </dt><dd class="ml-1 inline font-semibold tabular-nums">
-              {{ formatMoney(row.original.egcs_fc_netamount ?? row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
+              {{ formatMoney(row.original.egcs_fc_netamount ?? row.original.egcs_fc_paymentamount) }}
             </dd>
           </div>
         </dl>
@@ -800,7 +789,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
               v-model:state="selectedPayment"
               :agreement-id="agreementId" :currency="agreementCurrency"
               :payment-amount-calculator="paymentAmountCalculator" :payment-calculator-model="paymentCalculatorModel"
-              :ceiling-error="isPaymentAboveCalculatorCeiling ? t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? ZERO_MONEY, paymentCalculatorCurrency) }) : null"
+              :ceiling-error="isPaymentAboveCalculatorCeiling ? t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? zeroAmount) }) : null"
               :pending="isSavingPayment"
               @amount="handlePaymentAmountInput" @calculator-result="handlePaymentCalculatorResult" @calculator-payload="handlePaymentCalculatorExtensionPayload"
               @resolved-items="(field, items) => resolvedPaymentLabels[field] = items" />
@@ -849,21 +838,21 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
                   <dt class="text-sm text-muted">
                     {{ t('agreement.payments.gross') }}
                   </dt><dd class="font-semibold tabular-nums">
-                    {{ formatMoney(offsetPreview.egcs_fc_grossamount, agreementCurrency.toUpperCase()) }}
+                    {{ formatMoney(offsetPreview.egcs_fc_grossamount) }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-sm text-muted">
                     {{ t('agreement.payments.offset') }}
                   </dt><dd class="font-semibold tabular-nums">
-                    {{ formatMoney(offsetPreview.egcs_fc_offsetamount, agreementCurrency.toUpperCase()) }}
+                    {{ formatMoney(offsetPreview.egcs_fc_offsetamount) }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-sm text-muted">
                     {{ t('agreement.payments.net') }}
                   </dt><dd class="font-semibold tabular-nums">
-                    {{ formatMoney(offsetPreview.egcs_fc_netamount, agreementCurrency.toUpperCase()) }}
+                    {{ formatMoney(offsetPreview.egcs_fc_netamount) }}
                   </dd>
                 </div>
               </dl>
@@ -878,7 +867,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
                   {{ t('agreement.payments.wizard.memo_number', { number: memoIndex + 1 }) }}
                 </legend>
                 <p class="font-semibold tabular-nums">
-                  {{ formatMoney(offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount ?? ZERO_MONEY, agreementCurrency.toUpperCase()) }}
+                  {{ formatMoney(offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount ?? zeroAmount) }}
                 </p>
                 <p class="text-sm text-muted">
                   {{ t(offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_allocationmode === 'allocator' ? 'agreement.payments.wizard.allocated_coding' : 'agreement.payments.wizard.manual_coding') }}
@@ -904,7 +893,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
                   </template>
                   <template v-else>
                     <span class="break-words text-sm">{{ selectedMemoCodingLabel(memoIndex, line.egcs_fc_codingaccount) }}</span>
-                    <span class="font-semibold tabular-nums">{{ formatMoney(parseMoney(line.egcs_fc_amount), agreementCurrency.toUpperCase()) }}</span>
+                    <span class="font-semibold tabular-nums">{{ formatMoney(parseMoney(line.egcs_fc_amount)) }}</span>
                   </template>
                 </div>
                 <UButton

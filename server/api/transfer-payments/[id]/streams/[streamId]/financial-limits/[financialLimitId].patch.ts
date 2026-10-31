@@ -1,3 +1,5 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
+import { parseDecimalText } from '~~/shared/utils/money'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { createTransferPaymentScopedAuthorizeHandler, authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
@@ -6,7 +8,7 @@ import { notFound, badRequest } from '~~/server/utils/api-errors'
 import { TransferPaymentFinancialLimitsPatchSchema } from '~~/shared/types/schemas/transfer-payment'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { sql } from 'kysely'
-import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { databaseMoneyText } from '~~/server/utils/database-money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 /**
@@ -43,7 +45,7 @@ export default defineEventHandler(async event => {
         ...nonMoneyValues,
         ...(egcs_tp_maxallowableperrecipient === undefined
           ? {}
-          : { egcs_tp_maxallowableperrecipient: databaseMoneyValue(egcs_tp_maxallowableperrecipient) })
+          : { egcs_tp_maxallowableperrecipient: sql<number>`${egcs_tp_maxallowableperrecipient}::numeric` })
       })
         .where('id', '=', financialLimitId).where('egcs_tp_transferpaymentstream', '=', streamId)
         .where('_deleted', '=', false).returning([
@@ -53,7 +55,7 @@ export default defineEventHandler(async event => {
           'egcs_tp_maxpercentofretroactivecostsallowable', 'egcs_tp_stackinglimit', 'egcs_tp_active', '_deleted'
         ]).executeTakeFirst()
       if (!result) return await notFound(event, 'FINANCIAL_LIMIT_NOT_FOUND', 'apiErrors.transfer_payment.financial_limit_not_found')
-      return { ...result, egcs_tp_maxallowableperrecipient: parseDatabaseMoney(result.egcs_tp_maxallowableperrecipient) }
+      return { ...result, egcs_tp_maxpercentofsupportavailableperrecipient: parseSafeDecimal(String(result.egcs_tp_maxpercentofsupportavailableperrecipient)), egcs_tp_maxpercentofretroactivecostsallowable: parseSafeDecimal(String(result.egcs_tp_maxpercentofretroactivecostsallowable)), egcs_tp_stackinglimit: parseSafeDecimal(String(result.egcs_tp_stackinglimit)), egcs_tp_maxallowableperrecipient: parseDecimalText(result.egcs_tp_maxallowableperrecipient) }
     }
   )
 })

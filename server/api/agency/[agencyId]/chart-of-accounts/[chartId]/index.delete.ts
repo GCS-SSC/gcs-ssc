@@ -1,4 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3'
+import { sql } from 'kysely'
 import { authorize } from '~~/server/utils/authorize'
 import { withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -12,6 +13,7 @@ export default defineEventHandler(async event => {
   await authorize(event, 'agency', 'delete', { type: 'agency', agencyId })
   return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
     const current = await trx.selectFrom('Agency_Chart_of_Account').select('id')
+      .select(sql<boolean>`agency_chart_is_in_use("Agency_Chart_of_Account".id)`.as('is_in_use'))
       .where('id', '=', chartId).where('egcs_ay_organizationagency', '=', agencyId)
       .where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!current) return await notFound(event, 'CHART_OF_ACCOUNT_NOT_FOUND', 'apiErrors.transfer_payment.chart_of_account_not_found')
@@ -24,6 +26,7 @@ export default defineEventHandler(async event => {
     const receivableLine = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable_Line').select('id')
       .where('egcs_fc_accountreceivablechartofaccount', '=', chartId).executeTakeFirst()
     if (receivableLine) return await badRequest(event, 'ACCOUNT_RECEIVABLE_CHART_IN_USE', 'apiErrors.agency.account_receivable_chart_in_use')
+    if (current.is_in_use) return await badRequest(event, 'AGENCY_CHART_IN_USE', 'apiErrors.agency.chart_in_use')
     await trx.updateTable('Agency_Chart_of_Account').set({ _deleted: true }).where('id', '=', chartId).execute()
     return { success: true }
   }, 'delete')

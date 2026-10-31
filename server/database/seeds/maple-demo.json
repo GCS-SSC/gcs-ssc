@@ -7080,7 +7080,7 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": "20001",
-      "egcs_fc_snapshotschemaversion": 3,
+      "egcs_fc_snapshotschemaversion": 4,
       "egcs_fc_packet": {
         "risk": {
           "apply": false,
@@ -7111,10 +7111,16 @@
               "fiscalYear": "2026-2027",
               "percentage": null,
               "description": "Fictional equipment procurement and installation for Emergency Shelter Upgrade.",
-              "totalAmount": "120000.00",
+              "totalAmount": {
+                "amount": "12000000",
+                "currency": "CAD"
+              },
               "costSubsection": "Community facility equipment",
               "fundingSources": [],
-              "programFunding": "120000.00",
+              "programFunding": {
+                "amount": "12000000",
+                "currency": "CAD"
+              },
               "sourceCategory": {
                 "en": null,
                 "fr": null
@@ -7296,7 +7302,7 @@
             }
           }
         ],
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "amendmentTypes": [],
         "sourceVersions": {
           "budget": "10027",
@@ -7304,7 +7310,7 @@
         },
         "amendmentSubtypes": []
       },
-      "egcs_fc_canonicalhash": "88b4432b8168f93a8ec0f15ede6a342b0e552680b71200786da13b77c049337f",
+      "egcs_fc_canonicalhash": "f1db62ddf546245e0c45de6b8bea5dfe8ef2ec674958d8c120f3d3b3dccc1f84",
       "egcs_fc_submittedat": "2026-10-13T06:10:25.552Z"
     }
   ],
@@ -7328,8 +7334,8 @@
       "egcs_fc_organizationcostcategory": "10089",
       "egcs_fc_costsubsection": "Community facility equipment",
       "egcs_fc_description": "Fictional equipment procurement and installation for Emergency Shelter Upgrade.",
-      "egcs_fc_totalamount": "120000.00",
-      "egcs_fc_programfunding": "120000.00",
+      "egcs_fc_totalamount": "12000000",
+      "egcs_fc_programfunding": "12000000",
       "egcs_fc_currency": "cad",
       "egcs_fc_calculationmode": "manual",
       "egcs_fc_sourcecategory": null,
@@ -7360,7 +7366,7 @@
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
       "_deleted": false,
-      "egcs_fc_totalamount": "120000.00"
+      "egcs_fc_totalamount": "12000000"
     }
   ],
   "Funding_Case_Agreement_Commitment_Line": [
@@ -7371,7 +7377,7 @@
       "egcs_fc_transferpaymentstream": "10118",
       "egcs_fc_commitmentlinenumber": 1,
       "egcs_fc_transferpaymentstreamchartofaccount": "10010",
-      "egcs_fc_amount": "120000.00",
+      "egcs_fc_amount": "12000000",
       "_deleted": false
     }
   ],
@@ -7393,10 +7399,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 0,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10109",
@@ -7404,10 +7410,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 1,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10110",
@@ -7415,10 +7421,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 2,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10111",
@@ -7426,10 +7432,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 3,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10112",
@@ -7437,10 +7443,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 4,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10113",
@@ -7448,10 +7454,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 5,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10114",
@@ -7459,10 +7465,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 6,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10115",
@@ -7470,10 +7476,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 7,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10116",
@@ -7481,10 +7487,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 8,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10117",
@@ -7492,10 +7498,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 9,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10118",
@@ -7503,10 +7509,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 10,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     },
     {
       "id": "10119",
@@ -7514,10 +7520,10 @@
       "egcs_fc_fundingagreement": "10135",
       "egcs_fc_fundingagreementbudgetlineitem": "10019",
       "egcs_fc_month": 11,
-      "egcs_fc_amount": "10000.00",
+      "egcs_fc_amount": "1000000",
       "egcs_fc_currency": "cad",
       "_deleted": false,
-      "egcs_fc_totalamount": "10000.00"
+      "egcs_fc_totalamount": "1000000"
     }
   ],
   "Funding_Case_Agreement_Profile": [
@@ -7597,25 +7603,28 @@
       "id": "10024",
       "egcs_tp_transferpaymentprofile": "10022",
       "egcs_tp_fiscalyear": "10041",
-      "egcs_tp_totalbudget": "2000000.00",
+      "egcs_tp_totalbudget": "200000000",
       "egcs_tp_overcommitthreshold": "0.00",
-      "_deleted": false
+      "_deleted": false,
+      "egcs_tp_currency": "cad"
     },
     {
       "id": "10025",
       "egcs_tp_transferpaymentprofile": "10022",
       "egcs_tp_fiscalyear": "10042",
-      "egcs_tp_totalbudget": "2000000.00",
+      "egcs_tp_totalbudget": "200000000",
       "egcs_tp_overcommitthreshold": "0.00",
-      "_deleted": false
+      "_deleted": false,
+      "egcs_tp_currency": "cad"
     },
     {
       "id": "10026",
       "egcs_tp_transferpaymentprofile": "10022",
       "egcs_tp_fiscalyear": "10043",
-      "egcs_tp_totalbudget": "2000000.00",
+      "egcs_tp_totalbudget": "200000000",
       "egcs_tp_overcommitthreshold": "0.00",
-      "_deleted": false
+      "_deleted": false,
+      "egcs_tp_currency": "cad"
     }
   ],
   "Transfer_Payment_Profile": [
@@ -7663,7 +7672,7 @@
     {
       "id": "10008",
       "egcs_tp_transferpaymentstream": "10118",
-      "egcs_tp_totalbudget": "2000000.00",
+      "egcs_tp_totalbudget": "200000000",
       "egcs_tp_transferpaymentbudget": "10024",
       "egcs_tp_overcommitthreshold": "0.00",
       "_deleted": false
@@ -7671,7 +7680,7 @@
     {
       "id": "10009",
       "egcs_tp_transferpaymentstream": "10118",
-      "egcs_tp_totalbudget": "2000000.00",
+      "egcs_tp_totalbudget": "200000000",
       "egcs_tp_transferpaymentbudget": "10025",
       "egcs_tp_overcommitthreshold": "0.00",
       "_deleted": false
@@ -7679,7 +7688,7 @@
     {
       "id": "10010",
       "egcs_tp_transferpaymentstream": "10118",
-      "egcs_tp_totalbudget": "2000000.00",
+      "egcs_tp_totalbudget": "200000000",
       "egcs_tp_transferpaymentbudget": "10026",
       "egcs_tp_overcommitthreshold": "0.00",
       "_deleted": false

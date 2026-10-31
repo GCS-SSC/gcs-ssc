@@ -1,3 +1,4 @@
+import { assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { FundingHistoryExternalCreateSchema } from '~~/shared/types/schemas'
@@ -46,6 +47,7 @@ export default defineEventHandler(async event => {
       const warnings = await collectFundingHistorySimilarityWarnings(context, validated, trx)
       await requireFundingHistorySimilarityConfirmation(event, warnings, validated.confirmations)
 
+      await assertCurrencyMoneyValues(event, validated.egcs_ar_currency, [validated.egcs_ar_fundingamount])
       const historyValues = {
         egcs_ar_agencyname_en: validated.egcs_ar_agencyname_en,
         egcs_ar_agencyname_fr: validated.egcs_ar_agencyname_fr,
@@ -89,7 +91,7 @@ export default defineEventHandler(async event => {
           egcs_ar_applicantrecipient: recipientId
         })))
         .execute()
-      return { ...history, egcs_ar_fundingamount: parseDatabaseMoney(history.egcs_ar_fundingamount), recipientIds }
+      return { ...history, egcs_ar_fundingamount: parseDatabaseMoney(history.egcs_ar_fundingamount, history.egcs_ar_currency), recipientIds }
     })
   } catch (error: unknown) {
     await throwIfFundingHistoryConstraintError(event, error)

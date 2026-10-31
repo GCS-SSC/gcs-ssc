@@ -1,5 +1,7 @@
+import { zeroMoney } from '~~/shared/utils/money'
 import type { Kysely, Transaction } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
+import { resolveAgreementCurrency } from './agreement-currency'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 import { resolveLatestTargetApprovalEvidence } from './business-approval-evidence'
 import { hasPositiveCompletionTerminus } from './completion-terminus'
@@ -10,7 +12,6 @@ import { budgetFiscalYearStableId } from './agreement-budget-lineage'
 import { readEffectiveAccountReceivableRecoveries, readEffectiveCorrectionAdjustments } from './agreement-accounting-projection'
 
 type DbClient = Kysely<Database> | Transaction<Database>
-const ZERO_MONEY = parseMoney('0.00')
 
 /**
  * Returns the paid floor for an exact commitment line after successful JV adjustments.
@@ -59,7 +60,8 @@ export const getCommitmentLinePaymentCoverage = async (
     .select(['line.egcs_fc_fundingagreement', 'coding.egcs_tp_agencychartofaccount', 'commitment.egcs_fc_currency as currency', 'commitment.egcs_fc_type as commitmentTypeId',
       databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('line.id', '=', commitmentLineId).where('line._deleted', '=', false).executeTakeFirst()
-  if (line && options.currency !== undefined && options.currency !== line.currency) throw new Error('Commitment line currency must match selected Payment currency')
+  if (!line) throw new Error('Commitment line is unavailable')
+  if (options.currency !== undefined && options.currency !== line.currency) throw new Error('Commitment line currency must match selected Payment currency')
   if (line) query = query.where('Funding_Case_Agreement_Payment.egcs_fc_currency', '=', line.currency)
   const rows = await query.execute()
   const approvalByPayment = new Map<string, Awaited<ReturnType<typeof resolveLatestTargetApprovalEvidence>>>()
@@ -70,22 +72,20 @@ export const getCommitmentLinePaymentCoverage = async (
   const paidAmount = sumMoney(rows.flatMap((row): Money[] =>
     approvalByPayment.get(String(row.paymentId))?.approvalRuntimeState === 'denied'
       ? []
-      : [parseDatabaseMoney(row.amount)]))
-  const originalCoverage = { hasActivePaymentLine: rows.length > 0, paidAmount }
-  if (!line) return originalCoverage
+      : [parseDatabaseMoney(row.amount, line.currency)]), line.currency)
 
   const coding = await readCommitmentCodingCapacity(db, String(line.egcs_fc_fundingagreement),
     String(line.egcs_tp_agencychartofaccount), { ...options, currency: line.currency, includeCommitmentLineId: commitmentLineId, commitmentTypeId: line.commitmentTypeId }, approvalByPayment)
   const ownPaid = addMoney(paidAmount, sumMoney(coding.adjustments.filter(row => String(row.commitmentLineId) === commitmentLineId)
-    .map(row => parseDatabaseMoney(row.amount))))
-  const codingPaidFloor = subtractMoney(parseDatabaseMoney(line.amount), coding.available)
-  const typedFloor = coding.typedAvailable === null ? ZERO_MONEY : subtractMoney(parseDatabaseMoney(line.amount), coding.typedAvailable)
-  const adjustedFloor = [ownPaid, codingPaidFloor, typedFloor].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, ZERO_MONEY)
+    .map(row => row.amount), line.currency))
+  const codingPaidFloor = subtractMoney(parseDatabaseMoney(line.amount, line.currency), coding.available)
+  const typedFloor = coding.typedAvailable === null ? zeroMoney(line.currency) : subtractMoney(parseDatabaseMoney(line.amount, line.currency), coding.typedAvailable)
+  const adjustedFloor = [ownPaid, codingPaidFloor, typedFloor].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, zeroMoney(line.currency))
   return {
     hasActivePaymentLine: rows.length > 0
       || coding.adjustments.some(row => String(row.commitmentLineId) === commitmentLineId)
-      || compareMoney(adjustedFloor, ZERO_MONEY) > 0,
-    paidAmount: compareMoney(adjustedFloor, ZERO_MONEY) < 0 ? ZERO_MONEY : adjustedFloor
+      || compareMoney(adjustedFloor, zeroMoney(line.currency)) > 0,
+    paidAmount: compareMoney(adjustedFloor, zeroMoney(line.currency)) < 0 ? zeroMoney(line.currency) : adjustedFloor
   }
 }
 
@@ -108,7 +108,7 @@ const readCommitmentCodingCapacity = async (
   options: CoverageOptions,
   approvalByPayment: Map<string, ApprovalEvidence>
 ) => {
-  const adjustmentRows = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher_Line as adjustment')
+  const rawAdjustmentRows = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher_Line as adjustment')
     .innerJoin('Funding_Case_Agreement_Journal_Voucher as voucher', 'voucher.id', 'adjustment.egcs_fc_journalvoucher')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'voucher.egcs_fc_payment')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'adjustment.egcs_fc_chartofaccount')
@@ -119,6 +119,7 @@ const readCommitmentCodingCapacity = async (
     .where('coding.egcs_tp_agencychartofaccount', '=', agencyChartId)
     .where('adjustment.egcs_fc_kind', '=', 'adjustment')
     .where('adjustment._deleted', '=', false).where('voucher._deleted', '=', false).where('payment._deleted', '=', false).execute()
+  const adjustmentRows = rawAdjustmentRows.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount, options.currency) }))
   const successfulVouchers = new Set<string>()
   for (const voucherId of new Set(adjustmentRows.map(row => String(row.voucherId)))) {
     if (await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', voucherId)) successfulVouchers.add(voucherId)
@@ -158,7 +159,7 @@ const readCommitmentCodingCapacity = async (
     .where('paymentLine._deleted', '=', false).where('payment._deleted', '=', false)
   if (options.excludePaymentId) codingPaymentsQuery = codingPaymentsQuery.where('payment.id', '!=', options.excludePaymentId)
   if (options.excludePaymentLineId) codingPaymentsQuery = codingPaymentsQuery.where('paymentLine.id', '!=', options.excludePaymentLineId)
-  const codingPayments = await codingPaymentsQuery.execute()
+  const codingPayments = (await codingPaymentsQuery.execute()).map(row => ({ ...row, amount: parseDatabaseMoney(row.amount, options.currency) }))
   for (const paymentId of new Set([...codingPayments, ...adjustments].flatMap(row => row.paymentId === null ? [] : [String(row.paymentId)]))) {
     if (!approvalByPayment.has(paymentId)) {
       approvalByPayment.set(paymentId, await resolveLatestTargetApprovalEvidence(db, 'fundingcasepayment', paymentId))
@@ -167,8 +168,8 @@ const readCommitmentCodingCapacity = async (
   const counted = (paymentId: string | null) => paymentId === null || approvalByPayment.get(String(paymentId))?.approvalRuntimeState !== 'denied'
   const countedAdjustments = adjustments.filter(row => counted(row.paymentId))
   const codingPaid = sumMoney([...codingPayments.filter(row => counted(row.paymentId)), ...countedAdjustments]
-    .map(row => parseDatabaseMoney(row.amount)))
-  let typedPaid = ZERO_MONEY
+    .map(row => row.amount), options.currency)
+  let typedPaid = zeroMoney(options.currency)
   let typedAvailable: Money | null = null
   if (options.commitmentTypeId) {
     const history = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as historicalLine')
@@ -182,12 +183,12 @@ const readCommitmentCodingCapacity = async (
     typedPaid = sumMoney([
       ...codingPayments.filter(row => String(row.commitmentTypeId) === options.commitmentTypeId && counted(row.paymentId)),
       ...countedAdjustments.filter(row => row.commitmentLineId !== null && historyIds.has(String(row.commitmentLineId)))
-    ].map(row => parseDatabaseMoney(row.amount)))
-    if (compareMoney(typedPaid, ZERO_MONEY) < 0) typedPaid = ZERO_MONEY
-    const committed = sumMoney(codingLines.filter(line => String(line.commitmentTypeId) === options.commitmentTypeId).map(line => parseDatabaseMoney(line.amount)))
+    ].map(row => row.amount), options.currency)
+    if (compareMoney(typedPaid, zeroMoney(options.currency)) < 0) typedPaid = zeroMoney(options.currency)
+    const committed = sumMoney(codingLines.filter(line => String(line.commitmentTypeId) === options.commitmentTypeId).map(line => parseDatabaseMoney(line.amount, options.currency)), options.currency)
     typedAvailable = subtractMoney(committed, typedPaid)
   }
-  const committed = sumMoney(codingLines.map(row => parseDatabaseMoney(row.amount)))
+  const committed = sumMoney(codingLines.map(row => parseDatabaseMoney(row.amount, options.currency)), options.currency)
   const available = subtractMoney(committed, codingPaid)
   return {
     adjustments: countedAdjustments,
@@ -244,15 +245,15 @@ export const getCommitmentAllocationPaidCoverage = async (
     for (const member of members) {
       const attached = payments.filter(row => String(row.commitmentLineId) === String(member.id))
       const paid = sumMoney(attached.filter(row => approvals.get(String(row.paymentId))?.approvalRuntimeState !== 'denied')
-        .map(row => parseDatabaseMoney(row.amount)))
+        .map(row => parseDatabaseMoney(row.amount, input.currency)), input.currency)
       const adjustments = coding?.adjustments.filter(row => String(row.commitmentLineId) === String(member.id)) ?? []
-      const exactPaid = addMoney(paid, sumMoney(adjustments.map(row => parseDatabaseMoney(row.amount))))
-      lines.set(String(member.id), { paidAmount: compareMoney(exactPaid, ZERO_MONEY) < 0 ? ZERO_MONEY : exactPaid,
+      const exactPaid = addMoney(paid, sumMoney(adjustments.map(row => row.amount), input.currency))
+      lines.set(String(member.id), { paidAmount: compareMoney(exactPaid, zeroMoney(input.currency)) < 0 ? zeroMoney(input.currency) : exactPaid,
         hasActivePaymentLine: attached.length > 0 || adjustments.length > 0 })
     }
-    const exactFloor = sumMoney(members.map(row => lines.get(String(row.id))!.paidAmount))
-    const sharedFloor = coding ? subtractMoney(sumMoney(members.map(row => parseDatabaseMoney(row.amount))), coding.available) : ZERO_MONEY
-    codingFloors.set(codingId, [sharedFloor, exactFloor, coding?.typedPaid ?? ZERO_MONEY].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, ZERO_MONEY))
+    const exactFloor = sumMoney(members.map(row => lines.get(String(row.id))!.paidAmount), input.currency)
+    const sharedFloor = coding ? subtractMoney(sumMoney(members.map(row => parseDatabaseMoney(row.amount, input.currency)), input.currency), coding.available) : zeroMoney(input.currency)
+    codingFloors.set(codingId, [sharedFloor, exactFloor, coding?.typedPaid ?? zeroMoney(input.currency)].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, zeroMoney(input.currency)))
   }
   return { lines, codingFloors }
 }
@@ -304,7 +305,11 @@ export const getAgreementCommitmentPaymentCapacity = async (
     .whereRef('account.egcs_ay_currency', '=', 'commitment.egcs_fc_currency')
   if (currency) linesQuery = linesQuery.where('commitment.egcs_fc_currency', '=', currency)
   const lines = await linesQuery.execute()
-  if (!lines.length) return ZERO_MONEY
+  if (!lines.length) {
+    const ownerCurrency = await resolveAgreementCurrency(db, agreementId)
+    if (!ownerCurrency) throw new Error('Agreement currency is unavailable')
+    return zeroMoney(ownerCurrency)
+  }
   if (new Set(lines.map(row => row.currency)).size > 1) throw new Error('Commitment payment capacity currency is ambiguous')
   const selectedCurrency = lines[0]!.currency
   let query = db.selectFrom('Funding_Case_Agreement_Payment_Line as selectedPaymentLine')
@@ -325,18 +330,18 @@ export const getAgreementCommitmentPaymentCapacity = async (
     const selected = lines.filter(row => String(row.agencyChartId) === agencyChartId)
     const lineIds = new Set(selected.map(row => String(row.id)))
     const directPaid = sumMoney(payments.filter(row => lineIds.has(String(row.commitmentLineId))
-      && approvalByPayment.get(String(row.paymentId))?.approvalRuntimeState !== 'denied').map(row => parseDatabaseMoney(row.amount)))
+      && approvalByPayment.get(String(row.paymentId))?.approvalRuntimeState !== 'denied').map(row => parseDatabaseMoney(row.amount, selectedCurrency)), selectedCurrency)
     const coding = await readCommitmentCodingCapacity(db, agreementId, agencyChartId, { ...input, currency: selectedCurrency }, approvalByPayment)
     const selectedPaid = addMoney(directPaid, sumMoney(coding?.adjustments.filter(row => lineIds.has(String(row.commitmentLineId)))
-      .map(row => parseDatabaseMoney(row.amount)) ?? []))
-    const selectedCommitted = sumMoney(selected.map(row => parseDatabaseMoney(row.amount)))
+      .map(row => row.amount) ?? [], selectedCurrency))
+    const selectedCommitted = sumMoney(selected.map(row => parseDatabaseMoney(row.amount, selectedCurrency)), selectedCurrency)
     const effectiveAvailable = subtractMoney(selectedCommitted, selectedPaid)
     const ownAvailable = compareMoney(effectiveAvailable, selectedCommitted) > 0 ? selectedCommitted : effectiveAvailable
     const remaining = [ownAvailable, coding.available, coding.typedAvailable ?? ownAvailable]
       .reduce((minimum, amount) => compareMoney(amount, minimum) < 0 ? amount : minimum, ownAvailable)
-    available.push(compareMoney(remaining, ZERO_MONEY) < 0 ? ZERO_MONEY : remaining)
+    available.push(compareMoney(remaining, zeroMoney(selectedCurrency)) < 0 ? zeroMoney(selectedCurrency) : remaining)
   }
-  return sumMoney(available)
+  return sumMoney(available, selectedCurrency)
 }
 
 /**
@@ -352,14 +357,16 @@ export const getAgreementCommitmentPaymentCapacity = async (
 export const validateAgreementPaymentAllocations = async (
   db: DbClient,
   agreementId: string,
-  allocations: Array<{ commitmentLineId: string; amount: string }>,
+  allocations: Array<{ commitmentLineId: string; amount: Money }>,
   options: { excludePaymentId?: string; currency?: string } = {}
 ): Promise<boolean> => {
+  const currency = await resolveAgreementCurrency(db, agreementId)
+  if (!currency || (options.currency !== undefined && options.currency !== currency)) return false
   const totals = new Map<string, Money>()
   for (const row of allocations) {
     const amount = parseMoney(row.amount)
-    if (compareMoney(amount, ZERO_MONEY) < 0) return false
-    totals.set(row.commitmentLineId, addMoney(totals.get(row.commitmentLineId) ?? ZERO_MONEY, amount))
+    if (amount.currency !== currency.toUpperCase() || compareMoney(amount, zeroMoney(currency)) < 0) return false
+    totals.set(row.commitmentLineId, addMoney(totals.get(row.commitmentLineId) ?? zeroMoney(currency), amount))
   }
   const codingTotals = new Map<string, { amount: Money; currency: Currency_Codes }>()
   const typedTotals = new Map<string, { codingId: string; commitmentTypeId: string; amount: Money; currency: Currency_Codes }>()
@@ -376,12 +383,12 @@ export const validateAgreementPaymentAllocations = async (
     if (options.currency !== undefined && line.currency !== options.currency) return false
     if ([...codingTotals.values()].some(pool => pool.currency !== line.currency)) return false
     const coverage = await getCommitmentLinePaymentCoverage(db, lineId, options)
-    if (compareMoney(proposed, subtractMoney(parseDatabaseMoney(line.amount), coverage.paidAmount)) > 0) return false
+    if (compareMoney(proposed, subtractMoney(parseDatabaseMoney(line.amount, currency), coverage.paidAmount)) > 0) return false
     const codingId = String(line.egcs_tp_agencychartofaccount)
-    codingTotals.set(codingId, { currency: line.currency, amount: addMoney(codingTotals.get(codingId)?.amount ?? ZERO_MONEY, proposed) })
+    codingTotals.set(codingId, { currency: line.currency, amount: addMoney(codingTotals.get(codingId)?.amount ?? zeroMoney(currency), proposed) })
     if (line.commitmentTypeId !== undefined) {
       const key = `${codingId}:${line.commitmentTypeId}`
-      typedTotals.set(key, { codingId, commitmentTypeId: line.commitmentTypeId, currency: line.currency, amount: addMoney(typedTotals.get(key)?.amount ?? ZERO_MONEY, proposed) })
+      typedTotals.set(key, { codingId, commitmentTypeId: line.commitmentTypeId, currency: line.currency, amount: addMoney(typedTotals.get(key)?.amount ?? zeroMoney(currency), proposed) })
     }
   }
   for (const [codingId, proposed] of codingTotals) {

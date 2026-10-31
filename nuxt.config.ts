@@ -54,6 +54,8 @@ export default defineNuxtConfig({
   nitro: {
     experimental: { asyncContext: true },
     externals: {
+      // Bundle the vendored provider so its SDK imports use the host's source aliases.
+      inline: ['@gcs-ssc/survey', '@gcs-ssc/extensions'],
       external: ['docxtemplater', 'pizzip', 'puppeteer', 'libreoffice-convert', 'kysely-pglite']
     }
   },

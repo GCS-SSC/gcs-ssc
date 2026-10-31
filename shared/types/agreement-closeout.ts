@@ -10,10 +10,10 @@ export type CloseoutFinancialRow = {
   fiscalYear: string
   currency: Currency_Codes
   approvedClaimAmount: Money
-  originalApprovedClaimAmount?: Money
-  accountReceivableRecoveryAmount?: Money
-  cashPaidAmount?: Money
-  correctionAmount?: Money
+  originalApprovedClaimAmount: Money
+  accountReceivableRecoveryAmount: Money
+  cashPaidAmount: Money
+  correctionAmount: Money
   paidAmount: Money
   variance: Money
   state: CloseoutFinancialState
@@ -46,7 +46,7 @@ export type CloseoutBlocker = CloseoutBlockerBase & (
 )
 
 export type AgreementCloseoutReadiness = {
-  schemaVersion: 1
+  schemaVersion: 2
   agreementId: string
   agreementStatus: StatusId
   agreementTerminal: boolean

@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { validateReviewSetApprovalTemplateForAgency, validateReviewSetApprovalTemplatesForAgency } from './agency-review-set-dependencies'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { H3Event } from 'h3'
@@ -264,8 +265,8 @@ const mapExistingMembersForValidation = (members: ReviewSetupMemberRow[]): Revie
     egcs_cn_reviewschema: String(member.egcs_cn_reviewschema),
     egcs_cn_order: member.egcs_cn_order,
     egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure === true,
-    egcs_cn_failurethreshold: member.egcs_cn_failurethreshold !== undefined
-      ? member.egcs_cn_failurethreshold
+    egcs_cn_failurethreshold: member.egcs_cn_failurethreshold !== undefined && member.egcs_cn_failurethreshold !== null
+      ? parseSafeDecimal(String(member.egcs_cn_failurethreshold))
       : null,
     egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ? String(member.egcs_cn_defaultgroup) : null,
     egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate

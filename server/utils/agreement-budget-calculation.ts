@@ -3,7 +3,7 @@ import { sql, type Kysely, type Transaction } from 'kysely'
 import type { H3Event } from 'h3'
 import type { Database } from '~~/shared/types/database'
 import { calculateBudgetPercentages } from '~~/shared/utils/budget-percentage'
-import { isNumeric19Money, moneyToCents, parseMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, isPersistableMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { badRequest, throwApiError } from './api-errors'
 import { assertAgreementBudgetProgramFundingCapacity } from './agreement-budget'
@@ -49,11 +49,11 @@ export const prepareBudgetCalculation = async (event: H3Event, db: Db, input: In
     const draftId = rowId ?? '__new__'
     try {
       const amounts = calculateBudgetPercentages([
-        ...rows.filter(row => row.id !== draftId).map(row => ({ ...row, programFunding: parseDatabaseMoney(row.programFunding) })),
+        ...rows.filter(row => row.id !== draftId).map(row => ({ ...row, programFunding: parseDatabaseMoney(row.programFunding, row.currency) })),
         { id: draftId, versionId: year.egcs_fc_budgetversion, fiscalYearId: year.egcs_fc_fiscalyear,
           currency: input.egcs_fc_currency ?? existing!.egcs_fc_currency, categoryId: definition.categoryId,
           mode: config.mode, sourceCategoryId: config.source, percentage: input.egcs_fc_percentage ?? config.percentage,
-          programFunding: parseMoney('0') }
+          programFunding: zeroMoney(input.egcs_fc_currency ?? existing!.egcs_fc_currency) }
       ])
       programFunding = amounts.get(draftId)!
     } catch { await badRequest(event, 'INVALID_BUDGET_CALCULATION', 'apiErrors.agreement.invalid_budget_calculation') }
@@ -90,13 +90,13 @@ export const recalculateAgreementBudget = async (event: H3Event, db: Db, rowId: 
   const rows = await loadCalculationRows(db, anchor.egcs_fc_budgetversion)
   let amounts: Map<string, Money>
   try {
-    amounts = calculateBudgetPercentages(rows.map(row => ({ ...row, programFunding: parseDatabaseMoney(row.programFunding) })))
+    amounts = calculateBudgetPercentages(rows.map(row => ({ ...row, programFunding: parseDatabaseMoney(row.programFunding, row.currency) })))
   } catch {
     return await badRequest(event, 'INVALID_BUDGET_CALCULATION', 'apiErrors.agreement.invalid_budget_calculation')
   }
   for (const row of rows) {
     const amount = amounts.get(row.id)!
-    if (!isNumeric19Money(amount) || moneyToCents(amount) + moneyToCents(parseDatabaseMoney(row.otherFunding)) > moneyToCents(parseDatabaseMoney(row.totalAmount))) {
+    if (!isPersistableMoney(amount) || compareMoney(addMoney(amount, parseDatabaseMoney(row.otherFunding, row.currency)), parseDatabaseMoney(row.totalAmount, row.currency)) > 0) {
       await throwApiError(event, { statusCode: 400, code: 'VALIDATION_FAILED', key: 'apiErrors.agreement.calculated_funding_exceeds_total', params: { row: row.description }, details: [{ path: `lineItems.${row.id}.egcs_fc_totalamount`, message: row.description }] })
     }
   }
@@ -108,7 +108,7 @@ export const recalculateAgreementBudget = async (event: H3Event, db: Db, rowId: 
   await assertAgreementBudgetFinancialLimits(db, { agreementId: String(version.egcs_fc_fundingagreement), versionId: anchor.egcs_fc_budgetversion, streamId })
   if (version.egcs_fc_iscurrent) {
     const years = new Map(rows.map(row => [`${row.yearRowId}:${row.currency}`, { identity: row.yearIdentity ?? row.yearRowId, currency: row.currency }]))
-    for (const { identity, currency } of years.values()) await assertAgreementBudgetProgramFundingCapacity(event, db, streamId, identity, parseMoney('0'), { lockStreamBudget: true, currency })
+    for (const { identity, currency } of years.values()) await assertAgreementBudgetProgramFundingCapacity(event, db, streamId, identity, zeroMoney(currency), { lockStreamBudget: true, currency })
     await assertAgreementCurrentBudgetUsage(db, String(version.egcs_fc_fundingagreement))
   }
   return amounts

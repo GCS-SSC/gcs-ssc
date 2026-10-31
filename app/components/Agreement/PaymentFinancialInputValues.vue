@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { GcsExtensionPaymentCalculationResult } from '@gcs-ssc/extensions/server'
-import { formatMoneyText, parseMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const { inputs } = defineProps<{ inputs: GcsExtensionPaymentCalculationResult }>()
 const { t, locale } = useI18n()
-const financialRows = computed<[string, string][]>(() => [
+const financialRows = computed<[string, Money][]>(() => [
   ['agreement.payments.financial_inputs.commitment_remaining', inputs.commitmentRemaining],
   ['agreement.payments.financial_inputs.payments_to_date', inputs.totalPaymentsToDate],
   ['agreement.payments.financial_inputs.credit_memos', inputs.totalCreditMemos],
@@ -17,7 +17,7 @@ const financialRows = computed<[string, string][]>(() => [
   ['agreement.payments.financial_inputs.agreement_total', inputs.agreementTotal],
   ['agreement.payments.financial_inputs.final_fiscal_year_total', inputs.finalFiscalYearTotal]
 ])
-const money = (amount: string, currency: string) => formatMoneyText(parseMoneyText(amount), locale.value, currency.toUpperCase())
+const money = (amount: Money) => formatMoneyText(amount, locale.value)
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const money = (amount: string, currency: string) => formatMoneyText(parseMoneyTe
         {{ t(label) }}
       </dt>
       <dd class="mt-1 min-w-0 font-medium tabular-nums [overflow-wrap:anywhere]">
-        {{ money(amount, inputs.currency) }}
+        {{ money(amount) }}
       </dd>
     </div>
     <div>

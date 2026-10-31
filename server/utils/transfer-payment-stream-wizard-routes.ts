@@ -7,7 +7,8 @@ import type { TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/sch
 import { badRequest as badRequestApiError } from './api-errors'
 import { buildAmendmentTypeKey } from './transfer-payment-stream-uniqueness'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
-import { addMoney, compareMoney, parseMoney, type Money } from '~~/shared/utils/money'
+import { assertCurrencyMoneyValues } from './agreement-currency'
+import { addMoney, compareMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 
 type StreamWizardTransaction = Transaction<Database>
 type StreamWizardPayload = TransferPaymentStreamPolymorphicWizard
@@ -93,6 +94,7 @@ const assertBudgetReferences = async (
     .where('Agency_Fiscal_Year._deleted', '=', false)
     .select([
       'Transfer_Payment_Fiscal_Year_Budget.id as id',
+      'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency as currency',
       databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('egcs_tp_totalbudget')
     ])
     .orderBy('Transfer_Payment_Fiscal_Year_Budget.id', 'asc')
@@ -114,18 +116,21 @@ const assertBudgetReferences = async (
     ])
     .groupBy('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
     .execute()
-  const allocatedByBudget = new Map(existingAllocations.map(item => [String(item.budget_id), parseDatabaseMoney(item.total)]))
+  const currenciesByBudget = new Map(budgets.map(budget => [String(budget.id), budget.currency]))
+  const allocatedByBudget = new Map(existingAllocations.map(item => [String(item.budget_id), parseDatabaseMoney(item.total, currenciesByBudget.get(String(item.budget_id))!)]))
   const requestedByBudget = new Map<string, Money>()
-  const zero = parseMoney('0')
   for (const item of payload.budgets) {
     const budgetId = String(item.egcs_tp_transferpaymentbudget)
-    requestedByBudget.set(budgetId, addMoney(requestedByBudget.get(budgetId) ?? zero, item.egcs_tp_totalbudget))
+    const currency = currenciesByBudget.get(budgetId)!
+    await assertCurrencyMoneyValues(event, currency, [item.egcs_tp_totalbudget])
+    requestedByBudget.set(budgetId, addMoney(requestedByBudget.get(budgetId) ?? zeroMoney(currency), item.egcs_tp_totalbudget))
   }
   const exceedsCapacity = budgets.some(budget => {
     const budgetId = String(budget.id)
+    const zero = zeroMoney(budget.currency)
     return compareMoney(
       addMoney(allocatedByBudget.get(budgetId) ?? zero, requestedByBudget.get(budgetId) ?? zero),
-      parseDatabaseMoney(budget.egcs_tp_totalbudget)
+      parseDatabaseMoney(budget.egcs_tp_totalbudget, budget.currency)
     ) > 0
   })
   if (exceedsCapacity) {
@@ -308,7 +313,7 @@ const assertAgencyFinanceReferences = async (
   if (chartIds.length) {
     const charts = await db.selectFrom('Agency_Chart_of_Account')
       .where('id', 'in', chartIds).where('egcs_ay_organizationagency', '=', agencyId)
-      .where('_deleted', '=', false).select(['id', 'egcs_ay_fiscalyear', 'egcs_ay_currency'])
+      .where('_deleted', '=', false).where('egcs_ay_active', '=', true).select(['id', 'egcs_ay_fiscalyear', 'egcs_ay_currency'])
       .forUpdate().execute()
     const budgetIds = uniqueStrings(payload.budgets, item => item.egcs_tp_transferpaymentbudget)
     const budgets = budgetIds.length
@@ -461,6 +466,7 @@ const insertAmendmentTypes = async (
     .insertInto('Transfer_Payment_Amendment_Type')
     .values(payload.amendmentTypes.map(item => ({
       egcs_tp_transferpaymentstream: streamId,
+      egcs_tp_active: item.egcs_tp_active ?? true,
       egcs_tp_amended: item.egcs_tp_amended,
       egcs_tp_name_en: item.egcs_tp_name_en,
       egcs_tp_name_fr: item.egcs_tp_name_fr,
@@ -515,6 +521,7 @@ const insertAmendmentSubtypes = async (
     })
     const subtype = await trx.insertInto('Transfer_Payment_Amendment_Subtype').values({
       egcs_tp_transferpaymentstream: streamId,
+      egcs_tp_active: item.egcs_tp_active ?? true,
       egcs_tp_name_en: item.egcs_tp_name_en,
       egcs_tp_name_fr: item.egcs_tp_name_fr,
       egcs_tp_description_en: item.egcs_tp_description_en,
@@ -587,7 +594,7 @@ const insertStreamWizardFinancialLimit = async (
     .insertInto('Transfer_Payment_Financial_Limits')
     .values({
       egcs_tp_transferpaymentstream: streamId,
-      egcs_tp_maxallowableperrecipient: databaseMoneyValue(payload.financialLimit.egcs_tp_maxallowableperrecipient),
+      egcs_tp_maxallowableperrecipient: sql<number>`${payload.financialLimit.egcs_tp_maxallowableperrecipient}::numeric`,
       egcs_tp_maxpercentofsupportavailableperrecipient:
         payload.financialLimit.egcs_tp_maxpercentofsupportavailableperrecipient,
       egcs_tp_maxpercentofretroactivecostsallowable: 0,

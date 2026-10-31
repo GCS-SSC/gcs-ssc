@@ -1,8 +1,8 @@
+import { addMoney, compareMoney, minMoney, subtractMoney, sumMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 import { applyAccountReceivableClaimReductions } from './account-receivable-claim-reductions'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Narrow engine-owned Payment controls, reservations and exact principal allocation. */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Currency_Codes, Database, JsonValue } from '~~/shared/types/database'
-import { moneyFromCents, moneyToCents, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { resolveAgreementScopeContext } from './agreement'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { readAccountReceivableApprovedRecoveryMethod } from './account-receivable'
@@ -14,7 +14,6 @@ import { readAccountReceivablePoolBalance, readAccountReceivablePoolOffsetPolicy
 import type { PaymentOffsetCodingPlan } from './agreement-payment-offset-plan'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 
-const ZERO = parseMoney('0.00')
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
 
 export const readAccountReceivablePoolDebts = async (db: Kysely<Database>, input: { agencyId: string; applicantRecipientId: string; currency?: Currency_Codes }) => {
@@ -49,7 +48,7 @@ export const assertAccountReceivablePaymentAllowed = async (
     .where('egcs_fc_applicantrecipient', '=', input.applicantRecipientId).where('_deleted', '=', false).execute()
   for (const pool of pools) {
     const balance = await readAccountReceivablePoolBalance(db, String(pool.id))
-    if (moneyToCents(balance.egcs_fc_receivableamount) > BigInt(0) && await readAccountReceivablePoolOffsetPolicy(db, String(pool.id)) === 'direct_repayment') throw new Error('AR_DIRECT_REPAYMENT_HOLD')
+    if (compareMoney(balance.egcs_fc_receivableamount, zeroMoney(pool.egcs_fc_currency)) > 0 && await readAccountReceivablePoolOffsetPolicy(db, String(pool.id)) === 'direct_repayment') throw new Error('AR_DIRECT_REPAYMENT_HOLD')
     if (pool.egcs_fc_currency !== input.currency) continue
     let pending = db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_pool', '=', String(pool.id))
       .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false)
@@ -70,6 +69,7 @@ export const releaseAccountReceivablePaymentOffset = async (trx: Transaction<Dat
 export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Database>, paymentId: string, options: { plans?: PaymentOffsetCodingPlan[] } = {}) => {
   const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('gross')).where('id', '=', paymentId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const currency = payment.egcs_fc_currency
   const context = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
   if (!context) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
   const { pool } = await lockAccountReceivablePaymentPoolAgreements(trx, { agencyId: context.agencyId,
@@ -88,24 +88,24 @@ export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Dat
     : []
   const debts = await readAccountReceivablePoolDebts(trx, { agencyId: context.agencyId,
     applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency })
-  let remaining = moneyToCents(parseDatabaseMoney(payment.gross))
+  let remaining = parseDatabaseMoney(payment.gross, currency)
   const plans: Array<{ receivableId: string; amount: Money }> = []
   for (const debt of debts.filter(item => item.egcs_fc_recoverymethod === 'offset')) {
     const balance = await readAccountReceivableCashBalance(trx, String(debt.id))
-    const reservedHere = sumMoney(retained.filter(memo => String(memo.egcs_fc_receivable) === String(debt.id)).map(memo => parseDatabaseMoney(memo.amount)))
-    const available = moneyToCents(balance.egcs_fc_available) + moneyToCents(reservedHere)
-    const amount = available < remaining ? available : remaining
-    if (amount <= BigInt(0)) continue
-    plans.push({ receivableId: String(debt.id), amount: moneyFromCents(amount) })
-    remaining -= amount
-    if (remaining <= BigInt(0)) break
+    const reservedHere = sumMoney(retained.filter(memo => String(memo.egcs_fc_receivable) === String(debt.id)).map(memo => parseDatabaseMoney(memo.amount, currency)), currency)
+    const available = addMoney(balance.egcs_fc_available, reservedHere)
+    const amount = minMoney([available, remaining], currency)
+    if (compareMoney(amount, zeroMoney(currency)) <= 0) continue
+    plans.push({ receivableId: String(debt.id), amount: amount })
+    remaining = subtractMoney(remaining, amount)
+    if (compareMoney(remaining, zeroMoney(currency)) <= 0) break
   }
-  const sameRetainedPlan = retained.length === plans.length && plans.every(plan => retained.some(memo => String(memo.egcs_fc_receivable) === plan.receivableId && parseDatabaseMoney(memo.amount) === plan.amount))
+  const sameRetainedPlan = retained.length === plans.length && plans.every(plan => retained.some(memo => String(memo.egcs_fc_receivable) === plan.receivableId && compareMoney(parseDatabaseMoney(memo.amount, currency), plan.amount) === 0))
   if (sameRetainedPlan && current) {
     let sameCoding = true
     for (const memo of retained) {
       const lines = await readAccountReceivableOffsetMemoLines(trx, String(memo.id))
-      if (!lines.length || sumMoney(lines.map(line => line.egcs_fc_amount)) !== parseDatabaseMoney(memo.amount)) throw new Error('AR_OFFSET_CODING_REQUIRED')
+      if (!lines.length || compareMoney(sumMoney(lines.map(line => line.egcs_fc_amount), currency), parseDatabaseMoney(memo.amount, currency)) !== 0) throw new Error('AR_OFFSET_CODING_REQUIRED')
       if (options.plans) {
         const proposed = options.plans.find(plan => plan.receivableId === String(memo.egcs_fc_receivable))?.coding.map(line => ({
           codingLineId: line.codingLineId, accountId: line.agencyChartOfAccountId, dimensions: line.accountingDimensions,
@@ -118,11 +118,11 @@ export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Dat
     }
     if (sameCoding) return await readAccountReceivablePaymentOffset(trx, paymentId)
   }
-  if (plans.length && (!options.plans || options.plans.length !== plans.length || !plans.every(plan => options.plans!.some(selected => selected.receivableId === plan.receivableId && selected.amount === plan.amount)))) throw new Error('AR_OFFSET_CODING_REQUIRED')
+  if (plans.length && (!options.plans || options.plans.length !== plans.length || !plans.every(plan => options.plans!.some(selected => selected.receivableId === plan.receivableId && compareMoney(selected.amount, plan.amount) === 0)))) throw new Error('AR_OFFSET_CODING_REQUIRED')
   if (!plans.length && options.plans?.length) throw new Error('AR_OFFSET_PLAN_CHANGED')
   await releaseAccountReceivablePaymentOffset(trx, paymentId)
   if (plans.length) {
-    const amount = sumMoney(plans.map(plan => plan.amount))
+    const amount = sumMoney(plans.map(plan => plan.amount), currency)
     const recovery = await trx.insertInto('Funding_Case_Account_Receivable_Recovery').values({ egcs_fc_pool: String(pool.id), egcs_fc_payment: paymentId,
       egcs_fc_amount: databaseMoneyValue(amount) }).returning('id').executeTakeFirstOrThrow()
     await linkAccountReceivablePoolOffsetApplication(trx, String(recovery.id), options.plans!)
@@ -135,14 +135,15 @@ export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, p
   const payment = await db.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency'])
     .select(sql<boolean>`EXISTS (SELECT 1 FROM "Common_Status" status WHERE status.id = "Funding_Case_Agreement_Payment".egcs_fc_status AND status.egcs_cn_terminal AND NOT status._deleted)`.as('egcs_fc_isterminal'))
     .select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('gross')).where('id', '=', paymentId).executeTakeFirstOrThrow()
+  const currency = payment.egcs_fc_currency
   const recoveries = await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select(['id', 'egcs_fc_outcome'])
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')).where('egcs_fc_payment', '=', paymentId)
     .where('egcs_fc_outcome', 'in', ['open', 'posted']).where('_deleted', '=', false).execute()
   const settled = payment.egcs_fc_isterminal || recoveries.some(recovery => recovery.egcs_fc_outcome === 'posted')
   const retainedRecovery = recoveries[0] ?? await db.selectFrom('Funding_Case_Account_Receivable_Recovery')
     .select(['id', 'egcs_fc_outcome']).where('egcs_fc_payment', '=', paymentId).where('_deleted', '=', false).orderBy('id', 'desc').executeTakeFirst()
-  const gross = parseDatabaseMoney(payment.gross)
-  const offset = sumMoney(recoveries.map(row => parseDatabaseMoney(row.amount)))
+  const gross = parseDatabaseMoney(payment.gross, currency)
+  const offset = sumMoney(recoveries.map(row => parseDatabaseMoney(row.amount, currency)), currency)
   let control: 'allowed' | 'direct_repayment_hold' | 'recovery_pending' = 'allowed'
   if (!settled) {
     try {
@@ -164,7 +165,7 @@ export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, p
               egcs_fc_receivablerecovered: _recovered, egcs_fc_receivableoutstanding: _outstanding,
               egcs_fc_receivableavailable: _available, ...memo }) => memo))).map(memo => ({ ...memo,
           egcs_fc_outcome: retainedRecovery?.egcs_fc_outcome ?? memo.egcs_fc_outcome,
-          egcs_fc_appliedamount: retainedRecovery?.egcs_fc_outcome === 'released' ? ZERO : memo.egcs_fc_appliedamount })) }
+          egcs_fc_appliedamount: retainedRecovery?.egcs_fc_outcome === 'released' ? zeroMoney(currency) : memo.egcs_fc_appliedamount })) }
 }
 
 export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Database>, paymentId: string) => {
@@ -180,27 +181,28 @@ export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Dat
   if (owner) {
     const pool = await db.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
       .where('egcs_fc_applicantrecipient', '=', String(payment.egcs_fc_applicantrecipient)).where('egcs_fc_currency', '=', payment.egcs_fc_currency).executeTakeFirst()
-    return { schemaVersion: 5 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
+    return { schemaVersion: 6 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
       poolBasisHash: pool ? hashPublicationDefinition(json(await captureAccountReceivablePoolBasis(db, String(pool.id)))) : null }
   }
-  return { schemaVersion: 5 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
+  return { schemaVersion: 6 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
     poolBasisHash: null }
 }
 
 export const validateAccountReceivablePaymentOffset = async (trx: Transaction<Database>, paymentId: string, options: { packet?: JsonValue } = {}) => {
   const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency']).where('id', '=', paymentId).executeTakeFirstOrThrow()
+  const currency = payment.egcs_fc_currency
   await assertAccountReceivablePaymentAllowed(trx, { agreementId: String(payment.egcs_fc_fundingagreement), applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
   const packet = await captureAccountReceivablePaymentOffsetPacket(trx, paymentId)
   if (options.packet && hashPublicationDefinition(json(packet)) !== hashPublicationDefinition(options.packet)) throw new Error('AR_OFFSET_BASIS_CHANGED')
-  if (moneyToCents(packet.egcs_fc_netamount) < BigInt(0)) throw new Error('AR_OFFSET_EXCEEDS_GROSS')
+  if (compareMoney(packet.egcs_fc_netamount, zeroMoney(currency)) < 0) throw new Error('AR_OFFSET_EXCEEDS_GROSS')
   const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
   if (!owner) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
   const pool = await trx.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
     .where('egcs_fc_applicantrecipient', '=', String(payment.egcs_fc_applicantrecipient)).where('egcs_fc_currency', '=', payment.egcs_fc_currency).executeTakeFirstOrThrow()
   const balance = await readAccountReceivablePoolBalance(trx, String(pool.id))
-  const eligible = moneyToCents(balance.egcs_fc_availableamount) + moneyToCents(packet.egcs_fc_offsetamount)
-  const gross = moneyToCents(packet.egcs_fc_grossamount)
-  if (moneyToCents(packet.egcs_fc_offsetamount) !== (eligible < gross ? eligible : gross)) throw new Error('AR_OFFSET_PLAN_STALE')
+  const eligible = addMoney(balance.egcs_fc_availableamount, packet.egcs_fc_offsetamount)
+  const gross = packet.egcs_fc_grossamount
+  if (compareMoney(packet.egcs_fc_offsetamount, minMoney([eligible, gross], currency)) !== 0) throw new Error('AR_OFFSET_PLAN_STALE')
   return packet
 }
 

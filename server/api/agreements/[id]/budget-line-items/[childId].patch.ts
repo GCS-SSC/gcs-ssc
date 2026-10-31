@@ -1,5 +1,6 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { resolveAgreementBudgetProponent } from '~~/server/utils/agreement-budget-proponent'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Budget line-item route behavior is covered by focused route tests. */
@@ -229,8 +230,9 @@ const fetchBudgetLineItemResponse = async (
   .executeTakeFirstOrThrow()
   .then(async line => ({
     ...line,
-    egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
-    egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding),
+    egcs_fc_percentage: line.egcs_fc_percentage === null ? null : parseSafeDecimal(String(line.egcs_fc_percentage)),
+    egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency),
+    egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding, line.egcs_fc_currency),
     egcs_fc_fundingsources: await loadBudgetFundingSources(db, [String(line.row_id)])
   }))
 
@@ -311,8 +313,13 @@ const resolveBudgetLinePatchInput = async (
 
   const calculation = await prepareBudgetCalculation(event, db, patchValues, String(existing.id))
   if (calculation.egcs_fc_programfunding !== undefined) patchValues.egcs_fc_programfunding = calculation.egcs_fc_programfunding
+  await assertCurrencyMoneyValues(event, existing.egcs_fc_currency, [
+    ...(patchValues.egcs_fc_totalamount === undefined ? [] : [patchValues.egcs_fc_totalamount]),
+    ...(patchValues.egcs_fc_programfunding === undefined ? [] : [patchValues.egcs_fc_programfunding]),
+    ...(patchValues.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)
+  ])
   const existingSources = await loadBudgetFundingSources(db, [String(existing.id)])
-  await validateMergedBudgetLineItemFundingPatch(event, { ...existing, egcs_fc_fundingsources: existingSources }, patchValues)
+  await validateMergedBudgetLineItemFundingPatch(event, { ...existing, egcs_fc_totalamount: parseDatabaseMoney(existing.egcs_fc_totalamount, existing.egcs_fc_currency), egcs_fc_programfunding: parseDatabaseMoney(existing.egcs_fc_programfunding, existing.egcs_fc_currency), egcs_fc_fundingsources: existingSources }, patchValues)
   if (patchValues.egcs_fc_fundingsources !== undefined) {
     await validateBudgetFundingSources(event, db, streamId, patchValues.egcs_fc_fundingsources, String(existing.id))
   }

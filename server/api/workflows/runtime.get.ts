@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { getRiskReadiness } from '~~/server/utils/risk-readiness'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorizeReviewRuntimeAction, canAuthorizeReviewRuntimeAction, canAuthorizeWorkflowOwnerRecovery, resolveReviewRuntimeEntityFromReview } from '~~/server/utils/review-runtime-access'
+import { authorizeWorkflowOwnerRead, canAuthorizeReviewRuntimeAction, canAuthorizeWorkflowOwnerRecovery, resolveReviewRuntimeEntityFromReview } from '~~/server/utils/review-runtime-access'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
 import {
   getWorkflowRuntime,
@@ -34,7 +34,7 @@ export default defineEventHandler(async event => {
   if (!context) return await respondCompletionRuntimeEntityNotFound(event, query.entityType)
   const authContext = extensionRuntime
     ? await authorizeExtensionLifecycleRead(event, extensionRuntime)
-    : await authorizeReviewRuntimeAction(event, 'read_assessment', context)
+    : await authorizeWorkflowOwnerRead(event, context)
   const assignmentOwner = !extensionRuntime && context.agreementId
     && ['fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo', 'fundingcasecorrection', 'fundingcasejournalvoucher', 'commonreview', 'commonrecommendation'].includes(context.entityType)
     ? await resolveEntityAssignmentOwner(event.context.$db, context.entityType as AssignableEntityType, context.entityId)

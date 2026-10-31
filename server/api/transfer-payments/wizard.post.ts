@@ -1,3 +1,4 @@
+import { assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler } from 'h3'
 import { dateOnlySql } from '~~/server/utils/database-date'
 import { TransferPaymentWizardSchema } from '~~/shared/types/schemas'
@@ -141,6 +142,7 @@ export default defineEventHandler(async event => {
 
       // 4. Create Budgets
       if (validated.budgets.length > 0) {
+        for (const budget of validated.budgets) await assertCurrencyMoneyValues(event, budget.egcs_tp_currency, [budget.egcs_tp_totalbudget])
         await trx
           .insertInto('Transfer_Payment_Fiscal_Year_Budget')
           .values(

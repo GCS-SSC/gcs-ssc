@@ -1,6 +1,7 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { loadAgreementBudgetProponentName, resolveAgreementBudgetProponent } from '~~/server/utils/agreement-budget-proponent'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -76,8 +77,13 @@ export default defineEventHandler(async event => {
     if (body.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, trx, agreementId, body.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, body, String(existing.id))
     if (calculation.egcs_fc_programfunding !== undefined) body.egcs_fc_programfunding = calculation.egcs_fc_programfunding
+    await assertCurrencyMoneyValues(event, existing.egcs_fc_currency, [
+      ...(body.egcs_fc_totalamount === undefined ? [] : [body.egcs_fc_totalamount]),
+      ...(body.egcs_fc_programfunding === undefined ? [] : [body.egcs_fc_programfunding]),
+      ...(body.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)
+    ])
     const existingSources = await loadBudgetFundingSources(trx, [String(existing.id)])
-    await validateMergedBudgetLineItemFundingPatch(event, { ...existing, egcs_fc_fundingsources: existingSources }, body)
+    await validateMergedBudgetLineItemFundingPatch(event, { ...existing, egcs_fc_totalamount: parseDatabaseMoney(existing.egcs_fc_totalamount, existing.egcs_fc_currency), egcs_fc_programfunding: parseDatabaseMoney(existing.egcs_fc_programfunding, existing.egcs_fc_currency), egcs_fc_fundingsources: existingSources }, body)
     if (body.egcs_fc_fundingsources !== undefined) await validateBudgetFundingSources(event, trx, currentContext.streamId, body.egcs_fc_fundingsources, String(existing.id))
     const updateValues = targetFiscalYearRowId
       ? { ...body, egcs_fc_fundingagreementbudgetfiscalyear: targetFiscalYearRowId }
@@ -115,9 +121,10 @@ export default defineEventHandler(async event => {
       : String(existing.stable_fiscal_year_id)
     return {
       ...updated,
+      egcs_fc_percentage: updated.egcs_fc_percentage === null ? null : parseSafeDecimal(String(updated.egcs_fc_percentage)),
       ...await loadAgreementBudgetProponentName(trx, updated.egcs_fc_applicantrecipient),
-      egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount),
-      egcs_fc_programfunding: amounts.get(updated.id) ?? parseDatabaseMoney(updated.egcs_fc_programfunding),
+      egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount, updated.egcs_fc_currency),
+      egcs_fc_programfunding: amounts.get(updated.id) ?? parseDatabaseMoney(updated.egcs_fc_programfunding, updated.egcs_fc_currency),
       egcs_fc_fundingsources: await loadBudgetFundingSources(trx, [String(updated.id)]),
       id: updated.egcs_fc_originalbudgetlineitem ?? updated.id,
       egcs_fc_fundingagreementbudgetfiscalyear: fiscalYearIdentity,

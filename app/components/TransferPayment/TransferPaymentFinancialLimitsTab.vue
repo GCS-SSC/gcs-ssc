@@ -5,7 +5,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { Ref } from 'vue'
 import type { TransferPaymentFinancialLimitsForm, TransferPaymentFinancialLimitsRow } from '~~/shared/types/transfer-payment-ui'
-import { formatMoneyText } from '~~/shared/utils/money'
+import { formatDecimalText } from '~~/shared/utils/money'
 
 const { profileId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
   profileId: string
@@ -155,7 +155,7 @@ const onDelete = async (id: string) => {
       </template>
       <template #egcs_tp_maxallowableperrecipient-cell="{ row }">
         <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-          {{ formatMoneyText(row.original.egcs_tp_maxallowableperrecipient, locale, null) }}
+          {{ formatDecimalText(row.original.egcs_tp_maxallowableperrecipient, locale) }}
         </span>
       </template>
       <template #egcs_tp_maxpercentofsupportavailableperrecipient-cell="{ row }">

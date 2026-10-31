@@ -3,9 +3,10 @@ import type { Kysely, Transaction } from 'kysely'
 import type { H3Event } from 'h3'
 import type { Database } from '~~/shared/types/database'
 import type { Money } from '~~/shared/utils/money'
-import { databaseMoneyValue } from '~~/server/utils/database-money'
+import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { badRequest } from '~~/server/utils/api-errors'
-import { compareMoney, parseMoney, sumMoney } from '~~/shared/utils/money'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from './agreement-currency'
+import { compareMoney, sumMoney } from '~~/shared/utils/money'
 
 export type AgreementFundingSourceInput = {
   egcs_fc_fundingsubtype: string
@@ -18,23 +19,26 @@ type FundingTarget =
 
 /** Applies the exact program plus other-source arithmetic for a collection of lines. */
 export const areLineFundingAmountsComplete = (
-  lines: Array<{ id: string, egcs_fc_amount: string | number, egcs_fc_totalamount: string | number }>,
-  sources: Array<{ lineId: string, egcs_fc_amount: string | number }>,
+  lines: Array<{ id: string, egcs_fc_amount: string, egcs_fc_totalamount: string, egcs_fc_currency: string }>,
+  sources: Array<{ lineId: string, egcs_fc_amount: string }>,
   options: { requireSource: boolean }
 ): boolean => {
+  const currencyByLine = new Map(lines.map(line => [String(line.id), line.egcs_fc_currency]))
   const amountsByLine = new Map<string, Money[]>()
   for (const source of sources) {
     const key = String(source.lineId)
+    const currency = currencyByLine.get(key)
+    if (!currency) return false
     const amounts = amountsByLine.get(key) ?? []
-    amounts.push(parseMoney(source.egcs_fc_amount))
+    amounts.push(parseDatabaseMoney(source.egcs_fc_amount, currency))
     amountsByLine.set(key, amounts)
   }
   return lines.every(line => {
     const amounts = amountsByLine.get(String(line.id)) ?? []
     if (options.requireSource && amounts.length === 0) return false
     return compareMoney(
-      sumMoney([parseMoney(line.egcs_fc_amount), ...amounts]),
-      parseMoney(line.egcs_fc_totalamount)
+      sumMoney([parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency), ...amounts], line.egcs_fc_currency),
+      parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)
     ) === 0
   })
 }
@@ -47,6 +51,8 @@ export const replaceAgreementLineFunding = async (
   target: FundingTarget,
   sources: AgreementFundingSourceInput[]
 ) => {
+  const currency = await assertAgreementCurrency(event, trx, agreementId)
+  await assertCurrencyMoneyValues(event, currency, sources.map(source => source.egcs_fc_amount))
   const ids = sources.map(source => source.egcs_fc_fundingsubtype)
   if (new Set(ids).size !== ids.length) {
     return await badRequest(event, 'AGREEMENT_FUNDING_SUBTYPE_DUPLICATE', 'apiErrors.agreement.funding_subtype_invalid')
@@ -167,12 +173,20 @@ export const getAgreementLineFundingCompletionStatus = async (
 
   const lines = target.kind === 'forecast'
     ? await db.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
-        .select(['id', 'egcs_fc_amount', 'egcs_fc_totalamount'])
+        .select(({ ref }) => [
+          'id', 'egcs_fc_currency',
+          databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'),
+          databaseMoneyText(ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
+        ])
         .where('egcs_fc_agreementforecast', '=', target.id)
         .where('_deleted', '=', false)
         .execute()
     : await db.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
-        .select(['id', 'egcs_fc_amount', 'egcs_fc_totalamount'])
+        .select(({ ref }) => [
+          'id', 'egcs_fc_currency',
+          databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'),
+          databaseMoneyText(ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
+        ])
         .where('egcs_fc_fundingagreementclaim', '=', target.id)
         .where('_deleted', '=', false)
         .execute()
@@ -180,17 +194,23 @@ export const getAgreementLineFundingCompletionStatus = async (
   const ids = lines.map(line => String(line.id))
   const sources = target.kind === 'forecast'
     ? await db.selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
-        .select(['egcs_fc_forecastlineitem as lineId', 'egcs_fc_amount'])
+        .select(({ ref }) => [
+          'egcs_fc_forecastlineitem as lineId',
+          databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount')
+        ])
         .where('egcs_fc_forecastlineitem', 'in', ids)
         .where('_deleted', '=', false)
         .execute()
     : await db.selectFrom('Funding_Case_Agreement_Claim_Line_Item_Funding')
-        .select(['egcs_fc_claimlineitem as lineId', 'egcs_fc_amount'])
+        .select(({ ref }) => [
+          'egcs_fc_claimlineitem as lineId',
+          databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount')
+        ])
         .where('egcs_fc_claimlineitem', 'in', ids)
         .where('_deleted', '=', false)
         .execute()
   const complete = areLineFundingAmountsComplete(
-    lines.map(line => ({ id: String(line.id), egcs_fc_amount: line.egcs_fc_amount, egcs_fc_totalamount: line.egcs_fc_totalamount })),
+    lines.map(line => ({ id: String(line.id), egcs_fc_amount: line.egcs_fc_amount, egcs_fc_totalamount: line.egcs_fc_totalamount, egcs_fc_currency: line.egcs_fc_currency })),
     sources.map(source => ({ lineId: String(source.lineId), egcs_fc_amount: source.egcs_fc_amount })),
     { requireSource: true }
   )
@@ -205,25 +225,33 @@ export const assertAgreementLineFundingBalance = async (
 ) => {
   const line = target.kind === 'forecast'
     ? await db.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
-        .select(['egcs_fc_amount', 'egcs_fc_totalamount'])
+        .select(({ ref }) => [
+          'egcs_fc_currency',
+          databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'),
+          databaseMoneyText(ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
+        ])
         .where('id', '=', target.lineId).executeTakeFirstOrThrow()
     : await db.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
-        .select(['egcs_fc_amount', 'egcs_fc_totalamount'])
+        .select(({ ref }) => [
+          'egcs_fc_currency',
+          databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'),
+          databaseMoneyText(ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
+        ])
         .where('id', '=', target.lineId).executeTakeFirstOrThrow()
   const sources = target.kind === 'forecast'
     ? await db.selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
-        .select('egcs_fc_amount')
+        .select(({ ref }) => databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'))
         .where('egcs_fc_forecastlineitem', '=', target.lineId).where('_deleted', '=', false).execute()
     : await db.selectFrom('Funding_Case_Agreement_Claim_Line_Item_Funding')
-        .select('egcs_fc_amount')
+        .select(({ ref }) => databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'))
         .where('egcs_fc_claimlineitem', '=', target.lineId).where('_deleted', '=', false).execute()
-  if (compareMoney(parseMoney(line.egcs_fc_totalamount), parseMoney(line.egcs_fc_amount)) < 0) {
+  if (compareMoney(parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency), parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency)) < 0) {
     return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_BELOW_PROGRAM', 'apiErrors.agreement.funding_breakdown_required')
   }
   if (sources.length === 0) return null
   if (compareMoney(
-    sumMoney([parseMoney(line.egcs_fc_amount), ...sources.map(source => parseMoney(source.egcs_fc_amount))]),
-    parseMoney(line.egcs_fc_totalamount)
+    sumMoney([parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency), ...sources.map(source => parseDatabaseMoney(source.egcs_fc_amount, line.egcs_fc_currency))], line.egcs_fc_currency),
+    parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)
   ) !== 0) {
     return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_MISMATCH', 'apiErrors.agreement.funding_breakdown_required')
   }

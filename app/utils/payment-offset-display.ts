@@ -1,6 +1,4 @@
-import { compareMoney, isCanonicalMoney, parseMoney } from '~~/shared/utils/money'
-
-const ZERO_MONEY = parseMoney('0')
+import { compareMoney, isCanonicalMoney, zeroMoney } from '~~/shared/utils/money'
 
 /**
  * Whether a payment has a positive credit memo deduction to present.
@@ -8,4 +6,4 @@ const ZERO_MONEY = parseMoney('0')
  * @returns True only for a valid positive monetary amount.
  */
 export const hasPaymentOffset = (value: unknown): boolean => isCanonicalMoney(value)
-  && compareMoney(value, ZERO_MONEY) > 0
+  && compareMoney(value, zeroMoney(value.currency)) > 0

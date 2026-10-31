@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CloseoutFinancialRow, CloseoutFinancialTotal } from '~~/shared/types/agreement-closeout'
-import { formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const { rows = [], totals = [] } = defineProps<{
   rows?: CloseoutFinancialRow[]
@@ -8,10 +8,7 @@ const { rows = [], totals = [] } = defineProps<{
 }>()
 
 const { t, locale } = useI18n()
-const formatMoney = (value: Money, currency: string): string =>
-  formatMoneyText(value, locale.value, currency.toUpperCase())
-// Retained closeout packets created before Corrections contain only paidAmount.
-const noCorrections = parseMoney('0')
+const formatMoney = (value: Money): string => formatMoneyText(value, locale.value)
 </script>
 
 <template>
@@ -63,25 +60,25 @@ const noCorrections = parseMoney('0')
             {{ row.currency }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(row.originalApprovedClaimAmount ?? row.approvedClaimAmount, row.currency) }}
+            {{ formatMoney(row.originalApprovedClaimAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(row.approvedClaimAmount, row.currency) }}
+            {{ formatMoney(row.approvedClaimAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(row.cashPaidAmount ?? row.paidAmount, row.currency) }}
+            {{ formatMoney(row.cashPaidAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(row.correctionAmount ?? noCorrections, row.currency) }}
+            {{ formatMoney(row.correctionAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(row.accountReceivableRecoveryAmount ?? noCorrections, row.currency) }}
+            {{ formatMoney(row.accountReceivableRecoveryAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(row.paidAmount, row.currency) }}
+            {{ formatMoney(row.paidAmount) }}
           </td>
           <td class="px-4 py-3 text-right font-medium">
-            {{ formatMoney(row.variance, row.currency) }}
+            {{ formatMoney(row.variance) }}
           </td>
           <td class="px-4 py-3">
             {{ t(`agreement.closeout.financial_states.${row.state}`) }}
@@ -102,25 +99,25 @@ const noCorrections = parseMoney('0')
             {{ total.currency }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.originalApprovedClaimAmount ?? total.approvedClaimAmount, total.currency) }}
+            {{ formatMoney(total.originalApprovedClaimAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.approvedClaimAmount, total.currency) }}
+            {{ formatMoney(total.approvedClaimAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.cashPaidAmount ?? total.paidAmount, total.currency) }}
+            {{ formatMoney(total.cashPaidAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.correctionAmount ?? noCorrections, total.currency) }}
+            {{ formatMoney(total.correctionAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.accountReceivableRecoveryAmount ?? noCorrections, total.currency) }}
+            {{ formatMoney(total.accountReceivableRecoveryAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.paidAmount, total.currency) }}
+            {{ formatMoney(total.paidAmount) }}
           </td>
           <td class="px-4 py-3 text-right">
-            {{ formatMoney(total.variance, total.currency) }}
+            {{ formatMoney(total.variance) }}
           </td>
           <td class="px-4 py-3">
             {{ t(`agreement.closeout.financial_states.${total.state}`) }}

@@ -2,7 +2,7 @@ import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { sql } from 'kysely'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 export interface AgreementAmendmentBudgetDifference {
   previousTotal: Money
@@ -53,7 +53,7 @@ export const getAgreementAmendmentBudgetDifferences = async (
     const versionId = String(lineItem.egcs_fc_budgetversion)
     const currency = lineItem.egcs_fc_currency.toLowerCase()
     const versionAmounts = amounts.get(versionId) ?? new Map<string, Money[]>()
-    versionAmounts.set(currency, [...(versionAmounts.get(currency) ?? []), parseDatabaseMoney(lineItem.egcs_fc_totalamount)])
+    versionAmounts.set(currency, [...(versionAmounts.get(currency) ?? []), parseDatabaseMoney(lineItem.egcs_fc_totalamount, currency)])
     amounts.set(versionId, versionAmounts)
   }
 
@@ -65,8 +65,8 @@ export const getAgreementAmendmentBudgetDifferences = async (
     const sourceAmounts = amounts.get(sourceVersionId) ?? new Map<string, Money[]>()
     const combinedCurrencies = [...new Set([...amendmentAmounts.keys(), ...sourceAmounts.keys()])].sort()
     return [[String(version.egcs_fc_amendment), combinedCurrencies.map(currency => {
-      const previousTotal = sumMoney(sourceAmounts.get(currency) ?? [parseMoney('0')])
-      const amendedTotal = sumMoney(amendmentAmounts.get(currency) ?? [parseMoney('0')])
+      const previousTotal = sumMoney(sourceAmounts.get(currency) ?? [], currency)
+      const amendedTotal = sumMoney(amendmentAmounts.get(currency) ?? [], currency)
       return { previousTotal, amendedTotal, difference: subtractMoney(amendedTotal, previousTotal), currency }
     })] as const]
   }))

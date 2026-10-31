@@ -31,6 +31,7 @@ export default defineEventHandler(async event => {
       .where('egcs_ay_organizationagency', '=', agencyId).where('egcs_ay_fiscalyear', '=', input.fiscalYearId)
       .where('egcs_ay_currency', '=', input.currency).where('egcs_ay_kind', '=', 'commitment').where('_deleted', '=', false)
     if (input.selectedIds) query = query.where('id', 'in', input.selectedIds)
+    else query = query.where('egcs_ay_active', '=', true)
     if (input.search) query = query.where(sql<boolean>`egcs_ay_accountingdimensions::text ILIKE ${`%${escapeLikePattern(input.search)}%`}`)
     const count = await query.clearSelect().select(sql<string>`count(*)::text`.as('total')).executeTakeFirstOrThrow()
     const accounts = await query.orderBy('id').limit(input.limit).offset((input.page - 1) * input.limit).execute()

@@ -176,7 +176,9 @@ const hasRequiredScopeSubtypes = computed(() => hasRequiredAmendmentSubtypeSelec
 const isHistoricalAmendment = computed(() => amendment.value?.egcs_fc_isopen === false
   || isTerminalStatus(amendment.value?.egcs_fc_status))
 const scopeIncludesDuration = computed(() => selectedScopeTypes.value.some(type => type.egcs_tp_amended === 'duration'))
-const scopeSubtypeQuery = computed(() => ({ amendment_type_ids: scopeTypeIds.value.join(',') }))
+const scopeSubtypeQuery = computed(() => ({ amendment_type_ids: scopeTypeIds.value.join(','), amendmentId }))
+const inactiveScopeTypeIds = computed(() => (amendment.value?.amendment_types ?? []).filter(type => type.egcs_tp_active === false).map(type => String(type.id)))
+const inactiveScopeSubtypeIds = computed(() => (amendment.value?.amendment_subtypes ?? []).filter(subtype => subtype.egcs_tp_active === false).map(subtype => String(subtype.id)))
 const durationDatesValid = computed(() => {
   const dates = durationDates.value
   return Boolean(
@@ -548,6 +550,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                 <UFormField data-ui-target="agreements.amendments.amendments.types" :label="t('agreement.amendments.types')" required>
                   <CommonServerLookupSelect
                     v-model:values="scopeTypeIds"
+                    :disabled-values="inactiveScopeTypeIds"
                     multiple
                     :limit="100"
                     :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/types?amendmentId=${encodeURIComponent(amendmentId)}`"
@@ -576,6 +579,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                   <CommonServerLookupSelect
                     v-else
                     v-model:values="scopeSubtypeIds"
+                    :disabled-values="inactiveScopeSubtypeIds"
                     multiple
                     :limit="100"
                     :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/subtypes`"

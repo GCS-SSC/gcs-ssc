@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { FundingCaseAgreementCommitmentLineBalances } from '~~/shared/types/funding-case-agreement-ui'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
-import { formatMoneyText, parseMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const { balances } = defineProps<{ balances: FundingCaseAgreementCommitmentLineBalances }>()
 const { t, locale } = useI18n()
-const money = (amount: string, currency: string) => formatMoneyText(parseMoneyText(amount), locale.value, currency.toUpperCase())
+const money = (amount: Money) => formatMoneyText(amount, locale.value)
 </script>
 
 <template>
@@ -22,21 +22,21 @@ const money = (amount: string, currency: string) => formatMoneyText(parseMoneyTe
           <dt class="text-sm text-muted">
             {{ t('agreement.commitments.committed') }}
           </dt><dd class="font-medium tabular-nums">
-            {{ money(line.egcs_fc_amount, balances.currency) }}
+            {{ money(line.egcs_fc_amount) }}
           </dd>
         </div>
         <div>
           <dt class="text-sm text-muted">
             {{ t('agreement.commitments.paid') }}
           </dt><dd class="font-medium tabular-nums">
-            {{ money(line.egcs_fc_paidamount, balances.currency) }}
+            {{ money(line.egcs_fc_paidamount) }}
           </dd>
         </div>
         <div>
           <dt class="text-sm text-muted">
             {{ t('agreement.commitments.balance') }}
           </dt><dd class="font-medium tabular-nums">
-            {{ money(line.egcs_fc_balance, balances.currency) }}
+            {{ money(line.egcs_fc_balance) }}
           </dd>
         </div>
       </dl>

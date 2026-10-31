@@ -1,5 +1,5 @@
 import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
   FundingCaseAgreementBudgetFiscalYearPatchSchema,
@@ -24,7 +24,7 @@ import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-
 import { assertFiscalYearOverlapsDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { moneyToCents, type Money } from '~~/shared/utils/money'
+import { addMoney, compareScaledMoney, parseDecimalText, type Money } from '~~/shared/utils/money'
 import { loadAgreementBudgetProponentName, resolveAgreementBudgetProponent } from './agreement-budget-proponent'
 import { loadBudgetFundingSources, replaceBudgetFundingSources, validateBudgetFundingSources } from './agreement-budget-funding'
 
@@ -183,9 +183,9 @@ export const resolveAgreementBudgetProgramFundingCapacity = async (
   }
 
   const allocation = await resolveAllocatedProgramFunding(db, streamId, String(fiscalYear.fiscal_year_id), options.excludeLineItemId, streamBudget.currency)
-  const streamBudgetTotal = parseDatabaseMoney(streamBudget.total_budget)
+  const streamBudgetTotal = parseDatabaseMoney(streamBudget.total_budget, streamBudget.currency)
   const overcommitThresholdHundredths = parseThresholdHundredths(streamBudget.overcommit_threshold)
-  const allocatedProgramFunding = parseDatabaseMoney(allocation?.allocated_program_funding)
+  const allocatedProgramFunding = parseDatabaseMoney(allocation?.allocated_program_funding, streamBudget.currency)
 
   if (overcommitThresholdHundredths === null) {
     return null
@@ -206,10 +206,10 @@ export const exceedsAgreementBudgetProgramFundingCapacity = (
   capacity: AgreementBudgetProgramFundingCapacity,
   nextProgramFunding: Money
 ) => {
-  const requestedCents = moneyToCents(capacity.allocatedProgramFunding) + moneyToCents(nextProgramFunding)
-  const maximumScaledCents = moneyToCents(capacity.streamBudgetTotal)
-    * (BigInt(100) + capacity.overcommitThresholdHundredths)
-  return requestedCents * BigInt(100) > maximumScaledCents
+  const requested = addMoney(capacity.allocatedProgramFunding, nextProgramFunding)
+  // The threshold is dimensionless; compare exact products without rounding the currency ceiling.
+  const maximumFactor = parseDecimalText(`${(BigInt(100) + capacity.overcommitThresholdHundredths) / BigInt(100)}.${String((BigInt(100) + capacity.overcommitThresholdHundredths) % BigInt(100)).padStart(2, '0')}`)
+  return compareScaledMoney(requested, parseDecimalText('1'), capacity.streamBudgetTotal, maximumFactor) > 0
 }
 
 export const assertAgreementBudgetProgramFundingCapacity = async (
@@ -461,6 +461,7 @@ export const createAgreementBudgetLineItem = async (
     await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, validated, undefined, String(fiscalYear.id))
     const programFunding = calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding!
+    await assertCurrencyMoneyValues(event, validated.egcs_fc_currency, [validated.egcs_fc_totalamount, programFunding, ...(validated.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)])
 
     await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...validated, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding })
     await validateBudgetFundingSources(event, trx, currentContext.streamId, validated.egcs_fc_fundingsources ?? [])
@@ -498,8 +499,8 @@ export const createAgreementBudgetLineItem = async (
     return {
       ...inserted,
       ...await loadAgreementBudgetProponentName(trx, proponentId),
-      egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
-      egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
+      egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount, inserted.egcs_fc_currency),
+      egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding, inserted.egcs_fc_currency),
       egcs_fc_fundingsources: fundingSources,
       id: inserted.egcs_fc_originalbudgetlineitem ?? inserted.id,
       egcs_fc_fundingagreementbudgetfiscalyear: validated.egcs_fc_fundingagreementbudgetfiscalyear,

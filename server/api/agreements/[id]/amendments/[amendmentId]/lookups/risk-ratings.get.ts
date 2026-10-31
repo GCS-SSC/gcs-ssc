@@ -6,7 +6,7 @@ import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { buildListRouteResponse } from '~~/server/utils/list-route-response'
-import { isRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
+import { isRiskRatingWorkflowManaged, toRiskRatingDto } from '~~/server/utils/agreement-risk-rating'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
@@ -31,7 +31,7 @@ export default defineEventHandler(async event => {
       const scoreSearch = Number(search)
       base = base.where(eb => eb.or([
         eb('egcs_tp_name_en', 'ilike', `%${escapedSearch}%`), eb('egcs_tp_name_fr', 'ilike', `%${escapedSearch}%`),
-        ...(Number.isFinite(scoreSearch) ? [eb('egcs_tp_riskscore', '=', scoreSearch)] : [])
+        ...(Number.isFinite(scoreSearch) ? [eb('egcs_tp_riskscore', '=', String(scoreSearch))] : [])
       ]))
     }
     const [items, count] = await Promise.all([
@@ -41,7 +41,7 @@ export default defineEventHandler(async event => {
       base.select(eb => eb.fn.count('id').as('total')).executeTakeFirst()
     ])
     return {
-      ...buildListRouteResponse(items, count, count, page, limit),
+      ...buildListRouteResponse(items.map(toRiskRatingDto), count, count, page, limit),
       workflow_managed: await isRiskRatingWorkflowManaged(db, {
         streamId: context.streamId, entityType: 'fundingcaseamendment', entityId: amendmentId
       })

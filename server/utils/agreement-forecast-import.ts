@@ -10,7 +10,7 @@ import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/util
 import { BusinessStatusViolation, lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { databaseMoneyValue } from '~~/server/utils/database-money'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
-import { moneyToCents, parseMoney } from '~~/shared/utils/money'
+import { compareMoney, parseMoney, zeroMoney } from '~~/shared/utils/money'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
 
 /**
@@ -27,13 +27,13 @@ export const createAgreementForecastAggregate = async (
   agencyId: string,
   creatorId: string
 ): Promise<GcsExtensionAgreementForecastCreateResult> => {
-  if (input.lineItems.some(line => moneyToCents(parseMoney(line.amount)) < BigInt(0))) {
-    throw new RangeError('Forecast line amounts must be nonnegative.')
-  }
   const currency = await resolveAgreementCurrency(trx, input.agreementId)
   if (!currency) return { status: 'agreement_unavailable' }
-  if (input.lineItems.some(line => line.currency !== currency)) {
+  if (input.lineItems.some(line => line.currency !== currency || parseMoney(line.amount).currency !== currency.toUpperCase())) {
     throw new Error('Forecast line currencies must match the owning Agreement currency.')
+  }
+  if (input.lineItems.some(line => compareMoney(parseMoney(line.amount), zeroMoney(currency)) < 0)) {
+    throw new RangeError('Forecast line amounts must be nonnegative.')
   }
   const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
     .select('id')

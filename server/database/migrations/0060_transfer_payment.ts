@@ -1,3 +1,4 @@
+import { installMonetaryTableGuards } from '../schema/currency-money'
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '../../../shared/types/database'
 
@@ -71,6 +72,7 @@ CREATE UNIQUE INDEX tp_idx_agreementsubtypeidtransferpaymentstream ON "Transfer_
 CREATE UNIQUE INDEX tp_idx_agreementsubtypetransferpaymentstreamagreementtype ON "Transfer_Payment_Agreement_Subtype" USING btree (egcs_tp_transferpaymentstream, egcs_tp_agreementtype) WHERE (_deleted = false);
 
 CREATE TABLE "Transfer_Payment_Amendment_Subtype" (
+  "egcs_tp_active" boolean DEFAULT true NOT NULL,
   "id" bigint DEFAULT nextval('"Transfer_Payment_Amendment_Subtype_id_seq"'::regclass) NOT NULL,
   "egcs_tp_name_en" character varying(255) NOT NULL,
   "egcs_tp_name_fr" character varying(255) NOT NULL,
@@ -96,6 +98,7 @@ CREATE TABLE "Transfer_Payment_Amendment_Subtype_Type" (
 CREATE UNIQUE INDEX tp_idx_amendmentsubtypetype ON "Transfer_Payment_Amendment_Subtype_Type" USING btree (egcs_tp_amendmentsubtype, egcs_tp_amendmenttype) WHERE (_deleted = false);
 
 CREATE TABLE "Transfer_Payment_Amendment_Type" (
+  "egcs_tp_active" boolean DEFAULT true NOT NULL,
   "id" bigint DEFAULT nextval('"Transfer_Payment_Amendment_Type_id_seq"'::regclass) NOT NULL,
   "egcs_tp_amended" amended_type NOT NULL,
   "egcs_tp_name_en" character varying(255) NOT NULL,
@@ -113,7 +116,7 @@ CREATE INDEX tp_idx_amendmenttypetransferpaymentstreamnamefr ON "Transfer_Paymen
 CREATE TABLE "Transfer_Payment_Financial_Limits" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Financial_Limits_id_seq"'::regclass) NOT NULL,
   "egcs_tp_transferpaymentstream" bigint NOT NULL,
-  "egcs_tp_maxallowableperrecipient" numeric(19,2) NOT NULL,
+  "egcs_tp_maxallowableperrecipient" numeric NOT NULL CONSTRAINT "tp_chk_maxrecipient_decimal_range" CHECK (egcs_tp_maxallowableperrecipient >= 0 AND egcs_tp_maxallowableperrecipient < 100000000000000000 AND egcs_tp_maxallowableperrecipient = trunc(egcs_tp_maxallowableperrecipient, 4)),
   "egcs_tp_maxpercentofsupportavailableperrecipient" numeric(5,2) NOT NULL,
   "egcs_tp_maxpercentofretroactivecostsallowable" numeric(5,2) NOT NULL,
   "egcs_tp_stackinglimit" numeric(5,2) NOT NULL,
@@ -133,11 +136,12 @@ CREATE TABLE "Transfer_Payment_Fiscal_Year_Budget" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Fiscal_Year_Budget_id_seq"'::regclass) NOT NULL,
   "egcs_tp_transferpaymentprofile" bigint NOT NULL,
   "egcs_tp_fiscalyear" bigint NOT NULL,
-  "egcs_tp_totalbudget" numeric(19,2) NOT NULL,
+  "egcs_tp_totalbudget" numeric NOT NULL,
   "egcs_tp_currency" currency_codes DEFAULT 'cad'::currency_codes NOT NULL,
   "egcs_tp_overcommitthreshold" numeric(5,2) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "Transfer_Payment_Fiscal_Year_Budget_pkey" PRIMARY KEY (id)
+  CONSTRAINT "Transfer_Payment_Fiscal_Year_Budget_pkey" PRIMARY KEY (id),
+  CONSTRAINT "tp_chk_program_budget_nonnegative" CHECK (egcs_tp_totalbudget >= 0)
 );
 
 CREATE UNIQUE INDEX tp_idx_fiscalyearbudgettransferpaymentprofilefiscalyear ON "Transfer_Payment_Fiscal_Year_Budget" USING btree (egcs_tp_transferpaymentprofile, egcs_tp_fiscalyear, egcs_tp_currency) WHERE (_deleted = false);
@@ -268,12 +272,13 @@ CREATE INDEX tp_idx_streamareaofexpertisetransferpaymentstreamnamefr ON "Transfe
 CREATE TABLE "Transfer_Payment_Stream_Budget" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Stream_Budget_id_seq"'::regclass) NOT NULL,
   "egcs_tp_transferpaymentstream" bigint NOT NULL,
-  "egcs_tp_totalbudget" numeric(19,2) NOT NULL,
+  "egcs_tp_totalbudget" numeric NOT NULL,
   "egcs_tp_transferpaymentbudget" bigint NOT NULL,
   "egcs_tp_overcommitthreshold" numeric(5,2) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "tp_uq_streambudgetidstream" UNIQUE (id, egcs_tp_transferpaymentstream),
-  CONSTRAINT "Transfer_Payment_Stream_Budget_pkey" PRIMARY KEY (id)
+  CONSTRAINT "Transfer_Payment_Stream_Budget_pkey" PRIMARY KEY (id),
+  CONSTRAINT "tp_chk_stream_budget_nonnegative" CHECK (egcs_tp_totalbudget >= 0)
 );
 
 CREATE UNIQUE INDEX tp_idx_streambudgettransferpaymentstreamtransferpaymentbudget ON "Transfer_Payment_Stream_Budget" USING btree (egcs_tp_transferpaymentstream, egcs_tp_transferpaymentbudget) WHERE (_deleted = false);
@@ -988,6 +993,7 @@ AS $function$
       catalog_id bigint;
       catalog_agency bigint;
       catalog_fiscalyear bigint;
+      catalog_active boolean;
       stream_profile bigint;
       stream_agency bigint;
       old_catalog_id bigint;
@@ -1037,11 +1043,15 @@ AS $function$
       END IF;
 
       IF TG_TABLE_NAME = 'Transfer_Payment_Stream_Chart_of_Account' THEN
-        SELECT catalog.egcs_ay_organizationagency, catalog.egcs_ay_fiscalyear
-        INTO catalog_agency, catalog_fiscalyear
+        SELECT catalog.egcs_ay_organizationagency, catalog.egcs_ay_fiscalyear, catalog.egcs_ay_active
+        INTO catalog_agency, catalog_fiscalyear, catalog_active
         FROM "Agency_Chart_of_Account" catalog
         WHERE catalog.id = catalog_id AND catalog._deleted = false
         FOR SHARE OF catalog;
+        IF (TG_OP = 'INSERT' OR OLD._deleted) AND catalog_active IS DISTINCT FROM true THEN
+          RAISE EXCEPTION 'New Chart selection must be active'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_chartactive';
+        END IF;
         PERFORM 1 FROM "Agency_Fiscal_Year" fiscal
         WHERE fiscal.id = catalog_fiscalyear AND fiscal._deleted = false
         FOR SHARE OF fiscal;
@@ -1084,6 +1094,15 @@ AS $function$
       END IF;
       RETURN NEW;
     END $function$;
+CREATE OR REPLACE FUNCTION guard_program_agency_immutable() RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+  IF NEW.egcs_tp_agency IS DISTINCT FROM OLD.egcs_tp_agency THEN
+    RAISE EXCEPTION 'Program Agency cannot change' USING ERRCODE = '23514', CONSTRAINT = 'tp_program_agency_immutable';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
 END $baseline$`.execute(db)
 }
 
@@ -1187,6 +1206,8 @@ END $baseline$`.execute(db)
 /** Installs the current installTriggers definitions for this subject on a fresh database. */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TRIGGER guard_program_agency_immutable BEFORE UPDATE OF egcs_tp_agency ON "Transfer_Payment_Profile" FOR EACH ROW EXECUTE FUNCTION guard_program_agency_immutable();
+
 CREATE TRIGGER guard_program_financial_id_agency BEFORE UPDATE OF egcs_tp_agency ON "Transfer_Payment_Profile" FOR EACH ROW EXECUTE FUNCTION guard_program_financial_id_agency();
 
 CREATE TRIGGER protect_workflow_amendment_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_tp_transferpaymentstream ON "Transfer_Payment_Amendment_Subtype" FOR EACH ROW EXECUTE FUNCTION protect_workflow_amendment_conditions();
@@ -1248,4 +1269,5 @@ CREATE TRIGGER validate_stream_workflow_publication AFTER UPDATE OF egcs_cn_curr
 
 CREATE TRIGGER validate_stream_workflow_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_workflow, _deleted ON "Transfer_Payment_Stream_Workflow" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
 END $baseline$`.execute(db)
+  await installMonetaryTableGuards(db, 'transfer-payment')
 }

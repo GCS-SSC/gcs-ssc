@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -50,6 +51,7 @@ export default defineEventHandler(async event => {
     const total = Number(count?.total ?? 0)
     const items = await withBusinessRecordState(db, 'fundingcaseamendment', rows.map(row => ({
       ...row,
+      egcs_fc_proposedriskscore: row.egcs_fc_proposedriskscore == null ? null : parseSafeDecimal(String(row.egcs_fc_proposedriskscore)),
       amendment_types: typeRows.filter(type => String(type.amendment_id) === String(row.id)),
       amendment_type_ids: typeRows.filter(type => String(type.amendment_id) === String(row.id)).map(type => String(type.id)),
       has_budget_snapshot: budgetIds.has(String(row.id)),

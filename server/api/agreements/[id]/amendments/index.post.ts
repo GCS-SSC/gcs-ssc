@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
@@ -32,8 +33,8 @@ export default defineEventHandler(async event => {
         .select(['id', 'egcs_tp_amended', 'egcs_tp_requiresamendmentsubtype'])
         .where('id', 'in', validated.amendment_type_ids)
         .where('egcs_tp_transferpaymentstream', '=', current.streamId)
-        .where('_deleted', '=', false)
-        .execute()
+        .where('_deleted', '=', false).where('egcs_tp_active', '=', true)
+        .forShare().execute()
       if (types.length !== validated.amendment_type_ids.length) {
         return await badRequest(event, 'INVALID_AGREEMENT_AMENDMENT_TYPE', 'apiErrors.agreement.invalid_amendment_type')
       }
@@ -44,6 +45,7 @@ export default defineEventHandler(async event => {
             .where('Transfer_Payment_Amendment_Subtype.id', 'in', validated.amendment_subtype_ids)
             .where('Transfer_Payment_Amendment_Subtype.egcs_tp_transferpaymentstream', '=', current.streamId)
             .where('Transfer_Payment_Amendment_Subtype._deleted', '=', false)
+            .where('Transfer_Payment_Amendment_Subtype.egcs_tp_active', '=', true)
             .where('Transfer_Payment_Amendment_Subtype_Type._deleted', '=', false)
             .forUpdate('Transfer_Payment_Amendment_Subtype')
             .execute()
@@ -104,7 +106,7 @@ export default defineEventHandler(async event => {
         }))).execute()
       }
       await createPrimaryEntityAssignment(trx, 'fundingcaseamendment', String(amendment.id), creatorId)
-      return { ...amendment, amendment_type_ids: validated.amendment_type_ids, amendment_subtype_ids: validated.amendment_subtype_ids }
+      return { ...amendment, egcs_fc_proposedriskscore: amendment.egcs_fc_proposedriskscore == null ? null : parseSafeDecimal(String(amendment.egcs_fc_proposedriskscore)), amendment_type_ids: validated.amendment_type_ids, amendment_subtype_ids: validated.amendment_subtype_ids }
     }, { action: 'create' })
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)

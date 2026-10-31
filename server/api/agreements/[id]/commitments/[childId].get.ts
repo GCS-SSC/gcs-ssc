@@ -81,7 +81,7 @@ export default defineEventHandler(async event => {
 
     return {
       ...commitmentWithState,
-      egcs_fc_totalamount: parseDatabaseMoney(commitment.egcs_fc_totalamount),
+      egcs_fc_totalamount: parseDatabaseMoney(commitment.egcs_fc_totalamount, commitment.egcs_fc_currency),
       lines
     }
   })

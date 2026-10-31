@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { loadAgreementBudgetProponents } from '~~/server/utils/agreement-budget-proponent'
 import { sql } from 'kysely'
@@ -82,8 +83,9 @@ export default defineEventHandler(async event => {
       proponents,
       lineItems: lineItems.map(line => ({
         ...line,
-        egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
-        egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding),
+        egcs_fc_percentage: line.egcs_fc_percentage === null ? null : parseSafeDecimal(String(line.egcs_fc_percentage)),
+        egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency),
+        egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding, line.egcs_fc_currency),
         egcs_fc_fundingsources: fundingSourcesByLine.get(String(line.row_id)) ?? []
       })),
       budget_differences: budgetDifferences.get(amendmentId) ?? []

@@ -13,7 +13,7 @@ import { assertApplicantRecipientProfileExists } from '~~/server/utils/applicant
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { isValidFundingHistoryId } from '~~/server/utils/funding-history-id'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { addMoney, parseMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 import type { Database } from '~~/shared/types/database'
 import type { Transaction } from 'kysely'
 
@@ -22,12 +22,11 @@ interface FundingTotal {
   amount: Money
 }
 
-const ZERO_MONEY = parseMoney('0')
 const MAX_HISTORY_ROWS = 5_000
 const MAX_HISTORY_DETAIL_ROWS = 50_000
 
 const addTotal = (totals: Map<string, Money>, currency: string, amount: Money): void => {
-  totals.set(currency, addMoney(totals.get(currency) ?? ZERO_MONEY, amount))
+  totals.set(currency, addMoney(totals.get(currency) ?? zeroMoney(currency), amount))
 }
 
 // eslint-disable-next-line local/require-authorize -- fresh authorization is performed inside the repeatable-read transaction.
@@ -191,7 +190,7 @@ export default defineEventHandler(async event => {
     for (const line of budgetLines) {
       const agreementId = String(line.agreementId)
       const totals = totalsByAgreement.get(agreementId) ?? new Map<string, Money>()
-      addTotal(totals, line.currency, parseDatabaseMoney(line.amount))
+      addTotal(totals, line.currency, parseDatabaseMoney(line.amount, line.currency))
       totalsByAgreement.set(agreementId, totals)
     }
     const toTotals = (totals: Map<string, Money> | undefined): FundingTotal[] =>
@@ -288,7 +287,7 @@ export default defineEventHandler(async event => {
         descriptionFr: record.descriptionFr,
         startDate: record.startDate,
         endDate: record.endDate,
-        totals: [{ currency: record.currency, amount: parseDatabaseMoney(record.amount) }],
+        totals: [{ currency: record.currency, amount: parseDatabaseMoney(record.amount, record.currency) }],
         recipients,
         canUpdateRole: targetPermissions?.canUpdateRole === true,
         canDeleteRole: targetPermissions?.canDeleteRole === true,

@@ -12,7 +12,7 @@ import { AccountReceivableSummaryEditSchema } from '~~/shared/types/schemas/acco
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import { accountReceivableReference, formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { AppFetchResponseError } from '~/utils/fetch-error'
-import { sumMoney } from '~~/shared/utils/money'
+import { sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({ key: route => route.path, i18n: { paths: {
   en: '/agreements/[id]/account-receivables/[accountReceivableId]', fr: '/ententes/[id]/comptes-debiteurs/[accountReceivableId]'
@@ -123,11 +123,11 @@ const tabs = computed(() => [
 const { selectedTab } = useUrlTabState({
   tabs, defaultKey: 'account_receivable.summary', enabled: computed(() => status.value === 'success')
 })
-const amount = (value: string | null | undefined) => formatAccountReceivableAmount(value, locale.value, receivable.value?.egcs_fc_currency ?? 'cad') ?? t('common.not_available')
+const amount = (value: Money | null | undefined) => formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 const heroBadges = computed(() => receivable.value
   ? [{ statusId: receivable.value.egcs_fc_status }]
   : [])
-const originalAmount = computed(() => receivable.value ? sumMoney(receivable.value.egcs_fc_lines.map(line => line.egcs_fc_amount)) : null)
+const originalAmount = computed(() => receivable.value ? sumMoney(receivable.value.egcs_fc_lines.map(line => line.egcs_fc_amount), receivable.value.egcs_fc_currency) : null)
 const breadcrumbs = computed(() => [
   { label: t('agreement.title'), to: authorizedRouteLocation(receivable.value?.egcs_fc_agreementreadable, localePath(appRouteLocations.agreements())) },
   { label: receivable.value?.egcs_fc_agreementnumber ?? '', to: authorizedRouteLocation(receivable.value?.egcs_fc_agreementreadable, localePath(appRouteLocations.agreementDetail(agreementId.value))) },

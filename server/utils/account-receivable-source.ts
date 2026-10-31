@@ -1,8 +1,8 @@
+import { compareMoney, subtractMoney, sumMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Live extraction is deliberately separate from retained AR reads. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely } from 'kysely'
 import type { Database, Currency_Codes, JsonValue } from '~~/shared/types/database'
-import { moneyToCents, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { authorize, authorizeWithFreshAuthContext, type AuthContext } from './authorize'
 import { resolveAgreementScopeContext } from './agreement'
 import { notFound, throwApiError } from './api-errors'
@@ -21,7 +21,6 @@ export type CapturedAccountReceivableSource = { id: string; label_en: string; la
     egcs_fc_agencyfiscalyear: string; egcs_fc_periodstart: number; egcs_fc_periodend: number;
     egcs_fc_paidbasis: Money; egcs_fc_sharedpaidbasis: Money; egcs_fc_accountingdimensions: JsonValue }> }
 
-const zero = parseMoney('0.00')
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
 export const accountReceivableError = async (event: H3Event, code: string): Promise<never> => {
   const keys: Record<string, string> = {
@@ -136,7 +135,7 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   const retainPaidSource = (row: (typeof cashRows)[number]) => {
     const key = `${row.paymentId}:${row.commitmentId}:${row.codingId}:${row.egcs_fc_periodstart}:${row.egcs_fc_periodend}`
     const previous = paidSources.get(key)
-    paidSources.set(key, { ...row, amount: sumMoney([previous ? parseDatabaseMoney(previous.amount) : zero, parseDatabaseMoney(row.amount)]) })
+    paidSources.set(key, { ...row, amount: sumMoney([previous ? parseDatabaseMoney(previous.amount, input.currency) : zeroMoney(input.currency), parseDatabaseMoney(row.amount, input.currency)], input.currency).amount })
   }
   for (const row of cashRows) retainPaidSource(row)
   for (const row of voucherRows) if (await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', String(row.voucherId))) {
@@ -145,13 +144,13 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   }
   const rows = [...paidSources.values()].map((row, index) => ({ ...row, id: String(index + 1) }))
   const applyPaidEffect = (effect: Money, eligible: (row: (typeof rows)[number]) => boolean): boolean => {
-    const selected = rows.filter(row => eligible(row) && moneyToCents(parseDatabaseMoney(row.amount)) > BigInt(0))
-    const effective = sumMoney([...selected.map(row => parseDatabaseMoney(row.amount)), effect])
-    if (moneyToCents(effective) < BigInt(0) || (!selected.length && moneyToCents(effect) !== BigInt(0))) return false
+    const selected = rows.filter(row => eligible(row) && compareMoney(parseDatabaseMoney(row.amount, input.currency), zeroMoney(input.currency)) > 0)
+    const effective = sumMoney([...selected.map(row => parseDatabaseMoney(row.amount, input.currency)), effect], input.currency)
+    if (compareMoney(effective, zeroMoney(input.currency)) < 0 || (!selected.length && compareMoney(effect, zeroMoney(input.currency)) !== 0)) return false
     const splits = allocateRetainedAccountReceivableCoding(effective, selected.map(row => ({ id: row.id,
-      basis: parseDatabaseMoney(row.amount), capacity: effective })))
+      basis: parseDatabaseMoney(row.amount, input.currency), capacity: effective })), input.currency)
     const apportioned = new Map(splits.map(row => [row.id, row.amount]))
-    for (const row of selected) row.amount = apportioned.get(row.id) ?? zero
+    for (const row of selected) row.amount = (apportioned.get(row.id) ?? zeroMoney(input.currency)).amount
     return true
   }
   const [corrections, recoveries] = await Promise.all([readEffectiveCorrectionAdjustments(db, input.agreementId), readEffectiveAccountReceivableRecoveries(db, input.agreementId)])
@@ -209,7 +208,7 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   const approvedClaims: typeof claimRows = []
   let ambiguousApprovedClaim = false
   for (const row of claimRows) {
-    if (moneyToCents(parseDatabaseMoney(row.amount)) > BigInt(0)
+    if (compareMoney(parseDatabaseMoney(row.amount, input.currency), zeroMoney(input.currency)) > 0
       && await hasPositiveCompletionTerminus(db, 'fundingclaimreconcile', String(row.reconcileId))) {
       if (row.submittingProponentId == null) ambiguousApprovedClaim = true
       else if (String(row.submittingProponentId) === input.applicantRecipientId) approvedClaims.push(row)
@@ -218,15 +217,15 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   const codingFor = (paidRows: typeof paid): CapturedAccountReceivableSource['coding'] => {
     const consolidated = new Map<string, CapturedAccountReceivableSource['coding'][number]>()
     for (const row of paidRows) {
-      const amount = parseDatabaseMoney(row.amount)
-      if (moneyToCents(amount) <= BigInt(0)) continue
+      const amount = parseDatabaseMoney(row.amount, input.currency)
+      if (compareMoney(amount, zeroMoney(input.currency)) <= 0) continue
       const item = { egcs_fc_commitmentline: String(row.commitmentId), egcs_fc_chartofaccount: String(row.codingId),
         egcs_fc_agencychartofaccount: String(row.chartId), egcs_fc_agencyfiscalyear: String(row.codingFiscalYearId),
         egcs_fc_periodstart: row.egcs_fc_periodstart, egcs_fc_periodend: row.egcs_fc_periodend,
         egcs_fc_paidbasis: amount, egcs_fc_sharedpaidbasis: amount, egcs_fc_accountingdimensions: json(row.egcs_ay_accountingdimensions) }
       const key = `${item.egcs_fc_commitmentline}:${item.egcs_fc_chartofaccount}:${item.egcs_fc_agencyfiscalyear}:${item.egcs_fc_periodstart}:${item.egcs_fc_periodend}`
       const previous = consolidated.get(key)
-      consolidated.set(key, { ...item, egcs_fc_paidbasis: sumMoney([previous?.egcs_fc_paidbasis ?? zero, amount]), egcs_fc_sharedpaidbasis: sumMoney([previous?.egcs_fc_paidbasis ?? zero, amount]) })
+      consolidated.set(key, { ...item, egcs_fc_paidbasis: sumMoney([previous?.egcs_fc_paidbasis ?? zeroMoney(input.currency), amount], input.currency), egcs_fc_sharedpaidbasis: sumMoney([previous?.egcs_fc_paidbasis ?? zeroMoney(input.currency), amount], input.currency) })
     }
     return [...consolidated.values()]
   }
@@ -240,32 +239,32 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   const coding = withSharedBasis(codingFor(paid))
   if (input.claimRelated) return approvedClaims.map(row => ({ id: `claim:${row.id}`,
     label_en: `Claim ${row.claimId} · ${row.egcs_fc_description}`, label_fr: `Réclamation ${row.claimId} · ${row.egcs_fc_description}`,
-    egcs_fc_sourceamount: parseDatabaseMoney(row.amount), egcs_fc_claim: String(row.claimId), egcs_fc_claimline: String(row.claimLineId),
+    egcs_fc_sourceamount: parseDatabaseMoney(row.amount, input.currency), egcs_fc_claim: String(row.claimId), egcs_fc_claimline: String(row.claimLineId),
     egcs_fc_reconcileline: String(row.id), egcs_fc_payment: null, egcs_fc_periodstart: row.egcs_fc_periodstart,
-    egcs_fc_periodend: row.egcs_fc_periodend, egcs_fc_evidence: json(row), coding }))
+    egcs_fc_periodend: row.egcs_fc_periodend, egcs_fc_evidence: json({ ...row, amount: parseDatabaseMoney(row.amount, input.currency) }), coding }))
   if (ambiguousApprovedClaim) return []
   const claimRecoveries = await readEffectiveAccountReceivableClaimRecoveries(db, input.agreementId)
   const approvedClaimLineIds = new Set(approvedClaims.map(row => String(row.claimLineId)))
-  const effectiveClaims = sumMoney([...approvedClaims.map(row => parseDatabaseMoney(row.amount)), ...claimRecoveries
+  const effectiveClaims = sumMoney([...approvedClaims.map(row => parseDatabaseMoney(row.amount, input.currency)), ...claimRecoveries
     .filter(recovery => recovery.currency === input.currency && approvedClaimLineIds.has(String(recovery.claimLineId)))
-    .map(recovery => recovery.amount)])
-  const unclaimed = subtractMoney(sumMoney(coding.map(item => item.egcs_fc_paidbasis)), effectiveClaims)
+    .map(recovery => recovery.amount)], input.currency)
+  const unclaimed = subtractMoney(sumMoney(coding.map(item => item.egcs_fc_paidbasis), input.currency), effectiveClaims)
   const advances = paid.filter(row => row.egcs_fc_paymenttype === 'advance')
-  const advanceTotal = sumMoney(codingFor(advances).map(item => item.egcs_fc_paidbasis))
-  const available = moneyToCents(unclaimed) < moneyToCents(advanceTotal) ? unclaimed : advanceTotal
-  if (moneyToCents(available) <= BigInt(0)) return []
+  const advanceTotal = sumMoney(codingFor(advances).map(item => item.egcs_fc_paidbasis), input.currency)
+  const available = compareMoney(unclaimed, advanceTotal) < 0 ? unclaimed : advanceTotal
+  if (compareMoney(available, zeroMoney(input.currency)) <= 0) return []
   const paymentIds = [...new Set(advances.map(row => String(row.paymentId)))].sort((left, right) => BigInt(left) < BigInt(right) ? -1 : 1)
   return paymentIds.flatMap(paymentId => {
     const paymentRows = advances.filter(row => String(row.paymentId) === paymentId)
     const paymentCoding = withSharedBasis(codingFor(paymentRows))
-    const paidAmount = sumMoney(paymentCoding.map(item => item.egcs_fc_paidbasis))
-    if (moneyToCents(paidAmount) <= BigInt(0)) return []
+    const paidAmount = sumMoney(paymentCoding.map(item => item.egcs_fc_paidbasis), input.currency)
+    if (compareMoney(paidAmount, zeroMoney(input.currency)) <= 0) return []
     const source = paymentRows[0]!
     return [{ id: `advance:${paymentId}`, label_en: `Advance Payment ${paymentId}`, label_fr: `Paiement d’avance ${paymentId}`,
-      egcs_fc_sourceamount: moneyToCents(paidAmount) < moneyToCents(available) ? paidAmount : available,
+      egcs_fc_sourceamount: compareMoney(paidAmount, available) < 0 ? paidAmount : available,
       egcs_fc_claim: null, egcs_fc_claimline: null, egcs_fc_reconcileline: null, egcs_fc_payment: paymentId,
       egcs_fc_periodstart: source.egcs_fc_periodstart, egcs_fc_periodend: source.egcs_fc_periodend,
-      egcs_fc_evidence: json({ payments: paymentRows, approvedClaims, egcs_fc_fiscaloutstanding: available,
+      egcs_fc_evidence: json({ payments: paymentRows.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount, input.currency) })), approvedClaims: approvedClaims.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount, input.currency) })), egcs_fc_fiscaloutstanding: available,
         formula: 'minimum_actual_advance_paid_and_actual_paid_minus_final_approved_claims' }), coding: paymentCoding }]
   })
 }

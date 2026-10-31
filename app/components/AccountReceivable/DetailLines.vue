@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 /* eslint-disable jsdoc/require-jsdoc -- Receivable line modal follows the established Commitment authoring pattern. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -9,7 +10,7 @@ import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/ty
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
-import { moneyToCents, parseMoneyText, sumMoney } from '~~/shared/utils/money'
+import { compareMoney, parseMoney, zeroMoney, sumMoney, type MoneyInput } from '~~/shared/utils/money'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 
 const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdit, canDelete, canUpdate } = defineProps<{
@@ -34,14 +35,14 @@ type LineForm = {
   egcs_fc_sourcekey: string | undefined
   egcs_fc_originalline: string | undefined
   egcs_fc_accountreceivablechartofaccount: string | undefined
-  egcs_fc_amount: string
+  egcs_fc_amount: MoneyInput
 }
 const modal = useCrudModal<AccountReceivableLine, LineForm>({
   createState: () => ({
     egcs_fc_sourcekey: undefined,
     egcs_fc_originalline: undefined,
     egcs_fc_accountreceivablechartofaccount: undefined,
-    egcs_fc_amount: ''
+    egcs_fc_amount: undefined
   }),
   updateState: line => ({
     egcs_fc_sourcekey: line.egcs_fc_sourcekey,
@@ -77,7 +78,7 @@ watch(search, () => {
 const dimensions = (line: AccountReceivableLine) => TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(line.egcs_fc_accountreceivableaccountingdimensions)
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase()
-  return lines.filter(line => !query || [line.egcs_fc_sourcekey, line.egcs_fc_amount,
+  return lines.filter(line => !query || moneyMatchesSearch(line.egcs_fc_amount, query, locale.value) || [line.egcs_fc_sourcekey,
     ...getAccountingDimensionSearchValues(dimensions(line))]
     .some(value => String(value).toLowerCase().includes(query)))
 })
@@ -87,12 +88,12 @@ watch(() => filtered.value.length, count => {
 const codingRequired = computed(() => {
   if (recodeMode.value) return true
   try {
-    return moneyToCents(parseMoneyText(selected.value?.egcs_fc_amount ?? '')) !== BigInt(0)
+    return compareMoney(parseMoney(selected.value?.egcs_fc_amount), zeroMoney(currency)) !== 0
   } catch {
     return false
   }
 })
-const total = computed(() => sumMoney(lines.map(line => line.egcs_fc_amount)))
+const total = computed(() => sumMoney(lines.map(line => line.egcs_fc_amount), currency))
 const columns: TableColumnInput<AccountReceivableLine>[] = [
   { id: 'lineNumber', headerKey: 'account_receivable.line_number' },
   { id: 'coding', headerKey: 'account_receivable.receivable_account' },
@@ -203,7 +204,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
         <span class="text-sm whitespace-normal">{{ formatAccountingDimensions(dimensions(row.original), locale === 'fr' ? 'fr' : 'en') || t('account_receivable.coding_not_selected') }}</span>
       </template>
       <template #amount-cell="{ row }">
-        <span class="font-semibold tabular-nums">{{ formatAccountReceivableAmount(row.original.egcs_fc_amount, locale, currency) ?? t('common.not_available') }}</span>
+        <span class="font-semibold tabular-nums">{{ formatAccountReceivableAmount(row.original.egcs_fc_amount, locale) ?? t('common.not_available') }}</span>
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
@@ -219,7 +220,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
         {{ t('account_receivable.established_amount') }}
       </dt>
       <dd class="font-semibold tabular-nums">
-        {{ formatAccountReceivableAmount(total, locale, currency) ?? t('common.not_available') }}
+        {{ formatAccountReceivableAmount(total, locale) ?? t('common.not_available') }}
       </dd>
     </dl>
     <UModal v-model:open="isOpen" data-help-view="casework.account-receivable.detail-lines.is-open" :title="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'account_receivable.edit_line' : 'account_receivable.add_line')" :ui="{ content: 'sm:max-w-2xl' }">

@@ -70,6 +70,7 @@ export default defineEventHandler(async event => {
       .where('Funding_Case_Agreement_Commitment_Line._deleted', '=', false)
       .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
       .where('Agency_Chart_of_Account._deleted', '=', false)
+      .where('Agency_Chart_of_Account.egcs_ay_active', '=', true)
       .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
       .where('Agency_Chart_of_Account.egcs_ay_currency', '=', payment.egcs_fc_currency)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
@@ -107,7 +108,7 @@ export default defineEventHandler(async event => {
       const dimensions = row.accounting_dimensions as TransferPaymentStreamChartOfAccountDimension[]
       return {
         id: String(row.id),
-        commitment_line_amount: parseDatabaseMoney(row.commitment_line_amount),
+        commitment_line_amount: parseDatabaseMoney(row.commitment_line_amount, payment.egcs_fc_currency),
         label_en: `${linePrefixEn} ${row.commitment_line_number} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
         label_fr: `${linePrefixFr} ${row.commitment_line_number} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
       }

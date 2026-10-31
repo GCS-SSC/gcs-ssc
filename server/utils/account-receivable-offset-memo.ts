@@ -1,14 +1,13 @@
+import { compareMoney, sumMoney, zeroMoney } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Offset Credit Memos each reduce one established AR within the Payment Agency. */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { AccountReceivableOffsetMemo, AccountReceivablePaymentCreditMemo } from '~~/shared/types/account-receivable'
 import { hashPublicationDefinition } from './system-publication'
-import { sumMoney, parseMoney } from '~~/shared/utils/money'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 import type { AgreementCodingAllocation } from './agreement-coding-allocator'
 
-const ZERO = parseMoney('0.00')
 const isoDate = (value: Date | string): string => new Date(value).toISOString()
 
 /** Agency/global AR authority is required before projecting a complete pool. */
@@ -22,25 +21,29 @@ export const readAccountReceivableOffsetMemos = async (db: Kysely<Database>, poo
   const result: AccountReceivableOffsetMemo[] = []
   for (const memo of memos) {
     const balance = await readAccountReceivableCashBalance(db, String(memo.egcs_fc_receivable))
+    const currency = balance.egcs_fc_principal.currency
     const rows = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo_Application as application')
       .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'application.egcs_fc_recovery')
       .select(['application.id', 'recovery.id as recoveryId', 'recovery.egcs_fc_payment', 'recovery.egcs_fc_outcome', 'recovery.egcs_fc_createdat', 'recovery.egcs_fc_postedat'])
       .select(databaseMoneyText(sql.ref('application.egcs_fc_amount')).as('amount')).where('application.egcs_fc_offsetmemo', '=', String(memo.id)).orderBy('application.id').execute()
     const applications = rows.map(row => ({ id: String(row.id), egcs_fc_recovery: String(row.recoveryId), egcs_fc_payment: String(row.egcs_fc_payment),
-      egcs_fc_amount: parseDatabaseMoney(row.amount), egcs_fc_outcome: row.egcs_fc_outcome, egcs_fc_createdat: isoDate(row.egcs_fc_createdat),
+      egcs_fc_amount: parseDatabaseMoney(row.amount, currency), egcs_fc_outcome: row.egcs_fc_outcome, egcs_fc_createdat: isoDate(row.egcs_fc_createdat),
       egcs_fc_postedat: row.egcs_fc_postedat === null ? null : isoDate(row.egcs_fc_postedat) }))
-    const posted = sumMoney(applications.filter(row => row.egcs_fc_outcome === 'posted').map(row => row.egcs_fc_amount))
+    const posted = sumMoney(applications.filter(row => row.egcs_fc_outcome === 'posted').map(row => row.egcs_fc_amount), currency)
     const codingLines = await readAccountReceivableOffsetMemoLines(db, String(memo.id))
     result.push({ id: String(memo.id), egcs_fc_pool: String(memo.egcs_fc_pool), egcs_fc_receivable: String(memo.egcs_fc_receivable),
       egcs_fc_codinglines: codingLines, egcs_fc_creditmemoreference: `OCM-${memo.id}`,
-      egcs_fc_amount: parseDatabaseMoney(memo.amount),
-      egcs_fc_appliedamount: posted, egcs_fc_reservedamount: sumMoney(applications.filter(row => row.egcs_fc_outcome === 'open').map(row => row.egcs_fc_amount)), egcs_fc_receivablereserved: balance.egcs_fc_reserved, egcs_fc_receivablerecovered: balance.egcs_fc_recovered, egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding,
+      egcs_fc_amount: parseDatabaseMoney(memo.amount, currency),
+      egcs_fc_appliedamount: posted, egcs_fc_reservedamount: sumMoney(applications.filter(row => row.egcs_fc_outcome === 'open').map(row => row.egcs_fc_amount), currency), egcs_fc_receivablereserved: balance.egcs_fc_reserved, egcs_fc_receivablerecovered: balance.egcs_fc_recovered, egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding,
       egcs_fc_receivableavailable: balance.egcs_fc_available, egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_applications: applications })
   }
   return result
 }
 
 export const readAccountReceivableOffsetMemoLines = async (db: Kysely<Database>, memoId: string) => {
+  const currency = (await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
+    .innerJoin('Funding_Case_Account_Receivable_Pool as pool', 'pool.id', 'memo.egcs_fc_pool')
+    .select('pool.egcs_fc_currency').where('memo.id', '=', memoId).executeTakeFirstOrThrow()).egcs_fc_currency
   const lines = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo_Line').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount'))
     .where('egcs_fc_offsetmemo', '=', memoId).orderBy('egcs_fc_linenumber').execute()
@@ -49,7 +52,7 @@ export const readAccountReceivableOffsetMemoLines = async (db: Kysely<Database>,
     egcs_fc_creditmemochartofaccount: String(line.egcs_fc_creditmemochartofaccount),
     egcs_fc_creditmemoaccountingdimensions: line.egcs_fc_creditmemoaccountingdimensions,
     egcs_fc_commitmentchartofaccount: line.egcs_fc_commitmentchartofaccount === null ? null : String(line.egcs_fc_commitmentchartofaccount),
-    egcs_fc_amount: parseDatabaseMoney(line.amount) }))
+    egcs_fc_amount: parseDatabaseMoney(line.amount, currency) }))
 }
 
 export const linkAccountReceivablePoolOffsetApplication = async (trx: Transaction<Database>, recoveryId: string,
@@ -57,13 +60,14 @@ export const linkAccountReceivablePoolOffsetApplication = async (trx: Transactio
   const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').selectAll()
     .where('id', '=', recoveryId).executeTakeFirstOrThrow()
   for (const plan of plans) {
-    if (!plan.coding.length || sumMoney(plan.coding.map(line => line.amount)) !== plan.amount) throw new Error('AR_OFFSET_CODING_REQUIRED')
+    const currency = plan.amount.currency
+    if (!plan.coding.length || compareMoney(sumMoney(plan.coding.map(line => line.amount), currency), plan.amount) !== 0) throw new Error('AR_OFFSET_CODING_REQUIRED')
     const memo = await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo').values({
       egcs_fc_pool: String(recovery.egcs_fc_pool), egcs_fc_receivable: plan.receivableId,
       egcs_fc_allocationevidence: plan.coding[0] && 'allocationPolicy' in plan.coding[0] ? sql`${JSON.stringify({ scope: 'stream', policy: plan.coding[0].allocationPolicy ?? null, accounts: plan.coding.map(({ amount: _amount, allocationPolicy: _policy, ...account }) => account) })}::jsonb` : null,
       egcs_fc_effectivedate: sql<Date>`${plan.effectiveDate ?? new Date().toISOString().slice(0, 10)}::date`,
       egcs_fc_amount: databaseMoneyValue(plan.amount) }).returning('id').executeTakeFirstOrThrow()
-    for (const [index, line] of plan.coding.filter(line => line.amount !== ZERO).entries()) {
+    for (const [index, line] of plan.coding.filter(line => compareMoney(line.amount, zeroMoney(currency)) !== 0).entries()) {
       await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo_Line').values({ egcs_fc_offsetmemo: String(memo.id),
         egcs_fc_linenumber: index + 1, egcs_fc_transferpaymentstreamchartofaccount: line.codingLineId,
         egcs_fc_commitmentchartofaccount: line.commitmentChartOfAccountId ?? null,
@@ -82,12 +86,13 @@ export const readAccountReceivablePaymentCreditMemos = async (db: Kysely<Databas
   const recovery = await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('egcs_fc_pool').where('id', '=', recoveryId).executeTakeFirstOrThrow()
   const memos = await readAccountReceivableOffsetMemos(db, [String(recovery.egcs_fc_pool)])
   return memos.flatMap(memo => {
+    const currency = memo.egcs_fc_amount.currency
     const applications = memo.egcs_fc_applications.filter(row => row.egcs_fc_recovery === recoveryId)
     const outcome = applications[0]?.egcs_fc_outcome
     if (!outcome) return []
     return [{ id: memo.id, egcs_fc_offsetmemo: memo.id, egcs_fc_creditmemoreference: memo.egcs_fc_creditmemoreference,
       egcs_fc_amount: memo.egcs_fc_amount, egcs_fc_codinglines: memo.egcs_fc_codinglines,
-      egcs_fc_appliedamount: outcome === 'released' ? ZERO : sumMoney(applications.map(row => row.egcs_fc_amount)),
+      egcs_fc_appliedamount: outcome === 'released' ? zeroMoney(currency) : sumMoney(applications.map(row => row.egcs_fc_amount), currency),
       egcs_fc_receivablereserved: memo.egcs_fc_receivablereserved, egcs_fc_receivablerecovered: memo.egcs_fc_receivablerecovered, egcs_fc_receivableoutstanding: memo.egcs_fc_receivableoutstanding, egcs_fc_receivableavailable: memo.egcs_fc_receivableavailable, egcs_fc_outcome: outcome }]
   })
 }

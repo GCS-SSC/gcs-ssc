@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Money } from '~~/shared/utils/money'
 import type { AccountReceivableLine } from '~~/shared/types/account-receivable'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 
@@ -6,7 +7,7 @@ const { lines, currency } = defineProps<{ lines: AccountReceivableLine[], curren
 const { t, locale } = useI18n()
 const monthKeys = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 const period = (line: AccountReceivableLine) => `${t(`agreement.payments.months.${monthKeys[line.egcs_fc_periodstart]}`)} – ${t(`agreement.payments.months.${monthKeys[line.egcs_fc_periodend]}`)}`
-const amount = (value: string) => formatAccountReceivableAmount(value, locale.value, currency) ?? t('common.not_available')
+const amount = (value: Money) => (value.currency === currency.toUpperCase() ? formatAccountReceivableAmount(value, locale.value) : null) ?? t('common.not_available')
 </script>
 
 <template>

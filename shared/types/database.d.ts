@@ -12,6 +12,12 @@ import type {
 import type { StatusId } from './status'
 import type { PaymentEvidence } from './payment-evidence'
 
+/** NUMERIC reads remain exact text; nonmonetary writes may use validated numbers. */
+export type DecimalColumn = ColumnType<string, string | number, string | number>
+export type NullableDecimalColumn = ColumnType<string | null, string | number | null, string | number | null>
+export type GeneratedDecimalColumn = ColumnType<string, string | number | undefined, string | number>
+export type GeneratedNullableDecimalColumn = ColumnType<string | null, string | number | null | undefined, string | number | null>
+
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
 export type Agreement_Applicant_Recipient_Type = 'guarantor' | 'obligant' | 'consultant' | 'partner'
@@ -46,101 +52,7 @@ export type Monitor_Responsible_Party = 'applicantrecipient' | 'organization' | 
 export type Follow_Up_Status = 'open' | 'onhold' | 'completed' | 'cancelled' | 'unabletocomplete'
 export type Jurisdiction = 'ab' | 'bc' | 'mb' | 'nb' | 'nl' | 'ns' | 'nt' | 'nu' | 'on' | 'pe' | 'qc' | 'sk' | 'yt'
 
-export type Currency_Codes =
-  | 'all'
-  | 'amd'
-  | 'ang'
-  | 'aoa'
-  | 'ars'
-  | 'aud'
-  | 'awg'
-  | 'azn'
-  | 'bam'
-  | 'bbd'
-  | 'bdt'
-  | 'bgn'
-  | 'bhd'
-  | 'bif'
-  | 'bnd'
-  | 'bob'
-  | 'bov'
-  | 'brl'
-  | 'bsd'
-  | 'btn'
-  | 'bwp'
-  | 'byr'
-  | 'bzd'
-  | 'cad'
-  | 'cdf'
-  | 'chf'
-  | 'clf'
-  | 'clp'
-  | 'cny'
-  | 'cop'
-  | 'crc'
-  | 'cuc'
-  | 'cve'
-  | 'czk'
-  | 'djf'
-  | 'dkk'
-  | 'dop'
-  | 'dzd'
-  | 'egp'
-  | 'ern'
-  | 'etb'
-  | 'eur'
-  | 'fjd'
-  | 'gbp'
-  | 'gel'
-  | 'gip'
-  | 'gmd'
-  | 'gnf'
-  | 'gtq'
-  | 'gyd'
-  | 'hkd'
-  | 'hnl'
-  | 'hrk'
-  | 'htg'
-  | 'huf'
-  | 'idr'
-  | 'ils'
-  | 'inr'
-  | 'iqd'
-  | 'irr'
-  | 'isk'
-  | 'jmd'
-  | 'jod'
-  | 'jpy'
-  | 'kes'
-  | 'kgs'
-  | 'khr'
-  | 'kmf'
-  | 'krw'
-  | 'kwd'
-  | 'kyd'
-  | 'kzt'
-  | 'lak'
-  | 'lbp'
-  | 'lrd'
-  | 'lsl'
-  | 'lyd'
-  | 'mga'
-  | 'mkd'
-  | 'mop'
-  | 'mur'
-  | 'mvr'
-  | 'mwk'
-  | 'myr'
-  | 'nok'
-  | 'nzd'
-  | 'svc'
-  | 'usd'
-  | 'xaf'
-  | 'xcd'
-  | 'xdr'
-  | 'xof'
-  | 'xpf'
-  | 'zar'
+export type Currency_Codes = import('@gcs-ssc/extensions/money').SupportedCurrencyCode
 
 export type Countries =
   | 'ad'
@@ -866,7 +778,7 @@ export interface AgencyCostCategoryLineItemTable {
   egcs_ay_active: Generated<boolean>
   egcs_ay_calculationmode: Generated<'manual' | 'category' | 'all_other'>
   egcs_ay_sourcecategory: Generated<string | null>
-  egcs_ay_percentage: Generated<number | null>
+  egcs_ay_percentage: GeneratedNullableDecimalColumn
   egcs_ay_allowpercentageoverride: Generated<boolean>
   id: Generated<string>
   egcs_ay_name_en: string
@@ -900,6 +812,7 @@ export interface AgencyAccountReceivableTypeTable {
 }
 
 export interface AgencyChartOfAccountTable {
+  egcs_ay_active: Generated<boolean>
   egcs_ay_commitmentchartofaccount: Generated<string | null>
   egcs_ay_kind: Generated<'commitment' | 'account_receivable' | 'credit_memo'>
   id: Generated<string>
@@ -1046,7 +959,7 @@ export interface ApplicantRecipientFundingHistoryTable {
   egcs_ar_description_fr?: string | null
   egcs_ar_startdate: Date
   egcs_ar_enddate: Date
-  egcs_ar_fundingamount: number
+  egcs_ar_fundingamount: string
   egcs_ar_currency: Currency_Codes
   _deleted: Generated<boolean>
 }
@@ -1091,7 +1004,7 @@ export interface CommonPublicationVersionReferenceTable {
   id: Generated<string>
   egcs_cn_parentversion: string
   egcs_cn_path: string
-  egcs_cn_order: number | null
+  egcs_cn_order: NullableDecimalColumn
   egcs_cn_publication: string
   egcs_cn_kind: PublicationKind
   egcs_cn_publicationversion: string
@@ -1132,7 +1045,7 @@ export interface CommonRuntimeItemTable {
   egcs_cn_runtime: string
   egcs_cn_parentruntimeitem: string | null
   egcs_cn_kind: RuntimeItemKind
-  egcs_cn_order: number
+  egcs_cn_order: DecimalColumn
   egcs_cn_publication: string
   egcs_cn_publicationkind: PublicationKind
   egcs_cn_publicationversion: string
@@ -1177,8 +1090,8 @@ export interface CommonAddressTable {
   egcs_cn_addresscountry: Countries
   egcs_cn_addresssubdivision: string
   egcs_cn_gcaddressid?: ColumnType<string, string | number, string | number>
-  egcs_cn_latitude?: number
-  egcs_cn_longitude?: number
+  egcs_cn_latitude?: DecimalColumn
+  egcs_cn_longitude?: DecimalColumn
   egcs_cn_mainphone: ColumnType<string, string | number, string | number>
   egcs_cn_mainphoneextension?: number
   egcs_cn_postalcodezipcode: string
@@ -1281,7 +1194,7 @@ export interface CommonRoutingSlipTable {
 export interface CommonApprovalTable {
   id: Generated<string>
   egcs_cn_runtimeitem: string
-  egcs_cn_sequence: number
+  egcs_cn_sequence: DecimalColumn
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
   egcs_cn_routingslip: string
@@ -1291,6 +1204,9 @@ export interface CommonApprovalTable {
   egcs_cn_assigneduser?: string | null
   egcs_cn_assignedgroup?: string | null
   egcs_cn_onbehalf?: string | null
+  egcs_cn_onbehalfname_en?: string | null
+  egcs_cn_onbehalfname_fr?: string | null
+  egcs_cn_onbehalfrequireactual?: boolean | null
   egcs_cn_approvername?: string | null
   egcs_cn_approvalpositiontitle?: string
   egcs_cn_isadded: boolean
@@ -1408,9 +1324,9 @@ export interface FundingCaseAgreementProfileTable {
   egcs_fc_agreementtype: Agreement_Type
   egcs_fc_agreementsubtype: string
   egcs_fc_furtherdistribution: boolean
-  egcs_fc_holdback: Generated<number>
+  egcs_fc_holdback: GeneratedDecimalColumn
   egcs_fc_holdbackbasis: string
-  egcs_fc_riskscore?: number | null
+  egcs_fc_riskscore?: NullableDecimalColumn
   egcs_fc_status: StatusId
   egcs_fc_authorizedassistancestartdate: Date
   egcs_fc_authorizedassistanceenddate: Date
@@ -1498,7 +1414,7 @@ export interface FundingCaseAgreementAmendmentTable {
   egcs_fc_status: StatusId
   egcs_fc_isopen: Generated<boolean>
   egcs_fc_changerisk: Generated<boolean>
-  egcs_fc_proposedriskscore: number | null
+  egcs_fc_proposedriskscore: NullableDecimalColumn
   egcs_fc_proposedauthorizedassistancestartdate?: Date | null
   egcs_fc_proposedauthorizedassistanceenddate?: Date | null
   _deleted: Generated<boolean>
@@ -1586,7 +1502,7 @@ export interface FundingCaseAgreementBudgetFiscalYearTable {
 export interface FundingCaseAgreementBudgetLineItemTable {
   egcs_fc_calculationmode: Generated<'manual' | 'category' | 'all_other'>
   egcs_fc_sourcecategory: Generated<string | null>
-  egcs_fc_percentage: Generated<number | null>
+  egcs_fc_percentage: GeneratedNullableDecimalColumn
   egcs_fc_allowpercentageoverride: Generated<boolean>
   id: Generated<string>
   egcs_fc_fundingagreement: Generated<string>
@@ -1597,8 +1513,8 @@ export interface FundingCaseAgreementBudgetLineItemTable {
   egcs_fc_organizationcostcategory: string
   egcs_fc_costsubsection: string
   egcs_fc_description: string
-  egcs_fc_totalamount: number
-  egcs_fc_programfunding: number
+  egcs_fc_totalamount: string
+  egcs_fc_programfunding: string
   egcs_fc_currency: Currency_Codes
   _deleted: Generated<boolean>
 }
@@ -1607,7 +1523,7 @@ export interface FundingCaseAgreementBudgetLineItemFundingTable {
   id: Generated<string>
   egcs_fc_budgetlineitem: string
   egcs_fc_fundingsubtype: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   egcs_fc_description_en?: string | null
   egcs_fc_description_fr?: string | null
   _deleted: Generated<boolean>
@@ -1629,8 +1545,8 @@ export interface FundingCaseAgreementForecastLineItemTable {
   egcs_fc_fundingagreement: Generated<string>
   egcs_fc_fundingagreementbudgetlineitem: string
   egcs_fc_month: number
-  egcs_fc_amount: number
-  egcs_fc_totalamount: number
+  egcs_fc_amount: string
+  egcs_fc_totalamount: string
   egcs_fc_currency: Currency_Codes
   _deleted: Generated<boolean>
 }
@@ -1639,7 +1555,7 @@ export interface FundingCaseAgreementForecastLineItemFundingTable {
   id: Generated<string>
   egcs_fc_forecastlineitem: string
   egcs_fc_fundingsubtype: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -1666,8 +1582,8 @@ export interface FundingCaseAgreementClaimLineItemTable {
   egcs_fc_submittedcostsubsection?: string | null
   egcs_fc_submittedlineitem?: string | null
   egcs_fc_description: string
-  egcs_fc_amount: number
-  egcs_fc_totalamount: number
+  egcs_fc_amount: string
+  egcs_fc_totalamount: string
   egcs_fc_currency: Currency_Codes
   _deleted: Generated<boolean>
 }
@@ -1676,7 +1592,7 @@ export interface FundingCaseAgreementClaimLineItemFundingTable {
   id: Generated<string>
   egcs_fc_claimlineitem: string
   egcs_fc_fundingsubtype: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -1695,14 +1611,14 @@ export interface FundingCaseAgreementClaimReconcileLineItemTable {
   egcs_fc_fundingagreementclaimreconcile: string
   egcs_fc_fundingagreementclaim: Generated<string>
   egcs_fc_lineitem: string
-  egcs_fc_reconciled: number
-  egcs_fc_sampled?: number | null
+  egcs_fc_reconciled: string
+  egcs_fc_sampled?: string | null
   egcs_fc_rationale?: string | null
   _deleted: Generated<boolean>
 }
 
 export interface FundingCaseAgreementCommitmentTable {
-  egcs_fc_totalamount: Generated<number>
+  egcs_fc_totalamount: Generated<string>
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_transferpaymentstream: Generated<string>
@@ -1721,7 +1637,7 @@ export interface FundingCaseAgreementCommitmentLineTable {
   egcs_fc_transferpaymentstream: Generated<string>
   egcs_fc_commitmentlinenumber: number
   egcs_fc_transferpaymentstreamchartofaccount: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -1762,12 +1678,12 @@ export interface FundingCaseAgreementCorrectionLineTable {
   egcs_fc_agencyfiscalyear: string
   egcs_fc_fiscalyeardisplay: string
   egcs_fc_accountingdimensions: JsonValue
-  egcs_fc_commitmentamount: number
-  egcs_fc_originalpaid: number
-  egcs_fc_jveffect: number
-  egcs_fc_priorcorrections: number
-  egcs_fc_arrecoveries: Generated<number>
-  egcs_fc_adjustment: Generated<number>
+  egcs_fc_commitmentamount: string
+  egcs_fc_originalpaid: string
+  egcs_fc_jveffect: string
+  egcs_fc_priorcorrections: string
+  egcs_fc_arrecoveries: Generated<string>
+  egcs_fc_adjustment: Generated<string>
   _deleted: Generated<boolean>
 }
 
@@ -1788,7 +1704,7 @@ export interface FundingCaseAgreementCorrectionAdjustmentTable {
   egcs_fc_commitmentline: string
   egcs_fc_chartofaccount: string
   egcs_fc_agencyfiscalyear: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -1830,7 +1746,7 @@ export interface FundingCaseAgreementJournalVoucherLineTable {
   egcs_fc_kind: 'original' | 'corrected' | 'adjustment'
   egcs_fc_chartofaccount: string
   egcs_fc_accountingdimensions: JsonValue
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -1844,7 +1760,7 @@ export interface FundingCaseAgreementPaymentTable {
   egcs_fc_paymenttype: Payment_Type
   egcs_fc_periodstart: number
   egcs_fc_periodend: number
-  egcs_fc_paymentamount: number
+  egcs_fc_paymentamount: string
   egcs_fc_currency: Currency_Codes
   egcs_fc_comment?: string | null
   egcs_fc_status: StatusId
@@ -1856,7 +1772,7 @@ export interface FundingCaseAgreementPaymentLineTable {
   egcs_fc_fundingagreementpayment: string
   egcs_fc_fundingagreementcommitment: Generated<string>
   egcs_fc_fundingagreementcommitmentline: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -2034,7 +1950,7 @@ export interface CommonReviewSetupTable {
   egcs_cn_reviewschema: string
   egcs_cn_defaultgroup?: string | null
   egcs_cn_failonchecklistfailure: Generated<boolean>
-  egcs_cn_failurethreshold: number | null
+  egcs_cn_failurethreshold: NullableDecimalColumn
   _deleted: Generated<boolean>
 }
 
@@ -2057,7 +1973,7 @@ export interface CommonReviewSetTable {
 export interface CommonReviewTable {
   id: Generated<string>
   egcs_cn_helpers?: JsonValue
-  egcs_cn_reviewresult: number | null
+  egcs_cn_reviewresult: NullableDecimalColumn
   egcs_cn_reviewset: string
   egcs_cn_reviewschema: string
   egcs_cn_runtimeitem: string
@@ -2067,9 +1983,9 @@ export interface CommonReviewTable {
   egcs_cn_disablealignment: boolean
   egcs_cn_disablereviewers: boolean
   egcs_cn_failonchecklistfailure: Generated<boolean>
-  egcs_cn_failurethreshold: Generated<number | null>
+  egcs_cn_failurethreshold: GeneratedNullableDecimalColumn
   egcs_cn_reviewalignment?: boolean | null
-  egcs_cn_reviewalignresult?: number | null
+  egcs_cn_reviewalignresult?: NullableDecimalColumn
   egcs_cn_reviewalignmentnarrative?: string | null
   _deleted: Generated<boolean>
 }
@@ -2077,11 +1993,11 @@ export interface CommonReviewTable {
 export interface CommonAssessmentTable {
   id: Generated<string>
   egcs_cn_review: string
-  egcs_cn_reviewresult: number
+  egcs_cn_reviewresult: DecimalColumn
   egcs_cn_disablecustomoutcomes: Generated<boolean>
   egcs_cn_disablealignment: Generated<boolean>
   egcs_cn_reviewalignment?: boolean | null
-  egcs_cn_reviewalignresult?: number | null
+  egcs_cn_reviewalignresult?: NullableDecimalColumn
   egcs_cn_reviewalignmentnarrative?: string | null
   _deleted: Generated<boolean>
 }
@@ -2099,7 +2015,7 @@ export interface CommonReviewResponseTable {
   egcs_cn_section: string
   egcs_cn_subsection: string
   egcs_cn_question: string
-  egcs_cn_value?: number | null
+  egcs_cn_value?: NullableDecimalColumn
   egcs_cn_comment: string
   egcs_cn_calculated: Generated<boolean>
   egcs_cn_assessment: string
@@ -2112,7 +2028,7 @@ export interface CommonAssessmentResponseTable {
   egcs_cn_section: string
   egcs_cn_subsection: string
   egcs_cn_question: string
-  egcs_cn_value?: number | null
+  egcs_cn_value?: NullableDecimalColumn
   egcs_cn_comment: Generated<string>
   egcs_cn_calculated: Generated<boolean>
   _deleted: Generated<boolean>
@@ -2408,8 +2324,8 @@ export interface TransferPaymentFiscalYearBudgetTable {
   egcs_tp_transferpaymentprofile: string
   egcs_tp_fiscalyear: string
   egcs_tp_currency: Generated<Currency_Codes>
-  egcs_tp_totalbudget: number
-  egcs_tp_overcommitthreshold: number
+  egcs_tp_totalbudget: string
+  egcs_tp_overcommitthreshold: DecimalColumn
   _deleted: Generated<boolean>
 }
 
@@ -2513,10 +2429,10 @@ export interface FundingCaseAgreementCloseoutSnapshotTable {
 export interface TransferPaymentFinancialLimitsTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  egcs_tp_maxallowableperrecipient: number
-  egcs_tp_maxpercentofsupportavailableperrecipient: number
-  egcs_tp_maxpercentofretroactivecostsallowable: number
-  egcs_tp_stackinglimit: number
+  egcs_tp_maxallowableperrecipient: DecimalColumn
+  egcs_tp_maxpercentofsupportavailableperrecipient: DecimalColumn
+  egcs_tp_maxpercentofretroactivecostsallowable: DecimalColumn
+  egcs_tp_stackinglimit: DecimalColumn
   egcs_tp_active: Generated<boolean>
   _deleted: Generated<boolean>
 }
@@ -2532,9 +2448,9 @@ export interface TransferPaymentObjectiveTable {
 export interface TransferPaymentStreamBudgetTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  egcs_tp_totalbudget: number
+  egcs_tp_totalbudget: string
   egcs_tp_transferpaymentbudget: string
-  egcs_tp_overcommitthreshold: number
+  egcs_tp_overcommitthreshold: DecimalColumn
   _deleted: Generated<boolean>
 }
 
@@ -2550,7 +2466,7 @@ export interface TransferPaymentStreamCostCategoryLineItemTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
   egcs_tp_organizationcostcategory: string
-  egcs_tp_costsharingratio: number
+  egcs_tp_costsharingratio: DecimalColumn
   _deleted: Generated<boolean>
 }
 
@@ -2582,6 +2498,7 @@ export interface TransferPaymentStreamOutcomeTable {
 }
 
 export interface TransferPaymentAmendmentTypeTable {
+  egcs_tp_active: Generated<boolean>
   id: Generated<string>
   egcs_tp_amended: Amended_Type
   egcs_tp_name_en: string
@@ -2592,6 +2509,7 @@ export interface TransferPaymentAmendmentTypeTable {
 }
 
 export interface TransferPaymentAmendmentSubtypeTable {
+  egcs_tp_active: Generated<boolean>
   id: Generated<string>
   egcs_tp_name_en: string
   egcs_tp_name_fr: string
@@ -2649,7 +2567,7 @@ export interface TransferPaymentStreamAreaOfExpertiseTable {
 export interface TransferPaymentStreamRiskRatingTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  egcs_tp_riskscore: number
+  egcs_tp_riskscore: DecimalColumn
   egcs_tp_name_en: string
   egcs_tp_name_fr: string
   _deleted: Generated<boolean>
@@ -2765,7 +2683,7 @@ export interface AuditAttributionColumns {
 export interface FundingCaseAgreementAccountReceivableTable {
   egcs_fc_allocationevidence: Generated<JsonValue | null>
   egcs_fc_entitytype: Generated<'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivableadjustment'>
-  egcs_fc_amount: Generated<number>
+  egcs_fc_amount: Generated<string>
   egcs_fc_agencyfinancialid: Generated<string | null>
   egcs_fc_financialsystemid: Generated<string>
   id: Generated<string>
@@ -2781,7 +2699,7 @@ export interface FundingCaseAgreementAccountReceivableTable {
   egcs_fc_monitorrequired: Generated<boolean>
   egcs_fc_advancepaymentrelated: Generated<boolean>
   egcs_fc_claimrelated: Generated<boolean>
-  egcs_fc_fiscaloutstanding: Generated<number | null>
+  egcs_fc_fiscaloutstanding: Generated<string | null>
   egcs_fc_recoverymethod: Generated<'offset' | 'direct_repayment' | null>
   egcs_fc_recipientpreference: 'offset' | 'direct_repayment' | null
   egcs_fc_preferenceoverride_en: Generated<string>
@@ -2812,7 +2730,7 @@ export interface FundingCaseAgreementAccountReceivableTable {
 export interface FundingCaseAccountReceivableCreditMemoTable {
   egcs_fc_allocationevidence: Generated<JsonValue | null>
   egcs_fc_receivables: Generated<JsonValue>
-  egcs_fc_totalamount: Generated<number>
+  egcs_fc_totalamount: Generated<string>
   id: Generated<string>
   egcs_fc_receivable: string
   egcs_fc_agency: string
@@ -2821,7 +2739,7 @@ export interface FundingCaseAccountReceivableCreditMemoTable {
   egcs_fc_currency: Currency_Codes
   egcs_fc_number: number
   egcs_fc_receiveddate: Date
-  egcs_fc_amount: Generated<number>
+  egcs_fc_amount: Generated<string>
   egcs_fc_reason: Generated<string>
   egcs_fc_createdby: string
   egcs_fc_createdat: Generated<Date>
@@ -2846,7 +2764,7 @@ export interface FundingCaseAccountReceivableCreditMemoLineTable {
   egcs_fc_linenumber: number
   egcs_fc_creditmemochartofaccount: string
   egcs_fc_creditmemoaccountingdimensions: Generated<JsonValue>
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -2864,8 +2782,8 @@ export interface FundingCaseAgreementAccountReceivableLineTable {
   egcs_fc_payment: string | null
   egcs_fc_periodstart: number
   egcs_fc_periodend: number
-  egcs_fc_sourceamount: number
-  egcs_fc_amount: Generated<number>
+  egcs_fc_sourceamount: string
+  egcs_fc_amount: Generated<string>
   egcs_fc_evidence: JsonValue
   _deleted: Generated<boolean>
 }
@@ -2881,9 +2799,9 @@ export interface FundingCaseAgreementAccountReceivableCodingTable {
   egcs_fc_agencyfiscalyear: string
   egcs_fc_periodstart: number
   egcs_fc_periodend: number
-  egcs_fc_paidbasis: number
-  egcs_fc_sharedpaidbasis: number
-  egcs_fc_amount: Generated<number>
+  egcs_fc_paidbasis: string
+  egcs_fc_sharedpaidbasis: string
+  egcs_fc_amount: Generated<string>
   egcs_fc_accountingdimensions: JsonValue
   _deleted: Generated<boolean>
 }
@@ -2902,7 +2820,7 @@ export interface FundingCaseAccountReceivableOffsetMemoTable {
   id: Generated<string>
   egcs_fc_receivable: string
   egcs_fc_pool: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   egcs_fc_createdat: Generated<Date>
   _deleted: Generated<boolean>
 }
@@ -2915,7 +2833,7 @@ export interface FundingCaseAccountReceivableOffsetMemoLineTable {
   egcs_fc_creditmemochartofaccount: string
   egcs_fc_creditmemoaccountingdimensions: JsonValue
   egcs_fc_commitmentchartofaccount: string | null
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -2923,7 +2841,7 @@ export interface FundingCaseAccountReceivableOffsetMemoApplicationTable {
   id: Generated<string>
   egcs_fc_offsetmemo: string
   egcs_fc_recovery: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   _deleted: Generated<boolean>
 }
 
@@ -2931,7 +2849,7 @@ export interface FundingCaseAccountReceivableRecoveryTable {
   id: Generated<string>
   egcs_fc_pool: string
   egcs_fc_payment: string
-  egcs_fc_amount: number
+  egcs_fc_amount: string
   egcs_fc_outcome: Generated<'open' | 'posted' | 'released'>
   egcs_fc_createdat: Generated<Date>
   egcs_fc_postedat: Date | null

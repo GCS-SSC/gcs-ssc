@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc */
@@ -15,7 +16,7 @@ import type {
   FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentCreateSchema } from '~~/shared/types/schemas'
-import { formatMoneyText, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, isCanonicalMoney, type Money } from '~~/shared/utils/money'
 import type { Currency_Codes } from '~~/shared/types/database'
 
 type CommitmentTableRow = FundingCaseAgreementCommitmentRow & {
@@ -146,10 +147,10 @@ const tableRows = computed<CommitmentTableRow[]>(() => commitments.value
       row.egcs_fc_currency,
       row.line_count,
       row.total_amount
-    ].some(value => String(value).toLowerCase().includes(normalizedSearch.value))
+    ].some(value => isCanonicalMoney(value) ? moneyMatchesSearch(value, normalizedSearch.value, locale.value) : String(value).toLowerCase().includes(normalizedSearch.value))
   }))
 
-const formatMoney = (value: Money, currency: string) => formatMoneyText(value, locale.value, currency)
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value)
 
 const warnRecordPrerequisite = () => toast.add({
   title: toast.localized('common.warning'),
@@ -415,7 +416,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
 
       <template #amount-cell="{ row }">
         <span class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(row.original.total_amount, row.original.egcs_fc_currency.toUpperCase()) }}
+          {{ formatMoney(row.original.total_amount) }}
         </span>
       </template>
 

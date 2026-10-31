@@ -110,9 +110,9 @@ export default defineEventHandler(async event => {
     reconciliation: reconciliationWithState,
     lines: lines.map(line => ({
       ...line,
-      submitted_amount: parseDatabaseMoney(line.submitted_amount),
-      egcs_fc_reconciled: line.egcs_fc_reconciled == null ? line.egcs_fc_reconciled : parseDatabaseMoney(line.egcs_fc_reconciled),
-      egcs_fc_sampled: line.egcs_fc_sampled == null ? line.egcs_fc_sampled : parseDatabaseMoney(line.egcs_fc_sampled)
+      submitted_amount: parseDatabaseMoney(line.submitted_amount, reconciliation.egcs_fc_currency),
+      egcs_fc_reconciled: line.egcs_fc_reconciled == null ? line.egcs_fc_reconciled : parseDatabaseMoney(line.egcs_fc_reconciled, reconciliation.egcs_fc_currency),
+      egcs_fc_sampled: line.egcs_fc_sampled == null ? line.egcs_fc_sampled : parseDatabaseMoney(line.egcs_fc_sampled, reconciliation.egcs_fc_currency)
     })),
     can_read: true,
     can_update_role: hasUpdateRole,

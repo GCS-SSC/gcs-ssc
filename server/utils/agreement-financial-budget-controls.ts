@@ -1,7 +1,7 @@
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Currency_Codes, Database, Workflow_Target_Entity_Type } from '~~/shared/types/database'
 import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
-import { compareMoney, sumMoney, parseMoneyText, type Money } from '~~/shared/utils/money'
+import { compareMoney, sumMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
 import { getBusinessRecordStateProjections } from './business-record-state'
 import { readEffectiveAccountReceivableClaimRecoveries } from './agreement-accounting-projection'
@@ -54,7 +54,6 @@ interface FundingAmountRow {
 }
 
 const negativeStates = ['unsuccessful', 'denied', 'cancelled', 'failed']
-const ZERO = parseMoneyText('0.00')
 /**
  * Ignores target approval evidence superseded by a newer workflow attempt.
  * @param state - Latest Completion, workflow and target approval evidence.
@@ -131,6 +130,7 @@ export const getAgreementFinancialBudgetViolation = async (
     WHERE NOT profile._deleted
   `.execute(db)).rows[0]
   if (!context) throw new Error('Agreement financial budget proposal is unavailable.')
+  const zero = zeroMoney(context.currency)
 
   const budgetRow = (await sql<{ amount: string }>`
     SELECT COALESCE(SUM(line.egcs_fc_programfunding), 0)::text AS amount
@@ -144,7 +144,7 @@ export const getAgreementFinancialBudgetViolation = async (
       AND version.egcs_fc_iscurrent AND NOT version._deleted AND NOT year._deleted AND NOT line._deleted
       AND line.egcs_fc_currency = ${context.currency}
   `.execute(db)).rows[0]
-  const budget = budgetRow ? parseDatabaseMoney(budgetRow.amount) : ZERO
+  const budget = budgetRow ? parseDatabaseMoney(budgetRow.amount, context.currency) : zero
 
   let forecastVersion: string | undefined
   let amounts: FundingAmountRow[]
@@ -207,7 +207,7 @@ export const getAgreementFinancialBudgetViolation = async (
       ? await readAgreementBudgetRecoveryCredits(db, agreementId, context.currency)
       : []
     for (const recovery of [...recoveries, ...postedRecoveries]) {
-      if (recovery.fiscalYearId !== context.fiscalYearId || compareMoney(recovery.amount, ZERO) >= 0) continue
+      if (recovery.fiscalYearId !== context.fiscalYearId || compareMoney(recovery.amount, zero) >= 0) continue
       const values = recoveriesByClaim.get(recovery.claimId) ?? []
       values.push(recovery.amount)
       recoveriesByClaim.set(recovery.claimId, values)
@@ -217,20 +217,20 @@ export const getAgreementFinancialBudgetViolation = async (
   for (const row of amounts) {
     const claimId = row.claimId ?? row.documentId
     const values = amountsByClaim.get(claimId) ?? []
-    values.push(parseDatabaseMoney(row.amount))
+    values.push(parseDatabaseMoney(row.amount, context.currency))
     amountsByClaim.set(claimId, values)
   }
   const annualAmounts: Money[] = []
   for (const [claimId, values] of amountsByClaim) {
-    let amount = sumMoney(values)
+    let amount = sumMoney(values, context.currency)
     const recoveries = recoveriesByClaim.get(claimId)
     if (recoveries) {
-      amount = sumMoney([amount, ...recoveries])
-      if (compareMoney(amount, ZERO) < 0) amount = ZERO
+      amount = sumMoney([amount, ...recoveries], context.currency)
+      if (compareMoney(amount, zero) < 0) amount = zero
     }
     annualAmounts.push(amount)
   }
-  const amount = sumMoney(annualAmounts)
+  const amount = sumMoney(annualAmounts, context.currency)
   if (compareMoney(amount, budget) > 0) return {
     kind: target.kind, fiscalYearId: context.fiscalYearId,
     ...(forecastVersion === undefined ? {} : { forecastVersion }),

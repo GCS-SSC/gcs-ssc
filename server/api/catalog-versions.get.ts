@@ -8,9 +8,10 @@ import { readCatalogVersions } from '~~/server/utils/catalog-versions'
 /** Returns only catalog revisions visible through existing business and approval grants. */
 export default defineEventHandler(async event => {
   setResponseHeader(event, 'Cache-Control', 'no-store')
+  // Better Auth uses the root database, outside PGlite's exclusive snapshot lease.
+  const session = await auth.api.getSession({ headers: event.headers })
   return await executeFreshReadSnapshot(event, async () => {
     const context = await authorize(event, 'system', 'read', async () => ({ bypass: true }))
-    const session = await auth.api.getSession({ headers: event.headers })
     if (!session || String(session.user.id) !== context.userId) return await unauthorized(event)
     return {
       accountId: context.userId,

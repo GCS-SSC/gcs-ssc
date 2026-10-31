@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementClaimLineItemCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -51,7 +51,8 @@ export default defineEventHandler(async event => {
           }
         }
 
-        await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+        const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+        await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount])
         const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: totalAmount, ...lineValues } = validated
         const created = await trx
           .insertInto('Funding_Case_Agreement_Claim_Line_Item')
@@ -76,8 +77,8 @@ export default defineEventHandler(async event => {
 
         return {
           ...created,
-          egcs_fc_amount: parseDatabaseMoney(created.egcs_fc_amount),
-          egcs_fc_totalamount: parseDatabaseMoney(created.egcs_fc_totalamount),
+          egcs_fc_amount: parseDatabaseMoney(created.egcs_fc_amount, currency),
+          egcs_fc_totalamount: parseDatabaseMoney(created.egcs_fc_totalamount, currency),
           egcs_fc_fundingsources: fundingSources
         }
       },

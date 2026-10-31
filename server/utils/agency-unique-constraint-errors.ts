@@ -5,6 +5,7 @@ const UNIQUE_VIOLATION_CODE = '23505'
 const FOREIGN_KEY_VIOLATION_CODE = '23503'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  ay_chk_chart_in_use: { code: 'AGENCY_CHART_IN_USE', key: 'apiErrors.agency.chart_in_use' },
   ay_chk_creditmemo_commitmentchart: { code: 'INVALID_CREDIT_MEMO_COMMITMENT_CHART', key: 'apiErrors.agency.invalid_credit_memo_commitment_chart' },
   ay_chk_creditmemo_commitmentchart_in_use: { code: 'CREDIT_MEMO_COMMITMENT_CHART_IN_USE', key: 'apiErrors.agency.credit_memo_commitment_chart_in_use' },
   ay_uq_ar_type_name_en: { code: 'AGENCY_DUPLICATE_ACCOUNT_RECEIVABLE_TYPE_NAME_EN', key: 'apiErrors.agency.duplicate_account_receivable_type_name_en' },

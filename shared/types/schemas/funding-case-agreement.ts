@@ -16,8 +16,8 @@ import { PositivePostgresBigintIdSchema, type WithId } from './common'
 import { CommonAddressBaseSchema, CommonAddressCreateSchema } from './admin-common'
 import { isRepresentableByNumeric } from '~~/shared/utils/decimal'
 import { isCanonicalNonNegativePostgresBigintText } from '~~/shared/utils/database-id'
-import { MoneySchema, NonNegativeMoneySchema, OptionalMoneySchema, PositiveMoneySchema } from './money'
-import { addMoney, compareMoney, isCanonicalMoney, parseMoney, type Money } from '~~/shared/utils/money'
+import { MoneySchema, NonNegativeMoneySchema, OptionalMoneySchema, PositiveMoneySchema, validateMoneyCurrency } from './money'
+import { addMoney, compareMoney, isCanonicalMoney, type Money } from '~~/shared/utils/money'
 
 const RequiredString = () => z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
 const AgreementProfileText = (maximum?: number) => RequiredString().superRefine((value, context) => {
@@ -354,6 +354,30 @@ const addBudgetLineItemFundingTotalsIssue = (
   })
 }
 
+const validateFinancialInputCurrencies = (
+  data: Partial<{
+    egcs_fc_currency: string
+    egcs_fc_amount: Money
+    egcs_fc_paymentamount: Money
+    egcs_fc_totalamount: Money
+    egcs_fc_programfunding: Money
+    egcs_fc_fundingsources: Array<{ egcs_fc_amount: Money }>
+  }>,
+  ctx: z.RefinementCtx
+) => {
+  const currency = data.egcs_fc_currency
+    ?? data.egcs_fc_totalamount?.currency
+    ?? data.egcs_fc_amount?.currency
+    ?? data.egcs_fc_paymentamount?.currency
+    ?? data.egcs_fc_programfunding?.currency
+  for (const key of ['egcs_fc_amount', 'egcs_fc_paymentamount', 'egcs_fc_totalamount', 'egcs_fc_programfunding'] as const) {
+    validateMoneyCurrency(data[key], currency, ctx, [key])
+  }
+  data.egcs_fc_fundingsources?.forEach((source, index) => {
+    validateMoneyCurrency(source.egcs_fc_amount, currency, ctx, ['egcs_fc_fundingsources', index, 'egcs_fc_amount'])
+  })
+}
+
 const validateBudgetLineItemFundingTotals = (
   data: Partial<{
     egcs_fc_totalamount: Money
@@ -373,10 +397,18 @@ const validateBudgetLineItemFundingTotals = (
   ].filter(value => value !== undefined)
   if (!moneyValues.every(isCanonicalMoney)) return
 
-  const zero = parseMoney('0')
+  const currency = data.egcs_fc_totalamount.currency
+  let mismatched = false
+  moneyValues.forEach((value, index) => {
+    if (value.currency === currency) return
+    mismatched = true
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection',
+      path: index === 1 ? ['egcs_fc_programfunding'] : ['egcs_fc_fundingsources', index - 2, 'egcs_fc_amount'] })
+  })
+  if (mismatched) return
   const totalFunding = (data.egcs_fc_fundingsources ?? []).reduce(
     (total, source) => addMoney(total, source.egcs_fc_amount),
-    addMoney(data.egcs_fc_programfunding, zero)
+    data.egcs_fc_programfunding
   )
 
   if (compareMoney(data.egcs_fc_totalamount, totalFunding) < 0) {
@@ -431,6 +463,7 @@ export const FundingCaseAgreementBudgetLineItemFundingTotalsSchema = FundingCase
 
 export const FundingCaseAgreementBudgetLineItemCreateSchema = FundingCaseAgreementBudgetLineItemBaseSchema.superRefine((data, ctx) => {
   validateBudgetLineItemFundingTotals(data, ctx)
+  validateFinancialInputCurrencies(data, ctx)
 })
 export const FundingCaseAgreementBudgetLineItemPatchSchema = FundingCaseAgreementBudgetLineItemBaseSchema.partial().superRefine((data, ctx) => {
   if (Object.keys(data).length === 0) {
@@ -438,6 +471,7 @@ export const FundingCaseAgreementBudgetLineItemPatchSchema = FundingCaseAgreemen
     return
   }
   validateBudgetLineItemFundingTotals(data, ctx)
+  validateFinancialInputCurrencies(data, ctx)
 })
 
 export type FundingCaseAgreementBudgetLineItem = z.infer<typeof FundingCaseAgreementBudgetLineItemCreateSchema>
@@ -473,10 +507,10 @@ export const FundingCaseAgreementCommitmentBaseSchema = z.object({
   egcs_fc_totalamount: NonNegativeMoneySchema
 })
 
-export const FundingCaseAgreementCommitmentCreateSchema = FundingCaseAgreementCommitmentBaseSchema
+export const FundingCaseAgreementCommitmentCreateSchema = FundingCaseAgreementCommitmentBaseSchema.superRefine(validateFinancialInputCurrencies)
 export const FundingCaseAgreementCommitmentPatchSchema = FundingCaseAgreementCommitmentBaseSchema.partial()
   .extend({ egcs_fc_status: ForbiddenBusinessStatusMutation() })
-  .superRefine(() => undefined)
+  .superRefine(validateFinancialInputCurrencies)
 
 export type FundingCaseAgreementCommitment = z.infer<typeof FundingCaseAgreementCommitmentCreateSchema>
 export type FundingCaseAgreementCommitmentPatch = z.infer<typeof FundingCaseAgreementCommitmentPatchSchema>
@@ -527,8 +561,8 @@ export const FundingCaseAgreementForecastLineItemBaseSchema = z.object({
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 
-export const FundingCaseAgreementForecastLineItemCreateSchema = FundingCaseAgreementForecastLineItemBaseSchema.strict()
-export const FundingCaseAgreementForecastLineItemPatchSchema = FundingCaseAgreementForecastLineItemBaseSchema.partial().strict().superRefine(() => undefined)
+export const FundingCaseAgreementForecastLineItemCreateSchema = FundingCaseAgreementForecastLineItemBaseSchema.strict().superRefine(validateFinancialInputCurrencies)
+export const FundingCaseAgreementForecastLineItemPatchSchema = FundingCaseAgreementForecastLineItemBaseSchema.partial().strict().superRefine(validateFinancialInputCurrencies)
 
 export type FundingCaseAgreementForecastLineItem = z.infer<typeof FundingCaseAgreementForecastLineItemCreateSchema>
 export type FundingCaseAgreementForecastLineItemPatch = z.infer<typeof FundingCaseAgreementForecastLineItemPatchSchema>
@@ -642,7 +676,7 @@ export const FundingCaseAgreementPaymentCreateSchema = FundingCaseAgreementPayme
     message: 'validation.date_range',
     path: ['egcs_fc_periodend']
   }
-)
+).superRefine(validateFinancialInputCurrencies)
 
 export const FundingCaseAgreementPaymentPatchSchema = FundingCaseAgreementPaymentSharedInputSchema.extend({
   egcs_fc_commitmenttype: RequiredBigintSelectionId().optional(),
@@ -651,7 +685,10 @@ export const FundingCaseAgreementPaymentPatchSchema = FundingCaseAgreementPaymen
   egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
   egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
   egcs_fc_status: ForbiddenBusinessStatusMutation()
-}).partial().superRefine(validatePeriodRange)
+}).partial().superRefine((data, ctx) => {
+  validatePeriodRange(data, ctx)
+  validateFinancialInputCurrencies(data, ctx)
+})
 
 export type FundingCaseAgreementPayment = z.infer<typeof FundingCaseAgreementPaymentBaseSchema>
 export type FundingCaseAgreementPaymentCreate = z.infer<typeof FundingCaseAgreementPaymentCreateSchema>
@@ -718,8 +755,8 @@ export const FundingCaseAgreementClaimLineItemBaseSchema = z.object({
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 
-export const FundingCaseAgreementClaimLineItemCreateSchema = FundingCaseAgreementClaimLineItemBaseSchema
-export const FundingCaseAgreementClaimLineItemPatchSchema = FundingCaseAgreementClaimLineItemBaseSchema.partial().superRefine(() => undefined)
+export const FundingCaseAgreementClaimLineItemCreateSchema = FundingCaseAgreementClaimLineItemBaseSchema.superRefine(validateFinancialInputCurrencies)
+export const FundingCaseAgreementClaimLineItemPatchSchema = FundingCaseAgreementClaimLineItemBaseSchema.partial().superRefine(validateFinancialInputCurrencies)
 
 export type FundingCaseAgreementClaimLineItem = z.infer<typeof FundingCaseAgreementClaimLineItemCreateSchema>
 export type FundingCaseAgreementClaimLineItemPatch = z.infer<typeof FundingCaseAgreementClaimLineItemPatchSchema>
@@ -731,7 +768,9 @@ export const FundingCaseAgreementClaimReconcileBaseSchema = z.object({
 })
 
 export const FundingCaseAgreementClaimReconcileCreateSchema = FundingCaseAgreementClaimReconcileBaseSchema.strict()
-export const FundingCaseAgreementClaimReconcilePatchSchema = FundingCaseAgreementClaimReconcileBaseSchema.partial()
+export const FundingCaseAgreementClaimReconcilePatchSchema = FundingCaseAgreementClaimReconcileBaseSchema
+  .omit({ egcs_fc_fundingagreementclaim: true })
+  .partial()
   .extend({ egcs_fc_status: ForbiddenBusinessStatusMutation() })
   .strict()
   .superRefine(() => undefined)

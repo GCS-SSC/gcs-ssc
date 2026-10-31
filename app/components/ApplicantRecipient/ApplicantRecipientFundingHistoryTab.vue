@@ -99,8 +99,8 @@ const formatDate = (value?: string | null): string => {
   }).format(date)
 }
 
-const formatMoney = (amount: Money, currency: string): string =>
-  formatMoneyText(amount, locale.value, currency.toUpperCase())
+const formatMoney = (amount: Money): string =>
+  formatMoneyText(amount, locale.value)
 
 const warnPrerequisite = () => toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
 const actionPending: Ref<boolean> = ref(false)
@@ -275,7 +275,7 @@ const visibleRows = computed(() => items.value)
       <template #amount-cell="{ row }">
         <div v-if="hasSummary(row.original)" class="space-y-1 whitespace-nowrap">
           <div v-for="total in row.original.totals || []" :key="total.currency" class="font-mono text-sm font-semibold">
-            {{ formatMoney(total.amount, total.currency) }}
+            {{ formatMoney(total.amount) }}
           </div>
           <span v-if="!row.original.totals?.length">{{ t('common.none') }}</span>
         </div>

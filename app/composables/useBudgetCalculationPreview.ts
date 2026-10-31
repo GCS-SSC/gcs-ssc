@@ -1,7 +1,7 @@
 import { computed, type Ref } from 'vue'
 import type { FundingCaseAgreementBudgetLineItemForm, FundingCaseAgreementBudgetLineItemRow } from '~~/shared/types/funding-case-agreement-ui'
 import { calculateBudgetPercentages } from '~~/shared/utils/budget-percentage'
-import { parseMoney } from '~~/shared/utils/money'
+import { parseMoney, zeroMoney } from '~~/shared/utils/money'
 
 /**
  * Shares the server's exact calculation using the complete budget and the draft row.
@@ -21,7 +21,7 @@ export const useBudgetCalculationPreview = (
       id: row.id!, versionId: 'preview', fiscalYearId: row.egcs_fc_fundingagreementbudgetfiscalyear!,
       currency: row.egcs_fc_currency!, categoryId: row.calculation_category_id!,
       mode: row.egcs_fc_calculationmode ?? 'manual', sourceCategoryId: row.egcs_fc_sourcecategory ?? null,
-      percentage: row.egcs_fc_percentage ?? null, programFunding: parseMoney(row.egcs_fc_programfunding ?? '0')
+      percentage: row.egcs_fc_percentage ?? null, programFunding: row.egcs_fc_programfunding === undefined ? zeroMoney(row.egcs_fc_currency!) : parseMoney(row.egcs_fc_programfunding)
     })))
     return amounts.get(id) ?? null
   } catch { return null }

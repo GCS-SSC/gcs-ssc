@@ -1,3 +1,4 @@
+import { toRiskRatingDto } from '~~/server/utils/agreement-risk-rating'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -35,7 +36,7 @@ export default defineEventHandler(async event => {
     baseQuery = baseQuery.where(eb => eb.or([
       eb('egcs_tp_name_en', 'ilike', `%${escapedSearch}%`),
       eb('egcs_tp_name_fr', 'ilike', `%${escapedSearch}%`),
-      ...(Number.isFinite(scoreSearch) ? [eb('egcs_tp_riskscore', '=', scoreSearch)] : [])
+      ...(Number.isFinite(scoreSearch) ? [eb('egcs_tp_riskscore', '=', String(scoreSearch))] : [])
     ]))
   }
 
@@ -54,7 +55,7 @@ export default defineEventHandler(async event => {
   const globalTotal = Number(statsResult?.total ?? 0)
 
   return {
-    items,
+    items: items.map(toRiskRatingDto),
     total,
     stats: {
       total: globalTotal,

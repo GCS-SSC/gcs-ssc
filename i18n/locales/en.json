@@ -1349,7 +1349,8 @@
       "chart_kind_immutable": "The account type cannot be changed. Create a separate account for the other type.",
       "account_receivable_chart_in_use": "This account is used by an accounts receivable and cannot be deleted.",
       "duplicate_account_receivable_type_name_en": "A receivable type with this English title already exists for the Agency.",
-      "duplicate_account_receivable_type_name_fr": "A receivable type with this French title already exists for the Agency."
+      "duplicate_account_receivable_type_name_fr": "A receivable type with this French title already exists for the Agency.",
+      "chart_in_use": "This accounting line is already in use and cannot be edited or deleted. Deactivate it to prevent new selections."
     },
     "admin_common": {
       "not_found": "Admin resource record not found.",
@@ -1407,7 +1408,8 @@
       "output_not_allowed": "This document template does not allow the selected output format.",
       "busy": "Document generation is busy. Try again shortly.",
       "input_changed": "The Agreement changed while the document was generated. Try again.",
-      "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
+      "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template.",
+      "render_limit_exceeded": "This template exceeds the document rendering limits. Reduce repeated sections or document content."
     },
     "agreement": {
       "custom_fields_invalid": "The saved Agreement custom-field selections are invalid.",
@@ -1596,7 +1598,7 @@
       "date_range_invalid": "Start date must be before end date.",
       "amendment_type_not_found": "Amendment type not found.",
       "amendment_subtype_not_found": "Amendment subtype not found.",
-      "amendment_subtype_in_use": "This amendment subtype is used by an amendment in progress. Complete or cancel the amendment before deleting the subtype.",
+      "amendment_subtype_in_use": "This amendment subtype is already in use. Deactivate it to prevent new selections.",
       "amendment_subtype_mapping_in_use": "These amendment type changes would invalidate an amendment in progress. Complete or cancel the amendment before changing the subtype's amendment types.",
       "agreement_subtype_not_found": "Agreement subtype not found.",
       "invalid_budget_fiscal_year": "The selected agreement budget fiscal year is invalid.",
@@ -1636,13 +1638,14 @@
       "duplicate_checklist_members": "Duplicate checklist members are not allowed.",
       "assessment_schema_not_found": "Assessment schema not found.",
       "checklist_schema_not_found": "Checklist schema not found.",
-      "amendment_type_in_use": "This amendment type is used by an amendment in progress and cannot be changed or deleted.",
+      "amendment_type_in_use": "This amendment type is already in use. Deactivate it to prevent new selections.",
       "duplicate_stream_holdback_basis": "This holdback basis already exists for the stream.",
       "duplicate_stream_document_template": "This document template is already linked to the stream.",
       "holdback_basis_in_use": "This holdback basis is used by an active agreement and cannot be changed or deleted.",
       "monitor_type_in_use": "This monitor type is used by an active agreement monitor and cannot be deleted.",
       "catalog_link_immutable": "Remove this stream selection and add another one to change its Agency definition.",
-      "stream_budget_in_use": "This stream budget is referenced by active financial records and cannot be changed or deleted."
+      "stream_budget_in_use": "This stream budget is referenced by active financial records and cannot be changed or deleted.",
+      "agency_immutable": "A Program cannot be moved to another Agency."
     },
     "applicant_recipient": {
       "profile_not_found": "Proponent profile not found.",

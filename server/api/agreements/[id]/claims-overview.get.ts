@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { defineEventHandler, type H3Event } from 'h3'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
@@ -34,6 +35,7 @@ const readRoute = async (event: H3Event, claimId?: string) => {
   }
 
   const { agreementId, db } = prepared
+  const currency = await assertAgreementCurrency(event, db, agreementId)
 
   // Saved references may identify a retained physical copy. Normalize only the
   // read identity; keep persisted foreign keys unchanged for subsequent writes.
@@ -328,7 +330,7 @@ const readRoute = async (event: H3Event, claimId?: string) => {
     const values = sourcesByLine.get(key) ?? []
     values.push({
       egcs_fc_fundingsubtype: String(source.egcs_fc_fundingsubtype),
-      egcs_fc_amount: parseDatabaseMoney(source.egcs_fc_amount),
+      egcs_fc_amount: parseDatabaseMoney(source.egcs_fc_amount, currency),
       funding_subtype_name_en: source.funding_subtype_name_en,
       funding_subtype_name_fr: source.funding_subtype_name_fr,
       funding_type_name_en: source.funding_type_name_en,
@@ -343,16 +345,16 @@ const readRoute = async (event: H3Event, claimId?: string) => {
     budgetLineItems: budgetLineItems.map(line => ({
       ...line,
       egcs_fc_fundingsources: budgetFundingSources.get(String(line.budget_row_id)) ?? [],
-      egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
-      egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding)
+      egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount, currency),
+      egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding, currency)
     })),
     lineItems: projectedLines.map(line => ({
       ...line,
-      egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount),
-      egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
+      egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount, currency),
+      egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount, currency),
       egcs_fc_fundingsources: sourcesByLine.get(String(line.id)) ?? [],
-      budget_line_total_amount: line.budget_line_total_amount == null ? line.budget_line_total_amount : parseDatabaseMoney(line.budget_line_total_amount),
-      budget_line_program_funding: line.budget_line_program_funding == null ? line.budget_line_program_funding : parseDatabaseMoney(line.budget_line_program_funding)
+      budget_line_total_amount: line.budget_line_total_amount == null ? line.budget_line_total_amount : parseDatabaseMoney(line.budget_line_total_amount, currency),
+      budget_line_program_funding: line.budget_line_program_funding == null ? line.budget_line_program_funding : parseDatabaseMoney(line.budget_line_program_funding, currency)
     })),
     reconciles: reconcilesWithState,
     reconcileLineItems: reconcileLineItems.map(line => ({
@@ -367,9 +369,9 @@ const readRoute = async (event: H3Event, claimId?: string) => {
         }
       })(),
       ...line,
-      egcs_fc_reconciled: parseDatabaseMoney(line.egcs_fc_reconciled),
-      egcs_fc_sampled: line.egcs_fc_sampled == null ? line.egcs_fc_sampled : parseDatabaseMoney(line.egcs_fc_sampled),
-      claim_line_item_amount: parseDatabaseMoney(line.claim_line_item_amount)
+      egcs_fc_reconciled: parseDatabaseMoney(line.egcs_fc_reconciled, currency),
+      egcs_fc_sampled: line.egcs_fc_sampled == null ? line.egcs_fc_sampled : parseDatabaseMoney(line.egcs_fc_sampled, currency),
+      claim_line_item_amount: parseDatabaseMoney(line.claim_line_item_amount, currency)
     }))
   }
 }

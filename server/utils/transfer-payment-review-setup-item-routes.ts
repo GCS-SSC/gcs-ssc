@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { validateReviewSetApprovalTemplateForAgency } from './agency-review-set-dependencies'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { H3Event } from 'h3'
@@ -264,7 +265,7 @@ export const patchTransferPaymentReviewSetupItem = async (
       ? String(updated.egcs_cn_approvaltemplate)
       : undefined,
     egcs_cn_failonchecklistfailure: updated.egcs_cn_failonchecklistfailure,
-    egcs_cn_failurethreshold: updated.egcs_cn_failurethreshold,
+    egcs_cn_failurethreshold: updated.egcs_cn_failurethreshold === null ? null : parseSafeDecimal(String(updated.egcs_cn_failurethreshold)),
     egcs_cn_disablecustomoutcomes: schema.egcs_cn_disablecustomoutcomes,
     egcs_cn_disablealignment: schema.egcs_cn_disablealignment,
     egcs_cn_disablereviewers: schema.egcs_cn_disablereviewers,

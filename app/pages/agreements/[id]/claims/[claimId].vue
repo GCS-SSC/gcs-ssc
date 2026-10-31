@@ -27,7 +27,7 @@ import type {
   FundingCaseAgreementClaimReconcileRow,
   FundingCaseAgreementClaimReconcileLineItemRow
 } from '~~/shared/types/funding-case-agreement-ui'
-import { compareMoney, formatMoneyText, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, parseMoney, zeroMoney, subtractMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
 type ClaimSubmissionTableRow = {
   id: string
@@ -104,13 +104,18 @@ const {
   status: profileStatus,
   refresh: refreshProfile
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcaseagreementclaim/${claimId}/context`)
+const getCurrency = (): string => {
+  const currency = profile.value?.egcs_fc_currency
+  if (!currency) throw new Error('Agreement currency is unavailable.')
+  return currency
+}
 const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'claim', claimId,
   computed(() => profile.value?.can_create_account_receivable === true))
 
 const { createValidator } = useZodI18n()
 const submissionAmountSchema = FundingCaseAgreementClaimLineItemBaseSchema.pick({ egcs_fc_amount: true })
 const validateSubmissionAmount = createValidator(submissionAmountSchema)
-const submissionModal = useCrudModal<ClaimSubmissionTableRow, ClaimSubmissionTableRow & { egcs_fc_amount: string }>({
+const submissionModal = useCrudModal<ClaimSubmissionTableRow, ClaimSubmissionTableRow & { egcs_fc_amount: MoneyInput }>({
   updateState: row => ({ ...row, egcs_fc_amount: row.submittedAmount })
 })
 const selectedSubmissionLine = submissionModal.selected
@@ -118,12 +123,12 @@ const isSubmissionModalOpen = submissionModal.isOpen
 const fundingEditorLine: Ref<FundingCaseAgreementClaimLineItemRow | null> = ref(null)
 const fundingEditorOpen: Ref<boolean> = ref(false)
 const fundingEditorSession = ref(0)
-const fundingEditorProgramAmount: Ref<string> = ref('0.00')
-const fundingEditorTotalAmount: Ref<string> = ref('0.00')
-const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money }>> = ref([])
+const fundingEditorProgramAmount: Ref<MoneyInput> = ref(undefined)
+const fundingEditorTotalAmount: Ref<MoneyInput> = ref(undefined)
+const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: MoneyInput }>> = ref([])
 const isSavingFunding: Ref<boolean> = ref(false)
-const draftReconciledAmounts: Ref<Record<string, string>> = ref({})
-const draftSampledAmounts: Ref<Record<string, string>> = ref({})
+const draftReconciledAmounts: Ref<Record<string, MoneyInput>> = ref({})
+const draftSampledAmounts: Ref<Record<string, MoneyInput>> = ref({})
 const draftRationales: Ref<Record<string, string>> = ref({})
 const draftAllocations: Ref<Record<string, string | null>> = ref({})
 const submissionSearch: Ref<string> = ref('')
@@ -236,7 +241,7 @@ const saveFundingEditor = async () => {
     }))
     if (sources.some(source => !source.egcs_fc_fundingsubtype)
       || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
-      || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)]), totalAmount) !== 0) {
+      || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)], getCurrency()), totalAmount) !== 0) {
       toast.add({ title: toast.localized('common.error'), description: toast.localized('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
       return
     }
@@ -452,21 +457,21 @@ const canEditReconcileLineItem = (claimLineId: string): boolean => {
   return existing ? canUpdateReconcileRole.value : canCreateReconcileLineItems.value
 }
 
-const ZERO_MONEY = parseMoney('0')
-const readDraftMoney = (value: string | null | undefined): Money => {
+const zeroAmount = () => zeroMoney(getCurrency())
+const readDraftMoney = (value: MoneyInput): Money => {
   try {
-    return value == null || value === '' ? ZERO_MONEY : parseMoney(value)
+    return value == null ? zeroAmount() : parseMoney(value)
   } catch {
-    return ZERO_MONEY
+    return zeroAmount()
   }
 }
-const totalSubmitted = computed(() => sumMoney(activeClaimLineItems.value.map(line => line.egcs_fc_amount)))
-const totalReconciled = computed(() => sumMoney(activeClaimLineItems.value.map(line => readDraftMoney(getDraftReconciledAmount(String(line.id))))))
+const totalSubmitted = computed(() => sumMoney(activeClaimLineItems.value.map(line => line.egcs_fc_amount), getCurrency()))
+const totalReconciled = computed(() => sumMoney(activeClaimLineItems.value.map(line => readDraftMoney(getDraftReconciledAmount(String(line.id)))), getCurrency()))
 const totalReconciledAll = computed(() => sumMoney(reconcileLineItems.value
   .filter((line: FundingCaseAgreementClaimReconcileLineItemRow) => successfulReconcileIds.value.has(String(line.egcs_fc_fundingagreementclaimreconcile)))
   .filter((line: FundingCaseAgreementClaimReconcileLineItemRow) => activeClaimLineIds.value.has(String(line.egcs_fc_lineitem)))
-  .map(line => line.egcs_fc_reconciled)))
-const totalSampled = computed(() => sumMoney(activeClaimLineItems.value.map(line => readDraftMoney(getDraftSampledAmount(String(line.id))))))
+  .map(line => line.egcs_fc_reconciled), getCurrency()))
+const totalSampled = computed(() => sumMoney(activeClaimLineItems.value.map(line => readDraftMoney(getDraftSampledAmount(String(line.id)))), getCurrency()))
 const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[]>(() => activeClaimLineItems.value.map(line => {
   const id = String(line.id)
   const persisted = reconcileLineByClaimLineId.value.get(id)
@@ -508,8 +513,8 @@ const loadSelectedReconcileDetail = async (reconcile: FundingCaseAgreementClaimR
     if (generation !== reconcileDetailGeneration || String(detail.reconciliation.id) !== String(activeReconcile.value?.id)) return
     selectedReconcileDetail.value = detail
     selectedReconcileRole.value = { id: String(detail.reconciliation.id), allowed: detail.can_update_role }
-    draftReconciledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_reconciled ?? '0.00']))
-    draftSampledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_sampled ?? '0.00']))
+    draftReconciledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_reconciled ?? zeroAmount()]))
+    draftSampledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_sampled ?? undefined]))
     draftRationales.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_rationale ?? '']))
   } catch (error: unknown) {
     if (generation === reconcileDetailGeneration) showError(error)
@@ -525,13 +530,13 @@ watch(() => activeReconcile.value?.id, () => {
 }, { immediate: true })
 
 watch(activeReconcileLineItems, () => {
-  const nextReconciled: Record<string, string> = {}
-  const nextSampled: Record<string, string> = {}
+  const nextReconciled: Record<string, MoneyInput> = {}
+  const nextSampled: Record<string, MoneyInput> = {}
   const nextRationales: Record<string, string> = {}
   for (const claimLine of activeClaimLineItems.value) {
     const existing = reconcileLineByClaimLineId.value.get(String(claimLine.id))
-    nextReconciled[String(claimLine.id)] = existing?.egcs_fc_reconciled ?? '0.00'
-    nextSampled[String(claimLine.id)] = existing?.egcs_fc_sampled ?? '0.00'
+    nextReconciled[String(claimLine.id)] = existing?.egcs_fc_reconciled ?? zeroAmount()
+    nextSampled[String(claimLine.id)] = existing?.egcs_fc_sampled ?? undefined
     nextRationales[String(claimLine.id)] = existing?.egcs_fc_rationale ?? ''
   }
   draftReconciledAmounts.value = nextReconciled
@@ -564,9 +569,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
   return String(value)
 }
 
-const formatMoney = (value: Money) => profile.value?.egcs_fc_currency
-  ? formatMoneyText(value, locale.value, profile.value.egcs_fc_currency.toUpperCase())
-  : value
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value)
 const joinLabelParts = (parts: Array<string | number | null | undefined>) =>
   parts
     .map(part => part === null || part === undefined ? '' : String(part).trim())
@@ -605,8 +608,10 @@ const claimHeroBadges = computed(() => activeClaim.value
   : []
 )
 
-const getDraftReconciledAmount = (claimLineId: string) => draftReconciledAmounts.value[claimLineId] ?? '0.00'
-const getDraftSampledAmount = (claimLineId: string) => draftSampledAmounts.value[claimLineId] ?? '0.00'
+const getDraftReconciledAmount = (claimLineId: string) => Object.hasOwn(draftReconciledAmounts.value, claimLineId)
+  ? draftReconciledAmounts.value[claimLineId]
+  : zeroAmount()
+const getDraftSampledAmount = (claimLineId: string) => draftSampledAmounts.value[claimLineId]
 const getDraftRationale = (claimLineId: string) => draftRationales.value[claimLineId] ?? ''
 const setDraftAllocation = (claimLineId: string, value: string | number | null | undefined) => {
   draftAllocations.value = { ...draftAllocations.value, [claimLineId]: value === null || value === undefined ? null : String(value) }
@@ -630,13 +635,13 @@ const allocationOptions = computed(() =>
 
 const getTotalSuccessfulReconciledForClaimLineId = (claimLineId: string | number | null | undefined) => {
   if (claimLineId === undefined || claimLineId === null) {
-    return ZERO_MONEY
+    return zeroAmount()
   }
 
   return sumMoney(reconcileLineItems.value
     .filter((item: FundingCaseAgreementClaimReconcileLineItemRow) => successfulReconcileIds.value.has(String(item.egcs_fc_fundingagreementclaimreconcile)))
     .filter((item: FundingCaseAgreementClaimReconcileLineItemRow) => String(item.egcs_fc_lineitem) === String(claimLineId))
-    .map(item => item.egcs_fc_reconciled))
+    .map(item => item.egcs_fc_reconciled), getCurrency())
 }
 
 const getSuccessfulReconciledExcludingReconcile = (
@@ -646,7 +651,7 @@ const getSuccessfulReconciledExcludingReconcile = (
   .filter((item: FundingCaseAgreementClaimReconcileLineItemRow) => successfulReconcileIds.value.has(String(item.egcs_fc_fundingagreementclaimreconcile)))
   .filter((item: FundingCaseAgreementClaimReconcileLineItemRow) => String(item.egcs_fc_fundingagreementclaimreconcile) !== String(reconcileId))
   .filter((item: FundingCaseAgreementClaimReconcileLineItemRow) => String(item.egcs_fc_lineitem) === String(claimLineId))
-  .map(item => item.egcs_fc_reconciled))
+  .map(item => item.egcs_fc_reconciled), getCurrency())
 
 const getProjectedReconciliationLineBalance = (
   claimLineId: string | number,
@@ -663,12 +668,12 @@ const selectedReconcileLineBalance = computed(() => selectedReconcileLine.value
       selectedReconcileLine.value.submittedAmount,
       readDraftMoney(selectedReconcileLine.value.reconciledAmount)
     )
-  : ZERO_MONEY
+  : zeroAmount()
 )
 
-const updateSelectedReconciledAmount = (value: string | null | undefined): void => {
+const updateSelectedReconciledAmount = (value: MoneyInput): void => {
   if (!selectedReconcileLine.value) return
-  selectedReconcileLine.value.reconciledAmount = value ?? ''
+  selectedReconcileLine.value.reconciledAmount = value
   triggerRef(selectedReconcileLine)
 }
 
@@ -718,7 +723,7 @@ const claimSubmissionRows = computed<ClaimSubmissionTableRow[]>(() => {
     }
 
     const claimLine = claimLines[0]
-    const submittedAmount = claimLine?.egcs_fc_amount ?? ZERO_MONEY
+    const submittedAmount = claimLine?.egcs_fc_amount ?? zeroAmount()
     const budgetLineReconciledAmount = getTotalSuccessfulReconciledForClaimLineId(claimLine?.id)
 
     return [{
@@ -844,7 +849,7 @@ const {
 const isSubmissionCostCategoryGroupRow = (row: GroupedClaimSubmissionRow) => isSubmissionGroupRow(row, COST_CATEGORY_GROUP_COLUMN_ID)
 const isSubmissionCostSubsectionGroupRow = (row: GroupedClaimSubmissionRow) => isSubmissionGroupRow(row, COST_SUBSECTION_GROUP_COLUMN_ID)
 const getSubmissionGroupedTotal = (row: GroupedClaimSubmissionRow, key: 'submittedAmount' | 'reconciledAmount' | 'balance') =>
-  sumMoney(getSubmissionLeafRows(row).map(leafRow => leafRow.original[key]))
+  sumMoney(getSubmissionLeafRows(row).map(leafRow => leafRow.original[key]), getCurrency())
 
 const isReconcileMutationPending = computed(() =>
   isSavingReconcile.value || isSavingReconcileFinal.value || isSavingReconcileLine.value || isCancellingReconcile.value
@@ -858,13 +863,13 @@ const selectReconcile = (reconcileId: string | number) => {
 const getReconcileTotal = (reconcileId: string | number, key: 'egcs_fc_reconciled' | 'egcs_fc_sampled') =>
   sumMoney(reconcileLineItems.value
     .filter((line: FundingCaseAgreementClaimReconcileLineItemRow) => String(line.egcs_fc_fundingagreementclaimreconcile) === String(reconcileId))
-    .flatMap(line => line[key] == null ? [] : [line[key]]))
+    .flatMap(line => line[key] == null ? [] : [line[key]]), getCurrency())
 
 const getReconcileBalance = (reconcile: FundingCaseAgreementClaimReconcileRow) => subtractMoney(
   sumMoney(activeClaimLineItems.value.map(line => subtractMoney(
     line.egcs_fc_amount,
     getSuccessfulReconciledExcludingReconcile(line.id, reconcile.id)
-  ))),
+  )), getCurrency()),
   getReconcileTotal(reconcile.id, 'egcs_fc_reconciled')
 )
 
@@ -902,15 +907,15 @@ const saveSubmission = async () => {
     const { egcs_fc_amount: amount } = submissionAmountSchema.parse(line)
     const existing = activeClaimLineItems.value.find(item => String(item.id) === line.claimLineId)
     let didMutate = false
-    if (existing && existing.egcs_fc_amount !== amount) {
+    if (existing && compareMoney(existing.egcs_fc_amount, amount) !== 0) {
       await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', {
         egcs_fc_amount: amount,
-        egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)]),
+        egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)], getCurrency()),
         egcs_fc_description: existing.egcs_fc_description
       })
       didMutate = true
     }
-    if (!existing && compareMoney(amount, ZERO_MONEY) !== 0) {
+    if (!existing && compareMoney(amount, zeroAmount()) !== 0) {
       await sendJson(`/api/agreements/${agreementId}/claim-line-items`, 'POST', {
         egcs_fc_fundingagreementclaim: claimId,
         egcs_fc_fundingagreementbudgetlineitem: String(budgetLine.id),

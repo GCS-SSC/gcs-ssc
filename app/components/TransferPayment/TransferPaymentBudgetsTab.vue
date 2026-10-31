@@ -166,7 +166,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
       </template>
       <template #egcs_tp_totalbudget-cell="{ row }">
         <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-          {{ formatMoneyText(row.original.egcs_tp_totalbudget, locale, row.original.egcs_tp_currency.toUpperCase()) }}
+          {{ formatMoneyText(row.original.egcs_tp_totalbudget, locale) }}
         </span>
       </template>
       <template #egcs_tp_overcommitthreshold-cell="{ row }">

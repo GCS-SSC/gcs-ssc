@@ -1,4 +1,5 @@
 import { nanoid } from 'nanoid'
+import { getCurrency } from '~~/shared/utils/money'
 import { computed, toValue, watch } from 'vue'
 import type { EnumKey } from '~/types/enums'
 import type { MaybeRefOrGetter } from 'vue'
@@ -78,13 +79,19 @@ export const useEnumSelectOptions = (options: EnumSelectOptions) => {
       return []
     }
 
-    const mapped = rawItems.value.map((val: string) => ({
+    const values = enumName.value === 'currency_codes'
+      ? rawItems.value.filter(value => {
+          try {
+            getCurrency(value)
+            return true
+          } catch {
+            return false
+          }
+        })
+      : rawItems.value
+    const mapped = values.map((val: string) => ({
       label: (() => {
         if (enumName.value === 'currency_codes') {
-          if (val === 'all') {
-            return allOptionLabel.value || t('common.all')
-          }
-
           return currencyDisplayNames.value?.of(val.toUpperCase()) ?? val.toUpperCase()
         }
 
@@ -100,7 +107,7 @@ export const useEnumSelectOptions = (options: EnumSelectOptions) => {
     if (showAllOption.value) {
       mapped.unshift({
         label: allOptionLabel.value || t('common.all_statuses'),
-        value: 'all'
+        value: enumName.value === 'currency_codes' ? '__all__' : 'all'
       })
     }
 

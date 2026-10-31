@@ -1,3 +1,4 @@
+import { securityRemediationPostgresE2eSpecPaths } from '../tooling/gcs-ssc/scripts/security-remediation-e2e-specs'
 /* eslint-disable jsdoc/require-jsdoc */
 import { realpathSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
@@ -22,6 +23,7 @@ export const extensionProfileE2eSpecPath = 'tests/e2e/agreement-extension-persis
 export const notificationEditorE2eSpecPath = 'tests/e2e/notification-provider-editor-host.spec.ts'
 
 export const postgresE2eSpecPaths = [
+  ...securityRemediationPostgresE2eSpecPaths,
   'tests/e2e/stream-wizard-budget-reference-review.spec.ts',
   'tests/e2e/proponent-profile-list-review.spec.ts',
   'tests/e2e/proponent-profile-historical-subtype-update-review.spec.ts',

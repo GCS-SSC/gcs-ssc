@@ -1,4 +1,4 @@
-import { compareMoney, moneyFromCents, moneyToCents, sumMoney, type Money } from './money'
+import { absMoney, addMoney, allocateMoney, compareMoney, negateMoney, parseDecimalText, subtractMoney, sumMoney, zeroMoney, type Money } from './money'
 
 export type AccountReceivableRecoveryMethod = 'offset' | 'direct_repayment'
 
@@ -32,50 +32,40 @@ export type AccountReceivableCodingCapacity = {
 }
 
 /**
- * Allocates exact signed principal cents over retained coding, respecting every capacity.
- * Stable coding identity receives cent remainders; saturated coding is removed and
+ * Allocates exact signed principal minor units over retained coding, respecting every capacity.
+ * Stable coding identity receives minor-unit remainders; saturated coding is removed and
  * the remainder redistributed using only the original eligible retained weights.
  * @param amount - Exact signed principal adjustment or positive settlement.
  * @param coding - Retained coding weights and positive eligible capacities.
+ * @param currency - Owning denomination.
  * @returns Every coding allocation, including explicit zeroes to reset draft values.
  */
-export const allocateAccountReceivableCoding = (amount: Money, coding: readonly AccountReceivableCodingCapacity[]): Array<{ id: string; egcs_fc_amount: Money }> => {
-  const signedTotal = moneyToCents(amount)
-  const sign = signedTotal < BigInt(0) ? -BigInt(1) : BigInt(1)
-  const total = signedTotal < BigInt(0) ? -signedTotal : signedTotal
+export const allocateAccountReceivableCoding = (amount: Money, coding: readonly AccountReceivableCodingCapacity[], currency: string): Array<{ id: string; egcs_fc_amount: Money }> => {
+  const zero = zeroMoney(currency)
+  const negative = compareMoney(amount, zero) < 0
+  const total = absMoney(amount)
   const ordered = [...coding].sort((left, right) => BigInt(left.id) < BigInt(right.id) ? -1 : BigInt(left.id) > BigInt(right.id) ? 1 : 0)
   if (new Set(ordered.map(line => line.id)).size !== ordered.length) throw new Error('AR_DUPLICATE_CODING')
-  const rows = ordered.map(line => ({ id: line.id, weight: moneyToCents(line.egcs_fc_weight), capacity: moneyToCents(line.egcs_fc_capacity), allocated: BigInt(0) }))
-  if (rows.some(line => line.weight < BigInt(0) || line.capacity < BigInt(0))) throw new Error('AR_CODING_CAPACITY')
-  const eligibleCapacity = sumMoney(rows.filter(line => line.weight > BigInt(0)).map(line => moneyFromCents(line.capacity)))
-  if (compareMoney(moneyFromCents(total), eligibleCapacity) > 0) throw new Error('AR_CODING_CAPACITY')
+  const rows = ordered.map(line => ({ id: line.id, weight: line.egcs_fc_weight, capacity: line.egcs_fc_capacity, allocated: zero }))
+  if (rows.some(line => compareMoney(line.weight, zero) < 0 || compareMoney(line.capacity, zero) < 0)) throw new Error('AR_CODING_CAPACITY')
+  const eligibleCapacity = sumMoney(rows.filter(line => compareMoney(line.weight, zero) > 0).map(line => line.capacity), currency)
+  if (compareMoney(total, eligibleCapacity) > 0) throw new Error('AR_CODING_CAPACITY')
   let remaining = total
-  while (remaining > BigInt(0)) {
-    const eligible = rows.filter(line => line.weight > BigInt(0) && line.allocated < line.capacity)
-    const weight = eligible.reduce((sum, line) => sum + line.weight, BigInt(0))
-    if (weight === BigInt(0)) throw new Error('AR_CODING_CAPACITY')
-    const saturated = eligible.filter(line => remaining * line.weight / weight > line.capacity - line.allocated)
+  while (compareMoney(remaining, zero) > 0) {
+    const eligible = rows.filter(line => compareMoney(line.weight, zero) > 0 && compareMoney(line.allocated, line.capacity) < 0)
+    if (!eligible.length) throw new Error('AR_CODING_CAPACITY')
+    const shares = allocateMoney(remaining, eligible.map(line => parseDecimalText(line.weight.amount)), { method: 'ordered' })
+    const saturated = eligible.filter((line, index) => compareMoney(shares[index]!, subtractMoney(line.capacity, line.allocated)) > 0)
     if (saturated.length) {
       for (const line of saturated) {
-        const allocation = line.capacity - line.allocated
-        line.allocated += allocation
-        remaining -= allocation
+        const allocation = subtractMoney(line.capacity, line.allocated)
+        line.allocated = addMoney(line.allocated, allocation)
+        remaining = subtractMoney(remaining, allocation)
       }
       continue
     }
-    const roundAmount = remaining
-    for (const line of eligible) {
-      const allocation = roundAmount * line.weight / weight
-      line.allocated += allocation
-      remaining -= allocation
-    }
-    for (const line of eligible) {
-      if (remaining === BigInt(0)) break
-      if (line.allocated < line.capacity) {
-        line.allocated += BigInt(1)
-        remaining -= BigInt(1)
-      }
-    }
+    for (const [index, line] of eligible.entries()) line.allocated = addMoney(line.allocated, shares[index]!)
+    remaining = zero
   }
-  return rows.map(line => ({ id: line.id, egcs_fc_amount: moneyFromCents(line.allocated * sign) }))
+  return rows.map(line => ({ id: line.id, egcs_fc_amount: negative ? negateMoney(line.allocated) : line.allocated }))
 }

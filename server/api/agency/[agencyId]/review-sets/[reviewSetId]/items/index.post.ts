@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { validateReviewSetApprovalTemplateForAgency } from '~~/server/utils/agency-review-set-dependencies'
 import { TransferPaymentStreamReviewSetupMemberCreateSchema } from '~~/shared/types/schemas'
@@ -125,7 +126,7 @@ export default defineEventHandler(async event => {
         egcs_cn_order: created.egcs_cn_order,
         egcs_cn_approvaltemplate: created.egcs_cn_approvaltemplate ? String(created.egcs_cn_approvaltemplate) : undefined,
         egcs_cn_failonchecklistfailure: created.egcs_cn_failonchecklistfailure,
-        egcs_cn_failurethreshold: created.egcs_cn_failurethreshold,
+        egcs_cn_failurethreshold: created.egcs_cn_failurethreshold === null ? null : parseSafeDecimal(String(created.egcs_cn_failurethreshold)),
         egcs_cn_disablecustomoutcomes: schema.egcs_cn_disablecustomoutcomes,
         egcs_cn_disablealignment: schema.egcs_cn_disablealignment,
         egcs_cn_disablereviewers: schema.egcs_cn_disablereviewers,

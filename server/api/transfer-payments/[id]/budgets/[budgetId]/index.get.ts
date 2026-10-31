@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorizeTransferPaymentBudgetResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { sql } from 'kysely'
@@ -64,10 +65,11 @@ export default defineEventHandler(async event => {
 
   return {
     ...budget,
+    egcs_tp_overcommitthreshold: parseSafeDecimal(String(budget.egcs_tp_overcommitthreshold)),
     fiscal_year_currency_display: `${budget.fiscal_year_display} (${budget.egcs_tp_currency.toUpperCase()})`,
     id: String(budget.id),
     egcs_tp_transferpaymentprofile: String(budget.egcs_tp_transferpaymentprofile),
     egcs_tp_fiscalyear: String(budget.egcs_tp_fiscalyear),
-    egcs_tp_totalbudget: parseDatabaseMoney(budget.egcs_tp_totalbudget)
+    egcs_tp_totalbudget: parseDatabaseMoney(budget.egcs_tp_totalbudget, budget.egcs_tp_currency)
   }
 })

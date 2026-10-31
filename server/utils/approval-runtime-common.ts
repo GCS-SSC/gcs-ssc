@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import type { H3Event } from 'h3'
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
 import { badRequest, forbidden, notFound } from '~~/server/utils/api-errors'
 import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
@@ -121,7 +122,6 @@ export const getRuntimeApprovals = async (
     .leftJoin('Common_Group as DefaultGroup', 'DefaultGroup.id', 'Common_Approval.egcs_cn_defaultgroup')
     .leftJoin('Common_Group as AssignedGroup', 'AssignedGroup.id', 'Common_Approval.egcs_cn_assignedgroup')
     .leftJoin('Common_User as AssignedUser', 'AssignedUser.id', 'Common_Approval.egcs_cn_assigneduser')
-    .leftJoin('Agency_Approval_Behalf_Type', 'Agency_Approval_Behalf_Type.id', 'Common_Approval.egcs_cn_onbehalf')
     .select([
       'Common_Approval.id as id',
       'Common_Approval.egcs_cn_sequence as egcs_cn_sequence',
@@ -148,9 +148,9 @@ export const getRuntimeApprovals = async (
       'AssignedGroup.egcs_cn_name_fr as assigned_group_name_fr',
       'AssignedUser.egcs_cn_name as assigned_user_name',
       'AssignedUser.egcs_cn_positiontitle as assigned_user_position_title',
-      'Agency_Approval_Behalf_Type.egcs_ay_name_en as onbehalf_name_en',
-      'Agency_Approval_Behalf_Type.egcs_ay_name_fr as onbehalf_name_fr',
-      'Agency_Approval_Behalf_Type.egcs_ay_requireactual as onbehalf_require_actual',
+      'Common_Approval.egcs_cn_onbehalfname_en as onbehalf_name_en',
+      'Common_Approval.egcs_cn_onbehalfname_fr as onbehalf_name_fr',
+      'Common_Approval.egcs_cn_onbehalfrequireactual as onbehalf_require_actual',
       'Common_Runtime_Item.id as runtimeItemId',
       'Common_Runtime_Item.egcs_cn_state as runtimeState'
     ])
@@ -163,12 +163,16 @@ export const getRuntimeApprovals = async (
   const approvals: RuntimeApprovalRow[] = approvalRows.map(approval => ({
     ...approval,
     id: String(approval.id),
+    egcs_cn_sequence: parseSafeDecimal(String(approval.egcs_cn_sequence)),
     egcs_cn_defaultuser: normalizeId(approval.egcs_cn_defaultuser),
     egcs_cn_defaultgroup: normalizeId(approval.egcs_cn_defaultgroup),
     egcs_cn_assigneduser: normalizeId(approval.egcs_cn_assigneduser),
     egcs_cn_assignedgroup: normalizeId(approval.egcs_cn_assignedgroup),
     egcs_cn_onbehalf: normalizeId(approval.egcs_cn_onbehalf),
     egcs_cn_attachment: normalizeId(approval.egcs_cn_attachment),
+    onbehalf_name_en: approval.onbehalf_name_en ?? null,
+    onbehalf_name_fr: approval.onbehalf_name_fr ?? null,
+    onbehalf_require_actual: approval.onbehalf_require_actual ?? null,
     runtimeItemId: String(approval.runtimeItemId)
   }))
 
@@ -527,13 +531,13 @@ export const addRuntimeApprovalStep = async (
 
   const maxActionedSequence = approvals.reduce<number | null>((maximum, approval) => {
     if (approval.egcs_cn_approvalvalue === null) return maximum
-    const sequence = Number(approval.egcs_cn_sequence)
+    const sequence = parseSafeDecimal(String(approval.egcs_cn_sequence))
     if (maximum === null || sequence > maximum) return sequence
     return maximum
   }, null)
   if (body.position === 'after'
     && maxActionedSequence !== null
-    && Number(anchor.egcs_cn_sequence) < maxActionedSequence) {
+    && parseSafeDecimal(String(anchor.egcs_cn_sequence)) < maxActionedSequence) {
     return await badRequest(event, 'ADDITIONAL_APPROVAL_BEFORE_ACTIONED', 'apiErrors.request.invalid_status')
   }
 
@@ -573,7 +577,7 @@ export const addRuntimeApprovalStep = async (
   const anchorId = anchorApprovalId
   const routingSlipId = String(routingSlip.id)
   const sequenceExpression = body.position === 'before'
-    ? sql<number>`(
+    ? sql<string>`(
         SELECT COALESCE(
           (previous.egcs_cn_sequence + anchor.egcs_cn_sequence) / 2,
           anchor.egcs_cn_sequence - 1
@@ -589,7 +593,7 @@ export const addRuntimeApprovalStep = async (
         ) previous ON true
         WHERE anchor.id = ${anchorId}
       )`
-    : sql<number>`(
+    : sql<string>`(
         SELECT COALESCE(
           (anchor.egcs_cn_sequence + following.egcs_cn_sequence) / 2,
           anchor.egcs_cn_sequence + 1
@@ -616,7 +620,7 @@ export const addRuntimeApprovalStep = async (
     egcs_cn_runtime: String(routingSlip.runtimeId),
     egcs_cn_parentruntimeitem: String(routingSlip.routingRuntimeItemId),
     egcs_cn_kind: 'approval_step',
-    egcs_cn_order: Number(approval?.maximum ?? 0) + 1,
+    egcs_cn_order: parseSafeDecimal(String(approval?.maximum ?? '0')) + 1,
     egcs_cn_publication: String(routingSlip.publicationId),
     egcs_cn_publicationkind: routingSlip.publicationKind,
     egcs_cn_publicationversion: String(routingSlip.publicationVersionId),
@@ -656,7 +660,7 @@ export const addRuntimeApprovalStep = async (
     (body.position === 'before' && String(anchor.id) === String(currentAwaitingApproval.id))
     || (body.position === 'after'
       && anchor.egcs_cn_approvalvalue !== null
-      && Number(anchor.egcs_cn_sequence) < Number(currentAwaitingApproval.egcs_cn_sequence))
+      && parseSafeDecimal(String(anchor.egcs_cn_sequence)) < parseSafeDecimal(String(currentAwaitingApproval.egcs_cn_sequence)))
   )
   if (insertedBeforeCurrent && currentAwaitingApproval) {
     await transitionRuntimeItem(trx, {

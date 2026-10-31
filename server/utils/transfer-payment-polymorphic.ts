@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns */
 import type { Kysely } from 'kysely'
 import type { Database, Entity_Type } from '~~/shared/types/database'
@@ -11,7 +12,7 @@ export type ReviewSetupMemberRow = {
   egcs_cn_order: number
   egcs_cn_approvaltemplate?: string | number | null
   egcs_cn_failonchecklistfailure?: boolean | null
-  egcs_cn_failurethreshold?: number | null
+  egcs_cn_failurethreshold?: string | number | null
   egcs_cn_defaultgroup?: string | number | null
   egcs_cn_name_en?: string | null
   egcs_cn_name_fr?: string | null
@@ -226,7 +227,7 @@ export const mapReviewSetupMembers = (members: ReviewSetupMemberRow[]) => member
   egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure === true,
   egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ? String(member.egcs_cn_defaultgroup) : null,
   ...(member.egcs_cn_failurethreshold !== null && member.egcs_cn_failurethreshold !== undefined
-    ? { egcs_cn_failurethreshold: member.egcs_cn_failurethreshold }
+    ? { egcs_cn_failurethreshold: parseSafeDecimal(String(member.egcs_cn_failurethreshold)) }
     : {}),
   egcs_cn_disablecustomoutcomes: member.egcs_cn_disablecustomoutcomes === true,
   egcs_cn_disablealignment: member.egcs_cn_disablealignment === true,

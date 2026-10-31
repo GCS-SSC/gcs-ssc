@@ -8,7 +8,8 @@ import { assertAccountReceivableWorkflowStatusTransition, captureAccountReceivab
 import { captureAccountReceivablePaymentOffsetPacket, postAccountReceivablePaymentOffset, releaseAccountReceivablePaymentOffset, validateAccountReceivablePaymentOffset, readAccountReceivablePaymentOffset } from './account-receivable-recovery'
 import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivablePaymentPoolAgreements, lockAccountReceivableRecoveryPool } from './account-receivable-context'
 import { lockPaymentRecoveryAgreements } from './payment-recovery-lock'
-import { compareMoney, parseMoney } from '~~/shared/utils/money'
+import { compareMoney, zeroMoney } from '~~/shared/utils/money'
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
 import { lockAssignableGroup } from './groups'
 import { captureRiskRatingMapping, resolveRiskRatingAgreementId } from './agreement-risk-rating'
@@ -160,7 +161,7 @@ const runtimeItemSummary = (item: Selectable<Database['Common_Runtime_Item']>) =
   runtimeState: item.egcs_cn_state,
   parentRuntimeItemId: item.egcs_cn_parentruntimeitem === null ? null : String(item.egcs_cn_parentruntimeitem),
   kind: item.egcs_cn_kind,
-  order: Number(item.egcs_cn_order),
+  order: parseSafeDecimal(String(item.egcs_cn_order)),
   publicationId: String(item.egcs_cn_publication),
   publicationVersionId: String(item.egcs_cn_publicationversion),
   publicationVersion: Number(item.egcs_cn_version),
@@ -416,15 +417,20 @@ const applyRiskRatingEffect = async (
     .select(['Common_Review.id', 'Common_Review.egcs_cn_reviewresult', 'Review_Item.egcs_cn_state'])
     .where('Review_Item.egcs_cn_runtime', '=', String(run.id))
     .where('Review_Item.egcs_cn_publicationversion', '=', effect.assessmentSchemaVersionId)
-    .where('Review_Item.egcs_cn_order', '=', sourceReview.order)
-    .where('Set_Item.egcs_cn_order', '=', sourceMember.sequence)
+    .where('Review_Item.egcs_cn_order', '=', String(sourceReview.order))
+    .where('Set_Item.egcs_cn_order', '=', String(sourceMember.sequence))
     .where('Set_Item.egcs_cn_publicationversion', '=', sourceMember.publicationVersionId)
     .where('Common_Review._deleted', '=', false)
     .forUpdate(['Common_Review', 'Review_Item'])
     .executeTakeFirst()
-  const assessmentScore = review?.egcs_cn_reviewresult === null || review?.egcs_cn_reviewresult === undefined
-    ? Number.NaN
-    : Number(review.egcs_cn_reviewresult)
+  let assessmentScore = Number.NaN
+  if (review?.egcs_cn_reviewresult !== null && review?.egcs_cn_reviewresult !== undefined) {
+    try {
+      assessmentScore = parseSafeDecimal(String(review.egcs_cn_reviewresult))
+    } catch {
+      return await fail('risk_rating_evidence_invalid')
+    }
+  }
   if (!review || !['succeeded', 'approved'].includes(review.egcs_cn_state) || !Number.isFinite(assessmentScore)) {
     return await fail('risk_rating_evidence_invalid')
   }
@@ -513,7 +519,7 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
       ? {
           budgetVersionId: packet.sourceVersions.budget,
           activityVersionId: packet.sourceVersions.activity,
-          risk: packet.schemaVersion === 3 ? packet.risk : null,
+          risk: packet.risk,
           duration: packet.amendment !== null && Object.hasOwn(packet.amendment, 'proposedAuthorizedAssistanceStartDate')
         }
       : undefined
@@ -739,7 +745,7 @@ export const createCompletionTransition = async (
     : null
   if (!setup && context.entityType === 'fundingcasepayment') {
     const offset = await readAccountReceivablePaymentOffset(trx, context.entityId)
-    if (compareMoney(offset.egcs_fc_offsetamount, parseMoney('0.00')) > 0) return await throwApiError(event, {
+    if (compareMoney(offset.egcs_fc_offsetamount, zeroMoney(offset.egcs_fc_offsetamount.currency)) > 0) return await throwApiError(event, {
       statusCode: 409, code: 'COMPLETION_WORKFLOW_REQUIRED', key: 'apiErrors.workflow.completion_workflow_required'
     })
   }
@@ -1548,10 +1554,10 @@ export const startWorkflow = async (...args: Parameters<typeof startWorkflowUnch
 }
 
 const findMemberForItem = (configuration: PublishedWorkflowConfiguration, item: {
-  egcs_cn_order: number
+  egcs_cn_order: string
   egcs_cn_kind: Database['Common_Runtime_Item']['egcs_cn_kind']
   egcs_cn_publication: string | number
-}) => configuration.members.find(member => member.sequence === Number(item.egcs_cn_order)
+}) => configuration.members.find(member => member.sequence === parseSafeDecimal(String(item.egcs_cn_order))
   && member.referenceId === String(item.egcs_cn_publication)
   && ((member.kind === 'review_set' && item.egcs_cn_kind === 'review_set')
     || (member.kind === 'recommendation_set' && item.egcs_cn_kind === 'recommendation_set')
@@ -1612,7 +1618,7 @@ export const advanceWorkflowItem = async (
     const alreadyAdvanced = await trx.selectFrom('Common_Runtime_Item').select('id')
       .where('egcs_cn_runtime', '=', String(run.id))
       .where('egcs_cn_parentruntimeitem', 'is', null)
-      .where('egcs_cn_order', '=', nextMember.sequence)
+      .where('egcs_cn_order', '=', String(nextMember.sequence))
       .where('_deleted', '=', false)
       .executeTakeFirst()
     if (alreadyAdvanced) return run
@@ -1748,7 +1754,7 @@ export const resumeWorkflowRun = async (
   const rootItem = await trx.selectFrom('Common_Runtime_Item').selectAll()
     .where('egcs_cn_runtime', '=', runId)
     .where('egcs_cn_parentruntimeitem', 'is', null)
-    .where('egcs_cn_order', '=', member.sequence)
+    .where('egcs_cn_order', '=', String(member.sequence))
     .where('_deleted', '=', false)
     .forUpdate()
     .executeTakeFirst()
@@ -2007,6 +2013,7 @@ const getWorkflowRuntimeInSnapshot = async (
       'Collection_Slip.id as routingSlipId'])
     .where('Collection_Item.egcs_cn_runtime', '=', String(selected.id))
     .where('Common_Data_Collection._deleted', '=', false).orderBy('Collection_Item.egcs_cn_order').execute()
+    .then(rows => rows.map(row => ({ ...row, workflowMemberOrder: parseSafeDecimal(String(row.workflowMemberOrder)) })))
   const reviewSets = await db.selectFrom('Common_Review_Set')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review_Set.egcs_cn_runtimeitem')
     .selectAll('Common_Review_Set')
@@ -2018,7 +2025,7 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Runtime_Item.egcs_cn_runtime', '=', String(selected.id))
     .where('Common_Review_Set._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
-    .execute()
+    .execute().then(rows => rows.map(row => ({ ...row, runtimeOrder: parseSafeDecimal(String(row.runtimeOrder)) })))
   const recommendationSets = await db.selectFrom('Common_Recommendation_Set')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Recommendation_Set.egcs_cn_runtimeitem')
     .selectAll('Common_Recommendation_Set')
@@ -2030,7 +2037,7 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Runtime_Item.egcs_cn_runtime', '=', String(selected.id))
     .where('Common_Recommendation_Set._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
-    .execute()
+    .execute().then(rows => rows.map(row => ({ ...row, runtimeOrder: parseSafeDecimal(String(row.runtimeOrder)) })))
   const reviews = await db.selectFrom('Common_Review')
     .innerJoin('Common_Review_Set', 'Common_Review_Set.id', 'Common_Review.egcs_cn_reviewset')
     .innerJoin('Common_Runtime_Item as Review_Item', 'Review_Item.id', 'Common_Review.egcs_cn_runtimeitem')
@@ -2058,7 +2065,7 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Runtime_Item.egcs_cn_parentruntimeitem', 'is', null)
     .where('Common_Routing_Slip._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'desc')
-    .executeTakeFirst()
+    .executeTakeFirst().then(row => row ? { ...row, order: parseSafeDecimal(String(row.order)) } : undefined)
   const nestedApprovalStages = await db.selectFrom('Common_Routing_Slip')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
     .select([
@@ -2072,7 +2079,7 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Runtime_Item.egcs_cn_parentruntimeitem', 'is not', null)
     .where('Common_Routing_Slip._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
-    .execute()
+    .execute().then(rows => rows.map(row => ({ ...row, order: parseSafeDecimal(String(row.order)) })))
   const submission = purpose === 'approval_submission' && ['fundingcasecorrection', 'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo', 'fundingcasepayment'].includes(entityType)
     ? (() => {
         const evidence = selected.egcs_cn_routing as WorkflowRoutingEvidence | null
@@ -2099,22 +2106,26 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('_deleted', '=', false)
     .orderBy('id', 'asc')
     .execute()
-  const topLevelItems = workflowItems.filter(item => item.egcs_cn_parentruntimeitem === null)
+  const topLevelItemsByOrder = new Map<number, Selectable<Database['Common_Runtime_Item']>>(workflowItems
+    .filter(item => item.egcs_cn_parentruntimeitem === null)
+    .map(item => [parseSafeDecimal(String(item.egcs_cn_order)), item]))
   const routing = selected.egcs_cn_routing as WorkflowRoutingEvidence | null
   const sourceVersion = routing
     ? await db.selectFrom('Common_Publication_Version').select('egcs_cn_definition')
         .where('id', '=', String(selected.egcs_cn_sourcepublicationversion)).executeTakeFirstOrThrow()
     : null
   const allMembers = sourceVersion ? readPublishedWorkflowConfiguration(sourceVersion.egcs_cn_definition).members : configuration.members
-  const steps = allMembers.map(member => ({
-    eligibility: routing?.decisions.find(decision => decision.memberId === member.memberId) ?? { memberId: member.memberId, eligible: true, unmatchedFieldIds: [] },
-    ...member,
-    runtimeItem: topLevelItems.find(item => item.egcs_cn_order === member.sequence)
-      ? runtimeItemSummary(topLevelItems.find(item => item.egcs_cn_order === member.sequence)!)
-      : null,
-    approvalStage: nestedApprovalStages.find(stage => stage.parentRuntimeItemId
-      === topLevelItems.find(item => item.egcs_cn_order === member.sequence)?.id) ?? null
-  }))
+  const steps = allMembers.map(member => {
+    const runtimeItem = topLevelItemsByOrder.get(member.sequence)
+    return {
+      eligibility: routing?.decisions.find(decision => decision.memberId === member.memberId) ?? { memberId: member.memberId, eligible: true, unmatchedFieldIds: [] },
+      ...member,
+      runtimeItem: runtimeItem ? runtimeItemSummary(runtimeItem) : null,
+      approvalStage: runtimeItem
+        ? nestedApprovalStages.find(stage => stage.parentRuntimeItemId === runtimeItem.id) ?? null
+        : null
+    }
+  })
   const retryContext = !runtimeId && !activeRun && RETRYABLE_RUNTIME_STATES.includes(selected.egcs_cn_state)
     ? resolvedContext ?? await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
     : null
@@ -2133,7 +2144,7 @@ const getWorkflowRuntimeInSnapshot = async (
     dataCollections: dataCollectionRows.map(row => {
       const { publicationDefinition, ...collection } = row
       const published = readPublishedDataCollectionSetup(publicationDefinition)
-      return { ...collection, workflowMemberId: configuration.members.find(member => member.kind === 'data_collection' && member.sequence === Number(collection.workflowMemberOrder))?.memberId,
+      return { ...collection, workflowMemberId: configuration.members.find(member => member.kind === 'data_collection' && member.sequence === collection.workflowMemberOrder)?.memberId,
         egcs_cn_definition: published.definition,
         egcs_cn_name_en: published.nameEn, egcs_cn_name_fr: published.nameFr,
         hasApproval: Boolean(published.approval) }

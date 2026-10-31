@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormSubmitEvent } from '#ui/types'
 import type { TransferPaymentWizard } from '~~/shared/types/schemas'
-import { formatMoneyText, parseMoney } from '~~/shared/utils/money'
+import { formatMoneyText, parseMoney, type MoneyInput } from '~~/shared/utils/money'
 import { useTransferPaymentWizardModal } from '~/composables/useTransferPaymentWizardModal'
 
 const { fixedAgencyId, pending = false } = defineProps<{
@@ -18,14 +18,14 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 /** Displays exact valid money while retaining invalid drafts for submit validation.
  * @param amount - Unchanged editable budget draft.
- * @param currency - Selected budget denomination.
  * @returns Localized valid amount or the original invalid draft.
  */
-const formatBudgetAmount = (amount: string, currency: string): string => {
+const formatBudgetAmount = (amount: MoneyInput): string => {
   try {
-    return formatMoneyText(parseMoney(amount), locale.value, currency.toUpperCase())
+    if (amount && 'draft' in amount) return amount.draft
+    return amount ? formatMoneyText(parseMoney(amount), locale.value) : t('common.none')
   } catch {
-    return amount
+    return t('common.none')
   }
 }
 const {
@@ -389,7 +389,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                       ({{ budget.egcs_tp_currency.toUpperCase() }})
                     </span>
                     <span class="text-primary font-mono font-black">
-                      {{ formatBudgetAmount(budget.egcs_tp_totalbudget, budget.egcs_tp_currency) }}
+                      {{ formatBudgetAmount(budget.egcs_tp_totalbudget) }}
                     </span>
                   </div>
                 </div>

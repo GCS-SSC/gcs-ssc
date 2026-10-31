@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementCommitmentLineCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -35,7 +35,8 @@ export default defineEventHandler(async event => {
       async (trx, currentContext) => {
         const commitment = await lockAgreementCommitmentEditable(event, trx, agreementId, validated.egcs_fc_commitment)
 
-        await assertAgreementCurrency(event, trx, agreementId, commitment.egcs_fc_currency)
+        const currency = await assertAgreementCurrency(event, trx, agreementId, commitment.egcs_fc_currency)
+        await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount])
         const chartOfAccount = await assertChartOfAccountBelongsToAgreementStream(
           event,
           trx,
@@ -76,7 +77,7 @@ export default defineEventHandler(async event => {
 
         await syncAgreementCommitmentEditingStatus(trx, validated.egcs_fc_commitment)
 
-        return { ...inserted, egcs_fc_amount: parseDatabaseMoney(inserted.egcs_fc_amount) }
+        return { ...inserted, egcs_fc_amount: parseDatabaseMoney(inserted.egcs_fc_amount, currency) }
       },
       { action: 'create' }
     )

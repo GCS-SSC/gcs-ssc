@@ -1349,7 +1349,8 @@
       "chart_kind_immutable": "Le type de compte ne peut pas être modifié. Créez un compte distinct pour l’autre type.",
       "account_receivable_chart_in_use": "Ce compte est utilisé par un compte débiteur et ne peut pas être supprimé.",
       "duplicate_account_receivable_type_name_en": "Un type de compte débiteur avec ce titre anglais existe déjà pour l’organisme.",
-      "duplicate_account_receivable_type_name_fr": "Un type de compte débiteur avec ce titre français existe déjà pour l’organisme."
+      "duplicate_account_receivable_type_name_fr": "Un type de compte débiteur avec ce titre français existe déjà pour l’organisme.",
+      "chart_in_use": "Cette ligne comptable est déjà utilisée et ne peut pas être modifiée ni supprimée. Désactivez-la pour empêcher de nouvelles sélections."
     },
     "admin_common": {
       "not_found": "Enregistrement de ressource administrateur introuvable.",
@@ -1407,7 +1408,8 @@
       "output_not_allowed": "Ce modèle de document ne permet pas le format de sortie sélectionné.",
       "busy": "La génération de documents est occupée. Réessayez sous peu.",
       "input_changed": "L’entente a changé pendant la génération du document. Réessayez.",
-      "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
+      "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML.",
+      "render_limit_exceeded": "Ce modèle dépasse les limites de génération de documents. Réduisez les sections répétées ou le contenu du document."
     },
     "agreement": {
       "custom_fields_invalid": "Les sélections de champs personnalisés enregistrées de l’entente sont invalides.",
@@ -1596,7 +1598,7 @@
       "date_range_invalid": "La date de début doit précéder la date de fin.",
       "amendment_type_not_found": "Type de modification introuvable.",
       "amendment_subtype_not_found": "Sous-type d'amendement non trouvé.",
-      "amendment_subtype_in_use": "Ce sous-type est utilisé par une modification en cours. Terminez ou annulez la modification avant de supprimer le sous-type.",
+      "amendment_subtype_in_use": "Ce sous-type de modification est déjà utilisé. Désactivez-le pour empêcher de nouvelles sélections.",
       "amendment_subtype_mapping_in_use": "Ces changements de type invalideraient une modification en cours. Terminez ou annulez la modification avant de changer les types du sous-type.",
       "agreement_subtype_not_found": "Sous-type d'entente introuvable.",
       "invalid_budget_fiscal_year": "L'exercice financier du budget d'entente sélectionné est invalide.",
@@ -1636,13 +1638,14 @@
       "duplicate_checklist_members": "Les membres de liste de contrôle en double ne sont pas autorisés.",
       "assessment_schema_not_found": "Schéma d'évaluation introuvable.",
       "checklist_schema_not_found": "Schéma de liste de contrôle introuvable.",
-      "amendment_type_in_use": "Ce type de modification est utilisé par une modification en cours et ne peut pas être modifié ou supprimé.",
+      "amendment_type_in_use": "Ce type de modification est déjà utilisé. Désactivez-le pour empêcher de nouvelles sélections.",
       "duplicate_stream_holdback_basis": "Cette base de retenue existe déjà pour le volet.",
       "duplicate_stream_document_template": "Ce modèle de document est déjà lié au volet.",
       "holdback_basis_in_use": "Cette base de retenue est utilisée par une entente active et ne peut pas être modifiée ou supprimée.",
       "monitor_type_in_use": "Ce type de surveillance est utilisé par une surveillance d’entente active et ne peut pas être supprimé.",
       "catalog_link_immutable": "Retirez cette sélection du volet de programme et ajoutez-en une autre pour changer sa définition d’organisme.",
-      "stream_budget_in_use": "Ce budget de volet est référencé par des dossiers financiers actifs et ne peut pas être modifié ou supprimé."
+      "stream_budget_in_use": "Ce budget de volet est référencé par des dossiers financiers actifs et ne peut pas être modifié ou supprimé.",
+      "agency_immutable": "Un programme ne peut pas être déplacé vers un autre organisme."
     },
     "applicant_recipient": {
       "profile_not_found": "Profil de promoteur introuvable.",

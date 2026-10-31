@@ -2,7 +2,7 @@ import { AgreementCommitmentRevisionRequired } from './agreement-payment-commitm
 import type { H3Event } from 'h3'
 import { useTranslation } from '@intlify/h3'
 import { AgreementFinancialBudgetViolation, AgreementForecastRevisionRequired } from './agreement-financial-budget-controls'
-import { AgreementBudgetFinancialLimitError } from './agreement-budget-financial-limits'
+import { AgreementBudgetFinancialLimitConfigurationError, AgreementBudgetFinancialLimitError } from './agreement-budget-financial-limits'
 import { badRequest, throwApiError } from './api-errors'
 import { resolveRequestLocale } from './request-locale'
 import { formatMoneyText } from '~~/shared/utils/money'
@@ -13,6 +13,10 @@ import { formatMoneyText } from '~~/shared/utils/money'
  * @param error - Failure from the locked write.
  */
 export const throwIfAgreementFinancialBudgetError = async (event: H3Event, error: unknown): Promise<void> => {
+  if (error instanceof AgreementBudgetFinancialLimitConfigurationError) {
+    await badRequest(event, 'INVALID_CURRENCY_AMOUNT', 'validation.invalid_number')
+    return
+  }
   if (error instanceof AgreementBudgetFinancialLimitError) {
     const { violation } = error
     const path = violation.kind === 'stacking'
@@ -32,11 +36,11 @@ export const throwIfAgreementFinancialBudgetError = async (event: H3Event, error
     return
   }
   if (!(error instanceof AgreementFinancialBudgetViolation)) return
-  const { kind, currency, amount, budget } = error.details
+  const { kind, amount, budget } = error.details
   const locale = resolveRequestLocale(event)
   const t = await useTranslation(event)
   await badRequest(event, `AGREEMENT_${kind.toUpperCase()}_BUDGET_EXCEEDED`, 'apiErrors.agreement.annual_budget_exceeded', {
     document: t(`agreement.budget_controls.${kind}`),
-    amount: formatMoneyText(amount, locale, currency), budget: formatMoneyText(budget, locale, currency)
+    amount: formatMoneyText(amount, locale), budget: formatMoneyText(budget, locale)
   })
 }

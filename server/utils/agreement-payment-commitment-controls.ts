@@ -21,8 +21,8 @@ export class AgreementCommitmentRevisionRequired extends Error {
  * @returns Whether the Payment needs a current, budget-valid Commitment.
  */
 export const getAgreementPaymentCommitmentViolation = async (db: Db, paymentId: string): Promise<boolean> => {
-  const result = (await sql<{ active: boolean, amount: string, budget: string }>`
-    SELECT commitment.egcs_fc_active AND NOT commitment._deleted AS active,
+  const result = (await sql<{ active: boolean, amount: string, budget: string, currency: string }>`
+    SELECT payment.egcs_fc_currency AS currency, commitment.egcs_fc_active AND NOT commitment._deleted AS active,
       COALESCE((SELECT SUM(GREATEST(current_commitment.egcs_fc_totalamount,
         COALESCE((SELECT SUM(line.egcs_fc_amount)
           FROM "Funding_Case_Agreement_Commitment_Line" line
@@ -48,7 +48,7 @@ export const getAgreementPaymentCommitmentViolation = async (db: Db, paymentId: 
       AND commitment.egcs_fc_currency = payment.egcs_fc_currency
     WHERE payment.id = ${paymentId}::bigint AND NOT payment._deleted
   `.execute(db)).rows[0]
-  return Boolean(result && (!result.active || compareMoney(parseDatabaseMoney(result.amount), parseDatabaseMoney(result.budget)) > 0))
+  return Boolean(result && (!result.active || compareMoney(parseDatabaseMoney(result.amount, result.currency), parseDatabaseMoney(result.budget, result.currency)) > 0))
 }
 
 /**

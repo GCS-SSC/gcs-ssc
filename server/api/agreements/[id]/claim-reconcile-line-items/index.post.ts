@@ -1,3 +1,4 @@
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { FundingCaseAgreementClaimReconcileLineItemCreateSchema } from '~~/shared/types/schemas'
@@ -53,6 +54,9 @@ export default defineEventHandler(async event => {
           return await badRequest(event, 'AGREEMENT_CLAIM_LINE_ITEM_NOT_FOUND', 'apiErrors.agreement.claim_line_item_not_found')
         }
 
+        const currency = await assertAgreementCurrency(event, trx, agreementId)
+        await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_reconciled, validated.egcs_fc_sampled].filter(value => value != null))
+
         const created = await trx
           .insertInto('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
           .values({
@@ -73,8 +77,8 @@ export default defineEventHandler(async event => {
 
         return {
           ...created,
-          egcs_fc_reconciled: parseDatabaseMoney(created.egcs_fc_reconciled),
-          egcs_fc_sampled: created.egcs_fc_sampled == null ? created.egcs_fc_sampled : parseDatabaseMoney(created.egcs_fc_sampled)
+          egcs_fc_reconciled: parseDatabaseMoney(created.egcs_fc_reconciled, currency),
+          egcs_fc_sampled: created.egcs_fc_sampled == null ? created.egcs_fc_sampled : parseDatabaseMoney(created.egcs_fc_sampled, currency)
         }
       },
       { action: 'create' }

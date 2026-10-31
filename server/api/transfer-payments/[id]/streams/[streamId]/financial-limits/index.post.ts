@@ -1,3 +1,5 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
+import { parseDecimalText } from '~~/shared/utils/money'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { createTransferPaymentScopedAuthorizeHandler, authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
@@ -6,7 +8,7 @@ import { notFound, badRequest } from '~~/server/utils/api-errors'
 import { TransferPaymentFinancialLimitsSchema } from '~~/shared/types/schemas/transfer-payment'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { sql } from 'kysely'
-import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { databaseMoneyText } from '~~/server/utils/database-money'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -43,7 +45,7 @@ export default defineEventHandler(async event => {
       return await trx.insertInto('Transfer_Payment_Financial_Limits')
         .values({
           ...validated,
-          egcs_tp_maxallowableperrecipient: databaseMoneyValue(validated.egcs_tp_maxallowableperrecipient),
+          egcs_tp_maxallowableperrecipient: sql<number>`${validated.egcs_tp_maxallowableperrecipient}::numeric`,
           egcs_tp_maxpercentofretroactivecostsallowable: 0,
           _deleted: false
         }).returning([
@@ -52,7 +54,7 @@ export default defineEventHandler(async event => {
           'egcs_tp_maxpercentofsupportavailableperrecipient',
           'egcs_tp_maxpercentofretroactivecostsallowable', 'egcs_tp_stackinglimit', 'egcs_tp_active', '_deleted'
         ]).executeTakeFirst()
-        .then(row => row && ({ ...row, egcs_tp_maxallowableperrecipient: parseDatabaseMoney(row.egcs_tp_maxallowableperrecipient) }))
+        .then(row => row && ({ ...row, egcs_tp_maxpercentofsupportavailableperrecipient: parseSafeDecimal(String(row.egcs_tp_maxpercentofsupportavailableperrecipient)), egcs_tp_maxpercentofretroactivecostsallowable: parseSafeDecimal(String(row.egcs_tp_maxpercentofretroactivecostsallowable)), egcs_tp_stackinglimit: parseSafeDecimal(String(row.egcs_tp_stackinglimit)), egcs_tp_maxallowableperrecipient: parseDecimalText(row.egcs_tp_maxallowableperrecipient) }))
     }
   )
 })

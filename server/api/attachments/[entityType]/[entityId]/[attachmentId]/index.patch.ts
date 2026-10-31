@@ -13,7 +13,9 @@ import { loadTargetAttachment } from '~~/server/utils/attachment-record'
 import { namespaceProviderMetadata, normalizeStorageProviderMetadata, resolveAgencyStorageProvider } from '~~/server/utils/file-storage-provider'
 import { createFileStorageSecretReader } from '~~/server/utils/file-storage-extensions'
 import { runBoundedExtensionOperation } from '~~/server/utils/extension-admission'
+import { observeStorageMetadataMutation, releaseStorageMetadataAfterSettlement } from '~~/server/utils/storage-metadata-settlement'
 import {
+  assertStorageMetadataRestored,
   completeReservedStorageCleanup,
   releaseReservedStorageCleanup,
   reserveStorageMetadataRestoration,
@@ -28,6 +30,7 @@ export default defineEventHandler(async event => {
   const body = await readValidatedBodyI18n(event, AttachmentPatchSchema)
   const sagaWorkerId = `request:${nanoid()}`
   let restorationId: string | null = null
+  let mutation: ReturnType<typeof observeStorageMetadataMutation> | undefined
   try {
     const result = await executeFreshAuthorizedAttachmentWrite(event, target, 'update', async (trx, _auth, resolved) => {
       const attachment = await loadTargetAttachment(trx, target, linkId, true)
@@ -113,6 +116,10 @@ export default defineEventHandler(async event => {
             ),
             contractVersion: providerUpdate.contractVersion
           }
+          await assertStorageMetadataRestored(trx, {
+            provider_key: providerUpdate.provider.extension.key, agency_id: resolved.agencyId,
+            object_id: attachment.provider_object_id
+          })
           const previousMetadata = await runBoundedExtensionOperation(
             'storage:read-provider-metadata', async signal => {
               if (signal.aborted) throw signal.reason
@@ -130,7 +137,10 @@ export default defineEventHandler(async event => {
           )
           await runBoundedExtensionOperation('storage:update-provider-metadata', async signal => {
             if (signal.aborted) throw signal.reason
-            await adapter.updateProviderMetadata({ ...operationContext, signal, metadata: metadata ?? {} })
+            mutation = observeStorageMetadataMutation(
+              adapter.updateProviderMetadata({ ...operationContext, signal, metadata: metadata ?? {} })
+            )
+            await mutation.promise
           })
           await supersedeStorageMetadataRestorations(trx, {
             provider_key: providerUpdate.provider.extension.key, agency_id: resolved.agencyId,
@@ -149,7 +159,9 @@ export default defineEventHandler(async event => {
     })
     return result
   } catch (error: unknown) {
-    if (restorationId) await releaseReservedStorageCleanup(event.context.$db, restorationId, sagaWorkerId)
+    const failedReservationId = restorationId
+    if (failedReservationId) await releaseStorageMetadataAfterSettlement(mutation,
+      async () => await releaseReservedStorageCleanup(event.context.$db, failedReservationId, sagaWorkerId))
     throw error
   }
 })

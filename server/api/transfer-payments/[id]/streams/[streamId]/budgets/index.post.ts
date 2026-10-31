@@ -1,3 +1,5 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
+import { assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { TransferPaymentStreamBudgetCreateSchema } from '~~/shared/types/schemas'
@@ -65,6 +67,7 @@ export default defineEventHandler(async event => {
           return await badRequest(event, 'TRANSFER_PAYMENT_BUDGET_NOT_FOUND', 'apiErrors.transfer_payment.budget_not_found')
         }
 
+        await assertCurrencyMoneyValues(event, budget.egcs_tp_currency, [validated.egcs_tp_totalbudget])
         const sumResult = await trx
           .selectFrom('Transfer_Payment_Stream_Budget')
           .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream')
@@ -78,8 +81,8 @@ export default defineEventHandler(async event => {
           .executeTakeFirst()
 
         if (compareMoney(
-          addMoney(parseDatabaseMoney(sumResult?.total), validated.egcs_tp_totalbudget),
-          parseDatabaseMoney(budget.total_budget)
+          addMoney(parseDatabaseMoney(sumResult?.total, budget.egcs_tp_currency), validated.egcs_tp_totalbudget),
+          parseDatabaseMoney(budget.total_budget, budget.egcs_tp_currency)
         ) > 0) {
           return await badRequest(event, 'TRANSFER_PAYMENT_STREAM_BUDGET_EXCEEDS_PROGRAM_BUDGET', 'apiErrors.transfer_payment.stream_budget_exceeds_program_budget')
         }
@@ -94,7 +97,7 @@ export default defineEventHandler(async event => {
           databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget'),
           'egcs_tp_overcommitthreshold'
         ]).executeTakeFirstOrThrow()
-          .then(row => ({ ...row, egcs_tp_currency: budget.egcs_tp_currency, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget) }))
+          .then(row => ({ ...row, egcs_tp_overcommitthreshold: parseSafeDecimal(String(row.egcs_tp_overcommitthreshold)), egcs_tp_currency: budget.egcs_tp_currency, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget, budget.egcs_tp_currency) }))
       }
     )
   } catch (error) {

@@ -1,6 +1,7 @@
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- Wizard helpers use typed contracts covered by focused composable tests. */
 import { nanoid } from 'nanoid'
+import type { MoneyInput } from '~~/shared/utils/money'
 import type { FormError } from '#ui/types'
 import { toValue } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
@@ -26,7 +27,7 @@ type TransferPaymentWizardForm = Omit<TransferPaymentWizard, 'profile' | 'budget
     egcs_tp_dateend: string | Date
   }
   budgets: Array<Omit<TransferPaymentWizard['budgets'][number], 'egcs_tp_totalbudget'> & {
-    egcs_tp_totalbudget: string
+    egcs_tp_totalbudget?: MoneyInput
   }>
 }
 
@@ -245,7 +246,7 @@ export const useTransferPaymentWizardModal = ({
       tempId: nanoid(),
       egcs_tp_fiscalyear: '',
       egcs_tp_currency: 'cad',
-      egcs_tp_totalbudget: '0',
+      egcs_tp_totalbudget: undefined,
       egcs_tp_overcommitthreshold: 0
     })
   }

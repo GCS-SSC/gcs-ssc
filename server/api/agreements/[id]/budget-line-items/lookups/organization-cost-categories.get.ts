@@ -1,3 +1,4 @@
+import { projectAgencyCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { sql } from 'kysely'
@@ -87,6 +88,6 @@ export default defineEventHandler(async event => {
 
     const total = Number(totalResult?.total || 0)
 
-    return { items, total, stats: { total, active: total }, page, limit }
+    return { items: items.map(projectAgencyCostLineItem), total, stats: { total, active: total }, page, limit }
   })
 })

@@ -1,5 +1,5 @@
 import { defineEventHandler } from 'h3'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementForecastLineItemCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -48,7 +48,8 @@ export default defineEventHandler(async event => {
         return budgetLineItem
       }
 
-      await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+      const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+      await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount])
       await assertAgreementForecastCellAvailable(
         event, trx, validated.egcs_fc_agreementforecast,
         validated.egcs_fc_fundingagreementbudgetlineitem, validated.egcs_fc_month
@@ -80,8 +81,8 @@ export default defineEventHandler(async event => {
       await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: validated.egcs_fc_agreementforecast })
       return {
         ...lineItem,
-        egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),
-        egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
+        egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount, currency),
+        egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount, currency),
         egcs_fc_fundingsources: fundingSources
       }
     },

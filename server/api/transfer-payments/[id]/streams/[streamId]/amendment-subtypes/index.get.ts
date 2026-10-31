@@ -56,6 +56,8 @@ export default defineEventHandler(async event => {
     baseQuery
       .select([
         'Transfer_Payment_Amendment_Subtype.id as id',
+        'Transfer_Payment_Amendment_Subtype.egcs_tp_active',
+        sql<boolean>`EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Amendment_Subtype" selected WHERE selected.egcs_fc_amendmentsubtype = "Transfer_Payment_Amendment_Subtype".id)`.as('in_use'),
         'Transfer_Payment_Amendment_Subtype.egcs_tp_name_en as egcs_tp_name_en',
         'Transfer_Payment_Amendment_Subtype.egcs_tp_name_fr as egcs_tp_name_fr',
         'Transfer_Payment_Amendment_Subtype.egcs_tp_description_en as egcs_tp_description_en',
@@ -66,7 +68,10 @@ export default defineEventHandler(async event => {
       .limit(limit)
       .offset(offset)
       .execute(),
-    baseQuery.select(eb => eb.fn.count('Transfer_Payment_Amendment_Subtype.id').as('total')).executeTakeFirst()
+    baseQuery.select(eb => [
+      eb.fn.count('Transfer_Payment_Amendment_Subtype.id').as('total'),
+      eb.fn.count('Transfer_Payment_Amendment_Subtype.id').filterWhere('Transfer_Payment_Amendment_Subtype.egcs_tp_active', '=', true).as('active')
+    ]).executeTakeFirst()
   ])
 
   const total = Number(countResult?.total || 0)
@@ -98,7 +103,7 @@ export default defineEventHandler(async event => {
     total,
     stats: {
       total,
-      active: total
+      active: Number(countResult?.active ?? 0)
     },
     page,
     limit

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 /* eslint-disable jsdoc/require-jsdoc -- Credit Memo line modal follows the established Commitment authoring pattern. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -8,7 +9,7 @@ import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/ty
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
-import { sumMoney } from '~~/shared/utils/money'
+import { sumMoney, type MoneyInput } from '~~/shared/utils/money'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { appRouteLocations } from '~/utils/route-locations'
 
@@ -36,14 +37,14 @@ type LineForm = {
   egcs_fc_receivable: string | undefined
   egcs_fc_linenumber: number | undefined
   egcs_fc_creditmemochartofaccount: string | undefined
-  egcs_fc_amount: string
+  egcs_fc_amount: MoneyInput
 }
 const modal = useCrudModal<AccountReceivableCreditMemoLine, LineForm>({
   createState: () => ({
     egcs_fc_receivable: receivableIds.length === 1 ? receivableIds[0] : undefined,
     egcs_fc_linenumber: Math.max(0, ...lines.map(line => line.egcs_fc_linenumber)) + 1,
     egcs_fc_creditmemochartofaccount: undefined,
-    egcs_fc_amount: ''
+    egcs_fc_amount: undefined
   }),
   updateState: line => ({
     egcs_fc_receivable: line.egcs_fc_receivable,
@@ -78,14 +79,14 @@ watch(search, () => {
 const dimensions = (line: AccountReceivableCreditMemoLine) => TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(line.egcs_fc_creditmemoaccountingdimensions)
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase()
-  return lines.filter(line => !query || [line.egcs_fc_linenumber, line.egcs_fc_amount,
+  return lines.filter(line => !query || moneyMatchesSearch(line.egcs_fc_amount, query, locale.value) || [line.egcs_fc_linenumber,
     ...getAccountingDimensionSearchValues(dimensions(line))]
     .some(value => String(value).toLowerCase().includes(query)))
 })
 watch(() => filtered.value.length, count => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(count / pagination.value.pageSize) - 1))
 })
-const total = computed(() => sumMoney(lines.map(line => line.egcs_fc_amount)))
+const total = computed(() => sumMoney(lines.map(line => line.egcs_fc_amount), currency))
 const columns: TableColumnInput<AccountReceivableCreditMemoLine>[] = [
   { accessorKey: 'egcs_fc_agreementnumber', headerKey: 'account_receivable.agreement' },
   { accessorKey: 'egcs_fc_financialsystemid', headerKey: 'applicant_recipient.agency_financial_ids.financial_system_id' },
@@ -158,7 +159,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
         <span class="text-sm whitespace-normal">{{ formatAccountingDimensions(dimensions(row.original), locale === 'fr' ? 'fr' : 'en') || t('account_receivable.coding_not_selected') }}</span>
       </template>
       <template #amount-cell="{ row }">
-        <span class="font-semibold tabular-nums">{{ formatAccountReceivableAmount(row.original.egcs_fc_amount, locale, currency) ?? t('common.not_available') }}</span>
+        <span class="font-semibold tabular-nums">{{ formatAccountReceivableAmount(row.original.egcs_fc_amount, locale) ?? t('common.not_available') }}</span>
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
@@ -172,7 +173,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
         {{ t('account_receivable.credit_memo_amount') }}
       </dt>
       <dd class="font-semibold tabular-nums">
-        {{ formatAccountReceivableAmount(total, locale, currency) ?? t('common.not_available') }}
+        {{ formatAccountReceivableAmount(total, locale) ?? t('common.not_available') }}
       </dd>
     </dl>
     <UModal v-model:open="isOpen" data-help-view="casework.account-receivable.credit-memo-lines.is-open" :title="t(selectedLineId ? 'account_receivable.credit_memo_edit_line' : 'account_receivable.credit_memo_add_line')" :ui="{ content: 'sm:max-w-2xl' }">

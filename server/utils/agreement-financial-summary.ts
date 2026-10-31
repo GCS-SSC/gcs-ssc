@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Local shaping helpers are covered by the exported builder's contract. */
 import type { Currency_Codes } from '~~/shared/types/database'
-import { addMoney, compareMoney, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, zeroMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 export type SummaryFiscalYear = { id: string, label: string, order: string }
 export type SummaryBudgetLine = {
@@ -57,9 +57,8 @@ export type SummaryAccountingEntry = {
   kind: 'journal_voucher' | 'correction' | 'account_receivable_recovery'
 }
 
-const ZERO = parseMoney('0')
 const MONTH_COUNT = 12
-const emptyMonths = (): Money[] => Array.from({ length: MONTH_COUNT }, () => ZERO)
+const emptyMonths = (currency: string): Money[] => Array.from({ length: MONTH_COUNT }, () => zeroMoney(currency))
 const assertMonth = (month: number): number => {
   if (!Number.isInteger(month) || month < 0 || month >= MONTH_COUNT) {
     throw new RangeError('Fiscal month must be an integer from 0 through 11.')
@@ -86,8 +85,8 @@ type SummaryLine = SummaryBudgetLine & {
 
 const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): SummaryLine => ({
   ...line,
-  forecast: hasActiveForecast ? emptyMonths() : null,
-  claimed: emptyMonths(), reconciled: emptyMonths(), originalClaimed: emptyMonths(), originalReconciled: emptyMonths(), accountReceivableRecoveries: emptyMonths()
+  forecast: hasActiveForecast ? emptyMonths(line.currency) : null,
+  claimed: emptyMonths(line.currency), reconciled: emptyMonths(line.currency), originalClaimed: emptyMonths(line.currency), originalReconciled: emptyMonths(line.currency), accountReceivableRecoveries: emptyMonths(line.currency)
 })
 
 /**
@@ -138,10 +137,11 @@ export const buildAgreementFinancialSummary = (
     const reconciledByClaimLine = new Map<string, Money>()
     for (const row of reconciliations) {
       if (!row.positive) continue
-      reconciledByClaimLine.set(row.claimLineId, addMoney(reconciledByClaimLine.get(row.claimLineId) ?? ZERO, row.amount))
+      reconciledByClaimLine.set(row.claimLineId, addMoney(reconciledByClaimLine.get(row.claimLineId) ?? zeroMoney(row.amount.currency), row.amount))
     }
 
     const groups = [...currencies].sort().map(currency => {
+      const ZERO = zeroMoney(currency)
       const lines = yearBudgetLines.filter(line => line.currency === currency)
         .map(line => lineFromBudget(line, Boolean(selectedForecast)))
       const byId = new Map(lines.map(line => [line.id, line]))
@@ -171,13 +171,13 @@ export const buildAgreementFinancialSummary = (
         // A claim/reconciliation spanning months is recognized in the end month, including overlaps.
         const line = claim.budgetLineId ? byId.get(claim.budgetLineId) : undefined
         const target = line ?? ensureUnmatchedLine(claim.budgetLineId ?? `claim:${claim.id}`, claim.description)
-        if (target.budget === ZERO && target.nameEn === `#${claim.budgetLineId}` && claim.description) {
+        if (compareMoney(target.budget, ZERO) === 0 && target.nameEn === `#${claim.budgetLineId}` && claim.description) {
           target.nameEn = claim.description
           target.nameFr = claim.description
           target.description = claim.description
         }
         const month = assertMonth(claim.periodEnd)
-        const recovery = sumMoney(claimRecoveries.filter(row => row.claimLineId === claim.id && row.currency === currency).map(row => row.amount))
+        const recovery = sumMoney(claimRecoveries.filter(row => row.claimLineId === claim.id && row.currency === currency).map(row => row.amount), currency)
         target.originalClaimed[month] = addMoney(target.originalClaimed[month] ?? ZERO, claim.amount)
         target.claimed[month] = addMoney(target.claimed[month] ?? ZERO, addMoney(claim.amount, recovery))
         target.accountReceivableRecoveries[month] = addMoney(target.accountReceivableRecoveries[month] ?? ZERO, recovery)
@@ -187,7 +187,7 @@ export const buildAgreementFinancialSummary = (
         if (compareMoney(reconciled, ZERO) > 0) latestReconciledMonth = Math.max(latestReconciledMonth ?? month, month)
       }
 
-      const paid = emptyMonths()
+      const paid = emptyMonths(currency)
       const paymentItems = yearPayments.filter(payment => payment.currency === currency).map(payment => {
         const month = assertMonth(payment.periodEnd)
         paid[month] = addMoney(paid[month] ?? ZERO, payment.amount)
@@ -200,7 +200,7 @@ export const buildAgreementFinancialSummary = (
           currency
         }
       })
-      const monthlyForecast = selectedForecast ? emptyMonths() : null
+      const monthlyForecast = selectedForecast ? emptyMonths(currency) : null
       if (monthlyForecast) {
         for (const line of lines) {
           if (!line.forecast) continue
@@ -210,25 +210,25 @@ export const buildAgreementFinancialSummary = (
         }
       }
       const progress = {
-        annualBudget: sumMoney(yearBudgetLines.filter(line => line.currency === currency).map(line => line.budget)),
-        reconciledTotal: sumMoney(lines.flatMap(line => line.reconciled)),
+        annualBudget: sumMoney(yearBudgetLines.filter(line => line.currency === currency).map(line => line.budget), currency),
+        reconciledTotal: sumMoney(lines.flatMap(line => line.reconciled), currency),
         latestReconciledMonth,
         forecastToReconciliation: monthlyForecast && latestReconciledMonth !== null
-          ? sumMoney(monthlyForecast.slice(0, latestReconciledMonth + 1))
+          ? sumMoney(monthlyForecast.slice(0, latestReconciledMonth + 1), currency)
           : null,
-        annualForecast: monthlyForecast ? sumMoney(monthlyForecast) : null,
+        annualForecast: monthlyForecast ? sumMoney(monthlyForecast, currency) : null,
         monthlyForecast
       }
       const yearEntries = accountingEntries.filter(entry => entry.fiscalYearId === year.id && entry.currency === currency)
-      const jvEffects = emptyMonths()
-      const correctionAdjustments = emptyMonths()
-      const accountReceivableRecoveries = emptyMonths()
+      const jvEffects = emptyMonths(currency)
+      const correctionAdjustments = emptyMonths(currency)
+      const accountReceivableRecoveries = emptyMonths(currency)
       for (const entry of yearEntries) {
         const month = assertMonth(entry.month)
         const target = entry.kind === 'journal_voucher' ? jvEffects : entry.kind === 'account_receivable_recovery' ? accountReceivableRecoveries : correctionAdjustments
         target[month] = addMoney(target[month] ?? ZERO, entry.amount)
       }
-      const correctedRecordedPaid = paid.map((amount, month) => sumMoney([amount, jvEffects[month] ?? ZERO, correctionAdjustments[month] ?? ZERO, accountReceivableRecoveries[month] ?? ZERO]))
+      const correctedRecordedPaid = paid.map((amount, month) => sumMoney([amount, jvEffects[month] ?? ZERO, correctionAdjustments[month] ?? ZERO, accountReceivableRecoveries[month] ?? ZERO], currency))
       return { currency, lines, paid, payments: paymentItems, progress,
         jvEffects, correctionAdjustments, accountReceivableRecoveries, correctedRecordedPaid, accountingEntries: yearEntries }
     })

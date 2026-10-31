@@ -14,9 +14,10 @@ export class ApprovalItemAuthorizationRepository {
 
   async resolve(
     applicationUserId: string,
-    target: ExactEntityTarget<Entity_Type>
+    target: ExactEntityTarget<Entity_Type>,
+    workflow?: { runtimeId?: string }
   ): Promise<ApprovalItemGrant | null> {
-    const row = await this.db
+    let query = this.db
       .selectFrom('user')
       .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
       .innerJoin('Common_Approval', join => join.on(eb => eb.or([
@@ -38,7 +39,26 @@ export class ApprovalItemAuthorizationRepository {
       .where('Common_Routing_Slip._deleted', '=', false)
       .where('Common_Routing_Slip.egcs_cn_entitytype', '=', target.entityType)
       .where('Common_Routing_Slip.egcs_cn_entityid', '=', target.entityId)
-      .executeTakeFirst()
+
+    if (workflow) {
+      query = query.where(eb => {
+        let runtime = eb.selectFrom('Common_Runtime_Item')
+          .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Common_Runtime_Item.egcs_cn_runtime')
+          .select('Common_Runtime.id')
+          .whereRef('Common_Runtime_Item.id', '=', 'Common_Routing_Slip.egcs_cn_runtimeitem')
+          .where('Common_Runtime_Item.egcs_cn_parentruntimeitem', 'is', null)
+          .where('Common_Runtime_Item._deleted', '=', false)
+          .where('Common_Runtime._deleted', '=', false)
+          .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
+          .where('Common_Runtime.egcs_cn_purpose', '=', 'approval_submission')
+          .whereRef('Common_Runtime.egcs_cn_entitytype', '=', 'Common_Routing_Slip.egcs_cn_entitytype')
+          .whereRef('Common_Runtime.egcs_cn_entityid', '=', 'Common_Routing_Slip.egcs_cn_entityid')
+        if (workflow.runtimeId) runtime = runtime.where('Common_Runtime.id', '=', workflow.runtimeId)
+        return eb.exists(runtime)
+      })
+        .orderBy('Common_Approval.id', 'desc')
+    }
+    const row = await query.executeTakeFirst()
 
     if (!row) return null
     return {
@@ -55,6 +75,7 @@ export class ApprovalItemAuthorizationRepository {
 export const resolveApprovalItemGrant = async (
   applicationUserId: string,
   target: ExactEntityTarget<Entity_Type>,
-  db: Kysely<Database>
+  db: Kysely<Database>,
+  workflow?: { runtimeId?: string }
 ): Promise<ApprovalItemGrant | null> => await new ApprovalItemAuthorizationRepository(db)
-  .resolve(applicationUserId, target)
+  .resolve(applicationUserId, target, workflow)

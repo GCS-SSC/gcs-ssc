@@ -1,3 +1,4 @@
+import type { MoneyInput } from '../utils/money'
 import type { Selectable } from 'kysely'
 import type { FundingCaseAgreementJournalVoucherTable } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
@@ -17,7 +18,7 @@ export type JournalVoucherAllocationDraft = {
   key: string
   egcs_fc_commitmentline: string
   egcs_fc_chartofaccount: string
-  egcs_fc_amount: string
+  egcs_fc_amount: MoneyInput
   egcs_fc_accountingdimensions: JournalVoucherAccountingLine['egcs_fc_accountingdimensions']
   egcs_fc_agreementcodingmatched: boolean
 }

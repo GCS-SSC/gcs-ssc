@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 import { sql } from 'kysely'
 import { defineEventHandler, type H3Event } from 'h3'
@@ -32,6 +33,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
   }
 
   const { agreementId, db } = prepared
+  const currency = await assertAgreementCurrency(event, db, agreementId)
 
   const [forecasts, budgetLineItems, lineItems] = await Promise.all([
     db
@@ -211,8 +213,8 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
   const parsedBudgetLineItems = budgetLineItems.map(lineItem => ({
     ...lineItem,
     egcs_fc_fundingsources: budgetFundingSources.get(String(lineItem.budget_row_id)) ?? [],
-    egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
-    egcs_fc_programfunding: parseDatabaseMoney(lineItem.egcs_fc_programfunding)
+    egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount, currency),
+    egcs_fc_programfunding: parseDatabaseMoney(lineItem.egcs_fc_programfunding, currency)
   }))
   const sourceRows = lineItems.length === 0
     ? []
@@ -245,7 +247,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
     const values = sourcesByLine.get(key) ?? []
     values.push({
       egcs_fc_fundingsubtype: String(source.egcs_fc_fundingsubtype),
-      egcs_fc_amount: parseDatabaseMoney(source.egcs_fc_amount),
+      egcs_fc_amount: parseDatabaseMoney(source.egcs_fc_amount, currency),
       funding_subtype_name_en: source.funding_subtype_name_en,
       funding_subtype_name_fr: source.funding_subtype_name_fr,
       funding_type_name_en: source.funding_type_name_en,
@@ -255,11 +257,11 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
   }
   const parsedLineItems = lineItems.map(lineItem => ({
     ...lineItem,
-    egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),
-    egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
+    egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount, currency),
+    egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount, currency),
     egcs_fc_fundingsources: sourcesByLine.get(String(lineItem.id)) ?? [],
-    budget_line_total_amount: lineItem.budget_line_total_amount == null ? null : parseDatabaseMoney(lineItem.budget_line_total_amount),
-    budget_line_program_funding: lineItem.budget_line_program_funding == null ? null : parseDatabaseMoney(lineItem.budget_line_program_funding)
+    budget_line_total_amount: lineItem.budget_line_total_amount == null ? null : parseDatabaseMoney(lineItem.budget_line_total_amount, currency),
+    budget_line_program_funding: lineItem.budget_line_program_funding == null ? null : parseDatabaseMoney(lineItem.budget_line_program_funding, currency)
   }))
   const forecastsWithState = await withBusinessRecordState(db, 'fundingcaseforecast', forecasts)
   return {

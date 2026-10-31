@@ -1,3 +1,4 @@
+import { sumMoney, zeroMoney } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc -- Proponent projections reuse existing financial scope grants in one fresh snapshot. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely } from 'kysely'
@@ -5,7 +6,6 @@ import { z } from 'zod'
 import type { Database } from '~~/shared/types/database'
 import type { ProponentAccountReceivableRow, ProponentCreditMemoRow, ProponentCreditMemoApplication, ProponentAccountBalanceRow } from '~~/shared/types/account-receivable-proponent'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { sumMoney } from '~~/shared/utils/money'
 import { authorize, requireAuthContext, type AuthContext } from './authorize'
 import { notFound } from './api-errors'
 import { canAccessApplicantRecipient } from './applicant-recipient-auth'
@@ -22,7 +22,6 @@ import { getValidatedQueryI18n } from './api-validate'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 
-const ZERO = parseDatabaseMoney('0.00')
 type ListInput = { page: number; limit: number; search?: string }
 const pageResult = <Row>(items: Row[], total: number, input: ListInput) => ({ items, total, page: input.page, limit: input.limit })
 const isoDate = (value: Date | string) => new Date(value).toISOString()
@@ -94,7 +93,7 @@ export const listProponentAccountReceivables = async (event: H3Event, id: string
       const fiscalYear = labels && typeof labels === 'object' && !Array.isArray(labels) && 'egcs_fc_fiscalyeardisplay' in labels
         ? String(labels.egcs_fc_fiscalyeardisplay ?? '')
         : ''
-      const amount = sumMoney(lines.map(line => line.egcs_fc_amount))
+      const amount = sumMoney(lines.map(line => line.egcs_fc_amount), header.egcs_fc_currency)
       return {
         id: String(header.id), egcs_fc_fundingagreement: String(header.egcs_fc_fundingagreement),
         egcs_fc_agreementnumber: header.egcs_fc_agreementnumber, egcs_fc_number: header.egcs_fc_number,
@@ -102,7 +101,7 @@ export const listProponentAccountReceivables = async (event: H3Event, id: string
         egcs_fc_status: String(header.egcs_fc_status), egcs_fc_currency: header.egcs_fc_currency,
         egcs_fc_typename_en: header.egcs_fc_typename_en, egcs_fc_typename_fr: header.egcs_fc_typename_fr,
         egcs_fc_fiscalyeardisplay: fiscalYear, egcs_fc_originalamount: amount,
-        egcs_fc_approvedamount: header.egcs_fc_outcome === 'posted' ? amount : ZERO,
+        egcs_fc_approvedamount: header.egcs_fc_outcome === 'posted' ? amount : zeroMoney(header.egcs_fc_currency),
         egcs_fc_effectiverecoverymethod: await readAccountReceivableApprovedRecoveryMethod(db, String(header.id))
       }
     }))
@@ -244,7 +243,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
         egcs_fc_candelete: await canDeleteCashMemo(db, auth, memo),
         egcs_fc_creditmemoreference: String(memo.id),
         egcs_fc_agency: String(agency.id), egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
-        egcs_fc_currency: memo.egcs_fc_currency, egcs_fc_amount: parseDatabaseMoney(memo.egcs_fc_amount),
+        egcs_fc_currency: memo.egcs_fc_currency, egcs_fc_amount: parseDatabaseMoney(memo.egcs_fc_amount, memo.egcs_fc_currency),
         egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: memo.egcs_fc_receiveddate
       }
     }))

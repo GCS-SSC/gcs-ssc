@@ -1,4 +1,4 @@
-import { moneyFromCents, moneyToCents, type Money } from './money'
+import { parseDecimalText, percentageMoney, sumMoney, type Money } from './money'
 
 export type BudgetCalculationMode = 'manual' | 'category' | 'all_other'
 
@@ -10,7 +10,7 @@ export interface PercentageBudgetRow {
   categoryId: string
   mode: BudgetCalculationMode
   sourceCategoryId: string | null
-  percentage: number | null
+  percentage: number | string | null
   programFunding: Money
 }
 
@@ -19,8 +19,8 @@ export interface PercentageBudgetRow {
  * @param percentage - Percentage with at most two decimal places.
  * @returns Integer hundredths of one percent.
  */
-export const percentageHundredths = (percentage: number): bigint => {
-  if (!Number.isFinite(percentage) || !/^(?:\d+)(?:\.\d{1,2})?$/.test(String(percentage)) || percentage < 0 || percentage > 100) {
+export const percentageHundredths = (percentage: number | string): bigint => {
+  if (!Number.isFinite(Number(percentage)) || !/^(?:\d+)(?:\.\d{1,2})?$/.test(String(percentage)) || Number(percentage) < 0 || Number(percentage) > 100) {
     throw new RangeError('Invalid budget percentage')
   }
   const [units = '0', fraction = ''] = String(percentage).split('.')
@@ -28,16 +28,15 @@ export const percentageHundredths = (percentage: number): bigint => {
 }
 
 /**
- * Applies a percentage to summed cents, rounding once to dollars, ties away from zero.
- * @param baseCents - Sum of source program funding in cents.
+ * Applies a percentage and rounds once to whole currency units, ties away from zero.
+ * @param base - Exact sum of source program funding.
  * @param percentage - Configured percentage.
- * @returns Canonical whole-dollar money.
+ * @param currency - Owning denomination.
+ * @returns Canonical whole-unit money.
  */
-export const percentageProgramFunding = (baseCents: bigint, percentage: number): Money => {
-  const numerator = baseCents * percentageHundredths(percentage)
-  const absolute = numerator < BigInt(0) ? -numerator : numerator
-  const dollars = (absolute + BigInt(500000)) / BigInt(1000000)
-  return moneyFromCents((numerator < BigInt(0) ? -dollars : dollars) * BigInt(100))
+export const percentageProgramFunding = (base: Money, percentage: number | string, currency: string): Money => {
+  percentageHundredths(percentage)
+  return percentageMoney(sumMoney([base], currency), parseDecimalText(String(percentage)), { rounding: 'halfAwayFromZero', scale: 0 })
 }
 
 /**
@@ -63,8 +62,8 @@ export const calculateBudgetPercentages = (rows: readonly PercentageBudgetRow[])
         if (mode === 'category' && (row.sourceCategoryId === null || row.sourceCategoryId === row.categoryId || sources.some(source => source.mode !== 'manual'))) {
           throw new RangeError('Invalid percentage source category')
         }
-        const base = sources.reduce((sum, source) => sum + moneyToCents(amounts.get(source.id)!), BigInt(0))
-        amounts.set(row.id, percentageProgramFunding(base, row.percentage))
+        const base = sumMoney(sources.map(source => amounts.get(source.id)!), row.currency)
+        amounts.set(row.id, percentageProgramFunding(base, row.percentage, row.currency))
       }
     }
   }

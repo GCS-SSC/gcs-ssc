@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { Money } from '~~/shared/utils/money'
 import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -34,7 +35,7 @@ const columns: TableColumnInput<AccountReceivableAdjustmentRow>[] = [
   { id: 'created', headerKey: 'account_receivable.created_at' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const amount = (value: string | null) => formatAccountReceivableAmount(value, locale.value, receivable.egcs_fc_currency) ?? t('common.not_available')
+const amount = (value: Money | null) => formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 /**
  * Deletes only the selected independently assigned draft Adjustment.
  * @param row - Selected independently assigned draft record.

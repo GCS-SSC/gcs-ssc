@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PaymentEvidence } from '~~/shared/types/payment-evidence'
-import { formatMoneyText, parseMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText } from '~~/shared/utils/money'
 
 const { agreementId, paymentId, evidence } = defineProps<{
   agreementId: string
@@ -9,6 +9,7 @@ const { agreementId, paymentId, evidence } = defineProps<{
   evidence: PaymentEvidence | null
 }>()
 const { t, locale } = useI18n()
+const supportedEvidence = computed(() => evidence?.version === 2)
 const capturedAt = computed(() => evidence
   ? new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(evidence.capturedAt))
   : '')
@@ -20,7 +21,7 @@ const period = computed(() => evidence
 
 <template>
   <div class="space-y-8" data-testid="payment-evidence">
-    <div v-if="evidence" class="space-y-4">
+    <div v-if="evidence && supportedEvidence" class="space-y-4">
       <p class="text-sm text-muted">
         {{ t('agreement.payments.evidence.captured', { date: capturedAt }) }}
       </p>
@@ -54,7 +55,7 @@ const period = computed(() => evidence
             {{ t('agreement.payments.evidence.amount') }}
           </dt>
           <dd class="mt-1 font-medium tabular-nums">
-            {{ formatMoneyText(parseMoneyText(evidence.selection.paymentAmount), locale, evidence.selection.currency.toUpperCase()) }}
+            {{ formatMoneyText(evidence.selection.paymentAmount, locale) }}
           </dd>
         </div>
       </dl>
@@ -79,14 +80,14 @@ const period = computed(() => evidence
     </ExtensionSlotHost>
 
     <CommonSection :title="t('agreement.payments.financial_inputs.title')" :grid-cols="1" data-testid="payment-evidence-inputs">
-      <AgreementPaymentFinancialInputValues v-if="evidence" :inputs="evidence.financialInputs" />
+      <AgreementPaymentFinancialInputValues v-if="evidence && supportedEvidence" :inputs="evidence.financialInputs" />
       <p v-else class="text-sm text-muted">
         {{ t('agreement.payments.evidence.unavailable') }}
       </p>
     </CommonSection>
 
     <CommonSection :title="t('agreement.payments.financial_inputs.line_balances')" :grid-cols="1" data-testid="payment-evidence-balances">
-      <AgreementPaymentCommitmentBalances v-if="evidence" :balances="evidence.commitmentBalances" />
+      <AgreementPaymentCommitmentBalances v-if="evidence && supportedEvidence" :balances="evidence.commitmentBalances" />
       <p v-else class="text-sm text-muted">
         {{ t('agreement.payments.evidence.unavailable') }}
       </p>

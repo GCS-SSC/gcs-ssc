@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- Typed Data Collection runtime adapter. */
 import type { H3Event } from 'h3'
 import type { Kysely, Selectable, Transaction } from 'kysely'
@@ -153,9 +154,9 @@ export const createRuntimeDataCollectionInTransaction = async (input: {
     .where('egcs_cn_parentversion', '=', String(runtime.egcs_cn_sourcepublicationversion))
     .where('egcs_cn_publicationversion', '=', snapshot.publicationVersionId).executeTakeFirst()
   if (!reference) return null
-  const runtimeOrder = input.runtimeItemOrder ?? Number((await input.db.selectFrom('Common_Runtime_Item')
+  const runtimeOrder = input.runtimeItemOrder ?? parseSafeDecimal(String((await input.db.selectFrom('Common_Runtime_Item')
     .select(eb => eb.fn.max('egcs_cn_order').as('maximum')).where('egcs_cn_runtime', '=', input.runtimeId)
-    .where('egcs_cn_parentruntimeitem', 'is', null).executeTakeFirst())?.maximum ?? 0) + 1
+    .where('egcs_cn_parentruntimeitem', 'is', null).executeTakeFirst())?.maximum ?? 0)) + 1
   const runtimeItemId = await createRuntimeItem(input.db, {
     egcs_cn_runtime: input.runtimeId, egcs_cn_parentruntimeitem: null, egcs_cn_kind: 'data_collection',
     egcs_cn_order: runtimeOrder, egcs_cn_publication: input.dataCollectionSetupId,

@@ -111,7 +111,7 @@ export const listAccountReceivableChartLookup = async (event: H3Event, id: strin
   if (input.egcs_fc_agencyfiscalyear && input.egcs_fc_agencyfiscalyear !== String(header.egcs_fc_agencyfiscalyear)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
   let query = event.context.$db.selectFrom('Agency_Chart_of_Account').where('egcs_ay_organizationagency', '=', context.agencyId)
     .where('egcs_ay_fiscalyear', '=', String(header.egcs_fc_agencyfiscalyear)).where('egcs_ay_currency', '=', header.egcs_fc_currency)
-    .where('egcs_ay_kind', '=', 'account_receivable').where('_deleted', '=', false)
+    .where('egcs_ay_kind', '=', 'account_receivable').where('_deleted', '=', false).where('egcs_ay_active', '=', true)
     .where(eb => eb.exists(eb.selectFrom('Transfer_Payment_Stream_Chart_of_Account')
       .select('id').whereRef('egcs_tp_agencychartofaccount', '=', 'Agency_Chart_of_Account.id')
       .where('egcs_tp_transferpaymentstream', '=', context.streamId).where('_deleted', '=', false)))

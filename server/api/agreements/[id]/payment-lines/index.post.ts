@@ -1,3 +1,4 @@
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { FundingCaseAgreementPaymentLineCreateSchema } from '~~/shared/types/schemas'
@@ -37,6 +38,9 @@ export default defineEventHandler(async event => {
       if (!editablePayment || typeof editablePayment !== 'object' || !('id' in editablePayment)) {
         return editablePayment
       }
+
+      const currency = await assertAgreementCurrency(event, trx, agreementId, editablePayment.egcs_fc_currency)
+      await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount])
 
       await runExtensionAgreementPaymentMutationGuards(event, trx, {
         operation: 'payment-line.create',
@@ -88,7 +92,7 @@ export default defineEventHandler(async event => {
         agreementId
       })
 
-      return { ...inserted, egcs_fc_amount: parseDatabaseMoney(inserted.egcs_fc_amount) }
+      return { ...inserted, egcs_fc_amount: parseDatabaseMoney(inserted.egcs_fc_amount, currency) }
     }, {
       action: 'create',
       assignmentTarget: {

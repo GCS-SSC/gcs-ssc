@@ -13,6 +13,6 @@ export const assertAgencyCreditMemoCommitmentChart = async (
   const linked = await db.selectFrom('Agency_Chart_of_Account').select('id')
     .where('id', '=', input.commitmentChartId).where('egcs_ay_organizationagency', '=', input.agencyId)
     .where('egcs_ay_fiscalyear', '=', input.fiscalYearId).where('egcs_ay_currency', '=', input.currency)
-    .where('egcs_ay_kind', '=', 'commitment').where('_deleted', '=', false).forShare().executeTakeFirst()
+    .where('egcs_ay_kind', '=', 'commitment').where('_deleted', '=', false).where('egcs_ay_active', '=', true).forShare().executeTakeFirst()
   if (!linked) return await badRequest(event, 'INVALID_CREDIT_MEMO_COMMITMENT_CHART', 'apiErrors.agency.invalid_credit_memo_commitment_chart')
 }

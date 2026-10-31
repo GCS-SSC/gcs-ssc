@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
  * @returns Alias map keyed by SDK import specifier.
  */
 export const sdkAliases = (rootDir: string): Record<string, string> => ({
+  '@gcs-ssc/extensions/money': resolve(rootDir, 'packages/gcs-ssc-extensions/src/money.ts'),
   '@gcs-ssc/extensions/server': resolve(rootDir, 'packages/gcs-ssc-extensions/src/server.ts'),
   '@gcs-ssc/extensions/ui': resolve(rootDir, 'packages/gcs-ssc-extensions/src/ui.ts'),
   '@gcs-ssc/extensions/nuxt': resolve(rootDir, 'packages/gcs-ssc-extensions/src/nuxt.ts'),

@@ -10,9 +10,9 @@ import {
 import type { Money } from '~~/shared/utils/money'
 
 type BudgetFundingState = {
-  egcs_fc_totalamount: Money | string
-  egcs_fc_programfunding: Money | string
-  egcs_fc_fundingsources: Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money | string }>
+  egcs_fc_totalamount: Money
+  egcs_fc_programfunding: Money
+  egcs_fc_fundingsources: Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money }>
 }
 
 type PeriodState = {

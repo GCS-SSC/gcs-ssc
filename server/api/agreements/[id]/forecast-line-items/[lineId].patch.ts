@@ -1,5 +1,5 @@
 import { defineEventHandler, getRouterParam } from 'h3'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Route-local validation helpers are self-descriptive and not public API. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
@@ -148,7 +148,8 @@ const patchForecastLineItemForRoute = async (
       return budgetLineItem
     }
 
-    if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency)
+    const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency)
+    await assertCurrencyMoneyValues(event, currency, [patchValues.egcs_fc_amount, patchValues.egcs_fc_totalamount].filter(value => value !== undefined))
     await assertAgreementForecastCellAvailable(
       event, trx, String(patchValues.egcs_fc_agreementforecast ?? existing.egcs_fc_agreementforecast),
       String(budgetLineItem.id), patchValues.egcs_fc_month ?? existing.egcs_fc_month, lineId
@@ -198,8 +199,8 @@ const patchForecastLineItemForRoute = async (
     }
     return {
       ...updated,
-      egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount),
-      egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount)
+      egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount, currency),
+      egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount, currency)
     }
   })
 }

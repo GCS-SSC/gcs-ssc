@@ -1,13 +1,10 @@
 /** Largest decimal value whose declared fractional units can be represented safely by JavaScript. */
 const MAX_SAFE_DECIMAL_UNITS = BigInt(Number.MAX_SAFE_INTEGER)
 
-/** Conservative supported maximum for persisted monetary request values (90 trillion). */
-export const MAX_SAFE_MONEY = 90_000_000_000_000
-
 /**
- * Converts a PostgreSQL NUMERIC string without silently discarding declared decimal precision.
+ * Converts bounded nonmonetary database decimals at an explicit numeric DTO boundary.
  *
- * @param value - Decimal text returned by the database driver.
+ * @param value - Nonmonetary decimal text returned by the database driver.
  * @returns A number when every declared decimal unit fits JavaScript's safe integer range.
  */
 export const parseSafeDecimal = (value: string): number => {
@@ -32,17 +29,6 @@ export const parseSafeDecimal = (value: string): number => {
   }
   return parsed
 }
-
-/**
- * Whether a request value fits the supported two-decimal monetary contract.
- *
- * @param value - Coerced monetary request value.
- * @returns True when the value is finite, bounded, and has at most two decimal places.
- */
-export const isSafeMoney = (value: number): boolean => Number.isFinite(value)
-  && Math.abs(value) <= MAX_SAFE_MONEY
-  && Number.isSafeInteger(Math.round(value * 100))
-  && Math.abs(value * 100 - Math.round(value * 100)) < 1e-7
 
 /**
  * Whether a JavaScript number can be stored by a PostgreSQL `numeric(precision, scale)` column

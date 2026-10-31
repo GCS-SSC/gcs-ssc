@@ -14,9 +14,11 @@ const columns: TableColumnInput<AgencyChartOfAccountItem>[] = [
   { accessorKey: 'egcs_ay_currency', headerKey: 'common.currency' },
   { accessorKey: 'egcs_ay_kind', headerKey: 'transfer_payment.chart_of_accounts.kind' },
   { id: 'dimensions', headerKey: 'transfer_payment.chart_of_accounts.accounting_fields' },
+  { accessorKey: 'egcs_ay_active', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const initialNewItem = {
+  egcs_ay_active: true,
   egcs_ay_fiscalyear: '',
   egcs_ay_currency: 'cad' as const,
   egcs_ay_kind: 'commitment' as const,
@@ -50,6 +52,9 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
     <template #egcs_ay_kind-cell="{ row }">
       {{ t(`enums.agency_chart_of_account_kind.${row.original.egcs_ay_kind}`) }}
     </template>
+    <template #egcs_ay_active-cell="{ row }">
+      <CommonStatusBadge :variant="row.original.egcs_ay_active ? 'active' : 'inactive'" />
+    </template>
     <template #dimensions-cell="{ row }">
       <div class="flex flex-wrap gap-1">
         <CommonStatusBadge
@@ -59,6 +64,12 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
       </div>
     </template>
     <template #form="{ state }">
+      <UFormField :label="t('common.active')" name="egcs_ay_active">
+        <USwitch v-model="state.egcs_ay_active" :label="t('common.active')" />
+      </UFormField>
+      <p v-if="state.is_in_use" class="text-sm text-muted">
+        {{ t('apiErrors.agency.chart_in_use') }}
+      </p>
       <UFormField
         :label="t('transfer_payment.chart_of_accounts.fiscal_year')"
         :description="state.id ? t('apiErrors.agency.chart_fiscal_year_immutable') : undefined"
@@ -97,6 +108,7 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
           label-en-key="label_en"
           label-fr-key="label_fr"
           :show-value-in-label="false"
+          :disabled="Boolean(state.is_in_use)"
           @update:model-value="state.egcs_ay_commitmentchartofaccount = $event ?? null" />
         <USelectMenu v-else :items="[]" disabled />
       </UFormField>
@@ -108,24 +120,25 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
           <UButton
             type="button" icon="i-lucide-plus" variant="outline"
             :label="t('transfer_payment.chart_of_accounts.add_field')"
+            :disabled="Boolean(state.is_in_use)"
             @click="addDimension(state)" />
         </div>
         <div
           v-for="(dimension, index) in state.egcs_ay_accountingdimensions" :key="index"
           class="grid gap-3 rounded-lg border border-default p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
           <UFormField :label="t('transfer_payment.chart_of_accounts.label_en')" :name="`egcs_ay_accountingdimensions.${index}.label_en`" required data-ui-target="agency.chart-of-accounts.egcs_ay_accountingdimensions.label_en">
-            <UInput v-model="dimension.label_en" required />
+            <UInput v-model="dimension.label_en" :readonly="Boolean(state.is_in_use)" required />
           </UFormField>
           <UFormField :label="t('transfer_payment.chart_of_accounts.label_fr')" :name="`egcs_ay_accountingdimensions.${index}.label_fr`" required data-ui-target="agency.chart-of-accounts.egcs_ay_accountingdimensions.label_fr">
-            <UInput v-model="dimension.label_fr" required />
+            <UInput v-model="dimension.label_fr" :readonly="Boolean(state.is_in_use)" required />
           </UFormField>
           <UFormField :label="t('transfer_payment.chart_of_accounts.value')" :name="`egcs_ay_accountingdimensions.${index}.value`" required data-ui-target="agency.chart-of-accounts.egcs_ay_accountingdimensions.value">
-            <UInput v-model="dimension.value" required />
+            <UInput v-model="dimension.value" :readonly="Boolean(state.is_in_use)" required />
           </UFormField>
           <CommonActionButton
             type="button" icon="i-lucide-trash" color="error" variant="ghost"
             :aria-label="t('transfer_payment.chart_of_accounts.remove_field')"
-            :disabled="(state.egcs_ay_accountingdimensions?.length ?? 0) === 1"
+            :disabled="Boolean(state.is_in_use) || (state.egcs_ay_accountingdimensions?.length ?? 0) === 1"
             @click="state.egcs_ay_accountingdimensions?.splice(index, 1)" />
         </div>
       </div>

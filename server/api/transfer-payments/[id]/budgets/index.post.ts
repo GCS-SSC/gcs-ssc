@@ -1,3 +1,5 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
+import { assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { TransferPaymentBudgetSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfer-payment-route-authorization'
@@ -47,6 +49,7 @@ export default defineEventHandler(async event => {
           return await badRequest(event, 'INVALID_FISCAL_YEAR', 'apiErrors.transfer_payment.invalid_fiscal_year')
         }
 
+        await assertCurrencyMoneyValues(event, validated.egcs_tp_currency, [validated.egcs_tp_totalbudget])
         return await trx
           .insertInto('Transfer_Payment_Fiscal_Year_Budget')
           .values({
@@ -62,7 +65,7 @@ export default defineEventHandler(async event => {
             'egcs_tp_overcommitthreshold'
           ])
           .executeTakeFirstOrThrow()
-          .then(row => ({ ...row, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget) }))
+          .then(row => ({ ...row, egcs_tp_overcommitthreshold: parseSafeDecimal(String(row.egcs_tp_overcommitthreshold)), egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget, row.egcs_tp_currency) }))
       }
     )
   } catch (error) {

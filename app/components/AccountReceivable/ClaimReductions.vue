@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { AccountReceivableClaimReductionSchema } from '~~/shared/types/schemas/account-receivable'
 import { NonNegativeMoneySchema } from '~~/shared/types/schemas/money'
 import type { AccountReceivableClaimReduction, AccountReceivableClaimReductionChoice } from '~~/shared/types/account-receivable'
-import { moneyToCents, parseMoneyText, subtractMoney, sumMoney } from '~~/shared/utils/money'
+import { compareMoney, parseMoney, zeroMoney, subtractMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
@@ -19,7 +19,7 @@ import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 const { accountReceivableId, currency, declaredAmount, reductions, canEdit, canUpdate, readOnly = false } = defineProps<{
   accountReceivableId: string
   currency: string
-  declaredAmount: string
+  declaredAmount: Money
   reductions: AccountReceivableClaimReduction[]
   canEdit: boolean
   canUpdate: boolean
@@ -33,14 +33,14 @@ const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
 const { recoveryFocusTarget, focusRecoveredContent } = useLoadRecoveryFocus()
 type Choice = AccountReceivableClaimReductionChoice
-type DraftLine = { egcs_fc_claimline: string, egcs_fc_amount: string }
+type DraftLine = { egcs_fc_claimline: string, egcs_fc_amount: MoneyInput }
 const choices: Ref<Choice[]> = ref([])
 const state: Ref<{ egcs_fc_lines: DraftLine[] } | null> = ref(null)
 const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 const loadError: Ref<unknown | null> = ref(null)
 const draftSchema = z.object({ egcs_fc_claimline: z.string(), egcs_fc_amount: NonNegativeMoneySchema })
 const lineModal = useCrudModal<Choice, DraftLine>({
-  updateState: choice => ({ egcs_fc_claimline: choice.id, egcs_fc_amount: state.value?.egcs_fc_lines.find(line => line.egcs_fc_claimline === choice.id)?.egcs_fc_amount ?? '0.00' })
+  updateState: choice => ({ egcs_fc_claimline: choice.id, egcs_fc_amount: state.value?.egcs_fc_lines.find(line => line.egcs_fc_claimline === choice.id)?.egcs_fc_amount ?? zeroMoney(currency) })
 })
 const selectedLine = lineModal.selected
 const isModalOpen = lineModal.isOpen
@@ -53,10 +53,10 @@ const planRequirementError = computed(() => {
   const amounts = reductions.map(reduction => NonNegativeMoneySchema.safeParse(reduction.egcs_fc_amount))
   if (!amounts.length) return 'claim_reduction_required'
   if (amounts.some(amount => !amount.success)) return 'claim_reduction_total'
-  const total = sumMoney(amounts.flatMap(amount => amount.success ? [amount.data] : []))
-  if (moneyToCents(total) <= BigInt(0)) return 'claim_reduction_required'
+  const total = sumMoney(amounts.flatMap(amount => amount.success ? [amount.data] : []), currency)
+  if (compareMoney(total, zeroMoney(currency)) <= 0) return 'claim_reduction_required'
   const declared = NonNegativeMoneySchema.safeParse(declaredAmount)
-  return !declared.success || moneyToCents(total) !== moneyToCents(declared.data) ? 'claim_reduction_total' : null
+  return !declared.success || compareMoney(total, declared.data) !== 0 ? 'claim_reduction_total' : null
 })
 const bilingual = (en: string | null, fr: string | null) => (locale.value === 'fr' ? fr || en : en || fr)
 const tableRows = computed(() => choices.value.map((choice, index) => ({
@@ -85,19 +85,19 @@ const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGro
 const groupLabel = (row: GroupedRow) => row.original[row.groupingColumnId as 'claimGroup' | 'categoryGroup' | 'subsectionGroup']
 const lineReduction = (row: TableRow) => {
   try {
-    return parseMoneyText(state.value?.egcs_fc_lines[row.index]?.egcs_fc_amount ?? '0.00')
+    return parseMoney(state.value?.egcs_fc_lines[row.index]?.egcs_fc_amount)
   } catch {
     return null
   }
 }
-const rowAmount = (row: GroupedRow, field: 'reconciled' | 'reduction' | 'balance'): string | null => {
+const rowAmount = (row: GroupedRow, field: 'reconciled' | 'reduction' | 'balance'): Money | null => {
   const lines = isGroupedRow(row) ? getLeafRows(row).map(leaf => leaf.original) : [row.original]
   const values = lines.map(line => {
     if (field === 'reconciled') return line.egcs_fc_reconciledamount
     const reduction = lineReduction(line)
     return reduction === null ? null : field === 'reduction' ? reduction : subtractMoney(line.egcs_fc_reconciledamount, reduction)
   })
-  return values.some(value => value === null) ? null : sumMoney(values.filter(value => value !== null))
+  return values.some(value => value === null) ? null : sumMoney(values.filter(value => value !== null), currency)
 }
 let generation = 0
 let disposed = false
@@ -113,7 +113,7 @@ const load = async () => {
     if (disposed || requestGeneration !== generation || owner !== accountReceivableId) return
     choices.value = result.items
     state.value = { egcs_fc_lines: result.items.map(choice => ({ egcs_fc_claimline: choice.id,
-      egcs_fc_amount: reductions.find(row => row.egcs_fc_claimline === choice.id)?.egcs_fc_amount ?? '0.00' })) }
+      egcs_fc_amount: reductions.find(row => row.egcs_fc_claimline === choice.id)?.egcs_fc_amount ?? zeroMoney(currency) })) }
     if (selectedLine.value && !selectedChoice.value) lineModal.close()
     loadStatus.value = 'success'
   } catch (failure) {
@@ -146,10 +146,10 @@ onBeforeUnmount(() => {
   disposed = true
   generation += 1
 })
-const format = (amount: string) => formatAccountReceivableAmount(amount, locale.value, currency)
+const format = (amount: Money) => formatAccountReceivableAmount(amount, locale.value)
 const totalAmount = (field: 'reconciled' | 'reduction' | 'balance') => {
   const values = tableRows.value.map(row => rowAmount({ id: row.id, original: row }, field))
-  return values.some(value => value === null) ? t('common.unavailable') : format(sumMoney(values.filter(value => value !== null).map(parseMoneyText)))
+  return values.some(value => value === null) ? t('common.unavailable') : format(sumMoney(values.filter(value => value !== null), currency))
 }
 const formattedAmount = (row: GroupedRow, field: 'reconciled' | 'reduction' | 'balance') => {
   const amount = rowAmount(row, field)
@@ -175,7 +175,7 @@ const save = async () => {
   try {
     const draft = draftSchema.parse(selectedLine.value)
     const lines = state.value.egcs_fc_lines.map(line => line.egcs_fc_claimline === draft.egcs_fc_claimline ? draft : line)
-    await sendJson(`/api/account-receivables/${owner}/claim-reductions`, 'PATCH', AccountReceivableClaimReductionSchema.parse({ egcs_fc_lines: lines.filter(line => moneyToCents(NonNegativeMoneySchema.parse(line.egcs_fc_amount)) > BigInt(0)) }))
+    await sendJson(`/api/account-receivables/${owner}/claim-reductions`, 'PATCH', AccountReceivableClaimReductionSchema.parse({ egcs_fc_lines: lines.filter(line => compareMoney(NonNegativeMoneySchema.parse(line.egcs_fc_amount), zeroMoney(currency)) > 0) }))
     if (!disposed && owner === accountReceivableId && lineModal.closeSession(session)) {
       state.value = { egcs_fc_lines: lines }
       emit('changed')

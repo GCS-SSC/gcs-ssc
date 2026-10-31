@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 import type { WithId } from './common'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { NonNegativeMoneySchema } from './money'
+import { NonNegativeMoneySchema, validateMoneyCurrency } from './money'
 
 const OptionalText = (maximumLength?: number) => z.preprocess(
   value => {
@@ -89,6 +89,7 @@ const validateFundingHistoryExternal = (
   value: Partial<z.infer<typeof FundingHistoryExternalBaseSchema>>,
   context: z.RefinementCtx
 ) => {
+  validateMoneyCurrency(value.egcs_ar_fundingamount, value.egcs_ar_currency, context, ['egcs_ar_fundingamount'])
   if ('egcs_ar_title_en' in value || 'egcs_ar_title_fr' in value) {
     addBilingualRequiredIssue(
       value.egcs_ar_title_en,

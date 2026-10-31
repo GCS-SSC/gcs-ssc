@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- canonical approval orchestration adapter */
 import { sql, type Kysely, type Transaction } from 'kysely'
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { RUNTIME_TERMINAL_STATES, type RuntimeState } from '~~/shared/constants/system-lifecycle'
 import type { Database, Entity_Type, Workflow_Purpose } from '~~/shared/types/database'
 import {
@@ -205,7 +206,7 @@ export const materializeCanonicalApprovalRuntime = async (
     ? siblingQuery.where('egcs_cn_parentruntimeitem', '=', String(parent.parentRuntimeItemId))
     : siblingQuery.where('egcs_cn_parentruntimeitem', 'is', null)
   const sibling = await siblingQuery.executeTakeFirst()
-  const routingOrder = input.runtimeItemOrder ?? Number(sibling?.maximum ?? 0) + 1
+  const routingOrder = input.runtimeItemOrder ?? parseSafeDecimal(String(sibling?.maximum ?? '0')) + 1
   const routingRuntimeItemId = await createRuntimeItem(trx, {
     egcs_cn_runtime: runtimeId,
     egcs_cn_parentruntimeitem: parent ? String(parent.parentRuntimeItemId) : null,
@@ -307,8 +308,9 @@ export const fetchCanonicalRoutingSlips = async (
   db: DbClient,
   entityType: Entity_Type,
   entityId: string,
-  options: { lock?: boolean } = {}
+  options: { lock?: boolean, assignedCommonUserId?: string | null } = {}
 ) => {
+  if (options.assignedCommonUserId === null) return []
   let query = db.selectFrom('Common_Routing_Slip')
     .innerJoin('Common_Runtime_Item as Routing_Item', 'Routing_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
     .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Routing_Item.egcs_cn_runtime')
@@ -331,6 +333,22 @@ export const fetchCanonicalRoutingSlips = async (
     .where('Common_Runtime._deleted', '=', false)
     .orderBy('Common_Runtime.id', 'desc')
     .orderBy('Common_Routing_Slip.id', 'desc')
+  if (options.assignedCommonUserId !== undefined) {
+    const assignedCommonUserId = options.assignedCommonUserId
+    query = query.where(eb => eb.exists(eb.selectFrom('Common_Approval as Assigned_Approval')
+      .innerJoin('Common_Runtime_Item as Assigned_Item', 'Assigned_Item.id', 'Assigned_Approval.egcs_cn_runtimeitem')
+      .select('Assigned_Approval.id')
+      .whereRef('Assigned_Approval.egcs_cn_routingslip', '=', 'Common_Routing_Slip.id')
+      .where('Assigned_Item._deleted', '=', false)
+      .where(assignment => assignment.or([
+        assignment('Assigned_Approval.egcs_cn_assigneduser', '=', assignedCommonUserId),
+        assignment.and([
+          assignment('Assigned_Approval.egcs_cn_assigneduser', 'is', null),
+          assignment('Assigned_Approval.egcs_cn_assignedgroup', 'is', null),
+          assignment('Assigned_Approval.egcs_cn_defaultuser', '=', assignedCommonUserId)
+        ])
+      ]))))
+  }
   if (options.lock) query = query.forUpdate(['Common_Runtime', 'Routing_Item', 'Common_Routing_Slip'])
   return await query.execute()
 }
@@ -339,10 +357,12 @@ export const listCanonicalApprovalRuntime = async (
   event: H3Event,
   entityType: Entity_Type,
   entityId: string,
-  options: { canManage: boolean }
+  options: { canManage: boolean, approvalOnly?: boolean }
 ) => {
   const currentUser = await resolveCurrentCommonUser(event)
-  const routingSlips = await fetchCanonicalRoutingSlips(event.context.$db, entityType, entityId)
+  const routingSlips = await fetchCanonicalRoutingSlips(event.context.$db, entityType, entityId, {
+    assignedCommonUserId: options.approvalOnly ? currentUser?.id ?? null : undefined
+  })
   const currentRoutingSlip = getCurrentApprovalRoutingSlip(routingSlips)
   const canManage = options.canManage && Boolean(
     !currentRoutingSlip || !RUNTIME_TERMINAL_STATES.has(currentRoutingSlip.routingSlipState)

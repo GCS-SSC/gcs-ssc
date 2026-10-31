@@ -34,7 +34,7 @@ export default defineEventHandler(async event => {
         const amendmentTypes = await trx.selectFrom('Transfer_Payment_Amendment_Type')
           .where('id', 'in', body.amendment_type_ids)
           .where('egcs_tp_transferpaymentstream', '=', streamId)
-          .where('_deleted', '=', false).select('id').execute()
+          .where('_deleted', '=', false).where('egcs_tp_active', '=', true).select('id').execute()
         if (amendmentTypes.length !== body.amendment_type_ids.length) {
           return await badRequest(event, 'INVALID_AMENDMENT_TYPE', 'apiErrors.transfer_payment.invalid_amendment_type')
         }

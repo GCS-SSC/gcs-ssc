@@ -2,7 +2,7 @@ import { defineEventHandler, getRouterParam } from 'h3'
 import { captureAgreementPaymentEvidence } from '~~/server/utils/agreement-payment-evidence'
 import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
 import type { Currency_Codes } from '~~/shared/types/database'
-import { resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementPaymentCreateSchema, FundingCaseAgreementPaymentPatchSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementPaymentEditable,
@@ -51,6 +51,9 @@ export default defineEventHandler(async event => {
     if (!editablePayment || typeof editablePayment !== 'object' || !('id' in editablePayment)) {
       return editablePayment
     }
+
+    const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? editablePayment.egcs_fc_currency)
+    if (patchValues.egcs_fc_paymentamount) await assertCurrencyMoneyValues(event, currency, [patchValues.egcs_fc_paymentamount])
 
     await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: patchValues.egcs_fc_applicantrecipient ?? editablePayment.egcs_fc_applicantrecipient, currency: patchValues.egcs_fc_currency ?? editablePayment.egcs_fc_currency, paymentId })
     await validateMergedFinancialPeriodPatch(event, editablePayment, patchValues)
@@ -119,32 +122,34 @@ export default defineEventHandler(async event => {
       if (!fiscalYear || typeof fiscalYear !== 'object' || !('id' in fiscalYear)) return fiscalYear
       evidence = await captureAgreementPaymentEvidence(trx, agreementId, commitmentId, input, fiscalYear.fiscal_year_display, { excludePaymentId: paymentId })
     }
-    const row = Object.keys(updateValues).length || evidence
-      ? await trx
-          .updateTable('Funding_Case_Agreement_Payment')
-          .set({ ...updateValues, ...(evidence ? { egcs_fc_evidence: sql`${JSON.stringify(evidence)}::jsonb` } : {}) })
-          .where('id', '=', paymentId)
-          .where('_deleted', '=', false)
-          .returning([
-            'id',
-            'egcs_fc_evidence',
-            'egcs_fc_fundingagreementcommitment',
-            'egcs_fc_fiscalyear',
-            'egcs_fc_paymenttype',
-            'egcs_fc_applicantrecipient',
-            'egcs_fc_periodstart',
-            'egcs_fc_periodend',
-            databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
-            'egcs_fc_currency',
-            'egcs_fc_comment',
-            'egcs_fc_status',
-            '_deleted'
-          ])
-          .executeTakeFirstOrThrow()
-      : editablePayment
+    if (!Object.keys(updateValues).length && !evidence) {
+      await syncAgreementPaymentEditingStatus(trx, paymentId, { event, agreementId, offsetPlans })
+      return editablePayment
+    }
+    const row = await trx
+      .updateTable('Funding_Case_Agreement_Payment')
+      .set({ ...updateValues, ...(evidence ? { egcs_fc_evidence: sql`${JSON.stringify(evidence)}::jsonb` } : {}) })
+      .where('id', '=', paymentId)
+      .where('_deleted', '=', false)
+      .returning([
+        'id',
+        'egcs_fc_evidence',
+        'egcs_fc_fundingagreementcommitment',
+        'egcs_fc_fiscalyear',
+        'egcs_fc_paymenttype',
+        'egcs_fc_applicantrecipient',
+        'egcs_fc_periodstart',
+        'egcs_fc_periodend',
+        databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
+        'egcs_fc_currency',
+        'egcs_fc_comment',
+        'egcs_fc_status',
+        '_deleted'
+      ])
+      .executeTakeFirstOrThrow()
 
     await syncAgreementPaymentEditingStatus(trx, paymentId, { event, agreementId, offsetPlans })
-    return { ...row, egcs_fc_paymentamount: parseDatabaseMoney(row.egcs_fc_paymentamount) }
+    return { ...row, egcs_fc_paymentamount: parseDatabaseMoney(row.egcs_fc_paymentamount, row.egcs_fc_currency) }
   }, {
     accountReceivablePayees: patchValues.egcs_fc_applicantrecipient ? [{ applicantRecipientId: patchValues.egcs_fc_applicantrecipient, currency: patchValues.egcs_fc_currency ?? await resolveAgreementCurrency(db, agreementId) as Currency_Codes }] : undefined,
     assignmentTarget: { entityType: 'fundingcasepayment', entityId: paymentId },

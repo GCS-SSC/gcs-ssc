@@ -307,6 +307,7 @@
       },
       "devDependencies": {
         "@electric-sql/pglite": "0.3.16",
+        "@playwright/test": "^1.58.2",
         "@types/node": "^25.3.0",
         "@types/pg": "^8.23.1",
         "@vitejs/plugin-vue": "^6.0.4",
@@ -383,6 +384,9 @@
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
       "version": "0.4.0",
+      "dependencies": {
+        "dinero.js": "2.0.2",
+      },
       "devDependencies": {
         "@types/node": "^25.3.0",
         "@vitest/coverage-v8": "^4.1.12",
@@ -1775,6 +1779,8 @@
     "devtools-protocol": ["devtools-protocol@0.0.1608973", "", {}, "sha512-Tpm17fxYzt+J7VrGdc1k8YdRqS3YV7se/M6KeemEqvUbq/n7At1rWVuXMxQgpWkdwSdIEKYbU//Bve+Shm4YNQ=="],
 
     "diff": ["diff@3.5.1", "", {}, "sha512-Z3u54A8qGyqFOSr2pk0ijYs8mOE9Qz8kTvtKeBI+upoG9j04Sq+oI7W8zAJiQybDcESET8/uIdHzs0p3k4fZlw=="],
+
+    "dinero.js": ["dinero.js@2.0.2", "", {}, "sha512-d+4egJTvNinkb66KSed11Daqz6MWaOHzyalLu6h3p+BLrsmwKFjHjvOKivOWeM7WyoX89te+xx4cKI6zrDtCfQ=="],
 
     "docxtemplater": ["docxtemplater@3.68.7", "", { "dependencies": { "@xmldom/xmldom": "^0.9.8" } }, "sha512-FwgeAKqY2vc9eVm2V2XGg8bq25B0OQjtSDITGi9zNnvu5GbtR4WvGjM5QNld/ALB6ZbsSuHskBPK9SvPpKhsbA=="],
 
@@ -3226,7 +3232,7 @@
 
     "@gcs-ssc/gcs-ssc-gcnotify/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
-    "@gcs-ssc/gcs-ssc-portal-connector/@gcs-ssc/survey": ["@gcs-ssc/survey@file:extensions/gcs-ssc-portal-connector/vendor/survey", { "dependencies": { "zod": "^4.6.5" }, "peerDependencies": { "vue": "^3.5.0" }, "optionalPeers": ["vue"] }],
+    "@gcs-ssc/gcs-ssc-portal-connector/@gcs-ssc/survey": ["@gcs-ssc/survey@file:extensions/gcs-ssc-portal-connector/vendor/survey", { "dependencies": { "@gcs-ssc/extensions": "^0.4.0", "zod": "^4.6.5" }, "peerDependencies": { "vue": "^3.5.0" }, "optionalPeers": ["vue"] }],
 
     "@gcs-ssc/gcs-ssc-portal-connector/@types/pg": ["@types/pg@8.23.1", "", { "dependencies": { "@types/node": "*", "pg-protocol": "*", "pg-types": "^2.2.0" } }, "sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A=="],
 

@@ -20,7 +20,7 @@ import type {
   FundingCaseAgreementForecastLineItemRow,
   FundingCaseAgreementForecastOverviewRow
 } from '~~/shared/types/funding-case-agreement-ui'
-import { compareMoney, formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, isCanonicalMoney, formatMoneyText, parseMoney, zeroMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
 definePageMeta({
   key: route => route.path,
@@ -107,11 +107,11 @@ const breakdownPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageIndex: 0,
   pageSize: 50
 })
-const draftAmounts: Ref<Record<string, string>> = ref({})
+const draftAmounts: Ref<Record<string, MoneyInput>> = ref({})
 const draftFundingAmounts: Ref<Record<string, Money>> = ref({})
 const monthlyEditorRow: Ref<ForecastBreakdownTableRow | null> = ref(null)
 const monthlyEditorOpen = ref(false)
-const monthlyEditorAmounts: Ref<Record<number, string>> = ref({})
+const monthlyEditorAmounts: Ref<Record<number, MoneyInput>> = ref({})
 const isSavingBreakdown: Ref<boolean> = ref(false)
 const breakdownReloadRequired = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
@@ -134,6 +134,11 @@ const {
   status: profileStatus,
   refresh: refreshProfile
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcaseforecast/${forecastId}/context`)
+const getCurrency = (): string => {
+  const currency = profile.value?.egcs_fc_currency
+  if (!currency) throw new Error('Agreement currency is unavailable.')
+  return currency
+}
 const {
   data: overview,
   error: overviewError,
@@ -262,7 +267,7 @@ const openMonthlyEditor = (row: ForecastBreakdownTableRow) => {
 }
 const isMonthlyEditorAmountInvalid = (month: number) => {
   try {
-    return compareMoney(parseMoney(monthlyEditorAmounts.value[month] ?? ''), ZERO_MONEY) < 0
+    return compareMoney(parseMoney(monthlyEditorAmounts.value[month]), zeroAmount()) < 0
   } catch {
     return true
   }
@@ -286,7 +291,7 @@ const applyMonthlyEditor = () => {
   MONTH_KEYS.forEach((_key, month) => {
     if (!canEditForecastAmount(row.budgetLineId, month)) return
     if (row.funding?.kind === 'other') {
-      setDraftFundingAmount(row.budgetLineId, row.funding.subtype, month, parseMoney(monthlyEditorAmounts.value[month] ?? ''))
+      setDraftFundingAmount(row.budgetLineId, row.funding.subtype, month, parseMoney(monthlyEditorAmounts.value[month]))
     } else {
       setDraftAmount(row.budgetLineId, month, monthlyEditorAmounts.value[month])
     }
@@ -392,17 +397,17 @@ const displayValue = (value: string | number | null | undefined) => {
   return String(value)
 }
 
-const ZERO_MONEY = '0.00' as Money
-const formatMoney = (value: Money) => profile.value?.egcs_fc_currency
-  ? formatMoneyText(value, locale.value, profile.value.egcs_fc_currency.toUpperCase())
-  : value
+const zeroAmount = () => zeroMoney(getCurrency())
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value)
 
 const getDraftAmount = (budgetLineId: string, month: number) => {
   if (!activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)) {
-    return lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_amount ?? ZERO_MONEY
+    return lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_amount ?? zeroAmount()
   }
   const key = getDraftKey(budgetLineId, month)
-  return draftAmounts.value[key] ?? lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? ZERO_MONEY
+  return Object.hasOwn(draftAmounts.value, key)
+    ? draftAmounts.value[key]
+    : lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? zeroAmount()
 }
 
 const getDraftMoney = (budgetLineId: string, month: number): Money | null => {
@@ -417,10 +422,10 @@ const hasInvalidDraftAmounts = computed(() => activeBudgetLineItems.value.some(l
   MONTH_KEYS.some((_month, month) => getDraftMoney(String(line.id), month) === null)
 ))
 
-const setDraftAmount = (budgetLineId: string, month: number, value: string | number | null | undefined) => {
+const setDraftAmount = (budgetLineId: string, month: number, value: MoneyInput) => {
   const key = getDraftKey(budgetLineId, month)
-  const draft = String(value ?? '')
-  draftAmounts.value = draft === (lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? ZERO_MONEY)
+  const draft = value
+  draftAmounts.value = isCanonicalMoney(draft) && compareMoney(draft, lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? zeroAmount()) === 0
     ? Object.fromEntries(Object.entries(draftAmounts.value).filter(([draftKey]) => draftKey !== key))
     : { ...draftAmounts.value, [key]: draft }
 }
@@ -428,12 +433,12 @@ const setDraftAmount = (budgetLineId: string, month: number, value: string | num
 const getFundingDraftKey = (budgetLineId: string, subtype: string, month: number) => `${budgetLineId}:${month}:${subtype}`
 const getSavedFundingAmount = (budgetLineId: string, subtype: string, month: number) =>
   lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_fundingsources
-    .find(source => source.egcs_fc_fundingsubtype === subtype)?.egcs_fc_amount ?? ZERO_MONEY
+    .find(source => source.egcs_fc_fundingsubtype === subtype)?.egcs_fc_amount ?? zeroAmount()
 const getDraftFundingAmount = (budgetLineId: string, subtype: string, month: number) =>
   draftFundingAmounts.value[getFundingDraftKey(budgetLineId, subtype, month)] ?? getSavedFundingAmount(budgetLineId, subtype, month)
 const setDraftFundingAmount = (budgetLineId: string, subtype: string, month: number, amount: Money) => {
   const key = getFundingDraftKey(budgetLineId, subtype, month)
-  if (amount === getSavedFundingAmount(budgetLineId, subtype, month)) {
+  if (compareMoney(amount, getSavedFundingAmount(budgetLineId, subtype, month)) === 0) {
     draftFundingAmounts.value = Object.fromEntries(Object.entries(draftFundingAmounts.value).filter(([draftKey]) => draftKey !== key))
   } else draftFundingAmounts.value[key] = amount
 }
@@ -448,16 +453,16 @@ const getProposedFundingSources = (budgetLineId: string, month: number) => {
 }
 
 const getPeriodTotal = (budgetLineId: string, months: number[]) =>
-  sumMoney(months.map((month: number) => getDraftMoney(budgetLineId, month) ?? ZERO_MONEY))
+  sumMoney(months.map((month: number) => getDraftMoney(budgetLineId, month) ?? zeroAmount()), getCurrency())
 
 const getColumnTotal = (months: number[]) =>
-  sumMoney(displayedBudgetLineItems.value.map(line => getPeriodTotal(String(line.id), months)))
+  sumMoney(displayedBudgetLineItems.value.map(line => getPeriodTotal(String(line.id), months)), getCurrency())
 
 const getLineTotal = (budgetLineId: string) =>
-  sumMoney(MONTH_KEYS.map((_month, index: number) => getDraftMoney(budgetLineId, index) ?? ZERO_MONEY))
+  sumMoney(MONTH_KEYS.map((_month, index: number) => getDraftMoney(budgetLineId, index) ?? zeroAmount()), getCurrency())
 
 const getGrandDraftTotal = () =>
-  sumMoney(displayedBudgetLineItems.value.map(line => getLineTotal(String(line.id))))
+  sumMoney(displayedBudgetLineItems.value.map(line => getLineTotal(String(line.id))), getCurrency())
 
 const getCostCategoryLabel = (line: { organization_cost_category_name_en?: string | null, organization_cost_category_name_fr?: string | null }) =>
   getBilingualValue(line, 'organization_cost_category_name', t('common.all'))
@@ -520,8 +525,8 @@ const breakdownRows = computed<ForecastBreakdownTableRow[]>(() => displayedBudge
       lineItemNameEn: [source.funding_type_name_en, source.funding_subtype_name_en].filter(Boolean).join(' / ') || subtype,
       lineItemNameFr: [source.funding_type_name_fr, source.funding_subtype_name_fr].filter(Boolean).join(' / ') || subtype,
       periodTotals: Object.fromEntries(allBreakdownPeriods.value.map(period => [period.columnId,
-        sumMoney(period.months.map(month => getDraftFundingAmount(budgetLineId, subtype, month)))])),
-      total: sumMoney(MONTH_KEYS.map((_key, month) => getDraftFundingAmount(budgetLineId, subtype, month)))
+        sumMoney(period.months.map(month => getDraftFundingAmount(budgetLineId, subtype, month)), getCurrency())])),
+      total: sumMoney(MONTH_KEYS.map((_key, month) => getDraftFundingAmount(budgetLineId, subtype, month)), getCurrency())
     }
   })]
   return row
@@ -594,8 +599,8 @@ const getBreakdownGroupedTotal = (row: GroupedForecastBreakdownRow, key: string)
       return leafRow.original.total
     }
 
-    return leafRow.original.periodTotals[key] ?? ZERO_MONEY
-  }))
+    return leafRow.original.periodTotals[key] ?? zeroAmount()
+  }), getCurrency())
 
 const toggleQuarter = (quarter: QuarterKey) => {
   expandedQuarters.value = expandedQuarters.value.includes(quarter)
@@ -619,14 +624,14 @@ const reloadForecastBreakdown = async () => {
     }
     pendingDrafts = Object.fromEntries(Object.entries(pendingDrafts).filter(([key, value]) => {
       try {
-        return parseMoney(value) !== (lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? ZERO_MONEY)
+        return compareMoney(parseMoney(value), lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? zeroAmount()) !== 0
       } catch {
         return true
       }
     }))
     pendingFundingDrafts = Object.fromEntries(Object.entries(pendingFundingDrafts).filter(([key, value]) => {
       const [budgetLineId, month, subtype] = key.split(':')
-      return value !== getSavedFundingAmount(budgetLineId ?? '', subtype ?? '', Number(month))
+      return compareMoney(value, getSavedFundingAmount(budgetLineId ?? '', subtype ?? '', Number(month))) !== 0
     }))
     breakdownReloadRequired.value = false
     return true
@@ -663,7 +668,7 @@ const saveForecastBreakdown = async () => {
         }
         const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
         const fundingChanged = Object.keys(draftFundingAmounts.value).some(key => key.startsWith(`${budgetLineId}:${month}:`))
-        if (!fundingChanged && (existing ? existing.egcs_fc_amount === amount : amount === ZERO_MONEY)) continue
+        if (!fundingChanged && (existing ? compareMoney(existing.egcs_fc_amount, amount) === 0 : compareMoney(amount, zeroAmount()) === 0)) continue
         if (!(existing ? canUpdateForecast.value : canCreateForecastLineItems.value)) {
           warnPrerequisite(t('apiErrors.request.invalid_status'))
           return
@@ -858,7 +863,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                         {{ formatMoney(getBreakdownGroupedTotal(row as GroupedForecastBreakdownRow, period.columnId)) }}
                       </span>
                       <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
-                        {{ formatMoney(row.original.periodTotals[period.columnId] ?? ZERO_MONEY) }}
+                        {{ formatMoney(row.original.periodTotals[period.columnId] ?? zeroAmount()) }}
                       </span>
                     </template>
 
@@ -962,7 +967,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                     :aria-label="`${t(`agreement.forecasts.months.${MONTH_KEYS[month]}`)} ${locale === 'fr' ? monthlyEditorRow.lineItemNameFr : monthlyEditorRow.lineItemNameEn}`"
                     :aria-invalid="isMonthlyEditorAmountInvalid(month)"
                     :aria-describedby="isMonthlyEditorAmountInvalid(month) ? `forecast-month-error-${month}` : undefined"
-                    @update:model-value="value => monthlyEditorAmounts[month] = String(value ?? '')" />
+                    @update:model-value="value => monthlyEditorAmounts[month] = value" />
                   <p v-if="isMonthlyEditorAmountInvalid(month)" :id="`forecast-month-error-${month}`" class="mt-1 text-xs text-error">
                     {{ t('validation.invalid_number') }}
                   </p>

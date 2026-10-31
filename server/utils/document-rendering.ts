@@ -3,6 +3,7 @@ import Docxtemplater from 'docxtemplater'
 import { DocumentConditionError, evaluateDocumentCondition, resolveDocumentConditionPath } from './document-conditions'
 import { prepareWordConditionTags, type CompiledDocumentConditions } from './document-word-conditions'
 import { loadBoundedDocx } from './document-docx-budget'
+import { createDocumentRenderBudget } from './document-render-budget'
 import puppeteer, { type Browser } from 'puppeteer'
 import libreOfficeConvert from 'libreoffice-convert'
 import { join } from 'node:path'
@@ -178,23 +179,32 @@ export const normalizeDocumentTemplateTags = (xml: string): string => xml
 const renderDocxTemplate = (templateBytes: Buffer, context: Record<string, unknown>, language: Language_Preference): Buffer => {
   const zip = loadBoundedDocx(templateBytes)
   const conditions: CompiledDocumentConditions = new Map()
+  let largestXmlPartBytes = 0
   for (const [path, file] of Object.entries(zip.files)) {
     if (path.startsWith('word/') && path.endsWith('.xml') && !file.dir) {
-      zip.file(path, prepareWordConditionTags(file.asText(), conditions))
+      const xml = prepareWordConditionTags(file.asText(), conditions)
+      largestXmlPartBytes = Math.max(largestXmlPartBytes, Buffer.byteLength(xml))
+      zip.file(path, xml)
     }
   }
+  const budget = createDocumentRenderBudget(largestXmlPartBytes)
   let conditionError: DocumentConditionError | undefined
   let doc: Docxtemplater
   try {
     doc = new Docxtemplater(zip, {
+      modules: [budget.module],
       paragraphLoop: true,
       linebreaks: true,
       errorLogging: false,
       nullGetter: () => getFallbackValue(language),
       parser: (tag: string) => ({
-        get: (scope: unknown, parserContext: { scopeList?: unknown[] }) => {
+        get: (scope: unknown, parserContext: { scopeList?: unknown[], meta?: { part?: { module?: string } } }) => {
           const compiled = conditions.get(tag)
-          if (!compiled) return getDocumentTemplateTagValue(tag, scope, parserContext.scopeList)
+          if (!compiled) {
+            const value = getDocumentTemplateTagValue(tag, scope, parserContext.scopeList)
+            budget.inspectValue(value, parserContext.meta?.part?.module === 'loop')
+            return value
+          }
           try {
             return evaluateDocumentCondition(compiled.condition, path => {
               const normalized = path.startsWith('this.') ? path.slice(5) : path
@@ -218,7 +228,7 @@ const renderDocxTemplate = (templateBytes: Buffer, context: Record<string, unkno
   try {
     doc.render(context)
   } catch (error) {
-    throw conditionError ?? error
+    throw budget.failure ?? conditionError ?? error
   }
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
 }

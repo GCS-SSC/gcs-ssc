@@ -362,7 +362,7 @@ const createAuth = () => {
       }
     },
     account: {
-      storeStateStrategy: 'cookie',
+      storeStateStrategy: 'database',
       storeAccountCookie: false
     },
     plugins: [{

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc */
 import { computed, onScopeDispose, ref, watch } from 'vue'
@@ -18,7 +19,7 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
 import { FundingCaseAgreementForecastCreateSchema } from '~~/shared/types/schemas'
-import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, isCanonicalMoney, zeroMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 type ForecastVersionRow = Omit<BusinessRecordStateFields, 'approvalRuntimeId' | 'approvalRuntimeState' | 'routingSlipId'> & {
   id: string
@@ -120,8 +121,7 @@ const columns: TableColumnInput<ForecastVersionRow>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
-const ZERO_MONEY = '0.00' as Money
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, currency)
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value)
 
 const forecastFiscalYearOptions = computed<FiscalYearLookupItem[]>(() => {
   const byId = new Map<string, FiscalYearLookupItem>()
@@ -160,7 +160,7 @@ const versionRows = computed<ForecastVersionRow[]>(() => {
       workflowRuntimeState: forecast.workflowRuntimeState,
       lifecycleTerminus: forecast.lifecycleTerminus,
       lineCount: lines.length,
-      totalAmount: sumMoney(lines.map(line => line.egcs_fc_amount))
+      totalAmount: sumMoney(lines.map(line => line.egcs_fc_amount), currency)
     })
   }
 
@@ -177,7 +177,7 @@ const versionRows = computed<ForecastVersionRow[]>(() => {
         getStatusLabel(row.status),
         row.lineCount,
         row.totalAmount
-      ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch))
+      ].some(value => isCanonicalMoney(value) ? moneyMatchesSearch(value, normalizedSearch, locale.value) : String(value ?? '').toLowerCase().includes(normalizedSearch))
     })
     .sort((a, b) => {
       const fiscalYearCompare = a.fiscalYearDisplay.localeCompare(b.fiscalYearDisplay)
@@ -212,7 +212,7 @@ const getRepresentativeGroupedRow = (row: ForecastGroupedRow) => {
     ?? records.reduce<ForecastVersionRow | null>((latest, item) =>
       !latest || BigInt(item.version) > BigInt(latest.version) ? item : latest, null)
 }
-const getGroupedRowTotal = (row: ForecastGroupedRow) => getRepresentativeGroupedRow(row)?.totalAmount ?? ZERO_MONEY
+const getGroupedRowTotal = (row: ForecastGroupedRow) => getRepresentativeGroupedRow(row)?.totalAmount ?? zeroMoney(currency)
 const getGroupedForecastStatus = (row: ForecastGroupedRow) =>
   getRepresentativeGroupedRow(row)?.status ?? row.original.status
 const getForecastRoute = (row: ForecastVersionRow) =>

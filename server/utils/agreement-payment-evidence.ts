@@ -37,7 +37,7 @@ export const captureAgreementPaymentEvidence = async (
     fiscalYearId: input.egcs_fc_fiscalyear, currency: input.egcs_fc_currency,
     ...(options.excludePaymentId ? { excludePaymentId: options.excludePaymentId } : {})
   })
-  return { version: 1, capturedAt: new Date().toISOString(),
+  return { version: 2, capturedAt: new Date().toISOString(),
     selection: { fiscalYearId: input.egcs_fc_fiscalyear, fiscalYearDisplay, commitmentTypeId: input.egcs_fc_commitmenttype,
       currency: input.egcs_fc_currency, paymentType: input.egcs_fc_paymenttype, periodStart: input.egcs_fc_periodstart,
       periodEnd: input.egcs_fc_periodend, paymentAmount: input.egcs_fc_paymentamount }, financialInputs,

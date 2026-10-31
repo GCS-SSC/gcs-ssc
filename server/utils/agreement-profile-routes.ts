@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { useNitroApp } from 'nitropack/runtime'
 import { assertAgreementFinancialId } from './agreement-financial-ids'
 import { assertAgreementProponentType } from './agreement-proponent-type'
@@ -18,6 +19,7 @@ import {
   canAccessAgreementStream,
   isAgreementHoldbackBasisValid,
   mapAgreementWriteValues,
+  toAgreementProfileNumericDto,
   resolveAgreementRiskRatingContext,
   resolveAgreementStreamScopeContext,
   resolveAgreementSubtypeContext,
@@ -69,7 +71,7 @@ const resolveCurrentAgreementRiskScore = async (
   .where('_deleted', '=', false)
   .select('egcs_fc_riskscore')
   .executeTakeFirst()
-  .then(row => row?.egcs_fc_riskscore)
+  .then(row => row?.egcs_fc_riskscore == null ? row?.egcs_fc_riskscore : parseSafeDecimal(row.egcs_fc_riskscore))
 
 const resolveNextAgreementStreamId = (
   validated: FundingCaseAgreementProfilePatch,
@@ -301,8 +303,8 @@ const patchValidatedAgreementProfile = async (
         .selectAll()
         .executeTakeFirstOrThrow()
 
-      await emitAgreementProfileUpdated(event, db, agreementId, nextStreamId, rawBody, validated, updatedAgreement)
-      return updatedAgreement
+      await emitAgreementProfileUpdated(event, db, agreementId, nextStreamId, rawBody, validated, toAgreementProfileNumericDto(updatedAgreement))
+      return toAgreementProfileNumericDto(updatedAgreement)
     }
 
     const updatedAgreement = await db
@@ -313,8 +315,8 @@ const patchValidatedAgreementProfile = async (
       .returningAll()
       .executeTakeFirstOrThrow()
 
-    await emitAgreementProfileUpdated(event, db, agreementId, nextStreamId, rawBody, validated, updatedAgreement)
-    return updatedAgreement
+    await emitAgreementProfileUpdated(event, db, agreementId, nextStreamId, rawBody, validated, toAgreementProfileNumericDto(updatedAgreement))
+    return toAgreementProfileNumericDto(updatedAgreement)
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)
     throw error

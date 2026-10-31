@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- typed review runtime helpers */
 import type { Kysely, Selectable, Transaction } from 'kysely'
 import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
@@ -362,7 +363,9 @@ export const fetchRuntimeReviewSetWithReviews = async (
         runtimeItemId: String(review.egcs_cn_runtimeitem),
         publicationVersionId: String(review.publicationVersionId),
         publicationVersion: Number(review.publicationVersion),
-        egcs_cn_reviewresult: review.egcs_cn_reviewresult === null ? null : Number(review.egcs_cn_reviewresult),
+        order: parseSafeDecimal(String(review.order)),
+        egcs_cn_reviewresult: review.egcs_cn_reviewresult === null ? null : parseSafeDecimal(String(review.egcs_cn_reviewresult)),
+        egcs_cn_failurethreshold: review.egcs_cn_failurethreshold === null ? null : parseSafeDecimal(String(review.egcs_cn_failurethreshold)),
         egcs_cn_reviewtype: schema.reviewType,
         egcs_cn_name_en: schema.name.en,
         egcs_cn_name_fr: schema.name.fr
@@ -466,9 +469,9 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
         initiatedBy: input.creatorCommonUserId
       })
   const rootOrder = input.runtimeItemOrder ?? (runtime
-    ? Number((await input.db.selectFrom('Common_Runtime_Item')
+    ? parseSafeDecimal(String((await input.db.selectFrom('Common_Runtime_Item')
       .select(eb => eb.fn.max('egcs_cn_order').as('maximum')).where('egcs_cn_runtime', '=', runtimeMetadata.runtimeId)
-      .where('egcs_cn_parentruntimeitem', 'is', null).executeTakeFirst())?.maximum ?? 0) + 1
+      .where('egcs_cn_parentruntimeitem', 'is', null).executeTakeFirst())?.maximum ?? 0)) + 1
     : 1)
   const setItemId = await createRuntimeItem(input.db, {
     egcs_cn_runtime: runtimeMetadata.runtimeId, egcs_cn_parentruntimeitem: null,
@@ -529,9 +532,9 @@ export const createRuntimeReviewSet = async (input: CreateRuntimeReviewSetInput)
 
 const isConfiguredNegative = async (db: Transaction<Database>, review: {
   id: string | number
-  egcs_cn_reviewresult: number | null
+  egcs_cn_reviewresult: string | null
   egcs_cn_failonchecklistfailure: boolean
-  egcs_cn_failurethreshold: number | null
+  egcs_cn_failurethreshold: string | null
 }) => {
   const checklist = review.egcs_cn_failonchecklistfailure
     ? await db.selectFrom('Common_Checklist').select('egcs_cn_result')
@@ -539,7 +542,7 @@ const isConfiguredNegative = async (db: Transaction<Database>, review: {
     : null
   return (review.egcs_cn_failonchecklistfailure && checklist?.egcs_cn_result === 'fail')
     || (review.egcs_cn_failurethreshold !== null && review.egcs_cn_reviewresult !== null
-      && Number(review.egcs_cn_reviewresult) < Number(review.egcs_cn_failurethreshold))
+      && parseSafeDecimal(String(review.egcs_cn_reviewresult)) < parseSafeDecimal(String(review.egcs_cn_failurethreshold)))
 }
 
 export const activateRetriedApprovalRuntime = async (
@@ -635,7 +638,7 @@ export const advanceReviewRuntimeAfterTerminalItem = async (
     .where('egcs_cn_parentruntimeitem', '=', String(current.setItemId)).where('egcs_cn_kind', '=', 'review')
     .where('_deleted', '=', false).orderBy('egcs_cn_order', 'asc').forUpdate().execute()
   if (configuration.sequential && positive && !currentConfiguredNegative) {
-    const next = siblings.find(item => item.egcs_cn_order > current.reviewOrder && item.egcs_cn_state === 'pending')
+    const next = siblings.find(item => parseSafeDecimal(String(item.egcs_cn_order)) > parseSafeDecimal(String(current.reviewOrder)) && item.egcs_cn_state === 'pending')
     if (next) {
       await transitionRuntimeItem(db, {
         runtimeId: String(current.runtimeId), runtimeItemId: String(next.id), from: 'pending', to: 'active',
@@ -761,7 +764,7 @@ export const resumeSequentialRuntimeReviewSet = async (
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review.egcs_cn_runtimeitem')
     .select(['Common_Review.id', 'Common_Runtime_Item.id as itemId', 'Common_Runtime_Item.egcs_cn_state as state'])
     .where('Common_Review.egcs_cn_reviewset', '=', reviewSetId)
-    .where('Common_Runtime_Item.egcs_cn_order', '=', member.order).where('Common_Review._deleted', '=', false)
+    .where('Common_Runtime_Item.egcs_cn_order', '=', String(member.order)).where('Common_Review._deleted', '=', false)
     .where('Common_Runtime_Item._deleted', '=', false).executeTakeFirst()
   if (!review || (review.state !== 'pending' && review.state !== 'paused')) return null
   await transitionRuntimeItem(db, {
@@ -945,7 +948,7 @@ export const cloneDeniedRuntimeReview = async (
   const retriedReviewIds = new Map<string, string>()
   for (const sourceReview of sourceReviews) {
     const successorItem = successorItems.find(item => item.egcs_cn_kind === 'review'
-      && item.egcs_cn_order === sourceReview.itemOrder)
+      && parseSafeDecimal(String(item.egcs_cn_order)) === parseSafeDecimal(String(sourceReview.itemOrder)))
     if (!successorItem) throw new Error('Review-set retry did not copy every review item')
     const review = await db.insertInto('Common_Review').values({
       egcs_cn_helpers: null,
@@ -984,12 +987,12 @@ export const cloneDeniedRuntimeReview = async (
     .where('_deleted', '=', false)
     .execute()
   const itemPath = (
-    items: Array<{ id: string | number, egcs_cn_parentruntimeitem: string | number | null, egcs_cn_kind: string, egcs_cn_order: number }>,
+    items: Array<{ id: string | number, egcs_cn_parentruntimeitem: string | number | null, egcs_cn_kind: string, egcs_cn_order: string }>,
     itemId: string
   ): string => {
     const item = items.find(candidate => String(candidate.id) === itemId)
     if (!item) throw new Error('Retry runtime item path is incomplete')
-    const segment = `${item.egcs_cn_kind}:${item.egcs_cn_order}`
+    const segment = `${item.egcs_cn_kind}:${parseSafeDecimal(String(item.egcs_cn_order))}`
     return item.egcs_cn_parentruntimeitem === null
       ? segment
       : `${itemPath(items, String(item.egcs_cn_parentruntimeitem))}/${segment}`
@@ -1093,7 +1096,7 @@ export const cloneDeniedRuntimeReview = async (
   })
   const successorReviewItems = successorItems
     .filter(candidate => candidate.egcs_cn_kind === 'review')
-    .sort((left, right) => left.egcs_cn_order - right.egcs_cn_order)
+    .sort((left, right) => parseSafeDecimal(String(left.egcs_cn_order)) - parseSafeDecimal(String(right.egcs_cn_order)))
   for (const [index, item] of successorReviewItems.entries()) {
     if (configuration.sequential && index > 0) continue
     await transitionRuntimeItem(db, {

@@ -1,3 +1,4 @@
+import { projectAgencyCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import {
@@ -55,7 +56,7 @@ export default defineEventHandler(async event => {
     const statsTotal = Number(statsResult?.total || 0)
 
     return {
-      items,
+      items: items.map(projectAgencyCostLineItem),
       total,
       stats: { total: statsTotal, active: statsTotal },
       page,

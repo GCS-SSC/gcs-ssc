@@ -8,7 +8,8 @@ import {
 } from '~~/server/utils/approval-runtime'
 import {
   authorizeReviewRuntimeAction,
-  canAuthorizeReviewRuntimeAction
+  canAuthorizeReviewRuntimeAction,
+  canAuthorizeWorkflowOwnerRead
 } from '~~/server/utils/review-runtime-access'
 import { ApprovalRuntimeQuerySchema } from '~~/shared/types/schemas/review-approval'
 import { requireAuthContext } from '~~/server/utils/authorize'
@@ -29,7 +30,8 @@ export default defineEventHandler(async event => {
 
   await authorizeReviewRuntimeAction(event, 'read_review_approval', runtimeEntity)
   const canManage = await canAuthorizeReviewRuntimeAction(event, 'manage_review_approval', runtimeEntity)
-  const runtime = await listApprovalRuntime(event, entityType, entityId, { canManage })
+  const hasOwnerRead = await canAuthorizeWorkflowOwnerRead(event, runtimeEntity)
+  const runtime = await listApprovalRuntime(event, entityType, entityId, { canManage, approvalOnly: !hasOwnerRead })
 
   if (!runtime) {
     return await respondApprovalRuntimeEntityNotFound(event, entityType)

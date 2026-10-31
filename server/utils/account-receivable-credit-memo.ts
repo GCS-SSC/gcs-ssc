@@ -1,7 +1,8 @@
+import { assertCurrencyMoneyValues } from './agreement-currency'
+import { compareMoney, minMoney, subtractMoney, zeroMoney } from '~~/shared/utils/money'
 import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import { readAccountReceivableCreditMemoLines } from './account-receivable-credit-memo-lines'
 import { allocateAgreementCoding, type AgreementCodingAllocation } from './agreement-coding-allocator'
-import { moneyFromCents, moneyToCents } from '~~/shared/utils/money'
 import { readAccountReceivablePoolBalance } from './account-receivable-pool-ledger'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 /* eslint-disable jsdoc/require-jsdoc -- Independently assigned repayment aggregate validates every included Agreement scope. */
@@ -65,9 +66,11 @@ const resolveRepaymentInputs = async (event: H3Event, db: Kysely<Database>, inpu
 
 export const createAccountReceivableCreditMemo = async (event: H3Event, input: AccountReceivableCreditMemoCreate) => {
   const context = await resolveRepaymentInputs(event, event.context.$db, input)
+  const currency = context.currency
   return await executeFreshAccountReceivableWrite(event, context, async (trx, auth, poolId) => {
     await authorizeWithFreshAuthContext(event, auth, 'account_receivable', 'create', { type: 'agency', agencyId: context.agencyId })
     await resolveRepaymentInputs(event, trx, input)
+    await assertCurrencyMoneyValues(event, context.currency, [input.egcs_fc_totalamount])
     const creatorId = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!creatorId) return await forbidden(event)
     // Different Proponents have different pool locks; serialize the Agency's memo sequence too.
@@ -79,12 +82,12 @@ export const createAccountReceivableCreditMemo = async (event: H3Event, input: A
       egcs_fc_totalamount: databaseMoneyValue(input.egcs_fc_totalamount),
       egcs_fc_agency: context.agencyId, egcs_fc_pool: poolId, egcs_fc_applicantrecipient: input.egcs_fc_applicantrecipient,
       egcs_fc_currency: context.currency, egcs_fc_number: (sequence.maximum ?? 0) + 1,
-      egcs_fc_receiveddate: sql<Date>`${input.egcs_fc_receiveddate.toISOString().slice(0, 10)}::date`, egcs_fc_amount: databaseMoneyValue(parseDatabaseMoney('0.00')),
+      egcs_fc_receiveddate: sql<Date>`${input.egcs_fc_receiveddate.toISOString().slice(0, 10)}::date`, egcs_fc_amount: databaseMoneyValue(zeroMoney(currency)),
       egcs_fc_reason: input.egcs_fc_reason, egcs_fc_createdby: creatorId,
       egcs_fc_status: await lockAgencyDraftStatus(trx, context.agencyId) }).returningAll().returning(sql<string>`egcs_fc_receiveddate::text`.as('egcs_fc_receiveddate')).executeTakeFirstOrThrow()
     await createPrimaryEntityAssignment(trx, 'fundingcaseaccountreceivablecreditmemo', String(created.id), creatorId)
     const automatic = await allocateCashCreditMemo(event, trx, String(created.id), context.receivableIds, input, context.agencyId, context.currency)
-    return { ...created, egcs_fc_amount: automatic ? input.egcs_fc_totalamount : parseDatabaseMoney('0.00'), egcs_fc_totalamount: input.egcs_fc_totalamount }
+    return { ...created, egcs_fc_amount: automatic ? input.egcs_fc_totalamount : zeroMoney(currency), egcs_fc_totalamount: input.egcs_fc_totalamount }
   }, { action: 'create' })
 }
 
@@ -105,28 +108,28 @@ const allocateCashCreditMemo = async (event: H3Event, trx: Transaction<Database>
     }
   }
   const allocations: Array<AgreementCodingAllocation & { receivableId: string }> = []
-  let remaining = moneyToCents(input.egcs_fc_totalamount)
+  let remaining = input.egcs_fc_totalamount
   let automatic = true
   for (const receivableId of receivableIds) {
-    if (remaining === BigInt(0)) break
+    if (compareMoney(remaining, zeroMoney(currency)) === 0) break
     const balance = await readAccountReceivableCashBalance(trx, receivableId, id)
-    const available = moneyToCents(balance.egcs_fc_available)
-    const assigned = available < remaining ? available : remaining
-    if (assigned <= BigInt(0)) continue
+    const available = balance.egcs_fc_available
+    const assigned = minMoney([available, remaining], currency)
+    if (compareMoney(assigned, zeroMoney(currency)) <= 0) continue
     const owner = await resolveAccountReceivableRuntimeContext(trx, receivableId)
     const debt = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_agencyfiscalyear').where('id', '=', receivableId).executeTakeFirstOrThrow()
     if (!owner) return await accountReceivableError(event, 'AR_REPAYMENT_OWNER')
     const retained = retainedByReceivable.get(receivableId)
     const result = await allocateAgreementCoding(event, trx, { agreementId: owner.agreementId, agencyId: owner.agencyId,
-      streamId: owner.streamId, amount: moneyFromCents(assigned), currency: owner.currency,
+      streamId: owner.streamId, amount: assigned, currency: owner.currency,
       agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), output: { kind: 'credit-memo', effectiveDate: new Date(input.egcs_fc_receiveddate).toISOString().slice(0, 10) },
       ...(retained?.policy ? { retainedPolicy: retained.policy } : {}),
       ...(retained ? { retainedCatalogScope: retained.scope ?? (evidence?.scope === 'agency' ? 'agency' as const : 'stream' as const), retainedCatalog: retained.accounts as unknown as import('@gcs-ssc/extensions/server').GcsCodingAllocationCatalogLine[] } : {}) })
     if (result === null) automatic = false
     else for (const line of result) allocations.push({ receivableId, ...line })
-    remaining -= assigned
+    remaining = subtractMoney(remaining, assigned)
   }
-  if (automatic && remaining > BigInt(0)) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
+  if (automatic && compareMoney(remaining, zeroMoney(currency)) > 0) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
   if (!automatic || !allocations.length) return false
   const first = allocations[0]!
   const capturedAccounts = (lines: typeof allocations) => lines.map(({ amount: _amount, allocationPolicy: _policy, receivableId: _receivable, ...account }) => account)
@@ -151,9 +154,10 @@ const allocateCashCreditMemo = async (event: H3Event, trx: Transaction<Database>
   await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo_Line').set({ _deleted: true }).where('egcs_fc_creditmemo', '=', id).where('_deleted', '=', false).execute()
   let lineNumber = 0
   for (const line of allocations) {
-    if (moneyToCents(line.amount) <= BigInt(0)) continue
+    if (compareMoney(line.amount, zeroMoney(currency)) <= 0) continue
     await validateCreditMemoCoding(trx, { egcs_fc_receivable: line.receivableId, egcs_fc_creditmemochartofaccount: line.agencyChartOfAccountId,
-      egcs_fc_agency: agencyId, egcs_fc_currency: currency, egcs_fc_allocationevidence: captured })
+      egcs_fc_agency: agencyId, egcs_fc_currency: currency, egcs_fc_allocationevidence: captured,
+      retainedAccountId: retainedByReceivable.has(line.receivableId) ? line.agencyChartOfAccountId : undefined })
     await trx.insertInto('Funding_Case_Account_Receivable_Credit_Memo_Line').values({ egcs_fc_creditmemo: id, egcs_fc_receivable: line.receivableId,
       egcs_fc_linenumber: ++lineNumber, egcs_fc_creditmemochartofaccount: line.agencyChartOfAccountId,
       egcs_fc_commitmentchartofaccount: line.commitmentChartOfAccountId ?? null,
@@ -177,19 +181,21 @@ export const assertAccountReceivableCreditMemoEditable = async (event: H3Event, 
 
 export const editAccountReceivableCreditMemo = async (event: H3Event, id: string, input: AccountReceivableCreditMemoEdit) => {
   const context = await authorizeAccountReceivableCreditMemo(event, id, 'update')
+  const currency = context.currency
   if (input.egcs_fc_receivable !== context.receivableId || input.egcs_fc_agency !== context.agencyId || input.egcs_fc_currency !== context.currency || input.egcs_fc_applicantrecipient !== context.applicantRecipientId) return await accountReceivableError(event, 'AR_REPAYMENT_OWNER')
   return await executeFreshAccountReceivableWrite(event, context, async (trx, auth) => {
     await assertAccountReceivableCreditMemoScopeAuthority(event, trx, auth, id, 'update')
     const memo = await assertAccountReceivableCreditMemoEditable(event, trx, id)
+    await assertCurrencyMoneyValues(event, memo.egcs_fc_currency, [input.egcs_fc_totalamount])
     const tags = input.egcs_fc_receivables ?? [input.egcs_fc_receivable]
     const retained = Array.isArray(memo.egcs_fc_receivables) ? memo.egcs_fc_receivables.map(String) : []
     if (JSON.stringify(tags) !== JSON.stringify(retained)) return await accountReceivableError(event, 'AR_REPAYMENT_OWNER')
     const automatic = memo.egcs_fc_allocationevidence && typeof memo.egcs_fc_allocationevidence === 'object' && !Array.isArray(memo.egcs_fc_allocationevidence)
-    if (automatic && (memo.egcs_fc_receiveddate !== new Date(input.egcs_fc_receiveddate).toISOString().slice(0, 10) || input.egcs_fc_totalamount !== parseDatabaseMoney(memo.egcs_fc_amount))) {
+    if (automatic && (memo.egcs_fc_receiveddate !== new Date(input.egcs_fc_receiveddate).toISOString().slice(0, 10) || compareMoney(input.egcs_fc_totalamount, parseDatabaseMoney(memo.egcs_fc_amount, currency)) !== 0)) {
       const dateChanged = memo.egcs_fc_receiveddate !== new Date(input.egcs_fc_receiveddate).toISOString().slice(0, 10)
       if (!await allocateCashCreditMemo(event, trx, id, retained, input, context.agencyId, context.currency, dateChanged ? null : memo.egcs_fc_allocationevidence)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
     }
-    if (!automatic && moneyToCents(input.egcs_fc_totalamount) < moneyToCents(parseDatabaseMoney(memo.egcs_fc_amount))) return await accountReceivableError(event, 'AR_INVALID_BASIS')
+    if (!automatic && compareMoney(input.egcs_fc_totalamount, parseDatabaseMoney(memo.egcs_fc_amount, currency)) < 0) return await accountReceivableError(event, 'AR_INVALID_BASIS')
     await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({
       egcs_fc_receiveddate: sql<Date>`${input.egcs_fc_receiveddate.toISOString().slice(0, 10)}::date`, egcs_fc_totalamount: databaseMoneyValue(input.egcs_fc_totalamount),
       egcs_fc_reason: input.egcs_fc_reason }).where('id', '=', id).execute()
@@ -199,6 +205,7 @@ export const editAccountReceivableCreditMemo = async (event: H3Event, id: string
 
 export const deleteAccountReceivableCreditMemo = async (event: H3Event, id: string) => {
   const context = await authorizeAccountReceivableCreditMemo(event, id, 'delete')
+  const currency = context.currency
   return await executeFreshAccountReceivableWrite(event, context, async (trx, auth) => {
     await assertAccountReceivableCreditMemoScopeAuthority(event, trx, auth, id, 'delete')
     const row = await assertAccountReceivableCreditMemoEditable(event, trx, id)
@@ -206,7 +213,7 @@ export const deleteAccountReceivableCreditMemo = async (event: H3Event, id: stri
     const workflow = await trx.selectFrom('Common_Runtime').select('id').where('egcs_cn_entitytype', '=', 'fundingcaseaccountreceivablecreditmemo').where('egcs_cn_entityid', '=', id).executeTakeFirst()
     if (!row.egcs_cn_isdraft || attachment || workflow) return await accountReceivableError(event, 'AR_RETAINED_EVIDENCE')
     await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo_Line').set({ _deleted: true }).where('egcs_fc_creditmemo', '=', id).where('_deleted', '=', false).execute()
-    await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ _deleted: true, egcs_fc_amount: databaseMoneyValue(parseDatabaseMoney('0.00')) }).where('id', '=', id).execute()
+    await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ _deleted: true, egcs_fc_amount: databaseMoneyValue(zeroMoney(currency)) }).where('id', '=', id).execute()
     await trx.updateTable('Common_Entity_Assignment').set({ _deleted: true }).where('egcs_cn_entitytype', '=', 'fundingcaseaccountreceivablecreditmemo').where('egcs_cn_entityid', '=', id).execute()
     return { success: true }
   }, { action: 'delete', target: { entityType: 'fundingcaseaccountreceivablecreditmemo', entityId: id } })
@@ -214,6 +221,7 @@ export const deleteAccountReceivableCreditMemo = async (event: H3Event, id: stri
 
 export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: string) => await executeFreshReadSnapshot(event, async () => {
   const context = await authorizeAccountReceivableCreditMemo(event, id)
+  const currency = context.currency
   const auth = await requireAuthContext(event)
   const db = event.context.$db
   const repayment = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll()
@@ -253,7 +261,7 @@ export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: s
   return { ...record, egcs_fc_automaticcoding: Boolean(repayment.egcs_fc_allocationevidence), egcs_fc_receivablelinks: receivableLinks, egcs_fc_lines: detailLines,
     egcs_fc_candeletelines: !repayment.egcs_fc_allocationevidence && editable && Boolean(assignment) && context.contexts.every(owner => auth.userAbilities.authorize('account_receivable', 'delete', owner.scope)), egcs_fc_receivablerecovered: balance.egcs_fc_recovered, egcs_fc_receivablereserved: balance.egcs_fc_reserved,
     egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding, egcs_fc_receivableavailable: balance.egcs_fc_available, egcs_fc_fundingagreement: String(debt.egcs_fc_fundingagreement), egcs_fc_agreementnumber: debt.egcs_fc_agreementnumber,
-    egcs_fc_totalamount: parseDatabaseMoney(repayment.egcs_fc_totalamount), egcs_fc_receivables: Array.isArray(repayment.egcs_fc_receivables) ? repayment.egcs_fc_receivables.map(String) : [], egcs_fc_receivablereadable: receivableReadable, egcs_fc_receivablereference: String(repayment.egcs_fc_receivable), egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount),
+    egcs_fc_totalamount: parseDatabaseMoney(repayment.egcs_fc_totalamount, currency), egcs_fc_receivables: Array.isArray(repayment.egcs_fc_receivables) ? repayment.egcs_fc_receivables.map(String) : [], egcs_fc_receivablereadable: receivableReadable, egcs_fc_receivablereference: String(repayment.egcs_fc_receivable), egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount, currency),
     egcs_fc_creditmemoreference: String(repayment.id),
     egcs_fc_debtorname_en: proponent.egcs_ar_legalname_en, egcs_fc_debtorname_fr: proponent.egcs_ar_legalname_fr,
     egcs_fc_cancomplete: editable && work, egcs_fc_canedit: editable && work, egcs_fc_canwork: work && repayment.egcs_fc_outcome === 'open',
@@ -266,7 +274,7 @@ export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: s
 
 export const validateCreditMemoCoding = async (db: Kysely<Database>, input: {
   egcs_fc_receivable: string; egcs_fc_creditmemochartofaccount: string; egcs_fc_agency: string; egcs_fc_allocationevidence?: import('~~/shared/types/database').JsonValue | null;
-  egcs_fc_currency: Database['Funding_Case_Account_Receivable_Credit_Memo']['egcs_fc_currency']
+  egcs_fc_currency: Database['Funding_Case_Account_Receivable_Credit_Memo']['egcs_fc_currency']; retainedAccountId?: string | null
 }) => {
   const context = await resolveAccountReceivableRuntimeContext(db, input.egcs_fc_receivable)
   const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll()
@@ -274,7 +282,7 @@ export const validateCreditMemoCoding = async (db: Kysely<Database>, input: {
   if (!context || !debt || debt.egcs_fc_outcome !== 'posted' || debt.egcs_fc_linkedreceivable || context.agencyId !== input.egcs_fc_agency
     || debt.egcs_fc_currency !== input.egcs_fc_currency) throw new Error('AR_REPAYMENT_OWNER')
   const automatic = input.egcs_fc_allocationevidence && typeof input.egcs_fc_allocationevidence === 'object' && !Array.isArray(input.egcs_fc_allocationevidence)
-  return await readAccountReceivableAccount(db, { id: input.egcs_fc_creditmemochartofaccount, agencyId: input.egcs_fc_agency,
+  return await readAccountReceivableAccount(db, { id: input.egcs_fc_creditmemochartofaccount, retainedAccountId: input.retainedAccountId, agencyId: input.egcs_fc_agency,
     streamId: context.streamId, agencyFiscalYearId: automatic ? undefined : String(debt.egcs_fc_agencyfiscalyear), currency: input.egcs_fc_currency, kind: 'credit_memo' })
 }
 
@@ -283,6 +291,6 @@ export const validateCreditMemoAmount = async (event: H3Event, db: Kysely<Databa
   const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_pool')
     .where('id', '=', input.egcs_fc_receivable).executeTakeFirstOrThrow()
   const pool = await readAccountReceivablePoolBalance(db, String(debt.egcs_fc_pool), { excludedCreditMemoId: excludedId })
-  if (moneyToCents(input.egcs_fc_amount) > moneyToCents(balance.egcs_fc_available)
-    || moneyToCents(input.egcs_fc_amount) > moneyToCents(pool.egcs_fc_availableamount)) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
+  if (compareMoney(input.egcs_fc_amount, balance.egcs_fc_available) > 0
+    || compareMoney(input.egcs_fc_amount, pool.egcs_fc_availableamount) > 0) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
 }

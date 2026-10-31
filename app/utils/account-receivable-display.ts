@@ -1,15 +1,14 @@
-import { formatMoneyText, parseMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
 
 /** Formats retained AR money; malformed draft values remain unavailable instead of becoming zero.
  * @param value - Exact amount entered or captured.
  * @param locale - Current interface locale.
- * @param currency - Inherited Agreement denomination.
  * @returns Localized amount or null for incomplete input.
  */
-export const formatAccountReceivableAmount = (value: string | null | undefined, locale: string, currency: string): string | null => {
-  if (value === null || value === undefined || value === '') return null
+export const formatAccountReceivableAmount = (value: Money | null | undefined, locale: string): string | null => {
+  if (value === null || value === undefined) return null
   try {
-    return formatMoneyText(parseMoneyText(value), locale, currency)
+    return formatMoneyText(parseMoney(value), locale)
   } catch {
     return null
   }

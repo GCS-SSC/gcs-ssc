@@ -122,7 +122,7 @@ export default defineEventHandler(async event => {
 
     const [paymentWithState] = await withBusinessRecordState(db, 'fundingcasepayment', [{
       ...payment,
-      egcs_fc_paymentamount: parseDatabaseMoney(payment.egcs_fc_paymentamount)
+      egcs_fc_paymentamount: parseDatabaseMoney(payment.egcs_fc_paymentamount, payment.egcs_fc_currency)
     }])
 
     return {
@@ -130,8 +130,8 @@ export default defineEventHandler(async event => {
       ...await readAccountReceivablePaymentOffset(db, paymentId, { liveMemoBalances }),
       lines: lines.map(line => ({
         ...line,
-        egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount),
-        commitment_line_amount: parseDatabaseMoney(line.commitment_line_amount)
+        egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount, payment.egcs_fc_currency),
+        commitment_line_amount: parseDatabaseMoney(line.commitment_line_amount, payment.egcs_fc_currency)
       }))
     }
   })

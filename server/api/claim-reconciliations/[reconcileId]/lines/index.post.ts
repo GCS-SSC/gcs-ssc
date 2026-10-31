@@ -1,3 +1,4 @@
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
@@ -55,6 +56,9 @@ export default defineEventHandler(async event => {
           .executeTakeFirst()
         if (!claimLine) return await notFound(event, 'CLAIM_LINE_NOT_FOUND', 'apiErrors.admin_common.not_found')
 
+        const currency = await assertAgreementCurrency(event, trx, runtime.agreementId)
+        await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_reconciled, validated.egcs_fc_sampled].filter(value => value != null))
+
         const created = await trx.insertInto('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
           .values({
             ...validated,
@@ -72,8 +76,8 @@ export default defineEventHandler(async event => {
         await syncAgreementClaimReconcileEditingStatus(trx, reconcileId)
         return {
           ...created,
-          egcs_fc_reconciled: parseDatabaseMoney(created.egcs_fc_reconciled),
-          egcs_fc_sampled: created.egcs_fc_sampled == null ? created.egcs_fc_sampled : parseDatabaseMoney(created.egcs_fc_sampled)
+          egcs_fc_reconciled: parseDatabaseMoney(created.egcs_fc_reconciled, currency),
+          egcs_fc_sampled: created.egcs_fc_sampled == null ? created.egcs_fc_sampled : parseDatabaseMoney(created.egcs_fc_sampled, currency)
         }
       },
       { action: 'create' }

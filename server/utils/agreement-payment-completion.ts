@@ -1,3 +1,4 @@
+import { zeroMoney, compareMoney } from '~~/shared/utils/money'
 import { assertAgreementPaymentCommitmentCurrent, getAgreementPaymentCommitmentViolation } from './agreement-payment-commitment-controls'
 import { assertPaymentRecoveryAllowed, withPaymentRecoveryErrors } from './payment-recovery-controls'
 import { rebuildAccountReceivablePaymentOffset } from './account-receivable-recovery'
@@ -31,11 +32,8 @@ import type {
   CompletionExecuteInput
 } from '~~/shared/types/schemas/completion'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
-import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { assertAgreementPaymentForecastCurrent, getAgreementPaymentForecastViolation } from './agreement-financial-budget-controls'
-
-const ZERO_MONEY = parseMoney('0')
 
 export const getAgreementPaymentCompletionRuntime = async (
   event: H3Event,
@@ -46,14 +44,14 @@ export const getAgreementPaymentCompletionRuntime = async (
     if (!context) return null
     const item = await resolveCompletionRecord(trx, 'fundingcasepayment', paymentId)
     const protection = await resolveBusinessStatusProtection(trx, 'fundingcasepayment', paymentId)
+    const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
+    if (!payment) return null
     const lineTotal = await getPaymentLineTotal(trx, paymentId)
-    const hasPositiveLineTotal = compareMoney(lineTotal, ZERO_MONEY) > 0
+    const hasPositiveLineTotal = compareMoney(lineTotal, zeroMoney(payment.egcs_fc_currency)) > 0
     const linesMatch = hasPositiveLineTotal && await paymentLineTotalMatchesPaymentAmount(trx, paymentId)
     const forecastViolation = item ? null : await getAgreementPaymentForecastViolation(trx, paymentId)
     const commitmentViolation = item ? false : await getAgreementPaymentCommitmentViolation(trx, paymentId)
     let recoveryBlocked = false
-    const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
-    if (!payment) return null
     try {
       await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, paymentId,
         applicantRecipientId: payment.egcs_fc_applicantrecipient,
@@ -123,7 +121,8 @@ export const executeAgreementPaymentCompletion = async (
         'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment'
       )
       .select([
-        'Funding_Case_Agreement_Payment.egcs_fc_status as egcs_fc_status'
+        'Funding_Case_Agreement_Payment.egcs_fc_status as egcs_fc_status',
+        'Funding_Case_Agreement_Payment.egcs_fc_currency as egcs_fc_currency'
       ])
       .where('Funding_Case_Agreement_Payment.id', '=', paymentId)
       .where('Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement', '=', context.agreementId)
@@ -154,7 +153,7 @@ export const executeAgreementPaymentCompletion = async (
     }
 
     const lineTotal = await getPaymentLineTotal(trx, paymentId)
-    if (compareMoney(lineTotal, ZERO_MONEY) <= 0) {
+    if (compareMoney(lineTotal, zeroMoney(lockedPayment.egcs_fc_currency)) <= 0) {
       return await badRequest(event, 'AGREEMENT_PAYMENT_LINES_REQUIRED', 'apiErrors.request.invalid_status')
     }
 

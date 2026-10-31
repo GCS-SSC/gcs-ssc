@@ -10,7 +10,7 @@ import {
   readTransferPaymentStreamSetupPatchBody
 } from '~~/server/utils/transfer-payment-stream-setup-routes'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
-import { isRiskRatingPinned } from '~~/server/utils/agreement-risk-rating'
+import { isRiskRatingPinned, toRiskRatingDto } from '~~/server/utils/agreement-risk-rating'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -65,7 +65,7 @@ export default defineEventHandler(async event => {
       if (Object.hasOwn(payload, 'egcs_tp_riskscore') && await isRiskRatingPinned(trx, streamId, riskRatingId)) {
         return await badRequest(event, 'RISK_RATING_WORKFLOW_REFERENCED', 'apiErrors.transfer_payment.risk_rating_workflow_referenced')
       }
-      return await executeTransferPaymentStreamSetupUpdate(event, trx
+      const updated = await executeTransferPaymentStreamSetupUpdate(event, trx
         .updateTable('Transfer_Payment_Stream_Risk_Rating')
         .set(payload)
         .where('id', '=', riskRatingId)
@@ -73,6 +73,7 @@ export default defineEventHandler(async event => {
         .where('_deleted', '=', false)
         .returningAll()
         .executeTakeFirstOrThrow())
+      return toRiskRatingDto(updated)
     }
   )
 })

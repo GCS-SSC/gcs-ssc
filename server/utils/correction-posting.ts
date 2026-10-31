@@ -1,7 +1,7 @@
+import { compareMoney, getCurrencyFractionDigits, zeroMoney } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Posting runs only within the locked Completion-linked workflow transaction. */
 import type { Kysely, Transaction } from 'kysely'
 import type { Database, JsonValue } from '~~/shared/types/database'
-import { parseMoney, moneyToCents } from '~~/shared/utils/money'
 import { databaseMoneyValue } from './database-money'
 import { hashPublicationDefinition } from './system-publication'
 import { readCorrectionLines, validateCorrectionPostingBasis } from './correction'
@@ -12,12 +12,12 @@ import { stageCorrectionOutcomeIntegrations } from './correction-notifications'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 export type CorrectionPacket = {
-  schemaVersion: 1
+  schemaVersion: 2
   correction: JsonValue
   lines: JsonValue
   sources: JsonValue
   attachments: JsonValue
-  calculation: { formula: string, moneyScale: 2, capacity: string }
+  calculation: { formula: string, moneyScale: number, capacity: string }
 }
 export type CorrectionTerminalOutcome = 'posted' | 'denied' | 'failed' | 'cancelled'
 
@@ -41,10 +41,10 @@ export const captureCorrectionPacket = async (db: DbClient, correctionId: string
       .where('attachment._deleted', '=', false).where('link._deleted', '=', false).orderBy('attachment.id').execute()
   ])
   return {
-    schemaVersion: 1, correction: retainJson(correction), lines: retainJson(lines), sources: retainJson(sources), attachments: retainJson(attachments),
+    schemaVersion: 2, correction: retainJson(correction), lines: retainJson(lines), sources: retainJson(sources), attachments: retainJson(attachments),
     calculation: {
       formula: 'original_paid + successful_jv_effect + prior_posted_corrections + adjustment',
-      moneyScale: 2, capacity: 'agreement_agency_chart_of_account'
+      moneyScale: getCurrencyFractionDigits(correction.egcs_fc_currency), capacity: 'agreement_agency_chart_of_account'
     }
   }
 }
@@ -156,7 +156,7 @@ export const postCorrection = async (
   if (hashPublicationDefinition(retainJson(lines)) !== hashPublicationDefinition(evidence.correctionPacket.lines)) {
     throw new Error('Correction lines differ from immutable submission evidence')
   }
-  const adjustments = lines.filter(line => moneyToCents(parseMoney(line.egcs_fc_adjustment)) !== BigInt(0))
+  const adjustments = lines.filter(line => compareMoney(line.egcs_fc_adjustment, zeroMoney(correction.egcs_fc_currency)) !== 0)
   await trx.insertInto('Funding_Case_Agreement_Correction_Adjustment').values(adjustments.map(line => ({
     egcs_fc_correction: correctionId, egcs_fc_fundingagreement: String(correction.egcs_fc_fundingagreement),
     egcs_fc_correctionline: String(line.id), egcs_fc_commitmentline: String(line.egcs_fc_commitmentline),

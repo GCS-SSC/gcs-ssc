@@ -45,17 +45,17 @@ RUN set -eux; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions eee1a9558bcfaf25bfd7789d7e1fddc76117bb71; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions ad8da21d10a576583e0e87fcc29f8353b0a35e69; \
   fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 5820c69b1cbc1be7f56471d1bb4d60b443e1b09e; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 3399640787546f100c7a2741d7dac85831003871; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 42dadd426023bdd9f5d81534a20e586c90079499; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 5f468d73607816a02988bf393af8fee65ebb8cb3; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 0eeb8a0ba13a5f56945001bd1a2a855d2a900d72; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation 7a87e56342f7de5d6b71d5269fb5c983945b4084; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 58f12fdddfebe3dd267ef9eb4fcec7ebf828062d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 3a07d1d11749df7112e0d27986feea7948920323; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 0f84b806b383cbdae49ec9f0e8db335b016b11ae; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 575402d6068ffe87bf4f1a0556688d734c11a3de; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 42b6ddd917c05752ac76aeeaccc6f33602e741db; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 1f75d859d7f6cf4fc0fd1a5ab8d8461a14d37624; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 7f46dc38d004462d2e8282932054550935a810ef; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 0af01ded58c0640c7133f79a051c015f018f4912; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 d92d738bdcc555c3378eb361d88896f2d8808fe1; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-gcnotify.git extensions/gcs-ssc-gcnotify 9da13146ac14ea4af59a8fb551c9baef75bcbefb
 
 RUN bun install --frozen-lockfile

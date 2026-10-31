@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
@@ -122,6 +123,9 @@ export default defineEventHandler(async event => {
       await readAssignedAgencyCustomFieldDefinitions(db, String(agreement.egcs_fc_transferpaymentstream)), agreement.egcs_fc_customfields)
 
     const [agreementWithState] = await withBusinessRecordState(db, 'fundingcaseagreement', [agreement])
+    if (!agreementWithState) {
+      return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
+    }
 
     const [canCreateChildRecords, canUpdate, canDelete] = await Promise.all([
       canAccessAgreement(context, 'create', agreementContext.scope, db),
@@ -131,10 +135,12 @@ export default defineEventHandler(async event => {
 
     return {
       ...agreementWithState,
+      egcs_fc_holdback: parseSafeDecimal(String(agreementWithState.egcs_fc_holdback)),
+      egcs_fc_riskscore: agreementWithState.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(agreementWithState.egcs_fc_riskscore)),
       risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, String(agreement.egcs_fc_transferpaymentstream), id),
       has_risk_rating_runs: await hasAgreementRiskRatingRuns(db, id),
       latest_risk_rating_run: await resolveLatestAgreementRiskRating(db, id),
-      risk_source: await resolveAgreementRiskSource(db, id, agreement.egcs_fc_riskscore === null ? null : Number(agreement.egcs_fc_riskscore)),
+      risk_source: await resolveAgreementRiskSource(db, id, agreement.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(agreement.egcs_fc_riskscore))),
       can_create_child_records_role: context.userAbilities.authorize('agreement', 'create', agreementContext.scope),
       can_update_child_records_role: context.userAbilities.authorize('agreement', 'update', agreementContext.scope),
       can_delete_child_records_role: context.userAbilities.authorize('agreement', 'delete', agreementContext.scope),

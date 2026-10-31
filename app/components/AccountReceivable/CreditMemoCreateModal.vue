@@ -2,6 +2,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Independent credit authoring and modal sessions have focused component coverage. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { MoneyInput } from '~~/shared/utils/money'
 import type { Currency_Codes } from '~~/shared/types/database'
 import type { CreditMemoCreateContext } from '~/utils/credit-memo-create-context'
 import { useBilingualValue } from '~/composables/useBilingualValue'
@@ -19,7 +20,7 @@ type State = {
   egcs_fc_applicantrecipient: string
   egcs_fc_receivable: string | undefined
   egcs_fc_receivables: string[]
-  egcs_fc_totalamount: string
+  egcs_fc_totalamount: MoneyInput
   egcs_fc_agency: string | undefined
   egcs_fc_currency: Currency_Codes | undefined
   egcs_fc_receiveddate: string | Date | null
@@ -61,7 +62,7 @@ watch([open, identity], ([isOpen]) => {
         egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient,
         egcs_fc_receivable: context.egcs_fc_receivable,
         egcs_fc_receivables: context.egcs_fc_receivable ? [context.egcs_fc_receivable] : [],
-        egcs_fc_totalamount: '',
+        egcs_fc_totalamount: undefined,
         egcs_fc_agency: context.egcs_fc_agency,
         egcs_fc_currency: context.egcs_fc_currency,
         egcs_fc_receiveddate: new Date().toISOString().slice(0, 10),

@@ -3,9 +3,9 @@
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AgreementClaimReconciliationTableLine } from '~~/shared/types/agreement-claim-reconciliation-ui'
-import { formatMoneyText, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, parseMoney, zeroMoney, subtractMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
-const { currency, lines = [], totalSubmitted = parseMoney('0'), totalReconciled = parseMoney('0'), totalSampled = parseMoney('0'), editMode = 'inline', actionPending = false } = defineProps<{
+const { currency, lines = [], totalSubmitted, totalReconciled, totalSampled, editMode = 'inline', actionPending = false } = defineProps<{
   currency: string
   lines?: AgreementClaimReconciliationTableLine[]
   totalSubmitted?: Money
@@ -16,21 +16,21 @@ const { currency, lines = [], totalSubmitted = parseMoney('0'), totalReconciled 
 }>()
 
 const emit = defineEmits<{
-  (event: 'update:reconciled' | 'update:sampled', id: string, value: string | null | undefined): void
+  (event: 'update:reconciled' | 'update:sampled', id: string, value: MoneyInput): void
   (event: 'update:rationale', id: string, value: string): void
   (event: 'edit', line: AgreementClaimReconciliationTableLine): void
 }>()
 
 const { locale, t } = useI18n()
 const { getGroupedDisclosureControlsId } = useGroupedDisclosureIds()
-const formatMoney = (value: Money): string => formatMoneyText(value, locale.value, currency)
+const formatMoney = (value: Money): string => formatMoneyText(value, locale.value)
 /**
  *
  * @param value
  */
-const tryParseMoney = (value: string | null | undefined): Money | null => {
+const tryParseMoney = (value: MoneyInput): Money | null => {
   try {
-    return value == null || value === '' ? null : parseMoney(value)
+    return value == null ? null : parseMoney(value)
   } catch {
     return null
   }
@@ -98,10 +98,10 @@ const sumLines = (groupLines: AgreementClaimReconciliationTableLine[], key: 'sub
   sumMoney(groupLines.flatMap(line => {
     const amount = tryParseMoney(line[key])
     return amount === null ? [] : [amount]
-  }))
+  }), currency)
 const getLineBalance = (line: AgreementClaimReconciliationTableLine) => line.balance
-  ?? subtractMoney(line.submittedAmount, tryParseMoney(line.reconciledAmount) ?? parseMoney('0'))
-const sumBalances = (groupLines: AgreementClaimReconciliationTableLine[]) => sumMoney(groupLines.map(getLineBalance))
+  ?? subtractMoney(line.submittedAmount, tryParseMoney(line.reconciledAmount) ?? zeroMoney(currency))
+const sumBalances = (groupLines: AgreementClaimReconciliationTableLine[]) => sumMoney(groupLines.map(getLineBalance), currency)
 const getCategoryLines = (category: ReconciliationCategoryGroup) => category.subsections.flatMap(subsection => subsection.lines)
 </script>
 
@@ -230,7 +230,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                     data-field-label-en="Reconciled amount" data-field-label-fr="Montant rapproché" :aria-label="t('agreement.claims.reconciled_amount_for', { name: line.name })"
                     class="w-40"
                     data-ui-target="agreement.claim-reconciliation-lines-table.line.reconciledAmount" @update:model-value="value => emit('update:reconciled', line.id, value)" />
-                  <span v-else>{{ formatMoney(tryParseMoney(line.reconciledAmount) ?? parseMoney('0')) }}</span>
+                  <span v-else>{{ formatMoney(tryParseMoney(line.reconciledAmount) ?? zeroMoney(currency)) }}</span>
                   <p v-if="line.editable && editMode === 'inline' && tryParseMoney(line.reconciledAmount) === null" :id="`reconciled-error-${line.id}`" class="mt-1 text-xs text-error">
                     {{ t('validation.invalid_number') }}
                   </p>
@@ -243,7 +243,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                     data-field-label-en="Sampled amount" data-field-label-fr="Montant échantillonné" :aria-label="t('agreement.claims.sampled_amount_for', { name: line.name })"
                     class="w-40"
                     data-ui-target="agreement.claim-reconciliation-lines-table.line.sampledAmount" @update:model-value="value => emit('update:sampled', line.id, value)" />
-                  <span v-else>{{ formatMoney(tryParseMoney(line.sampledAmount) ?? parseMoney('0')) }}</span>
+                  <span v-else>{{ formatMoney(tryParseMoney(line.sampledAmount) ?? zeroMoney(currency)) }}</span>
                 </td>
                 <td class="px-4 py-4">
                   <template v-if="editMode === 'inline'">
@@ -286,13 +286,13 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
             {{ t('agreement.claims.total') }}
           </th>
           <td class="px-4 py-4">
-            {{ formatMoney(totalSubmitted) }}
+            {{ formatMoney(totalSubmitted ?? zeroMoney(currency)) }}
           </td>
           <td class="px-4 py-4">
-            {{ formatMoney(totalReconciled) }}
+            {{ formatMoney(totalReconciled ?? zeroMoney(currency)) }}
           </td>
           <td class="px-4 py-4">
-            {{ formatMoney(totalSampled) }}
+            {{ formatMoney(totalSampled ?? zeroMoney(currency)) }}
           </td>
           <td class="px-4 py-4">
             <template v-if="editMode === 'action'">

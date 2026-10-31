@@ -3,7 +3,7 @@ import { sql, type Kysely, type Transaction } from 'kysely'
 import type { GcsExtensionAgreementFinancials, GcsExtensionPaymentCalculationInput, GcsExtensionPaymentCalculationResult } from '@gcs-ssc/extensions/server'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
-import { parseMoneyText } from '~~/shared/utils/money'
+import { parseMoney } from '~~/shared/utils/money'
 import { buildAgreementPaymentFinancialInputs, type PaymentPeriodPosition, type PaymentPeriodAmount, type PaymentReconciledPeriod, type PaymentCreditMemoSource } from './agreement-payment-policies'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 
@@ -163,7 +163,7 @@ const getClaimRows = async (db: Db, agreementId: string, currency: Currency_Code
     .execute()
 
   return rows.map(row => ({
-    amount: parseDatabaseMoney(row.amount),
+    amount: parseDatabaseMoney(row.amount, currency),
     month: row.month, periodStart: row.periodStart, periodEnd: row.month,
     claimId: String(row.claimId), applicantRecipientId: String(row.applicantRecipientId), isFinal: row.isFinal,
     fiscalYearOrder: Number(row.fiscal_year_order)
@@ -220,7 +220,7 @@ export const getCreditMemoSources = async (
       AND NOT debt._deleted AND NOT source._deleted
     ORDER BY debt.id, source.id
   `.execute(db)
-  return result.rows.map(row => ({ ...row, principal: parseDatabaseMoney(row.principal), creditAmount: parseDatabaseMoney(row.creditAmount) }))
+  return result.rows.map(row => ({ ...row, principal: parseDatabaseMoney(row.principal, currency), creditAmount: parseDatabaseMoney(row.creditAmount, currency) }))
 }
 
 /** Loads active forecast line amounts and their fiscal-period positions for an agreement. */
@@ -257,7 +257,7 @@ const getForecastRows = async (db: Db, agreementId: string, currency: Currency_C
     .execute() as Array<{ amount?: unknown, month?: unknown, fiscal_year_order?: unknown }>
 
   return rows.map(row => ({
-    amount: parseDatabaseMoney(row.amount),
+    amount: parseDatabaseMoney(row.amount, currency),
     month: Number(row.month ?? 0),
     fiscalYearOrder: Number(row.fiscal_year_order ?? 0)
   }))
@@ -309,7 +309,7 @@ const getBudgetSources = async (
     .execute() as Array<{ fiscal_year_order: unknown }>
 
   const normalizedRows = rows.map(row => ({
-    amount: parseDatabaseMoney(row.amount),
+    amount: parseDatabaseMoney(row.amount, currency),
     fiscalYearOrder: Number(row.fiscal_year_order ?? 0)
   }))
   return {
@@ -342,7 +342,7 @@ export const getAgreementPaymentCalculation = async (
   ] = await Promise.all([
     getClaimRows(db, agreementId, currency),
     agreementFinancials.getClaimRecoveryProjection().then(recoveries => recoveries.entries.filter(row => row.currency === currency).map(row => ({
-      amount: parseMoneyText(row.amount), month: row.month, fiscalYearOrder: Number(row.fiscalYearOrder)
+      amount: parseMoney(row.amount), month: row.month, fiscalYearOrder: Number(row.fiscalYearOrder)
     }))),
     getForecastRows(db, agreementId, currency),
     agreementFinancials.getCommitmentPaymentCapacity({
@@ -350,7 +350,7 @@ export const getAgreementPaymentCalculation = async (
       commitmentTypeId: input.commitmentTypeId,
       currency,
       ...(input.excludePaymentId ? { excludePaymentId: input.excludePaymentId } : {})
-    }).then(result => parseMoneyText(result.capacityAmount)),
+    }).then(result => parseMoney(result.capacityAmount)),
     getBudgetSources(db, agreementId, currency),
     agreementFinancials.getRecordedPaidToDate({ fiscalYearId: input.fiscalYearId, periodEnd: input.periodEnd, currency,
       ...(input.excludePaymentId ? { excludePaymentId: input.excludePaymentId } : {}) }),

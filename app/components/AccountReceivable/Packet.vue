@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { isCanonicalMoney, parseMoney, type Money } from '~~/shared/utils/money'
 import type { JsonValue } from '~~/shared/types/database'
 import type { AccountReceivableLine } from '~~/shared/types/account-receivable'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
@@ -13,15 +14,46 @@ type RecordValue = Record<string, JsonValue>
 const record = (value: JsonValue | undefined): RecordValue => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : {}
 const records = (value: JsonValue | undefined): RecordValue[] => Array.isArray(value) ? value.map(record) : []
 const packet = computed(() => record(submission.egcs_fc_packet))
+const supportedPacket = computed(() => packet.value.schemaVersion === (creditMemo ? 7 : 4))
 const header = computed(() => record(creditMemo ? packet.value.accountReceivableCreditMemo : packet.value.accountReceivable))
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
 const currency = computed(() => text(header.value.egcs_fc_currency))
-const amount = (value: JsonValue | undefined) => formatAccountReceivableAmount(typeof value === 'string' ? value : undefined, locale.value, currency.value) ?? t('common.not_available')
+/**
+ * Validates captured minor units against the retained receivable denomination.
+ * @param value - Exact amount captured in the packet.
+ * @returns Validated currency-bearing money.
+ */
+const capturedMoney = (value: JsonValue | undefined): Money => {
+  const parsed = parseMoney(value)
+  if (parsed.currency !== currency.value.toUpperCase()) throw new TypeError('Captured receivable money does not match its retained currency.')
+  return parsed
+}
+/**
+ * Formats valid retained money without inventing values for damaged evidence.
+ * @param value - Exact amount captured in the packet.
+ * @returns Localized monetary text or the unavailable label.
+ */
+const amount = (value: JsonValue | undefined) => {
+  try {
+    return formatAccountReceivableAmount(capturedMoney(value), locale.value) ?? t('common.not_available')
+  } catch {
+    return t('common.not_available')
+  }
+}
 const reference = computed(() => typeof header.value.id === 'string' ? header.value.id : t('common.not_available'))
 const coding = computed(() => records(packet.value.coding))
-const lines = computed(() => records(packet.value.lines).map(line => ({ ...line,
-  egcs_fc_coding: coding.value.filter(item => item.egcs_fc_receivableline === line.id)
-})) as unknown as AccountReceivableLine[])
+const lines = computed(() => {
+  try {
+    return records(packet.value.lines).map(line => ({ ...line,
+      egcs_fc_amount: capturedMoney(line.egcs_fc_amount),
+      egcs_fc_sourceamount: capturedMoney(line.egcs_fc_sourceamount),
+      egcs_fc_coding: coding.value.filter(item => item.egcs_fc_receivableline === line.id).map(item => ({ ...item,
+        egcs_fc_paidbasis: capturedMoney(item.egcs_fc_paidbasis), egcs_fc_amount: capturedMoney(item.egcs_fc_amount),
+        egcs_fc_sharedpaidbasis: capturedMoney(item.egcs_fc_sharedpaidbasis)
+      }))
+    })) as unknown as AccountReceivableLine[]
+  } catch { return null }
+})
 const creditMemoLines = computed(() => records(packet.value.lines))
 const attachments = computed(() => records(packet.value.attachments))
 const claimReductions = computed(() => records(packet.value.claimReductions))
@@ -52,7 +84,7 @@ const labels = computed(() => [
 </script>
 
 <template>
-  <CommonWorkflowPacket :title="t(creditMemo ? 'account_receivable.credit_memo_packet' : 'account_receivable.packet_title')" :packet-id="`account-receivable-${text(header.id)}-${submission.egcs_fc_canonicalhash}`" :captured-label="t('workflow.packet.submitted_at', { date: formatDate(submission.egcs_fc_submittedat) })" :hash="submission.egcs_fc_canonicalhash" :hash-label="t('workflow.packet.hash')">
+  <CommonWorkflowPacket v-if="supportedPacket" :title="t(creditMemo ? 'account_receivable.credit_memo_packet' : 'account_receivable.packet_title')" :packet-id="`account-receivable-${text(header.id)}-${submission.egcs_fc_canonicalhash}`" :captured-label="t('workflow.packet.submitted_at', { date: formatDate(submission.egcs_fc_submittedat) })" :hash="submission.egcs_fc_canonicalhash" :hash-label="t('workflow.packet.hash')">
     <template #summary>
       <p class="font-semibold">
         {{ reference }}
@@ -75,7 +107,7 @@ const labels = computed(() => [
         </div>
       </dl>
     </CommonSection>
-    <CommonSection v-if="creditMemo && typeof header.egcs_fc_receivableoutstanding === 'string'" :title="t('account_receivable.credit_memo_receivable')" :grid-cols="1">
+    <CommonSection v-if="creditMemo && isCanonicalMoney(header.egcs_fc_receivableoutstanding)" :title="t('account_receivable.credit_memo_receivable')" :grid-cols="1">
       <dl class="grid gap-4 text-sm sm:grid-cols-2">
         <div v-for="field in balanceFields" :key="field.key">
           <dt class="text-muted">
@@ -91,13 +123,17 @@ const labels = computed(() => [
       </p>
     </CommonSection>
     <CommonSection v-if="!creditMemo" :title="t('account_receivable.financial_lines')" :grid-cols="1">
-      <AccountReceivableSourceLines :lines="lines" :currency="currency">
+      <AccountReceivableSourceLines v-if="lines" :lines="lines" :currency="currency">
         <template #amount="{ line }">
           <p class="text-sm font-semibold">
             {{ t('account_receivable.established_amount') }}: {{ amount(line.egcs_fc_amount) }}
           </p>
         </template>
-      </AccountReceivableSourceLines><p class="text-sm text-muted">
+      </AccountReceivableSourceLines>
+      <p v-else class="text-sm text-muted">
+        {{ t('common.not_available') }}
+      </p>
+      <p class="text-sm text-muted">
         {{ t('account_receivable.basis_provenance') }}
       </p>
     </CommonSection>
@@ -211,4 +247,7 @@ const labels = computed(() => [
       </p>
     </CommonSection>
   </CommonWorkflowPacket>
+  <p v-else class="text-sm text-muted">
+    {{ t('common.not_available') }}
+  </p>
 </template>

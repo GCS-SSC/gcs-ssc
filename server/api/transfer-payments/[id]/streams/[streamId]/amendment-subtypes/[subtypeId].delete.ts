@@ -1,3 +1,4 @@
+import { isAmendmentSubtypeInUse } from '~~/server/utils/amendment-catalog-integrity'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
@@ -45,23 +46,7 @@ export default defineEventHandler(async event => {
         return await notFound(event, 'AMENDMENT_SUBTYPE_NOT_FOUND', 'apiErrors.transfer_payment.amendment_subtype_not_found')
       }
 
-      const amendmentInProgress = await trx
-        .selectFrom('Funding_Case_Agreement_Amendment_Subtype')
-        .innerJoin(
-          'Funding_Case_Agreement_Amendment',
-          'Funding_Case_Agreement_Amendment.id',
-          'Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendment'
-        )
-        .innerJoin('Common_Status', 'Common_Status.id', 'Funding_Case_Agreement_Amendment.egcs_fc_status')
-        .select('Funding_Case_Agreement_Amendment.id')
-        .where('Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendmentsubtype', '=', subtypeId)
-        .where('Funding_Case_Agreement_Amendment_Subtype._deleted', '=', false)
-        .where('Funding_Case_Agreement_Amendment._deleted', '=', false)
-        .where('Funding_Case_Agreement_Amendment.egcs_fc_isopen', '=', true)
-        .where('Common_Status.egcs_cn_terminal', '=', false)
-        .where('Common_Status._deleted', '=', false)
-        .forUpdate('Funding_Case_Agreement_Amendment_Subtype')
-        .executeTakeFirst()
+      const amendmentInProgress = await isAmendmentSubtypeInUse(trx, subtypeId)
 
       if (amendmentInProgress) {
         return await badRequest(

@@ -66,7 +66,7 @@ const refresh = async () => {
   status.value = 'pending'
   loadError.value = null
   try {
-    const url = getClientRequestUrl('/api/workflows/runtime')
+    const url = getClientRequestUrl('/api/workflows/approval-runtime')
     url.searchParams.set('entityType', requestTarget.entityType)
     url.searchParams.set('entityId', requestTarget.entityId)
     url.searchParams.set('purpose', 'approval_submission')
@@ -158,7 +158,7 @@ const metaItems = computed(() => context.value?.kind === 'proponent'
         <template #sidebar>
           <CommonTranslatedTabs v-model="selectedTab" ordering="localized" data-field-container="Page navigation state, not a business input field." :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
         </template>
-        <CommonWorkflowSection :entity-type="target.entityType" :entity-id="target.entityId" purpose="approval_submission" :can-edit="false" @changed="refresh" />
+        <CommonWorkflowSection :entity-type="target.entityType" :entity-id="target.entityId" purpose="approval_submission" :can-edit="false" approval-only @changed="refresh" />
       </CommonEntityEditorWorkspace>
     </template>
   </CommonDetailPage>

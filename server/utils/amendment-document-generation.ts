@@ -65,9 +65,9 @@ export const buildAmendmentDocumentContext = async (
     .where('egcs_fc_amendment', '=', amendmentId)
     .orderBy('id', 'desc').executeTakeFirst()
   const packet = submission?.egcs_fc_packet as AgreementApprovalSnapshot | undefined
-  const risk = packet?.schemaVersion === 3
+  const risk = packet
     ? packet.risk
-    : packet ? null : await readSubmissionRisk(db, { entityType: 'fundingcaseamendment', entityId: amendmentId })
+    : await readSubmissionRisk(db, { entityType: 'fundingcaseamendment', entityId: amendmentId })
   return {
     ...agreementContext,
     amendment: {

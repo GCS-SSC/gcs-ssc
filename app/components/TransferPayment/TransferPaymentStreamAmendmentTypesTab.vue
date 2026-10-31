@@ -38,6 +38,7 @@ const columns: TableColumnInput<TransferPaymentAmendmentTypeItem>[] = [
   { id: 'egcs_tp_amended', headerKey: 'transfer_payment.amended_type' },
   { id: 'name', accessorKey: 'egcs_tp_name_en', headerKey: 'common.name' },
   { accessorKey: 'egcs_tp_requiresamendmentsubtype', headerKey: 'transfer_payment.amendment_type_requires_subtype' },
+  { accessorKey: 'egcs_tp_active', headerKey: 'common.active' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -141,6 +142,9 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
         {{ t(row.original.egcs_tp_requiresamendmentsubtype ? 'common.yes' : 'common.no') }}
       </template>
 
+      <template #egcs_tp_active-cell="{ row }">
+        {{ t(row.original.egcs_tp_active ? 'common.yes' : 'common.no') }}
+      </template>
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
           <CommonActionButton
@@ -175,7 +179,8 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
       :pending="isSavingItem"
       @submit="saveItem">
       <template #default="{ state }">
-        <TransferPaymentFieldsTransferPaymentAmendmentTypeFields :model="state" />
+        <TransferPaymentFieldsTransferPaymentAmendmentTypeFields
+          :definition-locked="Boolean(state.in_use)" :model="state" />
       </template>
     </CommonFormDialog>
   </div>

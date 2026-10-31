@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useCrudModalPending } from '~/composables/useCrudModal'
@@ -18,7 +19,7 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementPaymentLineCreateSchema } from '~~/shared/types/schemas'
 import { formatAccountingDimension, formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
-import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, isCanonicalMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
   key: route => route.path,
@@ -165,15 +166,13 @@ const lines = computed<FundingCaseAgreementPaymentLineRow[]>(() => {
     line.fiscal_year_display,
     ...getAccountingDimensionSearchValues(line.accounting_dimensions),
     line.egcs_fc_amount
-  ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch.value)))
+  ].some(value => isCanonicalMoney(value) ? moneyMatchesSearch(value, normalizedSearch.value, locale.value) : String(value ?? '').toLowerCase().includes(normalizedSearch.value)))
 })
 const totalAmount = computed(() =>
-  sumMoney((payment.value?.lines ?? []).map((line: FundingCaseAgreementPaymentLineRow) => line.egcs_fc_amount))
+  payment.value ? sumMoney((payment.value.lines ?? []).map((line: FundingCaseAgreementPaymentLineRow) => line.egcs_fc_amount), payment.value.egcs_fc_currency) : null
 )
 
-const formatMoney = (value: Money) => payment.value?.egcs_fc_currency
-  ? formatMoneyText(value, locale.value, payment.value.egcs_fc_currency.toUpperCase())
-  : value
+const formatMoney = (value: Money | null) => value ? formatMoneyText(value, locale.value) : t('common.not_available')
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 const paymentPeriodLabel = (start: number, end: number) =>
   `${t(`agreement.payments.months.${MONTH_KEYS[start]}`)} - ${t(`agreement.payments.months.${MONTH_KEYS[end]}`)}`

@@ -7,7 +7,7 @@ import type {
   TransferPaymentStreamBudgetItem,
   TransferPaymentFinancialLimitsItem
 } from './schemas'
-import type { Money } from '../utils/money'
+import type { DecimalText, Money, MoneyInput } from '../utils/money'
 
 export interface TransferPaymentProfileRow extends TransferPaymentProfileItem, Record<string, unknown> {
   agency_name_en?: string
@@ -34,7 +34,7 @@ export interface TransferPaymentBudgetRow extends Omit<TransferPaymentBudgetItem
 }
 
 export type TransferPaymentBudgetForm = Partial<
-  Omit<TransferPaymentBudgetItem, 'egcs_tp_totalbudget'> & { egcs_tp_totalbudget: string }
+  Omit<TransferPaymentBudgetItem, 'egcs_tp_totalbudget'> & { egcs_tp_totalbudget: MoneyInput }
 >
 
 export interface TransferPaymentStreamBudgetRow extends Omit<TransferPaymentStreamBudgetItem, 'egcs_tp_totalbudget'>, Record<string, unknown> {
@@ -46,11 +46,11 @@ export interface TransferPaymentStreamBudgetRow extends Omit<TransferPaymentStre
 }
 
 export type TransferPaymentStreamBudgetForm = Partial<
-  Omit<TransferPaymentStreamBudgetItem, 'egcs_tp_totalbudget'> & { egcs_tp_totalbudget: string }
+  Omit<TransferPaymentStreamBudgetItem, 'egcs_tp_totalbudget'> & { egcs_tp_totalbudget: MoneyInput }
 >
 
 export interface TransferPaymentFinancialLimitsRow extends Omit<TransferPaymentFinancialLimitsItem, 'egcs_tp_maxallowableperrecipient'> {
-  egcs_tp_maxallowableperrecipient: Money
+  egcs_tp_maxallowableperrecipient: DecimalText
 }
 
 export type TransferPaymentFinancialLimitsForm = Partial<

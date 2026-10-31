@@ -17,10 +17,11 @@ type Db = Kysely<Database> | Transaction<Database>
 export const loadBudgetFundingSources = async (db: Db, lineIds: string[]) => {
   if (lineIds.length === 0) return []
   const rows = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item_Funding as funding')
+    .innerJoin('Funding_Case_Agreement_Budget_Line_Item as line', 'line.id', 'funding.egcs_fc_budgetlineitem')
     .innerJoin('Agency_Funding_Subtype as subtype', 'subtype.id', 'funding.egcs_fc_fundingsubtype')
     .innerJoin('Agency_Funding_Type as type', 'type.id', 'subtype.egcs_ay_fundingtype')
     .select([
-      'funding.id', 'funding.egcs_fc_budgetlineitem', 'funding.egcs_fc_fundingsubtype',
+      'funding.id', 'funding.egcs_fc_budgetlineitem', 'funding.egcs_fc_fundingsubtype', 'line.egcs_fc_currency as currency',
       databaseMoneyText(sql.ref('funding.egcs_fc_amount')).as('egcs_fc_amount'),
       'funding.egcs_fc_description_en', 'funding.egcs_fc_description_fr',
       'subtype.egcs_ay_name_en as funding_subtype_name_en',
@@ -34,7 +35,7 @@ export const loadBudgetFundingSources = async (db: Db, lineIds: string[]) => {
     .where('funding._deleted', '=', false)
     .orderBy('type.egcs_ay_name_en').orderBy('subtype.egcs_ay_name_en').orderBy('funding.id')
     .execute()
-  return rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) }))
+  return rows.map(({ currency, ...row }) => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, currency) }))
 }
 
 /**

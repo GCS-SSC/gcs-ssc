@@ -10,7 +10,7 @@ import { formatCorrectionReference } from '~~/shared/utils/correction'
 import { CorrectionEditSchema } from '~~/shared/types/schemas/correction'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import { correctionLineBalance, correctionBalanceTotals } from '~/utils/correction-financials'
-import { formatMoneyText, parseMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText, type Money, type MoneyInput } from '~~/shared/utils/money'
 import { AppFetchResponseError } from '~/utils/fetch-error'
 
 definePageMeta({ key: route => route.path, i18n: { paths: {
@@ -49,7 +49,7 @@ type FormState = {
   egcs_fc_requesteddate: string | Date | null
   egcs_fc_narrative_en: string
   egcs_fc_narrative_fr: string
-  egcs_fc_lines: Array<{ egcs_fc_commitmentline: string, egcs_fc_adjustment: string }>
+  egcs_fc_lines: Array<{ egcs_fc_commitmentline: string, egcs_fc_adjustment: MoneyInput }>
 }
 const state: Ref<FormState | null> = ref(null)
 const savedState: Ref<string> = ref('')
@@ -91,17 +91,17 @@ const tabs = [
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'lines' })
 type LineRow = CorrectionDetail['egcs_fc_lines'][number] & { index: number, balance: ReturnType<typeof correctionLineBalance> }
 const lineRows = computed<LineRow[]>(() => (correction.value?.egcs_fc_lines ?? []).map((line, index) => ({
-  ...line, index, balance: correctionLineBalance(line, state.value?.egcs_fc_lines[index]?.egcs_fc_adjustment ?? line.egcs_fc_adjustment)
+  ...line, index, balance: correctionLineBalance(line, state.value?.egcs_fc_lines[index] ? state.value.egcs_fc_lines[index].egcs_fc_adjustment : line.egcs_fc_adjustment, correction.value!.egcs_fc_currency)
 })))
-const totals = computed(() => correctionBalanceTotals(lineRows.value.map(line => line.balance)))
+const totals = computed(() => correction.value ? correctionBalanceTotals(lineRows.value.map(line => line.balance), correction.value.egcs_fc_currency) : null)
 const completionReady = computed(() => Boolean(
   totals.value?.hasAdjustments
   && lineRows.value.every(line => line.balance?.withinCommitment)
   && (state.value?.egcs_fc_narrative_en.trim() || state.value?.egcs_fc_narrative_fr.trim())
 ))
-const formatAmount = (amount: string | undefined | null) => amount === null || amount === undefined
+const formatAmount = (amount: Money | undefined | null) => amount === null || amount === undefined
   ? t('common.not_available')
-  : formatMoneyText(parseMoneyText(amount), locale.value, correction.value?.egcs_fc_currency ?? 'cad')
+  : formatMoneyText(amount, locale.value)
 const breadcrumbs = computed(() => [
   { label: t('agreement.title'), to: authorizedRouteLocation(correction.value?.egcs_fc_agreementreadable, localePath(appRouteLocations.agreements())) },
   { label: correction.value?.egcs_fc_agreementnumber ?? '', to: authorizedRouteLocation(correction.value?.egcs_fc_agreementreadable, localePath(appRouteLocations.agreementDetail(agreementId.value))) },

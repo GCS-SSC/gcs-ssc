@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Typed read-only workflow evidence projection. */
 import type { Kysely } from 'kysely'
 import { z } from 'zod'
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import type { Database, Entity_Type, JsonValue } from '~~/shared/types/database'
 import { QuestionnaireResponseEnvelopeSchema } from '~~/shared/types/schemas/questionnaire'
 import type {
@@ -107,7 +108,7 @@ export const getWorkflowSupplementaryInformation = async (
     const responses = readPinnedEvidence(() => QuestionnaireResponseEnvelopeSchema.parse(row.egcs_cn_response)).responses
     workflowByRuntimeId.get(runtimeId)!.collections.push({
       id: String(row.collectionId),
-      memberSequence: row.memberSequence!,
+      memberSequence: readPinnedEvidence(() => parseSafeDecimal(String(row.memberSequence))),
       name_en: publication.nameEn,
       name_fr: publication.nameFr,
       description_en: publication.descriptionEn,

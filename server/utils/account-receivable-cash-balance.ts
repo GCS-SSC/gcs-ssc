@@ -1,10 +1,15 @@
+import { subtractMoney } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc -- Credit Memo lines reduce their explicitly tagged receivable. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import { subtractMoney } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
 
+export const readAccountReceivableCurrency = async (db: Kysely<Database>, id: string) => (await db
+  .selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_currency')
+  .where('id', '=', id).executeTakeFirstOrThrow()).egcs_fc_currency
+
 export const readAccountReceivableCashBalance = async (db: Kysely<Database>, receivableId: string, excludedMemoId?: string) => {
+  const currency = await readAccountReceivableCurrency(db, receivableId)
   const row = (await sql<{ principal: string; recovered: string; reserved: string }>`SELECT
     coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Agreement_Account_Receivable_Line" line
       JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=line.egcs_fc_receivable
@@ -26,9 +31,9 @@ export const readAccountReceivableCashBalance = async (db: Kysely<Database>, rec
       JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
       JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
       WHERE memo.egcs_fc_receivable=${receivableId}::bigint AND recovery.egcs_fc_outcome='open' AND NOT recovery._deleted),0))::text AS reserved`.execute(db)).rows[0]!
-  const principal = parseDatabaseMoney(row.principal)
-  const recovered = parseDatabaseMoney(row.recovered)
-  const reserved = parseDatabaseMoney(row.reserved)
+  const principal = parseDatabaseMoney(row.principal, currency)
+  const recovered = parseDatabaseMoney(row.recovered, currency)
+  const reserved = parseDatabaseMoney(row.reserved, currency)
   const outstanding = subtractMoney(principal, recovered)
   return { egcs_fc_principal: principal, egcs_fc_recovered: recovered, egcs_fc_reserved: reserved,
     egcs_fc_outstanding: outstanding, egcs_fc_available: subtractMoney(outstanding, reserved) }

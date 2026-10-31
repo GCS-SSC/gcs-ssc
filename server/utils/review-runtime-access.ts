@@ -358,7 +358,11 @@ const authorizeApplicantRecipientRuntimeAction = async (
   const entityAction = action === 'delete_assessment_child' ? 'delete' : 'update'
   return await authorize(event, 'applicant_recipient', entityAction, async ({ context }) => {
     const canAccess = await canAccessApplicantRecipient(context, entityContext.entityId, entityAction, db)
-    return canAccess ? { bypass: true } : { denied: true }
+    const agencyId = entityContext.proponentAgencyContextId ?? entityContext.schemaAgencyId
+    const hasAgencyRole = !agencyId || context.userAbilities.authorize('applicant_recipient', entityAction, {
+      type: 'agency', agencyId
+    })
+    return canAccess && hasAgencyRole ? { bypass: true } : { denied: true }
   })
 }
 
@@ -539,14 +543,17 @@ const authorizeExtensionOwnerRole = async (
 const authorizeReviewRuntimeReadAccess = async (
   event: H3Event,
   entityContext: ReviewRuntimeEntityContext,
-  action: 'read_assessment' | 'list_review_sets' = 'read_assessment'
+  action: 'read_assessment' | 'list_review_sets' = 'read_assessment',
+  access: 'owner' | 'exact_item' = 'exact_item'
 ): Promise<AuthContext> => {
   const authContext = await requireAuthContext(event)
   const db = event.context.$db
   const extensionRuntime = await resolveExtensionAuthorizationRuntime(event, entityContext)
   if (entityContext.entityType.includes(':') && !extensionRuntime) return await forbidden(event)
   const exactItemTarget = getReviewRuntimeReadTarget(entityContext)
-  const approvalAssignment = await resolveApprovalItemGrant(authContext.userId, exactItemTarget, db)
+  const approvalAssignment = access === 'exact_item'
+    ? await resolveApprovalItemGrant(authContext.userId, exactItemTarget, db)
+    : null
   let hasInheritedOwnerRead = false
   try {
     if (entityContext.entityType === 'applicantrecipient') {
@@ -588,6 +595,26 @@ const authorizeReviewRuntimeReadAccess = async (
   }
 
   return await forbidden(event)
+}
+
+/** General workflow projections require owner Viewer access, beyond an exact approval assignment. */
+export const authorizeWorkflowOwnerRead = async (
+  event: H3Event,
+  entityContext: ReviewRuntimeEntityContext
+): Promise<AuthContext> => await authorizeReviewRuntimeReadAccess(event, entityContext, 'read_assessment', 'owner')
+
+/** Identifies whether full workflow and approval history is readable through owner Viewer permission. */
+export const canAuthorizeWorkflowOwnerRead = async (
+  event: H3Event,
+  entityContext: ReviewRuntimeEntityContext
+): Promise<boolean> => {
+  try {
+    await authorizeWorkflowOwnerRead(event, entityContext)
+    return true
+  } catch (error: unknown) {
+    if (getErrorStatusCode(error) === 403) return false
+    throw error
+  }
 }
 
 const authorizeFreshReviewRuntimeReadAccess = async (
@@ -812,19 +839,16 @@ export const resolveReviewRuntimeEntityFromReviewSet = async (
     .selectFrom('Common_Review_Set')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review_Set.egcs_cn_runtimeitem')
     .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Common_Runtime_Item.egcs_cn_runtime')
+    .innerJoin('Common_Review_Set_Setup', 'Common_Review_Set_Setup.id', 'Common_Review_Set.egcs_cn_reviewsetsetup')
     .leftJoin('Applicant_Recipient_Profile', join => join
       .onRef('Applicant_Recipient_Profile.id', '=', 'Common_Review_Set.egcs_cn_entityid')
       .on('Common_Review_Set.egcs_cn_entitytype', '=', 'applicantrecipient')
       .on('Applicant_Recipient_Profile._deleted', '=', false))
-    .leftJoin('Common_Review', join => join
-      .onRef('Common_Review.egcs_cn_reviewset', '=', 'Common_Review_Set.id')
-      .on('Common_Review._deleted', '=', false))
-    .leftJoin('Common_Review_Schema', 'Common_Review_Schema.id', 'Common_Review.egcs_cn_reviewschema')
     .select([
       'Common_Review_Set.egcs_cn_entitytype as entity_type',
       'Common_Review_Set.egcs_cn_entityid as entity_id',
       'Applicant_Recipient_Profile.id as applicant_recipient_id',
-      'Common_Review_Schema.egcs_cn_agency as proponent_schema_agency'
+      'Common_Review_Set_Setup.egcs_cn_agency as proponent_schema_agency'
     ])
     .where('Common_Review_Set.id', '=', reviewSetId)
     .where('Common_Review_Set._deleted', '=', false)
@@ -1535,6 +1559,11 @@ const executeFreshAuthorizedReviewRuntimeMutation = async <T>(
     const current = await requireLockedReviewRuntimeTarget(event, trx, entityContext)
     const workTarget = getReviewRuntimeReadTarget(current)
     if (!isAssignableEntityType(workTarget.entityType)) return await forbidden(event)
+    const agencyId = current.proponentAgencyContextId ?? current.schemaAgencyId
+    if (current.entityType === 'applicantrecipient' && agencyId
+      && !authContext.userAbilities.authorize('applicant_recipient', entityAction, { type: 'agency', agencyId })) {
+      return await forbidden(event)
+    }
     await authorizeFreshAssignedItem(
       event,
       trx,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { MoneyInput } from '~~/shared/utils/money'
 import type { GcsPaymentAmountCalculatorResult } from '@gcs-ssc/extensions/ui'
 import type { Currency_Codes } from '~~/shared/types/database'
 import type { FundingCaseAgreementPaymentForm } from '~~/shared/types/funding-case-agreement-ui'
@@ -16,7 +17,7 @@ const { agreementId, currency, paymentAmountCalculator, paymentCalculatorModel, 
   pending?: boolean
 }>()
 const emit = defineEmits<{
-  'amount': [value: string]
+  'amount': [value: MoneyInput]
   'calculator-result': [value: Record<string, unknown>]
   'calculator-payload': [key: string, value: Record<string, unknown>]
   'resolved-items': [field: string, items: AdminCommonLookupResponseItem[]]

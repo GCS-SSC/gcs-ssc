@@ -1,3 +1,4 @@
+import { isAmendmentTypeInUse } from '~~/server/utils/amendment-catalog-integrity'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { TransferPaymentAmendmentTypeSchema } from '~~/shared/types/schemas/transfer-payment'
 import { authorize } from '~~/server/utils/authorize'
@@ -50,24 +51,18 @@ export default defineEventHandler(async event => {
   try {
     return await executeFreshAuthorizedTransferPaymentStreamWrite(
       event, db, profileId, amendmentTypeContext.agencyId, streamId, 'update', async trx => {
-        const amendmentType = await trx.selectFrom('Transfer_Payment_Amendment_Type').select(['id', 'egcs_tp_amended'])
+        const amendmentType = await trx.selectFrom('Transfer_Payment_Amendment_Type').selectAll()
           .where('id', '=', amendmentTypeId).where('egcs_tp_transferpaymentstream', '=', streamId)
           .where('_deleted', '=', false).forUpdate().executeTakeFirst()
         if (!amendmentType) {
           return await notFound(event, 'AMENDMENT_TYPE_NOT_FOUND', 'apiErrors.transfer_payment.amendment_type_not_found')
         }
-        if (payload.egcs_tp_amended !== undefined && payload.egcs_tp_amended !== amendmentType.egcs_tp_amended) {
-          const reference = await trx.selectFrom('Funding_Case_Agreement_Amendment_Type')
-            .innerJoin('Funding_Case_Agreement_Amendment', 'Funding_Case_Agreement_Amendment.id', 'Funding_Case_Agreement_Amendment_Type.egcs_fc_amendment')
-            .select('Funding_Case_Agreement_Amendment_Type.id')
-            .where('Funding_Case_Agreement_Amendment_Type.egcs_fc_amendmenttype', '=', amendmentTypeId)
-            .where('Funding_Case_Agreement_Amendment_Type._deleted', '=', false)
-            .where('Funding_Case_Agreement_Amendment._deleted', '=', false)
-            .where('Funding_Case_Agreement_Amendment.egcs_fc_isopen', '=', true)
-            .forUpdate('Funding_Case_Agreement_Amendment_Type').executeTakeFirst()
-          if (reference) {
-            return await badRequest(event, 'AMENDMENT_TYPE_IN_USE', 'apiErrors.transfer_payment.amendment_type_in_use')
-          }
+        const definitionChanged = (payload.egcs_tp_amended !== undefined && payload.egcs_tp_amended !== amendmentType.egcs_tp_amended)
+          || (payload.egcs_tp_name_en !== undefined && payload.egcs_tp_name_en !== amendmentType.egcs_tp_name_en)
+          || (payload.egcs_tp_name_fr !== undefined && payload.egcs_tp_name_fr !== amendmentType.egcs_tp_name_fr)
+          || (payload.egcs_tp_requiresamendmentsubtype !== undefined && payload.egcs_tp_requiresamendmentsubtype !== amendmentType.egcs_tp_requiresamendmentsubtype)
+        if (definitionChanged && await isAmendmentTypeInUse(trx, amendmentTypeId)) {
+          return await badRequest(event, 'AMENDMENT_TYPE_IN_USE', 'apiErrors.transfer_payment.amendment_type_in_use')
         }
         return await trx.updateTable('Transfer_Payment_Amendment_Type').set(payload)
           .where('id', '=', amendmentTypeId).where('egcs_tp_transferpaymentstream', '=', streamId)

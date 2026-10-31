@@ -159,12 +159,12 @@ export default defineEventHandler(async event => {
     const positiveIds = new Set(states.filter(state => state.lifecycleTerminus === 'positive').map(state => String(state.id)))
 
     const years: SummaryFiscalYear[] = yearRows.map(row => ({ id: String(row.id), label: row.label, order: String(row.order) }))
-    const budgets: SummaryBudgetLine[] = budgetRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), budget: parseDatabaseMoney(row.budget) }))
+    const budgets: SummaryBudgetLine[] = budgetRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), budget: parseDatabaseMoney(row.budget, row.currency) }))
     const forecasts: SummaryForecast[] = forecastRows.map(row => ({ id: String(row.id), fiscalYearId: String(row.fiscalYearId), active: row.active, version: String(row.version) }))
-    const forecastLines: SummaryForecastLine[] = forecastLineRows.map(row => ({ ...row, id: String(row.id), forecastId: String(row.forecastId), fiscalYearId: String(row.fiscalYearId), budgetLineId: String(row.budgetLineId), amount: parseDatabaseMoney(row.amount) }))
-    const claims: SummaryClaimLine[] = claimRows.map(row => ({ ...row, id: String(row.id), claimId: String(row.claimId), fiscalYearId: String(row.fiscalYearId), budgetLineId: row.budgetLineId == null ? null : String(row.budgetLineId), amount: parseDatabaseMoney(row.amount) }))
-    const reconciliations: SummaryReconciliation[] = reconcileRows.map(row => ({ id: String(row.id), claimLineId: String(row.claimLineId), amount: parseDatabaseMoney(row.amount), positive: positiveIds.has(String(row.reconcileId)) }))
-    const payments: SummaryPayment[] = paymentRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), amount: parseDatabaseMoney(row.amount) }))
+    const forecastLines: SummaryForecastLine[] = forecastLineRows.map(row => ({ ...row, id: String(row.id), forecastId: String(row.forecastId), fiscalYearId: String(row.fiscalYearId), budgetLineId: String(row.budgetLineId), amount: parseDatabaseMoney(row.amount, row.currency) }))
+    const claims: SummaryClaimLine[] = claimRows.map(row => ({ ...row, id: String(row.id), claimId: String(row.claimId), fiscalYearId: String(row.fiscalYearId), budgetLineId: row.budgetLineId == null ? null : String(row.budgetLineId), amount: parseDatabaseMoney(row.amount, row.currency) }))
+    const reconciliations: SummaryReconciliation[] = reconcileRows.map(row => ({ id: String(row.id), claimLineId: String(row.claimLineId), amount: parseDatabaseMoney(row.amount, agreementCurrency), positive: positiveIds.has(String(row.reconcileId)) }))
+    const payments: SummaryPayment[] = paymentRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), amount: parseDatabaseMoney(row.amount, row.currency) }))
     const accounting = await getAgreementPaidAccountingProjection(db, agreementId, { paymentMode: 'finalized' })
     for (const entry of accounting.entries) {
       if (!years.some(year => year.id === entry.fiscalYearId)) years.push({

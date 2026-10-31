@@ -5,7 +5,7 @@ import type { AccountReceivableDetail } from '~~/shared/types/account-receivable
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
 import { accountReceivableReference, formatAccountReceivableAmount } from '~/utils/account-receivable-display'
-import { sumMoney } from '~~/shared/utils/money'
+import { sumMoney, type Money } from '~~/shared/utils/money'
 
 const { agreementId } = defineProps<{ agreementId: string }>()
 const { t, locale } = useI18n()
@@ -25,7 +25,7 @@ const { search, pagination, items, totalRecords, status, retry, refresh, respons
 const canCreate = computed(() => (response.value as { egcs_fc_cancreate?: boolean } | undefined)?.egcs_fc_cancreate === true)
 const tableRows = computed(() => items.value.map(receivable => ({
   ...receivable,
-  originalAmount: sumMoney(receivable.egcs_fc_lines.map(line => line.egcs_fc_amount))
+  originalAmount: sumMoney(receivable.egcs_fc_lines.map(line => line.egcs_fc_amount), receivable.egcs_fc_currency)
 })))
 type CollectionRow = typeof tableRows.value[number]
 const columns: TableColumnInput<CollectionRow>[] = [
@@ -37,7 +37,7 @@ const columns: TableColumnInput<CollectionRow>[] = [
   { id: 'method', headerKey: 'account_receivable.recovery_kind' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const amount = (value: string | null | undefined, currency: string | undefined) => currency ? formatAccountReceivableAmount(value, locale.value, currency) ?? t('common.not_available') : t('common.not_available')
+const amount = (value: Money | null | undefined) => formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 watch(() => agreementId, () => {
   createOpen.value = false
   deletingId.value = null
@@ -103,8 +103,8 @@ const created = async (id: string) => {
         </template>
         <template #amount-cell="{ row }">
           <div class="flex flex-col gap-1 tabular-nums">
-            <span class="text-sm font-semibold">{{ amount(row.original.egcs_fc_outcome === 'posted' ? row.original.egcs_fc_approvedamount : row.original.originalAmount, row.original.egcs_fc_currency) }}</span>
-            <span class="text-xs text-muted">{{ t('account_receivable.original_amount') }}: {{ amount(row.original.originalAmount, row.original.egcs_fc_currency) }}</span>
+            <span class="text-sm font-semibold">{{ amount(row.original.egcs_fc_outcome === 'posted' ? row.original.egcs_fc_approvedamount : row.original.originalAmount) }}</span>
+            <span class="text-xs text-muted">{{ t('account_receivable.original_amount') }}: {{ amount(row.original.originalAmount) }}</span>
           </div>
         </template>
         <template #year-cell="{ row }">

@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- Completion helpers expose typed contracts covered by focused runtime tests. */
 import type { H3Event } from 'h3'
 import type { Transaction } from 'kysely'
@@ -72,7 +73,7 @@ export const resolveReviewCompletionTerminalState = (input: {
     && input.failureThreshold !== null
     && input.reviewResult !== undefined
     && input.reviewResult !== null
-    && Number(input.reviewResult) < Number(input.failureThreshold)
+    && parseSafeDecimal(String(input.reviewResult)) < parseSafeDecimal(String(input.failureThreshold))
     ? 'unsuccessful'
     : 'succeeded'
 }
@@ -171,7 +172,7 @@ const applyCommonReviewCompletionSideEffects = async (
   const setup = readPublishedReviewSetup(context.setDefinition)
   const schema = readPublishedReviewSchema(context.schemaDefinition)
   if (!schema) throw new Error('Review completion has an invalid pinned schema definition')
-  const approval = setup.members.find(member => member.order === context.reviewOrder)?.approval
+  const approval = setup.members.find(member => member.order === parseSafeDecimal(String(context.reviewOrder)))?.approval
   if (approval) {
     if (await activateRetriedApprovalRuntime(trx, String(context.runtimeItemId), actor)) return
     await materializeCanonicalApprovalRuntime(trx, {

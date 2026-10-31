@@ -1,3 +1,5 @@
+import { assertCurrencyMoneyValues } from './agreement-currency'
+import { compareMoney, negateMoney, sumMoney, zeroMoney } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc -- Coding lines inherit the AR's exact assignment and protected transaction. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely } from 'kysely'
@@ -7,14 +9,12 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas/transfer-payment'
 import { z } from 'zod'
-import { moneyFromCents, moneyToCents, sumMoney, parseMoney } from '~~/shared/utils/money'
 import { authorizeAccountReceivable, assertAccountReceivableEditable, readAccountReceivableLines, readAccountReceivableCoding, allocateRetainedAccountReceivableCoding, validateAccountReceivableBasis, fiscalCapacity, freshCoding } from './account-receivable'
 import { executeFreshAccountReceivableWrite } from './account-receivable-context'
 import { accountReceivableError, readAccountReceivableSources } from './account-receivable-source'
 import { readAccountReceivableAccount } from './account-receivable-configuration'
 import { databaseMoneyValue, parseDatabaseMoney } from './database-money'
 
-const ZERO = parseMoney('0.00')
 export const readAccountReceivableAuthoringSources = async (db: Kysely<Database>, id: string) => {
   const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll().where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (debt.egcs_fc_linkedreceivable) {
@@ -34,10 +34,12 @@ export const readAccountReceivableAuthoringSources = async (db: Kysely<Database>
 
 export const writeAccountReceivableLine = async (event: H3Event, id: string, input: AccountReceivableLineCreate | AccountReceivableLinePatch, lineId?: string, options: { removeCoding?: boolean; recodeTo?: string } = {}) => {
   const context = await authorizeAccountReceivable(event, id, 'update')
+  const currency = context.currency
   if (lineId !== undefined && !isPositivePostgresBigintText(lineId)) return await accountReceivableError(event, 'AR_LINE_SET_STALE')
   const initial = await event.context.$db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_linkedreceivable').where('id', '=', id).executeTakeFirstOrThrow()
   return await executeFreshAccountReceivableWrite(event, { ...context, agreementIds: [context.agreementId] }, async trx => {
     const debt = await assertAccountReceivableEditable(event, trx, id)
+    await assertCurrencyMoneyValues(event, debt.egcs_fc_currency, [input.egcs_fc_amount])
     if (debt.egcs_fc_allocationevidence) return await accountReceivableError(event, 'AR_IMMUTABLE')
     let saved = lineId ? (await readAccountReceivableLines(trx, id)).find(line => String(line.id) === lineId) : undefined
     if (lineId && !saved) return await accountReceivableError(event, 'AR_LINE_SET_STALE')
@@ -52,15 +54,15 @@ export const writeAccountReceivableLine = async (event: H3Event, id: string, inp
       const other = (await readAccountReceivableLines(trx, id)).filter(line => line.id !== saved!.id && line.egcs_fc_originalline === saved!.egcs_fc_originalline && line.egcs_fc_accountreceivablechartofaccount === saved!.egcs_fc_accountreceivablechartofaccount)
       if (options.recodeTo) {
         if (options.recodeTo === saved.egcs_fc_accountreceivablechartofaccount || (await readAccountReceivableLines(trx, id)).length >= 500) return await accountReceivableError(event, 'AR_INVALID_BASIS')
-        const movedAmount = sumMoney([parseDatabaseMoney(current.amount), saved.egcs_fc_amount, ...other.map(line => line.egcs_fc_amount)])
-        if (moneyToCents(movedAmount) <= BigInt(0)) return await accountReceivableError(event, 'AR_INVALID_BASIS')
+        const movedAmount = sumMoney([parseDatabaseMoney(current.amount, currency), saved.egcs_fc_amount, ...other.map(line => line.egcs_fc_amount)], currency)
+        if (compareMoney(movedAmount, zeroMoney(currency)) <= 0) return await accountReceivableError(event, 'AR_INVALID_BASIS')
         const partitions = (await readAccountReceivableCoding(trx, id)).filter(row => row.egcs_fc_receivableline === saved!.id)
         let account
         let allocated: ReturnType<typeof allocateRetainedAccountReceivableCoding>
         try {
           account = await readAccountReceivableAccount(trx, { id: options.recodeTo, agencyId: context.agencyId,
             streamId: context.streamId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
-          allocated = allocateRetainedAccountReceivableCoding(movedAmount, partitions.map(row => ({ id: row.id, basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })))
+          allocated = allocateRetainedAccountReceivableCoding(movedAmount, partitions.map(row => ({ id: row.id, basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })), currency)
         } catch (error) { return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_ACCOUNT_UNAVAILABLE') }
         const { id: _lineId, ...retainedLine } = saved
         const replacement = await trx.insertInto('Funding_Case_Agreement_Account_Receivable_Line').values({ ...retainedLine,
@@ -78,7 +80,7 @@ export const writeAccountReceivableLine = async (event: H3Event, id: string, inp
         }
       }
       input = { egcs_fc_accountreceivablechartofaccount: saved.egcs_fc_accountreceivablechartofaccount,
-        egcs_fc_amount: moneyFromCents(-moneyToCents(sumMoney([parseDatabaseMoney(current.amount), ...other.map(line => line.egcs_fc_amount)]))) }
+        egcs_fc_amount: negateMoney(sumMoney([parseDatabaseMoney(current.amount, currency), ...other.map(line => line.egcs_fc_amount)], currency)) }
     }
     if (!saved) {
       const create = input as AccountReceivableLineCreate
@@ -101,11 +103,11 @@ export const writeAccountReceivableLine = async (event: H3Event, id: string, inp
         : { egcs_fc_claim: retained.egcs_fc_claim, egcs_fc_claimline: retained.egcs_fc_claimline, egcs_fc_reconcileline: retained.egcs_fc_reconcileline, egcs_fc_payment: retained.egcs_fc_payment,
             egcs_fc_periodstart: retained.egcs_fc_periodstart, egcs_fc_periodend: retained.egcs_fc_periodend, egcs_fc_sourceamount: databaseMoneyValue(retained.egcs_fc_sourceamount), egcs_fc_evidence: sql<JsonValue>`${JSON.stringify({ source: retained.egcs_fc_evidence, egcs_fc_debtorname_en: debtor.egcs_ar_legalname_en ?? debtor.egcs_ar_operatingname_en ?? '', egcs_fc_debtorname_fr: debtor.egcs_ar_legalname_fr ?? debtor.egcs_ar_operatingname_fr ?? '', egcs_fc_fiscalyeardisplay: year.egcs_ay_fiscalyeardisplay })}::jsonb` }
       const inserted = await trx.insertInto('Funding_Case_Agreement_Account_Receivable_Line').values({ ...values, egcs_fc_receivable: id, egcs_fc_fundingagreement: context.agreementId,
-        egcs_fc_sourcekey: create.egcs_fc_sourcekey, egcs_fc_amount: databaseMoneyValue(ZERO) }).returning('id').executeTakeFirstOrThrow()
+        egcs_fc_sourcekey: create.egcs_fc_sourcekey, egcs_fc_amount: databaseMoneyValue(zeroMoney(currency)) }).returning('id').executeTakeFirstOrThrow()
       for (const partition of coding) await trx.insertInto('Funding_Case_Agreement_Account_Receivable_Coding').values({ egcs_fc_receivable: id, egcs_fc_receivableline: String(inserted.id), egcs_fc_fundingagreement: context.agreementId,
         egcs_fc_commitmentline: partition.egcs_fc_commitmentline, egcs_fc_chartofaccount: partition.egcs_fc_chartofaccount, egcs_fc_agencychartofaccount: partition.egcs_fc_agencychartofaccount,
         egcs_fc_agencyfiscalyear: partition.egcs_fc_agencyfiscalyear, egcs_fc_periodstart: partition.egcs_fc_periodstart, egcs_fc_periodend: partition.egcs_fc_periodend,
-        egcs_fc_paidbasis: databaseMoneyValue(partition.egcs_fc_paidbasis), egcs_fc_sharedpaidbasis: databaseMoneyValue(partition.egcs_fc_sharedpaidbasis), egcs_fc_amount: databaseMoneyValue(ZERO),
+        egcs_fc_paidbasis: databaseMoneyValue(partition.egcs_fc_paidbasis), egcs_fc_sharedpaidbasis: databaseMoneyValue(partition.egcs_fc_sharedpaidbasis), egcs_fc_amount: databaseMoneyValue(zeroMoney(currency)),
         egcs_fc_accountingdimensions: sql<JsonValue>`${JSON.stringify(partition.egcs_fc_accountingdimensions)}::jsonb` }).execute()
       saved = (await readAccountReceivableLines(trx, id)).find(line => String(line.id) === String(inserted.id))!
     }
@@ -117,21 +119,21 @@ export const writeAccountReceivableLine = async (event: H3Event, id: string, inp
             claimRelated: debt.egcs_fc_claimrelated, advancePaymentRelated: debt.egcs_fc_advancepaymentrelated })
         : null
       if (refreshedSources) {
-        const snapshot = fiscalCapacity(refreshedSources, debt.egcs_fc_advancepaymentrelated)
+        const snapshot = fiscalCapacity(refreshedSources, debt.egcs_fc_advancepaymentrelated, currency)
         await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_fiscaloutstanding: snapshot === null ? null : databaseMoneyValue(snapshot) }).where('id', '=', id).execute()
       }
       const account = input.egcs_fc_accountreceivablechartofaccount
-        ? await readAccountReceivableAccount(trx, { id: input.egcs_fc_accountreceivablechartofaccount,
+        ? await readAccountReceivableAccount(trx, { id: input.egcs_fc_accountreceivablechartofaccount, retainedAccountId: saved.egcs_fc_accountreceivablechartofaccount,
             agencyId: context.agencyId, streamId: context.streamId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
         : null
       const partitions = (await readAccountReceivableCoding(trx, id)).filter(row => String(row.egcs_fc_receivableline) === String(saved.id))
-      if (moneyToCents(input.egcs_fc_amount) !== BigInt(0) && !partitions.some(row => moneyToCents(row.egcs_fc_paidbasis) > BigInt(0))) {
+      if (compareMoney(input.egcs_fc_amount, zeroMoney(currency)) !== 0 && !partitions.some(row => compareMoney(row.egcs_fc_paidbasis, zeroMoney(currency)) > 0)) {
         throw new Error('AR_NO_PAID_CODING')
       }
-      const allocated = allocateRetainedAccountReceivableCoding(input.egcs_fc_amount, partitions.map(row => ({ id: String(row.id), basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })))
+      const allocated = allocateRetainedAccountReceivableCoding(input.egcs_fc_amount, partitions.map(row => ({ id: String(row.id), basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })), currency)
       await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Line').set({ egcs_fc_amount: databaseMoneyValue(input.egcs_fc_amount), egcs_fc_accountreceivablechartofaccount: account ? String(account.id) : null,
         egcs_fc_accountreceivableaccountingdimensions: sql<JsonValue>`${JSON.stringify(account && String(account.id) === saved.egcs_fc_accountreceivablechartofaccount ? saved.egcs_fc_accountreceivableaccountingdimensions : account?.egcs_ay_accountingdimensions ?? [])}::jsonb` }).where('id', '=', String(saved.id)).execute()
-      for (const split of allocated) await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Coding').set({ egcs_fc_amount: databaseMoneyValue(split.amount), ...(refreshedSources ? { egcs_fc_sharedpaidbasis: databaseMoneyValue(freshCoding(refreshedSources, saved.egcs_fc_sourcekey, partitions.find(row => String(row.id) === split.id)!)?.egcs_fc_sharedpaidbasis ?? ZERO) } : {}) }).where('id', '=', split.id).execute()
+      for (const split of allocated) await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Coding').set({ egcs_fc_amount: databaseMoneyValue(split.amount), ...(refreshedSources ? { egcs_fc_sharedpaidbasis: databaseMoneyValue(freshCoding(refreshedSources, saved.egcs_fc_sourcekey, partitions.find(row => String(row.id) === split.id)!)?.egcs_fc_sharedpaidbasis ?? zeroMoney(currency)) } : {}) }).where('id', '=', split.id).execute()
       await validateAccountReceivableBasis(trx, id)
     } catch (error) { return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_INVALID_BASIS') }
     return { id: String(saved.id) }

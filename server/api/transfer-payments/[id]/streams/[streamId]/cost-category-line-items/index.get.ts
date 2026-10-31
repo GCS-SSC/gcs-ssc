@@ -1,3 +1,4 @@
+import { projectAgencyCostLineItem, projectStreamCostLineItem } from '~~/server/utils/cost-category-projection'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -112,5 +113,5 @@ export default defineEventHandler(async event => {
       .executeTakeFirst()
   ])
 
-  return buildListRouteResponse(items, countResult, statsResult, page, limit)
+  return buildListRouteResponse(items.map(item => projectAgencyCostLineItem(projectStreamCostLineItem(item))), countResult, statsResult, page, limit)
 })

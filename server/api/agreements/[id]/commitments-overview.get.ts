@@ -54,6 +54,7 @@ export default defineEventHandler(async event => {
         .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
         .select([
           'Funding_Case_Agreement_Commitment_Line.id as id',
+          'Funding_Case_Agreement_Commitment.egcs_fc_currency as currency',
           'Funding_Case_Agreement_Commitment_Line.egcs_fc_commitment as egcs_fc_commitment',
           'Funding_Case_Agreement_Commitment_Line.egcs_fc_commitmentlinenumber as egcs_fc_commitmentlinenumber',
           'Funding_Case_Agreement_Commitment_Line.egcs_fc_transferpaymentstreamchartofaccount as egcs_fc_transferpaymentstreamchartofaccount',
@@ -70,8 +71,8 @@ export default defineEventHandler(async event => {
 
     const commitmentsWithState = await withBusinessRecordState(db, 'fundingcaseagreementcommitment', commitments)
     return {
-      commitments: commitmentsWithState.map(commitment => ({ ...commitment, egcs_fc_totalamount: parseDatabaseMoney(commitment.egcs_fc_totalamount) })),
-      lines: lines.map(line => ({ ...line, egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount) }))
+      commitments: commitmentsWithState.map(commitment => ({ ...commitment, egcs_fc_totalamount: parseDatabaseMoney(commitment.egcs_fc_totalamount, commitment.egcs_fc_currency) })),
+      lines: lines.map(line => ({ ...line, egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount, line.currency) }))
     }
   })
 })

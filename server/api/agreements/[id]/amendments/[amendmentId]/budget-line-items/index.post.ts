@@ -1,6 +1,7 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { loadAgreementBudgetProponentName, resolveAgreementBudgetProponent } from '~~/server/utils/agreement-budget-proponent'
-import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
+import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema, FundingCaseAgreementBudgetLineItemCreateSchema } from '~~/shared/types/schemas'
 import { parseI18n } from '~~/server/utils/api-validate'
@@ -37,6 +38,7 @@ export default defineEventHandler(async event => {
     const proponentId = await resolveAgreementBudgetProponent(event, trx, { agreementId, proponentId: body.egcs_fc_applicantrecipient })
     await assertAgreementCurrency(event, trx, agreementId, body.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, body, undefined, String(year.id))
+    await assertCurrencyMoneyValues(event, body.egcs_fc_currency, [body.egcs_fc_totalamount, calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding!, ...(body.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)])
     await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...body, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding })
     await validateBudgetFundingSources(event, trx, currentContext.streamId, body.egcs_fc_fundingsources ?? [])
     const { egcs_fc_fundingsources, ...lineValues } = body
@@ -61,9 +63,10 @@ export default defineEventHandler(async event => {
     const amounts = await recalculateAgreementBudget(event, trx, inserted.id, currentContext.streamId)
     return {
       ...inserted,
+      egcs_fc_percentage: inserted.egcs_fc_percentage === null ? null : parseSafeDecimal(String(inserted.egcs_fc_percentage)),
       ...await loadAgreementBudgetProponentName(trx, proponentId),
-      egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
-      egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
+      egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount, inserted.egcs_fc_currency),
+      egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding, inserted.egcs_fc_currency),
       egcs_fc_fundingsources: await loadBudgetFundingSources(trx, [String(inserted.id)]),
       id: inserted.id,
       egcs_fc_fundingagreementbudgetfiscalyear: body.egcs_fc_fundingagreementbudgetfiscalyear

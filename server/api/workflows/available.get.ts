@@ -1,6 +1,6 @@
 import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
+import { authorizeWorkflowOwnerRead } from '~~/server/utils/review-runtime-access'
 import {
   resolveCompletionRuntimeEntityFromEntity,
   respondCompletionRuntimeEntityNotFound
@@ -27,7 +27,7 @@ export default defineEventHandler(async event => {
     ?? await resolveCompletionRuntimeEntityFromEntity(event.context.$db, query.entityType, query.entityId)
   if (!context) return await respondCompletionRuntimeEntityNotFound(event, query.entityType)
   if (extensionRuntime) await authorizeExtensionLifecycleRead(event, extensionRuntime)
-  else await authorizeReviewRuntimeAction(event, 'read_assessment', context)
+  else await authorizeWorkflowOwnerRead(event, context)
 
   const definition = await resolveEntityTypeLifecycleDefinition(event.context.$db, context.entityType)
   if (definition?.standardWorkflow !== 'explicit') return { items: [] }

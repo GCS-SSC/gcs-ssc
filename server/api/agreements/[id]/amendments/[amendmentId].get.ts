@@ -1,3 +1,4 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
@@ -24,12 +25,12 @@ export default defineEventHandler(async event => {
     const [types, subtypes, budgetVersion, activityVersion, agreementAmendable, amendmentsWithState, statusProtection] = await Promise.all([
       db.selectFrom('Funding_Case_Agreement_Amendment_Type')
         .innerJoin('Transfer_Payment_Amendment_Type', 'Transfer_Payment_Amendment_Type.id', 'Funding_Case_Agreement_Amendment_Type.egcs_fc_amendmenttype')
-        .select(['Transfer_Payment_Amendment_Type.id as id', 'Transfer_Payment_Amendment_Type.egcs_tp_amended as egcs_tp_amended', 'Transfer_Payment_Amendment_Type.egcs_tp_name_en as egcs_tp_name_en', 'Transfer_Payment_Amendment_Type.egcs_tp_name_fr as egcs_tp_name_fr'])
+        .select(['Transfer_Payment_Amendment_Type.id as id', 'Transfer_Payment_Amendment_Type.egcs_tp_amended as egcs_tp_amended', 'Transfer_Payment_Amendment_Type.egcs_tp_name_en as egcs_tp_name_en', 'Transfer_Payment_Amendment_Type.egcs_tp_name_fr as egcs_tp_name_fr', 'Transfer_Payment_Amendment_Type.egcs_tp_active'])
         .where('Funding_Case_Agreement_Amendment_Type.egcs_fc_amendment', '=', amendmentId)
         .where('Funding_Case_Agreement_Amendment_Type._deleted', '=', false).execute(),
       db.selectFrom('Funding_Case_Agreement_Amendment_Subtype')
         .innerJoin('Transfer_Payment_Amendment_Subtype', 'Transfer_Payment_Amendment_Subtype.id', 'Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendmentsubtype')
-        .select(['Transfer_Payment_Amendment_Subtype.id as id', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_en as egcs_tp_name_en', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_fr as egcs_tp_name_fr'])
+        .select(['Transfer_Payment_Amendment_Subtype.id as id', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_en as egcs_tp_name_en', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_fr as egcs_tp_name_fr', 'Transfer_Payment_Amendment_Subtype.egcs_tp_active'])
         .where('Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendment', '=', amendmentId)
         .where('Funding_Case_Agreement_Amendment_Subtype._deleted', '=', false).execute(),
       db.selectFrom('Funding_Case_Agreement_Budget_Version').select('id').where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).executeTakeFirst(),
@@ -48,6 +49,7 @@ export default defineEventHandler(async event => {
     const hasUpdateRole = actor.userAbilities.authorize('agreement', 'update', context.scope)
     return {
       ...amendmentsWithState[0],
+      egcs_fc_proposedriskscore: amendment.egcs_fc_proposedriskscore == null ? null : parseSafeDecimal(String(amendment.egcs_fc_proposedriskscore)),
       egcs_fc_changerisk: completed ? amendment.egcs_fc_changerisk : riskManaged || amendment.egcs_fc_changerisk,
       risk_workflow_managed: riskManaged,
       has_risk_rating_runs: riskHistory,

@@ -143,6 +143,7 @@ const {
   purpose = 'standard',
   canEdit = true,
   refreshKey = 0,
+  approvalOnly = false,
   hideWhenUnconfigured = false,
   showPreActionWhenUnconfigured = false,
   preActionShowHeader = true,
@@ -161,6 +162,7 @@ const {
   purpose?: Workflow_Purpose
   canEdit?: boolean
   refreshKey?: number
+  approvalOnly?: boolean
   hideWhenUnconfigured?: boolean
   showPreActionWhenUnconfigured?: boolean
   preActionShowHeader?: boolean
@@ -198,9 +200,9 @@ const availableWorkflows: Ref<AvailableStandardWorkflow[]> = ref([])
 const isLoadingAvailable: Ref<boolean> = ref(false)
 const availableWorkflowsStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 let availableWorkflowsRequestGeneration = 0
-const endpoint = computed(() => `/api/workflows/runtime?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}${selectedAttemptId.value ? `&runtimeId=${selectedAttemptId.value}` : ''}`)
+const endpoint = computed(() => `/api/workflows/${approvalOnly ? 'approval-runtime' : 'runtime'}?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}${selectedAttemptId.value ? `&runtimeId=${selectedAttemptId.value}` : ''}`)
 const { data, refresh, status, error = ref(undefined) } = await useFetch<RuntimeResponse, Error, string>(endpoint)
-const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}`)
+const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}:${approvalOnly}`)
 const helpDraftRevision = ref(0)
 watch(() => JSON.stringify(responses.value), () => {
   helpDraftRevision.value += 1

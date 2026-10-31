@@ -9,7 +9,6 @@ import { citext } from '@electric-sql/pglite/contrib/citext'
 import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import pg from 'pg'
 import type { Database } from '~~/shared/types/database'
-import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import {
   buildPostgresHealthPoolConfig,
   buildPostgresPoolConfig,
@@ -171,7 +170,7 @@ const createDatabase = (dependencies: DatabaseRuntimeDependencies): Omit<Databas
 
   if (databaseUrl) {
     const timeouts = resolvePostgresTimeoutConfig(config)
-    pg.types.setTypeParser(pg.types.builtins.NUMERIC, parseSafeDecimal)
+    pg.types.setTypeParser(pg.types.builtins.NUMERIC, String)
     pg.types.setTypeParser(pg.types.builtins.DATE, parsePostgresDate)
     pg.defaults.parseInputDatesAsUTC = true
 
@@ -206,7 +205,7 @@ const createDatabase = (dependencies: DatabaseRuntimeDependencies): Omit<Databas
     extensions: { citext, pg_trgm },
     parsers: {
       [pgliteTypes.INT8]: String,
-      [pgliteTypes.NUMERIC]: parseSafeDecimal
+      [pgliteTypes.NUMERIC]: String
     }
   }).dialect
   const database = new Kysely<Database>({ dialect: createAuditDialect(dialect, true, audit) })

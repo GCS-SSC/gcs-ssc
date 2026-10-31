@@ -33,11 +33,19 @@ const readRoute = defineEventHandler(async event => {
   if (typeIds.length === 0) return { items: [], total: 0, page: 1, limit: 0 }
   const items = await db.selectFrom('Transfer_Payment_Amendment_Subtype')
     .innerJoin('Transfer_Payment_Amendment_Subtype_Type', 'Transfer_Payment_Amendment_Subtype_Type.egcs_tp_amendmentsubtype', 'Transfer_Payment_Amendment_Subtype.id')
-    .select(['Transfer_Payment_Amendment_Subtype.id as id', 'egcs_tp_name_en', 'egcs_tp_name_fr'])
+    .select(['Transfer_Payment_Amendment_Subtype.id as id', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'Transfer_Payment_Amendment_Subtype.egcs_tp_active'])
     .distinct()
     .where('Transfer_Payment_Amendment_Subtype.egcs_tp_transferpaymentstream', '=', context.streamId)
     .where('Transfer_Payment_Amendment_Subtype_Type.egcs_tp_amendmenttype', 'in', typeIds)
     .where('Transfer_Payment_Amendment_Subtype._deleted', '=', false)
+    .where(eb => query.amendmentId
+      ? eb.or([
+          eb('Transfer_Payment_Amendment_Subtype.egcs_tp_active', '=', true),
+          eb.exists(eb.selectFrom('Funding_Case_Agreement_Amendment_Subtype as retained')
+            .select('retained.id').whereRef('retained.egcs_fc_amendmentsubtype', '=', 'Transfer_Payment_Amendment_Subtype.id')
+            .where('retained.egcs_fc_amendment', '=', query.amendmentId).where('retained._deleted', '=', false))
+        ])
+      : eb('Transfer_Payment_Amendment_Subtype.egcs_tp_active', '=', true))
     .where('Transfer_Payment_Amendment_Subtype_Type._deleted', '=', false)
     .orderBy('Transfer_Payment_Amendment_Subtype.id', 'asc').execute()
   return { items, total: items.length, page: 1, limit: items.length }

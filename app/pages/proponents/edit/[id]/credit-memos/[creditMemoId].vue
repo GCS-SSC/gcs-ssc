@@ -11,7 +11,7 @@ import { AppFetchResponseError } from '~/utils/fetch-error'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 import { useProponentCreditMemoDetail } from '~/composables/useProponentCreditMemoDetail'
 import { useBilingualValue } from '~/composables/useBilingualValue'
-import { formatMoneyText } from '~~/shared/utils/money'
+import { formatMoneyText, type MoneyInput } from '~~/shared/utils/money'
 
 definePageMeta({ key: route => route.path, i18n: { paths: { en: '/proponents/edit/[id]/credit-memos/[creditMemoId]', fr: '/promoteurs/modifier/[id]/notes-de-credit/[creditMemoId]' } } })
 const route = useRoute()
@@ -50,7 +50,7 @@ type FormState = {
   egcs_fc_applicantrecipient: string
   egcs_fc_receivable: string
   egcs_fc_receivables: string[]
-  egcs_fc_totalamount: string
+  egcs_fc_totalamount: MoneyInput
   egcs_fc_agency: string
   egcs_fc_currency: AccountReceivableCreditMemoDetail['egcs_fc_currency']
   egcs_fc_receiveddate: string | Date | null
@@ -167,7 +167,7 @@ const save = async () => {
           <div v-if="selectedTab === 'summary'" class="space-y-8" data-testid="credit-memo-summary" data-help-target="proponent.credit-memo.summary" data-help-kind="section">
             <CommonSection :title="t('account_receivable.credit_memo')" badge="01">
               <CommonValueCard :label="t('account_receivable.received_date')" :value="formatDate(creditMemo.egcs_fc_receiveddate)" />
-              <CommonValueCard :label="t('account_receivable.credit_memo_amount')" :value="formatMoneyText(creditMemo.egcs_fc_totalamount, locale, creditMemo.egcs_fc_currency.toUpperCase())" />
+              <CommonValueCard :label="t('account_receivable.credit_memo_amount')" :value="formatMoneyText(creditMemo.egcs_fc_totalamount, locale)" />
               <CommonValueCard :label="t('account_receivable.reason')" :value="creditMemo.egcs_fc_reason || t('common.not_available')" class="min-w-0 md:col-span-2 [&_p]:break-words [&_p]:whitespace-pre-wrap" />
             </CommonSection>
             <CommonSection :title="t('account_receivable.credit_memo_receivable')" badge="02">

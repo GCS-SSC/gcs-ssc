@@ -48,6 +48,7 @@ export default {
       'authorizeTransferPaymentProfileResource',
       'authorizeTransferPaymentOutcomeResource',
       'authorizeReviewRuntimeAction',
+      'authorizeWorkflowOwnerRead',
       'prepareAgreementCommitmentRoute',
       'prepareAgreementForecastRoute',
       'prepareAgreementClaimRoute',

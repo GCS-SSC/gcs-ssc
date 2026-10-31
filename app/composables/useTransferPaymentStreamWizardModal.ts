@@ -14,12 +14,12 @@ import {
   TransferPaymentStreamPolymorphicWizardSchema
 } from '~~/shared/types/schemas'
 import { useWizardFlow, type WizardStepItem } from '~/composables/useWizardFlow'
-import { formatMoneyText, parseMoney } from '~~/shared/utils/money'
+import { formatMoneyText, parseMoney, type MoneyInput } from '~~/shared/utils/money'
 
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 
 type StreamBudgetState = Omit<TransferPaymentStreamPolymorphicWizard['budgets'][number], 'egcs_tp_totalbudget'> & {
-  egcs_tp_totalbudget: string
+  egcs_tp_totalbudget?: MoneyInput
 }
 type StreamFinancialLimitState = Omit<NonNullable<TransferPaymentStreamPolymorphicWizard['financialLimit']>,
   'egcs_tp_maxallowableperrecipient'> & {
@@ -283,7 +283,7 @@ export const useTransferPaymentStreamWizardModal = ({
     addListItem('budgets', () => ({
       tempId: nanoid(),
       egcs_tp_transferpaymentbudget: '',
-      egcs_tp_totalbudget: '0',
+      egcs_tp_totalbudget: undefined,
       egcs_tp_overcommitthreshold: 0
     }))
   }
@@ -553,9 +553,9 @@ export const useTransferPaymentStreamWizardModal = ({
         {
           key: `total-${index}`,
           label: t('transfer_payment.total_budget'),
-          value: budgetLabels.value[budget.tempId]
-            ? formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale.value, budgetLabels.value[budget.tempId]!.currency.toUpperCase())
-            : budget.egcs_tp_totalbudget
+          value: budget.egcs_tp_totalbudget && 'draft' in budget.egcs_tp_totalbudget
+            ? budget.egcs_tp_totalbudget.draft
+            : budget.egcs_tp_totalbudget ? formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale.value) : t('common.none')
         },
         {
           key: `overcommit-${index}`,

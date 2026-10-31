@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { Money } from '~~/shared/utils/money'
 import type { ProponentAccountBalanceRow } from '~~/shared/types/account-receivable-proponent'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
@@ -17,8 +18,8 @@ const columns: TableColumnInput<ProponentAccountBalanceRow>[] = [
   { id: 'owedBy', headerKey: 'account_receivable.pool_owed_by_proponent' },
   { id: 'owedTo', headerKey: 'account_receivable.pool_owed_to_proponent' }
 ]
-const amount = (value: string, currency: string) =>
-  formatAccountReceivableAmount(value, locale.value, currency) ?? t('common.not_available')
+const amount = (value: Money) =>
+  formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 </script>
 
 <template>
@@ -38,16 +39,16 @@ const amount = (value: string, currency: string) =>
         <span class="text-sm uppercase">{{ row.original.egcs_fc_currency }}</span>
       </template>
       <template #debits-cell="{ row }">
-        <span class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_debitamount, row.original.egcs_fc_currency) }}</span>
+        <span class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_debitamount) }}</span>
       </template>
       <template #credits-cell="{ row }">
-        <span class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_creditamount, row.original.egcs_fc_currency) }}</span>
+        <span class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_creditamount) }}</span>
       </template>
       <template #owedBy-cell="{ row }">
-        <span class="text-sm font-semibold tabular-nums">{{ amount(row.original.egcs_fc_receivableamount, row.original.egcs_fc_currency) }}</span>
+        <span class="text-sm font-semibold tabular-nums">{{ amount(row.original.egcs_fc_receivableamount) }}</span>
       </template>
       <template #owedTo-cell="{ row }">
-        <span class="text-sm font-semibold tabular-nums">{{ amount(row.original.egcs_fc_refundableamount, row.original.egcs_fc_currency) }}</span>
+        <span class="text-sm font-semibold tabular-nums">{{ amount(row.original.egcs_fc_refundableamount) }}</span>
       </template>
     </CommonResourceLayout>
   </CommonSection>

@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { GcsPaymentAmountCalculatorResult } from '@gcs-ssc/extensions/ui'
 import type { GcsExtensionPaymentCalculationResult } from '@gcs-ssc/extensions/server'
 import type { FundingCaseAgreementCommitmentLineBalances } from '~~/shared/types/funding-case-agreement-ui'
-import { formatMoneyText, parseMoney } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const props = defineProps<{
   agreementId: string
@@ -65,7 +65,7 @@ const disclosureItems = computed(() => [
   { label: t('agreement.payments.financial_inputs.title'), value: 'inputs', slot: 'inputs', icon: 'i-lucide-wallet' },
   { label: t('agreement.payments.financial_inputs.line_balances'), value: 'balances', slot: 'balances', icon: 'i-lucide-list-tree' }
 ])
-const money = (amount: string, currency: string) => formatMoneyText(parseMoney(amount), locale.value, currency.toUpperCase())
+const money = (amount: Money) => formatMoneyText(amount, locale.value)
 </script>
 
 <template>
@@ -94,7 +94,7 @@ const money = (amount: string, currency: string) => formatMoneyText(parseMoney(a
               {{ detail.label }}
             </dt>
             <dd class="mt-1 font-medium tabular-nums">
-              {{ money(detail.value, calculatorResult.currency ?? '') }}
+              {{ money(detail.value) }}
             </dd>
           </div>
         </dl>

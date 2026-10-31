@@ -1,4 +1,4 @@
-import type { Money } from '~~/shared/utils/money'
+import type { Money, MoneyInput } from '~~/shared/utils/money'
 
 export type AgreementClaimReconciliationTableLine = {
   id: string
@@ -7,8 +7,8 @@ export type AgreementClaimReconciliationTableLine = {
   costCategory?: string
   costSubsection?: string
   submittedAmount: Money
-  reconciledAmount: string
-  sampledAmount: string | null
+  reconciledAmount: MoneyInput
+  sampledAmount: MoneyInput
   balance?: Money
   rationale: string
   editable: boolean

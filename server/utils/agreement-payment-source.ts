@@ -1,3 +1,4 @@
+import { majorMoneyText } from '~~/shared/utils/money'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Public read contracts are documented at their authorization boundary. */
 import type { H3Event } from 'h3'
@@ -50,9 +51,9 @@ export const listAgreementPaymentAccountingSources = async (
     databaseMoneyText(sql.ref('payment.egcs_fc_paymentamount')).as('egcs_fc_amount')])
     .orderBy('payment.id', 'desc').limit(input.limit).offset((input.page - 1) * input.limit).execute()
   const count = await query.select(sql<string>`count(*)::text`.as('total')).executeTakeFirstOrThrow()
-  return { items: rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount),
-    label_en: `${row.id} · ${row.egcs_fc_amount} ${row.egcs_fc_currency.toUpperCase()}`,
-    label_fr: `${row.id} · ${row.egcs_fc_amount} ${row.egcs_fc_currency.toUpperCase()}` })),
+  return { items: rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, row.egcs_fc_currency),
+    label_en: `${row.id} · ${majorMoneyText(parseDatabaseMoney(row.egcs_fc_amount, row.egcs_fc_currency))} ${row.egcs_fc_currency.toUpperCase()}`,
+    label_fr: `${row.id} · ${majorMoneyText(parseDatabaseMoney(row.egcs_fc_amount, row.egcs_fc_currency))} ${row.egcs_fc_currency.toUpperCase()}` })),
   total: Number(count.total), page: input.page, limit: input.limit }
 }
 
@@ -118,7 +119,7 @@ export const readAgreementPaymentAccountingSource = async (
       'a.egcs_ay_accountingdimensions as egcs_fc_accountingdimensions', databaseMoneyText(sql.ref('l.egcs_fc_amount')).as('egcs_fc_amount')])
     .where('l.egcs_fc_fundingagreementpayment', '=', paymentId).where('l._deleted', '=', false)
     .orderBy('c.id').forShare('l').execute()
-  return { header, allocations: rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount),
+  return { header, allocations: rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount, header.egcs_fc_currency),
     egcs_fc_accountingdimensions: TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(row.egcs_fc_accountingdimensions) })) }
 }
 

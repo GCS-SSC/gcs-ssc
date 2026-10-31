@@ -46,8 +46,6 @@ export default defineEventHandler(async event => {
         .innerJoin('Funding_Case_Agreement_Amendment', 'Funding_Case_Agreement_Amendment.id', 'Funding_Case_Agreement_Amendment_Type.egcs_fc_amendment')
         .select('Funding_Case_Agreement_Amendment_Type.id')
         .where('Funding_Case_Agreement_Amendment_Type.egcs_fc_amendmenttype', '=', amendmentTypeId)
-        .where('Funding_Case_Agreement_Amendment_Type._deleted', '=', false)
-        .where('Funding_Case_Agreement_Amendment._deleted', '=', false)
         .orderBy('Funding_Case_Agreement_Amendment_Type.id', 'asc')
         .forUpdate('Funding_Case_Agreement_Amendment_Type')
         .executeTakeFirst()

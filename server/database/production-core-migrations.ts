@@ -14,7 +14,6 @@ import * as storage from './migrations/0120_storage'
 import * as background_queue from './migrations/0125_background_queue'
 import * as integrity from './migrations/0130_integrity'
 import * as audit from './migrations/0140_audit'
-import * as commitment_budget_payment_hold from './migrations/9999_z_commitment_budget_payment_hold'
 
 export const productionCoreMigrations = {
   '0010_enums': enums,
@@ -31,9 +30,7 @@ export const productionCoreMigrations = {
   '0120_storage': storage,
   '0125_background_queue': background_queue,
   '0130_integrity': integrity,
-  '0140_audit': audit,
-  // This authorized incremental hotfix must sort after an already applied demo seed.
-  '9999_z_commitment_budget_payment_hold': commitment_budget_payment_hold
+  '0140_audit': audit
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

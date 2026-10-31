@@ -9,7 +9,7 @@ import type { Ref } from 'vue'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
 import type { AgreementClaimReconciliationTableLine } from '~~/shared/types/agreement-claim-reconciliation-ui'
-import { parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, parseMoney, zeroMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
 type ReconciliationLine = {
   claim_line_id: string
@@ -52,8 +52,8 @@ type ReconciliationDetail = {
   is_primary: boolean
 }
 type ReconciliationLineDraft = {
-  reconciled: string
-  sampled: string | null
+  reconciled: MoneyInput
+  sampled: MoneyInput
   rationale: string
 }
 const fetchReconciliationDetail = $fetch as unknown as (url: string) => Promise<ReconciliationDetail>
@@ -90,6 +90,20 @@ const {
   `claim-reconciliation-${reconcileId}`,
   () => fetchReconciliationDetail(`/api/claim-reconciliations/${reconcileId}`)
 )
+const getCurrency = (): string => {
+  const currency = data.value?.reconciliation.egcs_fc_currency
+  if (!currency) throw new Error('Agreement currency is unavailable.')
+  return currency
+}
+const zeroAmount = () => zeroMoney(getCurrency())
+const equalOptionalMoney = (left: MoneyInput, right: MoneyInput): boolean => {
+  if (left == null || right == null) return left === right
+  try {
+    return compareMoney(parseMoney(left), parseMoney(right)) === 0
+  } catch {
+    return false
+  }
+}
 usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(data.value) })
 
 const drafts: Ref<Record<string, ReconciliationLineDraft>> = ref({})
@@ -151,15 +165,15 @@ watch([() => data.value?.lines, () => data.value?.reconciliation.isCompleted], (
     const previous = previousById.get(line.claim_line_id)
     const draft = drafts.value[line.claim_line_id]
     const hasUnsavedChanges = !isCompleted && previous && draft && (
-      draft.reconciled !== (previous.egcs_fc_reconciled ?? '0.00')
-      || draft.sampled !== previous.egcs_fc_sampled
+      !equalOptionalMoney(draft.reconciled, previous.egcs_fc_reconciled ?? zeroAmount())
+      || !equalOptionalMoney(draft.sampled, previous.egcs_fc_sampled ?? undefined)
       || draft.rationale !== (previous.egcs_fc_rationale ?? '')
     )
     const nextDraft = hasUnsavedChanges
       ? draft
       : {
-          reconciled: line.egcs_fc_reconciled ?? '0.00',
-          sampled: line.egcs_fc_sampled,
+          reconciled: line.egcs_fc_reconciled ?? zeroAmount(),
+          sampled: line.egcs_fc_sampled ?? undefined,
           rationale: line.egcs_fc_rationale ?? ''
         }
     return [line.claim_line_id, nextDraft]
@@ -193,22 +207,22 @@ const breadcrumbItems = computed(() => {
   ]
 })
 const getLineName = (line: ReconciliationLine) => line.submitted_line_item || line.description || t('agreement.claims.line_label', { id: line.claim_line_id })
-const tryParseMoney = (value: string | null | undefined): Money | null => {
+const tryParseMoney = (value: MoneyInput): Money | null => {
   try {
-    return value == null || value === '' ? null : parseMoney(value)
+    return value == null ? null : parseMoney(value)
   } catch {
     return null
   }
 }
-const totalSubmitted = computed(() => sumMoney(data.value?.lines.map(line => line.submitted_amount) ?? []))
+const totalSubmitted = computed(() => sumMoney(data.value?.lines.map(line => line.submitted_amount) ?? [], getCurrency()))
 const totalReconciled = computed(() => sumMoney(data.value?.lines.flatMap(line => {
   const amount = tryParseMoney(drafts.value[line.claim_line_id]?.reconciled)
   return amount === null ? [] : [amount]
-}) ?? []))
+}) ?? [], getCurrency()))
 const totalSampled = computed(() => sumMoney(data.value?.lines.flatMap(line => {
   const amount = tryParseMoney(drafts.value[line.claim_line_id]?.sampled)
   return amount === null ? [] : [amount]
-}) ?? []))
+}) ?? [], getCurrency()))
 const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[]>(() => (data.value?.lines ?? []).map(line => ({
   id: line.claim_line_id,
   name: getLineName(line),
@@ -219,21 +233,23 @@ const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[
     || line.egcs_fc_costsubsection
     || t('common.all'),
   submittedAmount: line.submitted_amount,
-  reconciledAmount: drafts.value[line.claim_line_id]?.reconciled ?? line.egcs_fc_reconciled ?? '0.00',
+  reconciledAmount: Object.hasOwn(drafts.value, line.claim_line_id)
+    ? drafts.value[line.claim_line_id]?.reconciled
+    : line.egcs_fc_reconciled ?? zeroAmount(),
   sampledAmount: Object.hasOwn(drafts.value, line.claim_line_id)
-    ? drafts.value[line.claim_line_id]?.sampled ?? null
-    : line.egcs_fc_sampled,
+    ? drafts.value[line.claim_line_id]?.sampled
+    : line.egcs_fc_sampled ?? undefined,
   rationale: drafts.value[line.claim_line_id]?.rationale ?? line.egcs_fc_rationale ?? '',
   editable: data.value?.can_update === true && !data.value.reconciliation.isCompleted
     && Boolean(drafts.value[line.claim_line_id])
 })))
-const updateDraftReconciled = (id: string, value: string | null | undefined) => {
+const updateDraftReconciled = (id: string, value: MoneyInput) => {
   const draft = drafts.value[id]
-  if (draft) draft.reconciled = value ?? ''
+  if (draft) draft.reconciled = value
 }
-const updateDraftSampled = (id: string, value: string | null | undefined) => {
+const updateDraftSampled = (id: string, value: MoneyInput) => {
   const draft = drafts.value[id]
-  if (draft) draft.sampled = value ?? null
+  if (draft) draft.sampled = value
 }
 const updateDraftRationale = (id: string, value: string) => {
   const draft = drafts.value[id]
@@ -272,7 +288,7 @@ const saveLines = async (showSuccess = true, desiredIsFinal?: boolean): Promise<
         line,
         draft,
         reconciled: parseMoney(draft.reconciled),
-        sampled: draft.sampled == null || draft.sampled === '' ? null : parseMoney(draft.sampled)
+        sampled: draft.sampled == null ? null : parseMoney(draft.sampled)
       }
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== null)
     await mutateReconciliation(`/api/claim-reconciliations/${reconcileId}/lines/bulk`, {

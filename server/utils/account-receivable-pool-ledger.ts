@@ -1,15 +1,15 @@
+import { compareMoney, negateMoney, subtractMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Agency currency totals summarize repayments linked to individual receivables. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import { moneyFromCents, moneyToCents, parseMoney, subtractMoney, type Money } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 
-const ZERO = parseMoney('0.00')
-const positive = (amount: Money) => moneyToCents(amount) > BigInt(0) ? amount : ZERO
+const positive = (amount: Money) => compareMoney(amount, zeroMoney(amount.currency)) > 0 ? amount : zeroMoney(amount.currency)
 
 /** Caller must authorize the complete Agency-owned pool before reading its totals. */
 export const readAccountReceivablePoolBalance = async (db: Kysely<Database>, poolId: string, options: { excludedCreditMemoId?: string } = {}) => {
+  const currency = (await db.selectFrom('Funding_Case_Account_Receivable_Pool').select('egcs_fc_currency').where('id', '=', poolId).executeTakeFirstOrThrow()).egcs_fc_currency
   const totals = (await sql<{ debit: string; credit: string; reserved: string }>`SELECT
     coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Agreement_Account_Receivable" debt
       JOIN "Funding_Case_Agreement_Account_Receivable_Line" line ON line.egcs_fc_receivable=debt.id
@@ -20,12 +20,12 @@ export const readAccountReceivablePoolBalance = async (db: Kysely<Database>, poo
       + coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo"
         WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='open' AND NOT _deleted
           ${options.excludedCreditMemoId ? sql`AND id<>${options.excludedCreditMemoId}::bigint` : sql``}),0))::text AS reserved`.execute(db)).rows[0]!
-  const debit = parseDatabaseMoney(totals.debit)
-  const credit = parseDatabaseMoney(totals.credit)
+  const debit = parseDatabaseMoney(totals.debit, currency)
+  const credit = parseDatabaseMoney(totals.credit, currency)
   const net = subtractMoney(debit, credit)
-  const reserved = parseDatabaseMoney(totals.reserved)
+  const reserved = parseDatabaseMoney(totals.reserved, currency)
   return { egcs_fc_debitamount: debit, egcs_fc_creditamount: credit, egcs_fc_netamount: net,
-    egcs_fc_receivableamount: positive(net), egcs_fc_refundableamount: moneyToCents(net) < BigInt(0) ? moneyFromCents(-moneyToCents(net)) : ZERO,
+    egcs_fc_receivableamount: positive(net), egcs_fc_refundableamount: compareMoney(net, zeroMoney(net.currency)) < 0 ? negateMoney(net) : zeroMoney(currency),
     egcs_fc_reservedamount: reserved, egcs_fc_availableamount: positive(subtractMoney(positive(net), reserved)) }
 }
 
@@ -36,7 +36,9 @@ export const readAccountReceivablePoolOffsetPolicy = async (db: Kysely<Database>
       ORDER BY latest.egcs_fc_postedat DESC,latest.id DESC LIMIT 1),debt.egcs_fc_recoverymethod)`.as('method'))
     .where('debt.egcs_fc_pool', '=', poolId).where('debt.egcs_fc_linkedreceivable', 'is', null).where('debt.egcs_fc_outcome', '=', 'posted').where('debt._deleted', '=', false).execute()
   for (const debt of debts) {
-    if (debt.method === 'direct_repayment' && moneyToCents((await readAccountReceivableCashBalance(db, String(debt.id))).egcs_fc_outstanding) > BigInt(0)) return 'direct_repayment' as const
+    if (debt.method !== 'direct_repayment') continue
+    const balance = await readAccountReceivableCashBalance(db, String(debt.id))
+    if (compareMoney(balance.egcs_fc_outstanding, zeroMoney(balance.egcs_fc_outstanding.currency)) > 0) return 'direct_repayment' as const
   }
   return 'offset' as const
 }

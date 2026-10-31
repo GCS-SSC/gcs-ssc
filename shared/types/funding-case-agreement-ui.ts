@@ -5,7 +5,7 @@ import type { BusinessRecordStateFields } from './business-record-state'
 import type { AccountReceivablePaymentCreditMemo } from './account-receivable'
 import type { AgreementRiskSource, SubmissionRisk } from './risk'
 import type { StatusId } from './status'
-import type { Money } from '../utils/money'
+import type { Money, MoneyInput } from '../utils/money'
 import type { TransferPaymentStreamChartOfAccountDimension } from './schemas/transfer-payment'
 import type {
   FundingCaseAgreementActivityItem,
@@ -186,12 +186,13 @@ export interface FundingCaseAgreementBudgetDifference {
 export type FundingCaseAgreementBudgetFiscalYearForm = Partial<FundingCaseAgreementBudgetFiscalYearItem>
 export type FundingCaseAgreementBudgetLineItemForm = BudgetCalculationMetadata & Partial<Omit<FundingCaseAgreementBudgetLineItemItem,
   'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_fundingsources'> & {
-    egcs_fc_totalamount: string
-    egcs_fc_programfunding: string
-    egcs_fc_fundingsources: FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources']
+    egcs_fc_totalamount: MoneyInput
+    egcs_fc_programfunding: MoneyInput
+    egcs_fc_fundingsources: Array<Omit<FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources'][number], 'egcs_fc_amount'> & { egcs_fc_amount: MoneyInput }>
   }>
 
 export interface FundingCaseAgreementAmendmentTypeRow {
+  egcs_tp_active?: boolean
   id: string
   egcs_tp_name_en?: string | null
   egcs_tp_name_fr?: string | null
@@ -215,7 +216,7 @@ export interface FundingCaseAgreementAmendmentRow extends BusinessRecordStateFie
   egcs_fc_proposedauthorizedassistanceenddate?: string | null
   amendment_types: FundingCaseAgreementAmendmentTypeRow[]
   amendment_type_ids?: string[]
-  amendment_subtypes?: Array<{ id: string, egcs_tp_name_en?: string | null, egcs_tp_name_fr?: string | null }>
+  amendment_subtypes?: Array<{ egcs_tp_active?: boolean, id: string, egcs_tp_name_en?: string | null, egcs_tp_name_fr?: string | null }>
   amendment_subtype_ids?: string[]
   has_budget_snapshot: boolean
   has_activity_snapshot: boolean
@@ -276,9 +277,9 @@ export interface FundingCaseAgreementChartOfAccountLookupItem {
   fiscal_year_display?: string | null
 }
 
-export type FundingCaseAgreementCommitmentForm = Partial<FundingCaseAgreementCommitmentItem>
+export type FundingCaseAgreementCommitmentForm = Partial<Omit<FundingCaseAgreementCommitmentItem, 'egcs_fc_totalamount'> & { egcs_fc_totalamount: MoneyInput }>
 export type FundingCaseAgreementCommitmentLineForm = Partial<
-  Omit<FundingCaseAgreementCommitmentLineItem, 'egcs_fc_amount'> & { egcs_fc_amount: string }
+  Omit<FundingCaseAgreementCommitmentLineItem, 'egcs_fc_amount'> & { egcs_fc_amount: MoneyInput }
 >
 
 export interface FundingCaseAgreementPaymentRow extends FundingCaseAgreementPaymentItem, BusinessRecordStateFields {
@@ -336,12 +337,12 @@ export interface FundingCaseAgreementPaymentCommitmentLineLookupItem {
 }
 
 export type FundingCaseAgreementPaymentForm = Partial<
-  Omit<FundingCaseAgreementPaymentItem, 'egcs_fc_paymentamount'> & { egcs_fc_paymentamount: string }
+  Omit<FundingCaseAgreementPaymentItem, 'egcs_fc_paymentamount'> & { egcs_fc_paymentamount: MoneyInput }
 > & {
   extensions?: Record<string, Record<string, unknown>>
 }
 export type FundingCaseAgreementPaymentLineForm = Partial<
-  Omit<FundingCaseAgreementPaymentLineItem, 'egcs_fc_amount'> & { egcs_fc_amount: string }
+  Omit<FundingCaseAgreementPaymentLineItem, 'egcs_fc_amount'> & { egcs_fc_amount: MoneyInput }
 >
 
 export interface FundingCaseAgreementMonitorRow extends FundingCaseAgreementMonitorItem, BusinessRecordStateFields {
@@ -449,7 +450,12 @@ export interface FundingCaseAgreementForecastOverviewRow {
 }
 
 export type FundingCaseAgreementForecastForm = Partial<FundingCaseAgreementForecastItem>
-export type FundingCaseAgreementForecastLineItemForm = Partial<FundingCaseAgreementForecastLineItemItem>
+export type FundingCaseAgreementForecastLineItemForm = Partial<Omit<FundingCaseAgreementForecastLineItemItem,
+  'egcs_fc_amount' | 'egcs_fc_totalamount' | 'egcs_fc_fundingsources'> & {
+    egcs_fc_amount: MoneyInput
+    egcs_fc_totalamount: MoneyInput
+    egcs_fc_fundingsources: Array<{ egcs_fc_fundingsubtype: string; egcs_fc_amount: MoneyInput }>
+  }>
 
 export interface FundingCaseAgreementClaimRow extends FundingCaseAgreementClaimItem, BusinessRecordStateFields {
   fiscal_year_id?: string
@@ -508,9 +514,18 @@ export interface FundingCaseAgreementClaimOverviewRow {
 export type FundingCaseAgreementClaimForm = Partial<Omit<FundingCaseAgreementClaimItem, 'egcs_fc_receiveddate'> & {
   egcs_fc_receiveddate?: string
 }>
-export type FundingCaseAgreementClaimLineItemForm = Partial<FundingCaseAgreementClaimLineItemItem>
+export type FundingCaseAgreementClaimLineItemForm = Partial<Omit<FundingCaseAgreementClaimLineItemItem,
+  'egcs_fc_amount' | 'egcs_fc_totalamount' | 'egcs_fc_fundingsources'> & {
+    egcs_fc_amount: MoneyInput
+    egcs_fc_totalamount: MoneyInput
+    egcs_fc_fundingsources: Array<{ egcs_fc_fundingsubtype: string; egcs_fc_amount: MoneyInput }>
+  }>
 export type FundingCaseAgreementClaimReconcileForm = Partial<FundingCaseAgreementClaimReconcileItem>
-export type FundingCaseAgreementClaimReconcileLineItemForm = Partial<FundingCaseAgreementClaimReconcileLineItemItem>
+export type FundingCaseAgreementClaimReconcileLineItemForm = Partial<Omit<FundingCaseAgreementClaimReconcileLineItemItem,
+  'egcs_fc_reconciled' | 'egcs_fc_sampled'> & {
+    egcs_fc_reconciled: MoneyInput
+    egcs_fc_sampled: MoneyInput
+  }>
 
 export interface FundingCaseAgreementActivityOutcomeTag {
   id: string

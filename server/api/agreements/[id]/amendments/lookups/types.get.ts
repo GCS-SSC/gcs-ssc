@@ -34,6 +34,14 @@ const readRoute = defineEventHandler(async event => {
 
   let query = db.selectFrom('Transfer_Payment_Amendment_Type')
     .where('egcs_tp_transferpaymentstream', '=', context.streamId)
+    .where(eb => amendmentId
+      ? eb.or([
+          eb('egcs_tp_active', '=', true),
+          eb.exists(eb.selectFrom('Funding_Case_Agreement_Amendment_Type as retained')
+            .select('retained.id').whereRef('retained.egcs_fc_amendmenttype', '=', 'Transfer_Payment_Amendment_Type.id')
+            .where('retained.egcs_fc_amendment', '=', amendmentId).where('retained._deleted', '=', false))
+        ])
+      : eb('egcs_tp_active', '=', true))
 
   if (deleted !== undefined) query = query.where('_deleted', '=', deleted)
   if (search) {
@@ -47,7 +55,7 @@ const readRoute = defineEventHandler(async event => {
 
   const [items, count, stats] = await Promise.all([
     query
-      .select(['id', 'egcs_tp_amended', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_requiresamendmentsubtype'])
+      .select(['id', 'egcs_tp_amended', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_requiresamendmentsubtype', 'egcs_tp_active'])
       .orderBy('id', 'asc')
       .limit(limit)
       .offset((page - 1) * limit)

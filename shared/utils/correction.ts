@@ -1,4 +1,4 @@
-import { addMoney, compareMoney, isNumeric19Money, parseMoney, subtractMoney, sumMoney, type Money } from './money'
+import { addMoney, compareMoney, isPersistableMoney, subtractMoney, sumMoney, zeroMoney, type Money } from './money'
 
 export type CorrectionFinancialLine = {
   egcs_fc_commitmentline: string
@@ -7,7 +7,7 @@ export type CorrectionFinancialLine = {
   egcs_fc_originalpaid: Money
   egcs_fc_jveffect: Money
   egcs_fc_priorcorrections: Money
-  egcs_fc_arrecoveries?: Money
+  egcs_fc_arrecoveries: Money
   egcs_fc_adjustment: Money
 }
 
@@ -38,21 +38,22 @@ export class CorrectionAccountingError extends Error {
  * @param capacity - Complete Agreement coding pools, including incoming JV allocations.
  * @param options - Draft or Completion validation mode.
  * @param options.requireAdjustment - Whether at least one nonzero line is required.
+ * @param currency - Owning denomination.
  * @returns Corrected amounts and remaining balances for every line.
  */
 export const validateCorrectionAdjustments = (
   lines: CorrectionFinancialLine[],
   capacity: Map<string, { committed: Money; paid: Money }>,
-  options: { requireAdjustment: boolean }
+  options: { requireAdjustment: boolean }, currency: string
 ) => {
   const seen = new Set<string>()
   const codingDeltas = new Map<string, Money>()
-  const zero = parseMoney('0.00')
+  const zero = zeroMoney(currency)
   const projected = lines.map(line => {
     if (seen.has(line.egcs_fc_commitmentline)) throw new CorrectionAccountingError('COR_DUPLICATE_LINE')
     seen.add(line.egcs_fc_commitmentline)
-    if (!isNumeric19Money(line.egcs_fc_adjustment)) throw new CorrectionAccountingError('COR_PRECISION')
-    const original = sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries ?? zero])
+    if (!isPersistableMoney(line.egcs_fc_adjustment)) throw new CorrectionAccountingError('COR_PRECISION')
+    const original = sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries], currency)
     const corrected = addMoney(original, line.egcs_fc_adjustment)
     if (compareMoney(corrected, zero) < 0 || compareMoney(corrected, line.egcs_fc_commitmentamount) > 0) {
       throw new CorrectionAccountingError('COR_LINE_CAPACITY')

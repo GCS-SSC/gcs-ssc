@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { isCanonicalMoney, type Money } from '~~/shared/utils/money'
 import type { Ref } from 'vue'
 import type { AccountReceivableOffsetMemoLine, AccountReceivablePaymentCreditMemo } from '~~/shared/types/account-receivable'
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas/transfer-payment'
@@ -9,22 +10,22 @@ import { formatAccountReceivableAmount } from '~/utils/account-receivable-displa
 import { useBilingualValue } from '~/composables/useBilingualValue'
 
 const { payment } = defineProps<{ payment: {
-  egcs_fc_paymentamount: string
-  egcs_fc_grossamount?: string
+  egcs_fc_paymentamount: Money
+  egcs_fc_grossamount?: Money
   egcs_fc_currency: string
-  egcs_fc_offsetamount?: string
-  egcs_fc_netamount?: string
+  egcs_fc_offsetamount?: Money
+  egcs_fc_netamount?: Money
   egcs_fc_recoverycontrol?: 'allowed' | 'direct_repayment_hold' | 'recovery_pending'
   egcs_fc_creditmemos?: AccountReceivablePaymentCreditMemo[]
 } }>()
 const { t, locale } = useI18n()
 const { getBilingualValue } = useBilingualValue()
-const amount = (value: string | undefined) => formatAccountReceivableAmount(value, locale.value, payment.egcs_fc_currency) ?? t('common.not_available')
+const amount = (value: Money | undefined) => formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
 const dimensions = (line: AccountReceivableOffsetMemoLine) => TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(line.egcs_fc_creditmemoaccountingdimensions)
 const codedMemos = computed(() => payment.egcs_fc_creditmemos?.filter(memo => memo.egcs_fc_codinglines?.length) ?? [])
 const showMemoBalances = computed(() => Boolean(payment.egcs_fc_creditmemos?.length) && payment.egcs_fc_creditmemos!.every(memo =>
   [memo.egcs_fc_receivablerecovered, memo.egcs_fc_receivablereserved, memo.egcs_fc_receivableoutstanding, memo.egcs_fc_receivableavailable]
-    .every(value => typeof value === 'string')))
+    .every(isCanonicalMoney)))
 const totals = computed(() => [
   { label: 'agreement.payments.gross', value: payment.egcs_fc_grossamount ?? payment.egcs_fc_paymentamount },
   ...(hasPaymentOffset(payment.egcs_fc_offsetamount)

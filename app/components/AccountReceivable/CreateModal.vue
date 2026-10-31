@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Modal identity and draft recovery are covered by component regressions. */
 import { computed, ref, watch } from 'vue'
+import type { MoneyInput } from '~~/shared/utils/money'
 import type { Ref } from 'vue'
 import { createAccountReceivableCreateSchemaForType } from '~~/shared/types/schemas/account-receivable'
 import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
@@ -16,7 +17,7 @@ const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
 type CreateState = {
-  egcs_fc_amount?: string
+  egcs_fc_amount?: MoneyInput
   egcs_fc_agencyfinancialid?: string
   egcs_fc_applicantrecipient: string | undefined
   egcs_fc_agencyfiscalyear: string | undefined
@@ -75,7 +76,7 @@ watch([open, () => agreementId, () => adjustment?.id, () => sourceEntry], ([isOp
   selectedType.value = null
   state.value = isOpen
     ? {
-        ...(adjustment ? { egcs_fc_agencyfinancialid: adjustment.egcs_fc_effectiveagencyfinancialid ?? undefined } : { egcs_fc_amount: '' }),
+        ...(adjustment ? { egcs_fc_agencyfinancialid: adjustment.egcs_fc_effectiveagencyfinancialid ?? undefined } : { egcs_fc_amount: undefined }),
         egcs_fc_applicantrecipient: adjustment?.egcs_fc_applicantrecipient ?? sourceEntry?.egcs_fc_applicantrecipient,
         egcs_fc_agencyfiscalyear: adjustment?.egcs_fc_agencyfiscalyear ?? sourceEntry?.egcs_fc_agencyfiscalyear,
         egcs_fc_type: adjustment?.egcs_fc_type ?? (sourceEntry?.types.length === 1 ? String(sourceEntry.types[0]!.id) : undefined),

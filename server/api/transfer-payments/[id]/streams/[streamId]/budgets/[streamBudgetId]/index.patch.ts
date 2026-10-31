@@ -1,3 +1,5 @@
+import { parseSafeDecimal } from '~~/shared/utils/decimal'
+import { assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { TransferPaymentStreamBudgetCreateSchema } from '~~/shared/types/schemas'
@@ -64,7 +66,7 @@ export default defineEventHandler(async event => {
         }
 
         const targetBudgetId = String(validated.egcs_tp_transferpaymentbudget ?? lockedStreamBudget.budget_id)
-        const targetTotalBudget = validated.egcs_tp_totalbudget ?? parseDatabaseMoney(lockedStreamBudget.total_budget)
+        const targetTotalBudget = validated.egcs_tp_totalbudget
         const budgetIds = [...new Set([String(lockedStreamBudget.budget_id), targetBudgetId])].sort()
         const budgets = await trx.selectFrom('Transfer_Payment_Fiscal_Year_Budget')
           .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
@@ -120,6 +122,8 @@ export default defineEventHandler(async event => {
           }
         }
 
+        const amount = targetTotalBudget ?? parseDatabaseMoney(lockedStreamBudget.total_budget, budget.egcs_tp_currency)
+        await assertCurrencyMoneyValues(event, budget.egcs_tp_currency, [amount])
         const sumResult = await trx.selectFrom('Transfer_Payment_Stream_Budget')
           .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream')
           .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
@@ -132,8 +136,8 @@ export default defineEventHandler(async event => {
           .select(databaseMoneyText(sql`COALESCE(SUM(${sql.ref('Transfer_Payment_Stream_Budget.egcs_tp_totalbudget')}), 0)`).as('total'))
           .executeTakeFirst()
         if (compareMoney(
-          addMoney(parseDatabaseMoney(sumResult?.total), targetTotalBudget),
-          parseDatabaseMoney(budget.total_budget)
+          addMoney(parseDatabaseMoney(sumResult?.total, budget.egcs_tp_currency), amount),
+          parseDatabaseMoney(budget.total_budget, budget.egcs_tp_currency)
         ) > 0) {
           return await badRequest(event, 'TRANSFER_PAYMENT_STREAM_BUDGET_EXCEEDS_PROGRAM_BUDGET', 'apiErrors.transfer_payment.stream_budget_exceeds_program_budget')
         }
@@ -152,7 +156,7 @@ export default defineEventHandler(async event => {
             'egcs_tp_overcommitthreshold'
           ])
           .executeTakeFirstOrThrow()
-          .then(row => ({ ...row, egcs_tp_currency: budget.egcs_tp_currency, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget) }))
+          .then(row => ({ ...row, egcs_tp_overcommitthreshold: parseSafeDecimal(String(row.egcs_tp_overcommitthreshold)), egcs_tp_currency: budget.egcs_tp_currency, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget, budget.egcs_tp_currency) }))
       }
     )
   } catch (error) {

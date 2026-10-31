@@ -62,8 +62,9 @@ export const assertAgreementApprovalSubmissionUnlocked = async (
   }
 }
 
-export type AgreementApprovalSnapshotV2 = {
-  schemaVersion: 2
+export type AgreementApprovalSnapshot = {
+  schemaVersion: 4
+  risk: SubmissionRisk | null
   agreement: Record<string, JsonValue> | null
   proponents: Array<Record<string, JsonValue>>
   amendment: Record<string, JsonValue> | null
@@ -73,11 +74,6 @@ export type AgreementApprovalSnapshotV2 = {
   amendmentTypes: Array<Record<string, JsonValue>>
   amendmentSubtypes: Array<Record<string, JsonValue>>
 }
-export type AgreementApprovalSnapshotV3 = Omit<AgreementApprovalSnapshotV2, 'schemaVersion'> & {
-  schemaVersion: 3
-  risk: SubmissionRisk
-}
-export type AgreementApprovalSnapshot = AgreementApprovalSnapshotV2 | AgreementApprovalSnapshotV3
 
 export const resolveApprovalPacketDomains = (
   entityType: 'fundingcaseagreement' | 'fundingcaseamendment',
@@ -138,11 +134,11 @@ export const buildAgreementApprovalSnapshot = async (
     .where('Common_Runtime.egcs_cn_purpose', '=', 'approval_submission')
     .executeTakeFirstOrThrow() : null
   const previousPacket = previousSubmission?.egcs_fc_packet as AgreementApprovalSnapshot | undefined
-  if (previousSubmission && previousPacket && hashAgreementApprovalSnapshot(previousPacket) !== previousSubmission.egcs_fc_canonicalhash) {
+  if (previousSubmission && previousPacket && (previousPacket.schemaVersion !== 4 || hashAgreementApprovalSnapshot(previousPacket) !== previousSubmission.egcs_fc_canonicalhash)) {
     throw new AgreementApprovalSubmissionHashMismatchError('Retry submission packet failed its integrity check')
   }
   const risk = previousPacket
-    ? previousPacket.schemaVersion === 3 ? previousPacket.risk : null
+    ? previousPacket.risk
     : await captureSubmissionRisk(event, trx, { entityType, entityId })
   // Both targets enforce risk readiness when capturing their first approval submission.
   // Amendment Completion shares this transaction, so rejection also rolls back its evidence.
@@ -356,8 +352,9 @@ export const buildAgreementApprovalSnapshot = async (
       return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
     })()
   }))
-  const businessPacket: AgreementApprovalSnapshotV2 = {
-    schemaVersion: 2,
+  const businessPacket: AgreementApprovalSnapshot = {
+    schemaVersion: 4,
+    risk,
     agreement: amendment ? null : normalizeRow({
       customFields,
       agreementNumber: agreement.egcs_fc_agreementnumber,
@@ -413,8 +410,8 @@ export const buildAgreementApprovalSnapshot = async (
         allowPercentageOverride: row.egcs_fc_allowpercentageoverride,
         costSubsection: row.egcs_fc_costsubsection,
         description: row.egcs_fc_description,
-        totalAmount: parseDatabaseMoney(row.egcs_fc_totalamount),
-        programFunding: parseDatabaseMoney(row.egcs_fc_programfunding),
+        totalAmount: parseDatabaseMoney(row.egcs_fc_totalamount, row.egcs_fc_currency),
+        programFunding: parseDatabaseMoney(row.egcs_fc_programfunding, row.egcs_fc_currency),
         fundingSources: (budgetFundingByLine.get(String(row.row_id)) ?? []).map(source => ({
           fundingType: bilingualValue(source.funding_type_name_en, source.funding_type_name_fr),
           fundingSubtype: bilingualValue(source.funding_subtype_name_en, source.funding_subtype_name_fr),
@@ -438,6 +435,6 @@ export const buildAgreementApprovalSnapshot = async (
     amendmentTypes: amendmentTypes.map(type => normalizeRow({ amendedDomain: type.egcs_tp_amended, name: bilingualValue(type.egcs_tp_name_en, type.egcs_tp_name_fr) })),
     amendmentSubtypes: amendmentSubtypes.map(subtype => normalizeRow({ name: bilingualValue(subtype.egcs_tp_name_en, subtype.egcs_tp_name_fr) }))
   }
-  const packet: AgreementApprovalSnapshot = risk ? { ...businessPacket, schemaVersion: 3, risk } : businessPacket
+  const packet: AgreementApprovalSnapshot = businessPacket
   return { agreementId, amendmentId: amendment ? entityId : null, packet, hash: hashAgreementApprovalSnapshot(packet) }
 }

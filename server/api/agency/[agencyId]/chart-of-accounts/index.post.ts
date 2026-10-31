@@ -28,6 +28,7 @@ export default defineEventHandler(async event => {
         egcs_ay_fiscalyear: String(body.egcs_ay_fiscalyear),
         egcs_ay_currency: body.egcs_ay_currency,
         egcs_ay_kind: body.egcs_ay_kind,
+        egcs_ay_active: body.egcs_ay_active,
         egcs_ay_commitmentchartofaccount: body.egcs_ay_commitmentchartofaccount ?? null,
         egcs_ay_accountingdimensions: sql`${JSON.stringify(body.egcs_ay_accountingdimensions)}::jsonb`,
         _deleted: false

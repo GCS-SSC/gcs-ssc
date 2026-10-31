@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { moneyMatchesSearch } from '~/utils/money-search'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useCrudModalPending } from '~/composables/useCrudModal'
@@ -18,7 +19,7 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentLineCreateSchema } from '~~/shared/types/schemas'
 import { formatAccountingDimension, formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
-import { compareMoney, formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, isCanonicalMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
   key: route => route.path,
@@ -171,13 +172,13 @@ const lines = computed<FundingCaseAgreementCommitmentLineBalanceRow[]>(() => {
     line.egcs_fc_paidamount,
     line.egcs_fc_creditmemoamount,
     line.egcs_fc_balance
-  ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch.value)))
+  ].some(value => isCanonicalMoney(value) ? moneyMatchesSearch(value, normalizedSearch.value, locale.value) : String(value ?? '').toLowerCase().includes(normalizedSearch.value)))
 })
 
 const totalAmount = computed(() =>
-  sumMoney((commitment.value?.lines ?? []).map((line: FundingCaseAgreementCommitmentLineBalanceRow) => line.egcs_fc_amount))
+  commitment.value ? sumMoney((commitment.value.lines ?? []).map((line: FundingCaseAgreementCommitmentLineBalanceRow) => line.egcs_fc_amount), commitment.value.egcs_fc_currency) : null
 )
-const hasBalancedCoding = computed(() => commitment.value && compareMoney(totalAmount.value, commitment.value.egcs_fc_totalamount) === 0)
+const hasBalancedCoding = computed(() => commitment.value && compareMoney(totalAmount.value!, commitment.value.egcs_fc_totalamount) === 0)
 
 const displayValue = (value: string | number | null | undefined) => {
   if (value === undefined || value === null || value === '') {
@@ -187,9 +188,7 @@ const displayValue = (value: string | number | null | undefined) => {
   return String(value)
 }
 
-const formatMoney = (value: Money) => commitment.value?.egcs_fc_currency
-  ? formatMoneyText(value, locale.value, commitment.value.egcs_fc_currency.toUpperCase())
-  : value
+const formatMoney = (value: Money | null) => value ? formatMoneyText(value, locale.value) : t('common.not_available')
 
 const getCodingSecondaryText = (line: FundingCaseAgreementCommitmentLineBalanceRow) => {
   const activeLocale = locale.value === 'fr' ? 'fr' : 'en'
