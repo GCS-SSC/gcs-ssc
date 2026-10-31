@@ -54,16 +54,18 @@ export default defineEventHandler(async event => {
     .select([
       'id',
       'egcs_fc_agreementnumber',
-      'egcs_fc_currency',
       'egcs_fc_title_en',
       'egcs_fc_title_fr'
     ])
+    .$if(canReadAgreement, query => query.select('egcs_fc_currency'))
     .where('id', '=', agreementId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
   if (!agreement) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
+  const { egcs_fc_currency: currency, ...identity } = agreement
   return {
-    ...agreement,
+    ...identity,
+    ...(canReadAgreement ? { egcs_fc_currency: currency } : {}),
     can_read_agreement: canReadAgreement,
     ...(['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingcasemonitor', 'fundingcaseamendment', 'fundingcaseagreementcloseout'].includes(target.entityType)
       ? {

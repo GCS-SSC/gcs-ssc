@@ -14,7 +14,7 @@ services:
       PGLITE_ACCESS_DATA_DIR: /app/.data/pglite-access
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8995}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:8995}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev_only_local_secret_abcdefghijklmnopqrstuvwxyz123456}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be an operator-supplied signing secret}
     volumes:
       - pglite-data:/app/.data/pglite
       - pglite-access-data:/app/.data/pglite-access

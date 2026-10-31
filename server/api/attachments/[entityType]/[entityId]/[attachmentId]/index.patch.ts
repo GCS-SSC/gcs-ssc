@@ -17,7 +17,8 @@ import {
   completeReservedStorageCleanup,
   releaseReservedStorageCleanup,
   reserveStorageMetadataRestoration,
-  storageCleanupLocator
+  storageCleanupLocator,
+  supersedeStorageMetadataRestorations
 } from '~~/server/utils/storage-cleanup-outbox'
 
 export default defineEventHandler(async event => {
@@ -131,6 +132,10 @@ export default defineEventHandler(async event => {
             if (signal.aborted) throw signal.reason
             await adapter.updateProviderMetadata({ ...operationContext, signal, metadata: metadata ?? {} })
           })
+          await supersedeStorageMetadataRestorations(trx, {
+            provider_key: providerUpdate.provider.extension.key, agency_id: resolved.agencyId,
+            object_id: attachment.provider_object_id
+          }, restorationId)
           await completeReservedStorageCleanup(trx, restorationId, sagaWorkerId)
         } catch {
           return await throwApiError(event, {

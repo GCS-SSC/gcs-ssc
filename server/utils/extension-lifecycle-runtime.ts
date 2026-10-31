@@ -45,7 +45,9 @@ export const authorizeExtensionLifecycleRead = async (
         const agreement = await resolveAgreementScopeContext(owner.ownerId, event.context.$db)
         return agreement ? await canAccessAgreement(auth, 'read', agreement.scope, event.context.$db) : false
       })()
-    : await canAccessApplicantRecipient(auth, owner.ownerId, 'read', event.context.$db)
+    : await canAccessApplicantRecipient(auth, owner.ownerId, 'read', event.context.$db) && auth.userAbilities.authorize('applicant_recipient', 'read', {
+      type: 'agency', agencyId: owner.agencyId
+    })
   return allowed ? auth : await forbidden(event)
 }
 

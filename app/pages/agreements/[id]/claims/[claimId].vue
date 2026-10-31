@@ -591,7 +591,7 @@ const activeClaimPeriodLabel = computed(() => activeClaim.value
 const claimHeroTitle = computed(() => activeClaim.value ? t('agreement.claims.claim_label', { id: activeClaim.value.id }) : '')
 const claimHeroMetaItems = computed(() => [
   displayValue(profile.value?.egcs_fc_agreementnumber),
-  profile.value?.egcs_fc_currency.toUpperCase() ?? '',
+  profile.value?.egcs_fc_currency?.toUpperCase() ?? '',
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId),
   `${t('agreement.claims.submitting_proponent')}: ${getBilingualValue(activeClaim.value, 'submitting_proponent_name', t('common.unavailable'))}`,
   `${t('agreement.claims.fiscal_year')}: ${activeClaimFiscalYearLabel.value}`,
@@ -1564,6 +1564,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                       </p>
                     </div>
                     <AgreementClaimReconciliationLinesTable
+                      v-if="profile.egcs_fc_currency"
                       :currency="profile.egcs_fc_currency"
                       :lines="reconciliationTableLines"
                       :total-submitted="totalSubmitted"
@@ -1743,7 +1744,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
         </form>
       </template>
     </UModal>
-    <UModal v-if="profile" v-model:open="fundingEditorOpen" data-help-view="casework.claims.detail.funding-editor-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-if="profile?.egcs_fc_currency" v-model:open="fundingEditorOpen" data-help-view="casework.claims.detail.funding-editor-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
           <UFormField data-ui-target="agreements.claims.funding-source.program-amount" :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>

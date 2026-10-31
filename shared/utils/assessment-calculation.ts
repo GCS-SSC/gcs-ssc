@@ -152,38 +152,39 @@ export const validateAssessmentCalculationGraph = (
   const visited = new Set<string>()
   const seenCycles = new Set<string>()
 
-  const visit = (key: string, path: string[]) => {
-    if (visiting.has(key)) {
-      const cycleStartIndex = path.indexOf(key)
-      const cycleKeys = cycleStartIndex >= 0 ? path.slice(cycleStartIndex) : [key]
-      const normalizedCycle = [...cycleKeys].sort().join('|')
-
-      if (!seenCycles.has(normalizedCycle)) {
-        seenCycles.add(normalizedCycle)
-        issues.push({
-          type: 'cycle',
-          itemKeys: cycleKeys
-        })
+  for (const item of items) {
+    if (visited.has(item.key)) continue
+    const path: string[] = []
+    const frames = [{ key: item.key, references: referencedCalculationKeysByItem.get(item.key)?.values(), entered: false }]
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1]
+      if (!frame) break
+      if (!frame.entered) {
+        visiting.add(frame.key)
+        path.push(frame.key)
+        frame.entered = true
       }
-      return
+      const next = frame.references?.next()
+      if (!next || next.done) {
+        visiting.delete(frame.key)
+        visited.add(frame.key)
+        path.pop()
+        frames.pop()
+        continue
+      }
+      const referenceKey = next.value
+      if (visiting.has(referenceKey)) {
+        const cycleKeys = path.slice(path.indexOf(referenceKey))
+        const normalizedCycle = [...cycleKeys].sort().join('|')
+        if (!seenCycles.has(normalizedCycle)) {
+          seenCycles.add(normalizedCycle)
+          issues.push({ type: 'cycle', itemKeys: cycleKeys })
+        }
+      } else if (!visited.has(referenceKey)) {
+        frames.push({ key: referenceKey, references: referencedCalculationKeysByItem.get(referenceKey)?.values(), entered: false })
+      }
     }
-
-    if (visited.has(key)) {
-      return
-    }
-
-    visiting.add(key)
-    const nextPath = [...path, key]
-    referencedCalculationKeysByItem.get(key)?.forEach(referenceKey => {
-      visit(referenceKey, nextPath)
-    })
-    visiting.delete(key)
-    visited.add(key)
   }
-
-  items.forEach(item => {
-    visit(item.key, [])
-  })
 
   return {
     issues,
@@ -344,48 +345,43 @@ export const resolveAssessmentCalculationValues = (
   isItemApplicable: (item: AssessmentCalculationItemDescriptor, valuesByKey: Map<string, number | null | undefined>) => boolean
 ): AssessmentCalculationValueRow[] => {
   const valuesByKey = new Map(manualValuesByKey)
-  const remainingItems = new Map(items.map(item => [item.key, item]))
-  const resolvedItems = new Set<string>()
+  const itemsByKey = new Map(items.map(item => [item.key, item]))
+  const pendingCounts = new Map<string, number>()
+  const dependents = new Map<string, string[]>()
+  const ready: AssessmentCalculationItemDescriptor[] = []
   const calculatedValues: AssessmentCalculationValueRow[] = []
-  let madeProgress = true
 
-  while (remainingItems.size > 0 && madeProgress) {
-    madeProgress = false
+  for (const item of itemsByKey.values()) {
+    const dependencies = new Set([
+      ...collectCalculationAnswerReferenceKeys(item.expression),
+      ...(item.dependencyKeys ?? [])
+    ].filter(key => itemsByKey.has(key)))
+    pendingCounts.set(item.key, dependencies.size)
+    if (dependencies.size === 0) ready.push(item)
+    for (const key of dependencies) {
+      const children = dependents.get(key) ?? []
+      children.push(item.key)
+      dependents.set(key, children)
+    }
+  }
 
-    for (const [itemKey, item] of remainingItems.entries()) {
-      const dependencyKeys = [
-        ...collectCalculationAnswerReferenceKeys(item.expression),
-        ...(item.dependencyKeys ?? [])
-      ].filter(dependencyKey => remainingItems.has(dependencyKey))
-
-      if (dependencyKeys.some(dependencyKey => !resolvedItems.has(dependencyKey))) {
-        continue
-      }
-
-      if (!isItemApplicable(item, valuesByKey)) {
-        remainingItems.delete(itemKey)
-        resolvedItems.add(itemKey)
-        madeProgress = true
-        continue
-      }
-
+  for (let index = 0; index < ready.length; index += 1) {
+    const item = ready[index]
+    if (!item) continue
+    if (isItemApplicable(item, valuesByKey)) {
       const resolvedValue = evaluateAssessmentCalculationExpression(item.expression, valuesByKey, helpers)
       const normalizedValue = toNumber(resolvedValue)
-
       if (normalizedValue !== undefined) {
         const value = normalizeNumber(normalizedValue)
         valuesByKey.set(item.key, value)
-        calculatedValues.push({
-          section: item.section,
-          subsection: item.subsection,
-          question: item.question,
-          value
-        })
+        calculatedValues.push({ section: item.section, subsection: item.subsection, question: item.question, value })
       }
-
-      remainingItems.delete(itemKey)
-      resolvedItems.add(itemKey)
-      madeProgress = true
+    }
+    for (const key of dependents.get(item.key) ?? []) {
+      const pending = (pendingCounts.get(key) ?? 0) - 1
+      pendingCounts.set(key, pending)
+      const dependent = itemsByKey.get(key)
+      if (pending === 0 && dependent) ready.push(dependent)
     }
   }
 

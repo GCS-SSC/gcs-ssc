@@ -2379,6 +2379,7 @@
     "invalid_calculation_reference": "Select a valid assessment item reference for this calculation",
     "calculation_cycle": "Calculation references cannot contain cycles",
     "calculation_root_operation_required": "Calculated fields must start with an operation",
+    "calculation_resource_limit": "Calculation content exceeds the supported calculation count, formula size, argument count or nesting depth.",
     "calculation_operator_arguments": "Provide the correct number of arguments for the selected calculation operator",
     "incomplete_assessment_answers": "Complete all required assessment answers",
     "comments_required": "A comment is required for the selected answer",

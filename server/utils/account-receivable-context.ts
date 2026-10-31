@@ -10,6 +10,8 @@ import { lockRegisteredExtensionAgreementScopes, lockRegisteredExtensionAgreemen
 import { lockTransferPaymentStreams } from './transfer-payment-stream-lock'
 import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
 import { withAuditExecution } from './audit-context'
+import { assertAgreementCloseoutWriteAllowed } from './agreement-write-transaction'
+import { assertBusinessStatusMutationAllowed } from './business-status-runtime'
 
 export type AccountReceivablePoolIdentity = { agencyId: string; applicantRecipientId: string; currency: Currency_Codes }
 export type AccountReceivableRecordEntityType = 'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivableadjustment'
@@ -89,7 +91,7 @@ export const lockAccountReceivablePaymentPoolAgreements = async (
 export const executeFreshAccountReceivableWrite = async <T>(
   event: H3Event, identity: AccountReceivablePoolIdentity & { agreementIds: string[] },
   callback: (trx: Transaction<Database>, auth: AuthContext, poolId: string) => Promise<T>,
-  options: { action?: 'create' | 'update' | 'delete'; target?: { entityType: AccountReceivableCaseType; entityId: string }; sourceRead?: boolean } = {}
+  options: { action?: 'create' | 'update' | 'delete'; target?: { entityType: AccountReceivableCaseType; entityId: string }; sourceRead?: boolean; parentLifecycle?: 'ordinary' } = {}
 ): Promise<T> => {
   const initial = await Promise.all(identity.agreementIds.map(id => resolveAgreementScopeContext(id, event.context.$db)))
   if (initial.some(context => !context || context.agencyId !== identity.agencyId)) return await notFound(event, 'ACCOUNT_RECEIVABLE_NOT_FOUND', 'apiErrors.account_receivable.not_found')
@@ -117,8 +119,12 @@ export const executeFreshAccountReceivableWrite = async <T>(
       await lockRegisteredExtensionAgreementLifecycle(event, trx, { agreementId: id, agencyId: context.agencyId,
         currentStreamId: context.streamId, targetStreamIds: [context.streamId] })
       await assertAgreementCorrectionFinancialWriteAllowed(event, trx, id)
-      const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_currency').where('id', '=', id).executeTakeFirstOrThrow()
+      const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').select(['egcs_fc_currency', 'egcs_fc_status']).where('id', '=', id).executeTakeFirstOrThrow()
       if (agreement.egcs_fc_currency !== identity.currency) return await forbidden(event)
+      if (options.parentLifecycle === 'ordinary') {
+        await assertAgreementCloseoutWriteAllowed(event, trx, id, agreement.egcs_fc_status)
+        await assertBusinessStatusMutationAllowed(event, trx, 'fundingcaseagreement', id)
+      }
     }
     if (options.target) await authorizeFreshAssignedItem(event, trx, auth, options.target.entityType, options.target.entityId, options.action ?? 'update')
     return await withAuditExecution({ type: 'agency', agencyId: identity.agencyId }, () => callback(trx, auth, String(pool.id)))

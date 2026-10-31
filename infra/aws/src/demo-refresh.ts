@@ -1,12 +1,9 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { createHash } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { readDemoImage } from '../../../deployment/demo-image.js'
 
 const execute = promisify(execFile)
-const manifestPath = new URL('../../../deployment/demo-image.json', import.meta.url)
-const repository = 'gcs-ssc/gcs-ssc-demo'
 type Container = { name: string; image: string; environment?: Array<{ name: string; value: string }>; secrets?: Array<{ name: string; valueFrom: string }>; command?: string[] }
 export type TaskDefinition = Record<string, unknown> & { containerDefinitions: Container[] }
 type Service = {
@@ -45,24 +42,13 @@ export const aws: Aws = async <T>(args: string[]): Promise<T> => {
   return JSON.parse(result.stdout) as T
 }
 
-/** Resolve the public latest image and verify its registry digest.
+/** Read the independently approved release pin before any credentialed operation.
  * @returns Immutable GCS demo image reference.
  */
-export const resolveLatestImage = async (): Promise<string> => {
-  const tokenResponse = await fetch(`https://ghcr.io/token?service=ghcr.io&scope=repository:${repository}:pull`, { signal: AbortSignal.timeout(30000) })
-  if (!tokenResponse.ok) throw new Error(`GHCR token request failed (${tokenResponse.status})`)
-  const { token } = await tokenResponse.json() as { token: string }
-  const response = await fetch(`https://ghcr.io/v2/${repository}/manifests/latest`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' },
-    signal: AbortSignal.timeout(30000)
-  })
-  if (!response.ok) throw new Error(`GHCR latest lookup failed (${response.status}). Run the image workflow on main first.`)
-  const body = await response.text()
-  const digest = `sha256:${createHash('sha256').update(body).digest('hex')}`
-  if (response.headers.get('docker-content-digest') !== digest) throw new Error('GHCR manifest digest mismatch')
-  const manifest = JSON.parse(body) as { mediaType: string }
-  if (!['application/vnd.oci.image.manifest.v1+json', 'application/vnd.docker.distribution.manifest.v2+json'].includes(manifest.mediaType)) throw new Error('Expected the workflow’s single-platform image manifest')
-  return `ghcr.io/${repository}@${digest}`
+export const resolveApprovedImage = async (): Promise<string> => {
+  const image = readDemoImage()
+  if (!image) throw new Error('Approve a release digest in deployment/demo-image.json before refreshing')
+  return image
 }
 
 /** Preserve the validated demo task contract in a registrable revision.
@@ -113,10 +99,10 @@ for (const target of [{prefix:'AWS_DB',database:'gcs_ssc',role:'gcs_ssc'}, {pref
 
 type Dependencies = {
   aws: Aws; resolveImage: () => Promise<string>; wait: () => Promise<void>; health: (url: string) => Promise<boolean>
-  savePin: (image: string) => void; log: (message: string) => void
+  log: (message: string) => void
 }
 const defaults: Dependencies = {
-  aws, resolveImage: resolveLatestImage, wait: () => new Promise(resolve => setTimeout(resolve, 10000)),
+  aws, resolveImage: resolveApprovedImage, wait: () => new Promise(resolve => setTimeout(resolve, 10000)),
   /** Probe public readiness without following redirects.
    * @param url - Stack-owned health URL.
    * @returns Whether the application is ready.
@@ -128,10 +114,10 @@ const defaults: Dependencies = {
       return false
     }
   },
-  savePin: image => writeFileSync(manifestPath, `${JSON.stringify({ image }, null, 2)}\n`), log: console.log
+  log: console.log
 }
 
-/** Deploy the latest GCS demo release with an optional explicit schema reset.
+/** Deploy the approved GCS demo release with an optional explicit schema reset.
  * @param options - Reset and preview selection.
  * @param options.resetDb - Explicitly wipe the GCS demo schemas.
  * @param options.preview - Inspect without external mutations.
@@ -239,8 +225,7 @@ export const refreshDemo = async (options: { resetDb: boolean; preview: boolean 
           || task!.containers.find(container => container.name === 'Application')?.imageDigest !== image.split('@')[1]) throw new Error('Running image does not match the selected release')
         if (await dependencies.health(healthUrl)) {
           if (options.resetDb && service.deploymentConfiguration.deploymentCircuitBreaker) await aws(['ecs', 'update-service', ...serviceArgs, '--deployment-configuration', JSON.stringify({ deploymentCircuitBreaker: service.deploymentConfiguration.deploymentCircuitBreaker })])
-          dependencies.savePin(image)
-          log(`GCS demo ready: ${healthUrl}\nSaved deployment/demo-image.json for future CDK deployments.`)
+          log(`GCS demo ready: ${healthUrl}`)
           return
         }
       }

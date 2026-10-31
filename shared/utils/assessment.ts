@@ -369,11 +369,13 @@ const getSubSectionStatusItems = (
     return commentsRequired(answer.value, item.commentThreshold) && !String(answer.comment ?? '').trim()
   })
 
-  const status: AssessmentRuntimeStatus = !hasStarted
-    ? 'empty'
-    : hasPendingQuestion
-      ? 'in_progress'
-      : 'completed'
+  const status: AssessmentRuntimeStatus = applicableQuestions.length === 0
+    ? 'completed'
+    : !hasStarted
+        ? 'empty'
+        : hasPendingQuestion
+          ? 'in_progress'
+          : 'completed'
 
   acc.push({
     name: subsection.name,
@@ -606,7 +608,7 @@ const buildAssessmentSectionStatuses = (
   return {
     name: section.name,
     label: section.label,
-    status: getAggregateStatus(subSections),
+    status: getAggregateStatus(subSections, 'completed'),
     subSections,
     icon: section.icon
   }

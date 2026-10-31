@@ -181,6 +181,14 @@ export const createAssessmentResponseValidationSchema = (
     })
   })
 
+  if (options?.enforceCompletion && !runtimeSummary.readyToComplete && runtimeSummary.blockingIssues.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['answers'],
+      message: 'validation.incomplete_assessment_answers'
+    })
+  }
+
   createAssessmentReviewAlignmentValidationSchema(
     scoringMatrix,
     runtimeSummary.score.weightedScore,

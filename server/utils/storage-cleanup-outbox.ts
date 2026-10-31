@@ -60,23 +60,34 @@ export const processStorageCleanupBatch = async (
       const provider = await resolveAgencyStorageProvider(db, String(job.agency_id), job.provider_key)
       if (!provider) throw new Error('Recorded storage provider is unavailable')
       if (job.operation === 'restore_metadata') {
-        const payload = job.payload as null | {
-          metadata: Record<string, never>
-          target: GcsFileStorageTarget
-          contractVersion: number
-        }
-        if (!payload) throw new Error('Metadata restoration payload is unavailable')
-        const adapter = provider.adapter as GcsFileStorageProviderManagedMetadataAdapter
-        await runBoundedExtensionOperation('storage:restore-metadata', async signal => {
-          if (signal.aborted) throw signal.reason
-          await adapter.updateProviderMetadata({
-            signal,
-            objectId: job.object_id, locator: job.locator as Record<string, never>,
-            agencyId: String(job.agency_id), purpose: job.purpose as 'attachment',
-            target: payload.target, agencyConfig: provider.config,
-            secrets: createFileStorageSecretReader(db, provider.extension.key, String(job.agency_id), process.env.GCS_EXTENSION_SECRETS_KEY ?? ''),
-            contractVersion: payload.contractVersion, metadata: payload.metadata
+        await db.transaction().execute(async trx => {
+          // The interactive writer holds this same object row through provider I/O and commit.
+          await trx.selectFrom('Common_Attachment').select('id')
+            .where('egcs_cn_provider', '=', job.provider_key)
+            .where('egcs_cn_providerobjectid', '=', job.object_id).forUpdate().executeTakeFirstOrThrow()
+          const current = await trx.selectFrom('storage_cleanup_outbox').select('id')
+            .where('id', '=', String(job.id)).where('status', '=', 'processing')
+            .where('lease_owner', '=', workerId).forUpdate().executeTakeFirst()
+          if (!current) return
+          const payload = job.payload as null | {
+            metadata: Record<string, never>
+            target: GcsFileStorageTarget
+            contractVersion: number
+          }
+          if (!payload) throw new Error('Metadata restoration payload is unavailable')
+          const adapter = provider.adapter as GcsFileStorageProviderManagedMetadataAdapter
+          await runBoundedExtensionOperation('storage:restore-metadata', async signal => {
+            if (signal.aborted) throw signal.reason
+            await adapter.updateProviderMetadata({
+              signal,
+              objectId: job.object_id, locator: job.locator as Record<string, never>,
+              agencyId: String(job.agency_id), purpose: job.purpose as 'attachment',
+              target: payload.target, agencyConfig: provider.config,
+              secrets: createFileStorageSecretReader(trx, provider.extension.key, String(job.agency_id), process.env.GCS_EXTENSION_SECRETS_KEY ?? ''),
+              contractVersion: payload.contractVersion, metadata: payload.metadata
+            })
           })
+          await completeReservedStorageCleanup(trx, String(job.id), workerId)
         })
       } else {
         await deleteProviderObject({
@@ -145,4 +156,15 @@ export const releaseReservedStorageCleanup = async (
     status: 'pending', next_attempt_at: new Date(), updated_at: new Date(),
     lease_owner: null, lease_expires_at: null
   }).where('id', '=', id).where('lease_owner', '=', workerId).execute()
+}
+
+export const supersedeStorageMetadataRestorations = async (
+  trx: Transaction<Database>, request: Pick<StorageCleanupRequest, 'provider_key' | 'agency_id' | 'object_id'>, currentReservationId: string
+): Promise<void> => {
+  await trx.updateTable('storage_cleanup_outbox').set({
+    status: 'completed', completed_at: new Date(), updated_at: new Date(),
+    lease_owner: null, lease_expires_at: null, last_error: null
+  }).where('provider_key', '=', request.provider_key).where('agency_id', '=', request.agency_id)
+    .where('object_id', '=', request.object_id).where('operation', '=', 'restore_metadata')
+    .where('id', '!=', currentReservationId).where('status', 'in', ['pending', 'processing']).execute()
 }

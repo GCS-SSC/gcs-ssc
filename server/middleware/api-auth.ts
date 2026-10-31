@@ -2,6 +2,7 @@ import { defineEventHandler, getRequestURL } from 'h3'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { getMigrationReadiness } from '~~/server/utils/migration-readiness'
 import { startupUnavailable } from '~~/server/utils/startup-unavailable'
+import { requireBusinessRequestIntent } from '~~/server/utils/request-intent'
 
 /**
  * Establishes an active authenticated user before any protected API handler runs.
@@ -28,5 +29,6 @@ export default defineEventHandler(async event => {
     return
   }
 
+  await requireBusinessRequestIntent(event)
   await requireAuthContext(event)
 })

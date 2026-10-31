@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import { EnFrLabelSchema } from '../common'
 import { HelpSchema } from '../help'
-import { AssessmentCalculationFormulaSchema } from './calculation'
+import { ASSESSMENT_CALCULATION_LIMITS, AssessmentCalculationFormulaSchema } from './calculation'
 import type { AssessmentCalculationExpression } from './calculation'
 import {
   buildAssessmentCalculationKey,
@@ -177,6 +177,12 @@ const AssessmentDefinitionSchema = z.object({
   outcomes: z.array(OutcomeSchema),
   impactors: z.optional(z.array(ImpactorsSchema))
 }).superRefine((value, ctx) => {
+  const calculationCount = value.sections.reduce((total, section) => total + section.subSections.reduce(
+    (sectionTotal, subsection) => sectionTotal + subsection.questions.filter(question => question.type === 'calculation').length, 0
+  ), 0)
+  if (calculationCount > ASSESSMENT_CALCULATION_LIMITS.calculations) {
+    ctx.addIssue({ code: 'custom', message: 'validation.calculation_resource_limit', path: ['sections'] })
+  }
   validateStrictlyIncreasingMaxima(value.sectionMatrix, ctx, ['sectionMatrix'])
   value.outcomes.forEach((outcome, outcomeIndex) => {
     outcome.strategies.forEach((strategy, strategyIndex) => {

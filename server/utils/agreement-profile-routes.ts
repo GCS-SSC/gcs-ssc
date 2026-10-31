@@ -4,7 +4,8 @@ import { assertAgreementProponentType } from './agreement-proponent-type'
 import { captureParsedAuditRequestBody } from './audit-request'
 import { mergeAgreementCustomFields } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement profile helpers receive complete documentation. */
-import { readBody, type H3Event } from 'h3'
+import type { H3Event } from 'h3'
+import { readGcsExtensionRequestBody } from '@gcs-ssc/extensions/server'
 import { sql, type Kysely } from 'kysely'
 import { badRequest, forbidden, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { parseI18n } from '~~/server/utils/api-validate'
@@ -41,7 +42,7 @@ import { BusinessStatusViolation, lockBusinessStatus } from '~~/server/utils/bus
 import { isAgreementRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
 
 const readAgreementProfilePatchBody = async (event: H3Event) => {
-  const rawBody = await readBody<Record<string, unknown>>(event)
+  const rawBody = await readGcsExtensionRequestBody<Record<string, unknown>>(event)
   await captureParsedAuditRequestBody(event, rawBody)
   const validated = await parseI18n(event, FundingCaseAgreementProfilePatchSchema, rawBody)
 

@@ -380,7 +380,7 @@ export const createAccountReceivable = async (event: H3Event, agreementId: strin
       }
     }
     return { ...created, egcs_fc_amount: parseDatabaseMoney(created.egcs_fc_amount), egcs_fc_fiscaloutstanding: created.egcs_fc_fiscaloutstanding === null ? null : parseDatabaseMoney(created.egcs_fc_fiscaloutstanding) }
-  }, { action: 'create', sourceRead: !input.egcs_fc_linkedreceivable })
+  }, { action: 'create', sourceRead: !input.egcs_fc_linkedreceivable, parentLifecycle: 'ordinary' })
 }
 
 export const editAccountReceivable = async (event: H3Event, id: string, input: AccountReceivableEdit | AccountReceivableSummaryEdit) => {

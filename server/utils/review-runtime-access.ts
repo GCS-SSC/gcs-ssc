@@ -437,6 +437,8 @@ const authorizeSchemaAgencyRuntimeAction = async (
   action: ReviewRuntimeAction,
   entityContext: ReviewRuntimeEntityContext
 ): Promise<AuthContext | null> => {
+  if (entityContext.entityType.includes(':')) return null
+
   if (action === 'read_assessment' && entityContext.schemaAgencyId) {
     return await authorize(event, 'agency', 'read', { type: 'agency', agencyId: entityContext.schemaAgencyId })
   }
@@ -508,7 +510,9 @@ const authorizeExtensionOwnerAction = async (
         const agreement = await resolveAgreementScopeContext(owner.ownerId, event.context.$db)
         return agreement ? await canAccessAgreement(auth, action, agreement.scope, event.context.$db) : false
       })()
-    : await canAccessApplicantRecipient(auth, owner.ownerId, action, event.context.$db)
+    : await canAccessApplicantRecipient(auth, owner.ownerId, action, event.context.$db) && auth.userAbilities.authorize('applicant_recipient', action, {
+      type: 'agency', agencyId: owner.agencyId
+    })
   return allowed ? auth : await forbidden(event)
 }
 
@@ -540,6 +544,7 @@ const authorizeReviewRuntimeReadAccess = async (
   const authContext = await requireAuthContext(event)
   const db = event.context.$db
   const extensionRuntime = await resolveExtensionAuthorizationRuntime(event, entityContext)
+  if (entityContext.entityType.includes(':') && !extensionRuntime) return await forbidden(event)
   const exactItemTarget = getReviewRuntimeReadTarget(entityContext)
   const approvalAssignment = await resolveApprovalItemGrant(authContext.userId, exactItemTarget, db)
   let hasInheritedOwnerRead = false

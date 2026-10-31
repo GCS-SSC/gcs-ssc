@@ -2,7 +2,7 @@
 import Docxtemplater from 'docxtemplater'
 import { DocumentConditionError, evaluateDocumentCondition, resolveDocumentConditionPath } from './document-conditions'
 import { prepareWordConditionTags, type CompiledDocumentConditions } from './document-word-conditions'
-import PizZip from 'pizzip'
+import { loadBoundedDocx } from './document-docx-budget'
 import puppeteer, { type Browser } from 'puppeteer'
 import libreOfficeConvert from 'libreoffice-convert'
 import { join } from 'node:path'
@@ -176,7 +176,7 @@ export const normalizeDocumentTemplateTags = (xml: string): string => xml
   .replace(/\{\{\s*([\w.]+)\s*}}/g, '{$1}')
 
 const renderDocxTemplate = (templateBytes: Buffer, context: Record<string, unknown>, language: Language_Preference): Buffer => {
-  const zip = new PizZip(templateBytes)
+  const zip = loadBoundedDocx(templateBytes)
   const conditions: CompiledDocumentConditions = new Map()
   for (const [path, file] of Object.entries(zip.files)) {
     if (path.startsWith('word/') && path.endsWith('.xml') && !file.dir) {
@@ -301,7 +301,21 @@ const renderPdfFromHtml = async (
       deadline,
       renderBudgetMs
     )
-    page = await awaitWithinRenderBudget(browser.newPage(), deadline, renderBudgetMs)
+    const pagePromise = browser.newPage()
+    try {
+      page = await awaitWithinRenderBudget(pagePromise, deadline, renderBudgetMs)
+    } catch (error) {
+      void pagePromise.then(async latePage => {
+        try {
+          await awaitWithTimeout(latePage.close(), cleanupTimeoutMs, 'Late Chromium page cleanup timed out')
+        } catch (cleanupError: unknown) {
+          console.error('Failed to close a Chromium page created after its deadline.', {
+            error: getErrorMessage(cleanupError)
+          })
+        }
+      }, () => undefined)
+      throw error
+    }
     page.setDefaultTimeout(getRemainingRenderBudgetMs(deadline, renderBudgetMs))
     page.setDefaultNavigationTimeout(getRemainingRenderBudgetMs(deadline, renderBudgetMs))
     await awaitWithinRenderBudget(page.setJavaScriptEnabled(false), deadline, renderBudgetMs)
