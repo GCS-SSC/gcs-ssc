@@ -92,7 +92,7 @@ type AssessmentCalculationExpression =
     args: AssessmentCalculationExpression[]
   }
 
-const AssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculationExpression> = z.lazy(() => z.discriminatedUnion('kind', [
+const RecursiveAssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculationExpression> = z.lazy(() => z.discriminatedUnion('kind', [
   AssessmentCalculationNumberLiteralSchema,
   AssessmentCalculationBooleanLiteralSchema,
   AssessmentCalculationAnswerReferenceSchema,
@@ -100,7 +100,7 @@ const AssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculationExpr
   z.object({
     kind: z.literal('operation'),
     operator: z.enum(ASSESSMENT_CALCULATION_OPERATORS),
-    args: z.array(AssessmentCalculationExpressionSchema).min(1, { error: 'validation.required' })
+    args: z.array(RecursiveAssessmentCalculationExpressionSchema).min(1, { error: 'validation.required' })
   }).superRefine((value, ctx) => {
     const operatorConfig = ASSESSMENT_CALCULATION_OPERATOR_CONFIG[value.operator]
     if (value.args.length < operatorConfig.minArgs) {
@@ -120,6 +120,29 @@ const AssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculationExpr
     }
   })
 ]))
+export const ASSESSMENT_CALCULATION_LIMITS = { calculations: 512, formulaNodes: 1024, formulaDepth: 32, arguments: 64 } as const
+
+// Check the raw tree before recursive parsing so excessive depth cannot exhaust the stack.
+const AssessmentCalculationExpressionSchema = z.unknown().superRefine((value, ctx) => {
+  const pending = [{ value, depth: 1 }]
+  let nodes = 0
+  while (pending.length > 0) {
+    const node = pending.pop()
+    if (!node) break
+    nodes += 1
+    if (nodes > ASSESSMENT_CALCULATION_LIMITS.formulaNodes || node.depth > ASSESSMENT_CALCULATION_LIMITS.formulaDepth) {
+      ctx.addIssue({ code: 'custom', message: 'validation.calculation_resource_limit' })
+      return
+    }
+    if (typeof node.value === 'object' && node.value !== null && 'args' in node.value && Array.isArray(node.value.args)) {
+      if (node.value.args.length > ASSESSMENT_CALCULATION_LIMITS.arguments) {
+        ctx.addIssue({ code: 'custom', message: 'validation.calculation_resource_limit' })
+        return
+      }
+      for (const argument of node.value.args) pending.push({ value: argument, depth: node.depth + 1 })
+    }
+  }
+}).pipe(RecursiveAssessmentCalculationExpressionSchema)
 export { AssessmentCalculationExpressionSchema }
 
 export const AssessmentCalculationFormulaSchema = AssessmentCalculationExpressionSchema.refine(

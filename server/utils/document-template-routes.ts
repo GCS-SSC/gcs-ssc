@@ -4,6 +4,7 @@ import { sql, type Insertable, type Kysely, type Updateable } from 'kysely'
 import type { z } from 'zod'
 import { parseI18n } from './api-validate'
 import { badRequest, notFound } from './api-errors'
+import { loadBoundedDocx } from './document-docx-budget'
 import {
   cleanupStoredFileUploads,
   writeStoredTemplateFile,
@@ -202,6 +203,14 @@ const assertTemplateFilesMatchKind = async (
 ): Promise<void> => {
   if (templateKind === 'docx' && files.some(file => !file.filename.toLowerCase().endsWith('.docx'))) {
     return await badRequest(event, 'INVALID_TEMPLATE_FILE', 'apiErrors.document_generation.invalid_docx_file')
+  }
+
+  if (templateKind === 'docx') {
+    try {
+      for (const file of files) loadBoundedDocx(file.data)
+    } catch {
+      return await badRequest(event, 'INVALID_TEMPLATE_FILE', 'apiErrors.document_generation.invalid_docx_file')
+    }
   }
 
   if (templateKind === 'html' && files.some(file => !/\.(html|htm)$/i.test(file.filename))) {

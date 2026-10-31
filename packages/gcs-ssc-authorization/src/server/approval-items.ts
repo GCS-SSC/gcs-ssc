@@ -23,6 +23,7 @@ export class ApprovalItemAuthorizationRepository {
         eb('Common_Approval.egcs_cn_assigneduser', '=', eb.ref('Common_User.id')),
         eb.and([
           eb('Common_Approval.egcs_cn_assigneduser', 'is', null),
+          eb('Common_Approval.egcs_cn_assignedgroup', 'is', null),
           eb('Common_Approval.egcs_cn_defaultuser', '=', eb.ref('Common_User.id'))
         ])
       ])))

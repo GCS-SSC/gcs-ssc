@@ -1,5 +1,6 @@
 import { captureParsedAuditRequestBody } from './audit-request'
-import { getQuery, readBody, type H3Event } from 'h3'
+import { getQuery, type H3Event } from 'h3'
+import { readGcsExtensionRequestBody } from '@gcs-ssc/extensions/server'
 import type { z } from 'zod'
 import { ZodError } from 'zod'
 import { validationError } from './api-errors'
@@ -42,7 +43,7 @@ export const readValidatedBodyI18n = async <TSchema extends z.ZodTypeAny>(
   event: H3Event,
   schema: TSchema
 ): Promise<z.infer<TSchema>> => {
-  const body = await readBody(event)
+  const body = await readGcsExtensionRequestBody(event)
   await captureParsedAuditRequestBody(event, body)
   return await parseI18n(event, schema, body)
 }

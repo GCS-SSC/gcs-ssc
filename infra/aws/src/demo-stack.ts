@@ -445,7 +445,8 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   }
   const metabaseDistribution = new cloudfront.Distribution(stack, 'MetabaseDistribution', {
     comment: 'GCS-SSC Metabase demo',
-    enabled: true,
+    // Enable only in a separate deployment after verifying the retained administrator.
+    enabled: stack.node.tryGetContext('metabasePublicEnabled') === 'true',
     priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     defaultBehavior: {
       origin: origins.VpcOrigin.withVpcOrigin(metabaseVpcOrigin, { readTimeout: Duration.seconds(60) }),

@@ -2369,6 +2369,7 @@
     "invalid_calculation_reference": "Sélectionnez une référence d'élément d'évaluation valide pour ce calcul",
     "calculation_cycle": "Les références de calcul ne peuvent pas contenir de cycle",
     "calculation_root_operation_required": "Les champs calculés doivent commencer par une opération",
+    "calculation_resource_limit": "Le contenu de calcul dépasse le nombre de calculs, la taille des formules, le nombre d’arguments ou la profondeur d’imbrication pris en charge.",
     "calculation_operator_arguments": "Fournissez le bon nombre d'arguments pour l'opérateur de calcul sélectionné",
     "incomplete_assessment_answers": "Complétez toutes les réponses d'évaluation requises",
     "comments_required": "Un commentaire est requis pour la réponse sélectionnée",

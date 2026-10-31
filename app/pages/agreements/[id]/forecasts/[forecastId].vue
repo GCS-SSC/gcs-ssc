@@ -300,7 +300,7 @@ const forecastHeroTitle = computed(() => activeForecast.value
 )
 const forecastHeroMetaItems = computed(() => [
   displayValue(profile.value?.egcs_fc_agreementnumber),
-  profile.value?.egcs_fc_currency.toUpperCase() ?? '',
+  profile.value?.egcs_fc_currency?.toUpperCase() ?? '',
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId)
 ])
 const forecastHeroBadges = computed(() => [

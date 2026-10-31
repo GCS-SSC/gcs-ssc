@@ -43,9 +43,10 @@ database is migrated separately.
 - Metabase uses an immutable Docker Hub image digest. An init container
   downloads the regional RDS CA bundle before Metabase starts, and the JDBC
   connection verifies the database hostname. Its CloudFront endpoint starts
-  disabled until its setup sidecar creates and verifies an administrator using
-  a generated password in Secrets Manager. Its task can reach the GCS
-  database as a data source, but its application database is separate.
+  disabled by default. Its setup sidecar creates an administrator and verifies
+  the retained credentials and superuser identity. Enable public access only
+  after that verification, using the separate deployment step below. Its task can
+  reach the GCS database as a data source, but its application database is separate.
 - Secrets Manager secrets for authentication, database credentials, and the
   GCS extension encryption seed; separate two-week CloudWatch application logs.
 - An account-wide monthly cost budget, defaulting to **USD 200**. Providing
@@ -180,25 +181,48 @@ agreement, generate a document, and download a seeded template. Repeat the file
 download after a task replacement to verify persistence. The demo contains its
 usual seeded accounts and is intended for demonstration data.
 
+## Enable Metabase after administrator verification
+
+Keep `metabasePublicEnabled` absent or `false` during initial deployment or any
+Metabase database replacement. The CloudFront distribution remains disabled.
+Inspect the `metabase-setup` logs in `MetabaseApplicationLogs` and require
+`Metabase administrator verified` for the current task. The helper authenticates
+with the retained Secrets Manager credentials, checks the expected email and
+superuser status, and closes its verification session. A missing setup token alone
+does not establish success.
+
+After verification and private `/api/health` success, deploy from `infra/aws`:
+
+```bash
+bun run deploy -- -c metabasePublicEnabled=true
+```
+
+Keep that context on later deployments only while the verified Metabase database
+is retained. To replace or reset that database, first deploy with
+`-c metabasePublicEnabled=false` and wait for CloudFront to be disabled. Repeat
+administrator verification before enabling the endpoint again.
+
 ## One-command demo refresh
 
 From the repository root, using `AWS_PROFILE` in the environment or ignored
 `infra/aws/.env`:
 
 ```bash
-# Inspect the account, target and latest release without changing anything.
+# Inspect the account, target and approved release without changing anything.
 bun run aws:demo:refresh --preview
 
-# Deploy the latest verified main image while preserving the database.
+# Deploy the approved digest while preserving the database.
 bun run aws:demo:refresh
 
 # Wipe GCS demo database schemas and migration journals, then deploy and reseed.
 bun run aws:demo:refresh --reset-db
 ```
 
-Run the manual GCS image publishing workflow on `main` first to update `:latest`.
-The helper resolves that public tag to its verified digest automatically; no SHA,
-Docker daemon, new IAM roles, or CDK deployment is required. It targets only
+Review the successful manual image publishing workflow and its immutable release
+digest, then explicitly approve that digest in `deployment/demo-image.json` before
+running refresh. The helper reads only that pin. It never executes the mutable
+`:latest` tag with deployment credentials. No Docker daemon, new IAM roles, or
+CDK deployment is required. It targets only
 `GcsSscDemo` / Canada Central and validates the existing GCS demo task contract.
 Portal and Metabase services and their databases are untouched. GCS attachment
 files on EFS are preserved; reset discards database references to uploaded files.
@@ -215,8 +239,9 @@ require an explicit reset; the authorized Commitment budget hotfix supplies
 databases, so this release needs no reset or seed replay.
 
 The helper verifies ECS deployment completion, the actual running image digest,
-and public readiness, then updates the local `deployment/demo-image.json` pin.
-Commit/promote that pin separately if other operators should use the same release.
+and public readiness. The approved `deployment/demo-image.json` pin remains the
+selected release. Commit/promote that pin separately if other operators should use
+the same release.
 Direct ECS updates do not rewrite CloudFormation's deployed template; keep the
 manifest aligned before subsequent CDK deployments to avoid restoring an older image.
 Do not run concurrent GCS deployments or refresh commands.

@@ -6,6 +6,9 @@ import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { canAccessEntityAssignmentOwner, resolveEntityAssignmentOwner } from '~~/server/utils/entity-assignment'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
+import { resolveCanonicalLifecycleIdentity } from '~~/server/utils/extension-lifecycle-identity'
+import { isExtensionEnabledForAgency, isExtensionEnabledForStream, loadExtensionLifecycleEntity } from '~~/server/utils/extensions'
+import { isAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import { PaginationSchema } from '~~/shared/types/schemas'
 
 const Query = PaginationSchema.extend({ view: z.enum(['available', 'mine']) })
@@ -119,6 +122,33 @@ export default defineEventHandler(async event => {
     const liveReviewIds: string[] = []
     for (const candidate of reviewCandidates.rows) {
       if (await resolveEntityAssignmentOwner(trx, 'commonreview', candidate.id)) liveReviewIds.push(candidate.id)
+    }
+    const approvalCandidates = await trx.selectFrom('Common_Approval as approval')
+      .innerJoin('Common_Routing_Slip as slip', 'slip.id', 'approval.egcs_cn_routingslip')
+      .innerJoin('Common_Group as grp', 'grp.id', 'approval.egcs_cn_assignedgroup')
+      .leftJoin('Common_Group_Member as member', join => join
+        .onRef('member.egcs_cn_group', '=', 'grp.id').on('member.egcs_cn_user', '=', actor.id)
+        .on('member._deleted', '=', false))
+      .select(['approval.id', 'slip.egcs_cn_entitytype as entityType', 'slip.egcs_cn_entityid as entityId'])
+      .where('slip._deleted', '=', false).where('grp._deleted', '=', false)
+      .where('approval.egcs_cn_approvalvalue', 'is', null)
+      .where(eb => query.view === 'mine'
+        ? eb('approval.egcs_cn_assigneduser', '=', actor.id)
+        : eb.and([eb('approval.egcs_cn_assigneduser', 'is', null), eb('member.id', 'is not', null)]))
+      .execute()
+    const liveApprovalIds: string[] = []
+    for (const candidate of approvalCandidates) {
+      const entityId = String(candidate.entityId)
+      if (isAssignableEntityType(candidate.entityType)) {
+        if (!await resolveEntityAssignmentOwner(trx, candidate.entityType, entityId)) continue
+      } else {
+        const identity = await resolveCanonicalLifecycleIdentity(trx, candidate.entityType, entityId)
+        const loaded = identity ? await loadExtensionLifecycleEntity(candidate.entityType) : null
+        if (!identity || !loaded || loaded.definition.ownerKind !== identity.owner.owner) continue
+        if (!await isExtensionEnabledForAgency(trx, loaded.extension.key, identity.owner.agencyId)) continue
+        if (identity.scope.streamId && !await isExtensionEnabledForStream(trx, loaded.extension.key, identity.scope.streamId)) continue
+      }
+      liveApprovalIds.push(String(candidate.id))
     }
     const grants = auth.userAbilities.getGrants()
     /**
@@ -387,6 +417,7 @@ export default defineEventHandler(async event => {
         OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL))
         AND (memo_source.work_id IS NULL OR (credit_memo.id IS NOT NULL AND memo_agency.id IS NOT NULL AND proponent.id IS NOT NULL))
         AND (work.review_id IS NULL OR work.review_id = ANY(${liveReviewIds}::bigint[]))
+        AND (work.kind <> 'approval' OR work.id = ANY(${liveApprovalIds}::bigint[]))
         AND (work.kind <> 'recommendation' OR work.id = ANY(${authorizedRecommendationIds}::bigint[]))
         AND (work.kind <> 'data_collection' OR work.id = ANY(${authorizedCollectionIds}::bigint[]))
         AND (work.kind <> 'intake' OR (${query.view} = 'mine' AND ${intakeRead})

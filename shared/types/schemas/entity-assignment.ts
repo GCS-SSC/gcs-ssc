@@ -22,7 +22,7 @@ export const EntityAssignmentPromoteSchema = EntityAssignmentCreateSchema
 export const EntityAssignmentContextSchema = z.object({
   id: z.coerce.string(),
   egcs_fc_agreementnumber: z.string(),
-  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM),
+  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM).optional(),
   egcs_fc_title_en: z.string(),
   egcs_fc_title_fr: z.string(),
   can_read_agreement: z.boolean(),
@@ -30,6 +30,10 @@ export const EntityAssignmentContextSchema = z.object({
   can_update_agreement_role: z.boolean().optional(),
   can_delete_agreement_role: z.boolean().optional(),
   can_create_account_receivable: z.boolean().optional()
+}).superRefine((context, ctx) => {
+  if (context.can_read_agreement ? !context.egcs_fc_currency : context.egcs_fc_currency !== undefined) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_fc_currency'] })
+  }
 })
 export const AssignedWorkQuerySchema = z.object({
   search: z.string().trim().optional(),

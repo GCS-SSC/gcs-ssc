@@ -1,11 +1,11 @@
 import { useNitroApp } from 'nitropack/runtime'
 import { captureParsedAuditRequestBody } from './audit-request'
 /* eslint-disable jsdoc/require-jsdoc -- Applicant-recipient CRUD helpers are covered by route and integration tests. */
-import type { GcsExtensionAgreementAccess } from '@gcs-ssc/extensions/server'
+import { readGcsExtensionRequestBody, type GcsExtensionAgreementAccess } from '@gcs-ssc/extensions/server'
 import { runBoundedExtensionOperation } from './extension-admission'
 import { canonicalizeAuthorizationLockIds } from '@gcs-ssc/authorization/server'
 import type { H3Event } from 'h3'
-import { getQuery, readBody } from 'h3'
+import { getQuery } from 'h3'
 import type { Kysely, Transaction, Updateable } from 'kysely'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
@@ -354,7 +354,7 @@ export const patchApplicantRecipientAgencyFinancialId = async (
 }
 
 const readApplicantRecipientPatchBody = async (event: H3Event) => {
-  const rawBody = await readBody<Record<string, unknown>>(event)
+  const rawBody = await readGcsExtensionRequestBody<Record<string, unknown>>(event)
   await captureParsedAuditRequestBody(event, rawBody)
   const validated = await parseI18n(event, ApplicantRecipientProfilePatchSchema, rawBody)
 

@@ -392,8 +392,8 @@
     },
   },
   "patchedDependencies": {
-    "nitropack@2.13.5": "patches/nitropack@2.13.5.patch",
     "kysely-pglite@0.6.1": "patches/kysely-pglite@0.6.1.patch",
+    "nitropack@2.13.5": "patches/nitropack@2.13.5.patch",
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],

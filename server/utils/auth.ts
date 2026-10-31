@@ -345,6 +345,11 @@ const createAuth = () => {
       }
     : undefined
 
+  if (process.env.NODE_ENV === 'production'
+    && runtimeConfig.authSecret === 'dev_only_local_secret_abcdefghijklmnopqrstuvwxyz123456') {
+    throw new Error('BETTER_AUTH_SECRET must not use the published development secret')
+  }
+
   return betterAuth({
     database: createAuthDatabaseAdapter(useDb()),
     secret: runtimeConfig.authSecret,
@@ -353,16 +358,33 @@ const createAuth = () => {
     trustedOrigins: request => resolveTrustedOriginsForRequest(runtimeConfig, request),
     session: {
       cookieCache: {
-        enabled: true,
-        maxAge: 15 * 60,
-        strategy: 'compact',
-        version: runtimeConfig.authCookieCacheVersion
+        enabled: false
       }
     },
     account: {
       storeStateStrategy: 'cookie',
-      storeAccountCookie: true
+      storeAccountCookie: false
     },
+    plugins: [{
+      id: 'database-owned-oauth-accounts',
+      /**
+       * Removes retained account cookies before session-owned database account lookup.
+       * @param request - Incoming authentication request.
+       * @param context - Better Auth cookie configuration.
+       * @returns Request without account cache cookies.
+       */
+      onRequest: async (request, context) => {
+        // Older clients can retain account cookies even after storage is disabled.
+        const accountCookieName = context.authCookies.accountData.name
+        const headers = new Headers(request.headers)
+        const cookies = (headers.get('cookie') ?? '').split(';').filter(cookie => {
+          const name = cookie.trim().split('=', 1)[0]
+          return name !== accountCookieName && !name?.startsWith(`${accountCookieName}.`)
+        })
+        headers.set('cookie', cookies.join(';'))
+        return { request: new Request(request, { headers }) }
+      }
+    }],
     emailAndPassword: {
       enabled: true
     },
