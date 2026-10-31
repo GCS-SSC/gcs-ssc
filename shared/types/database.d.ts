@@ -396,6 +396,7 @@ export type Countries =
 export interface HostManagedExtensionsDatabase {
   'extensions.agency_enablement': ExtensionsAgencyEnablementTable
   'extensions.agency_storage_selection': ExtensionsAgencyStorageSelectionTable
+  'extensions.agency_notification_selection': ExtensionsAgencyNotificationSelectionTable
   'extensions.stream_configuration': ExtensionsStreamConfigurationTable
   'extensions.kv_entry': ExtensionsKvEntryTable
   'extensions.secret_entry': ExtensionsSecretEntryTable
@@ -553,6 +554,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Approval_Template: CommonApprovalTemplateTable
   Common_Approval_Step: CommonApprovalStepTable
   Common_Routing_Slip: CommonRoutingSlipTable
+  Common_Notification: CommonNotificationTable
   Common_Approval: CommonApprovalTable
   Common_Approval_Certification: CommonApprovalCertificationTable
   Common_Assessment_Outcome: CommonAssessmentOutcomeTable
@@ -618,6 +620,15 @@ export interface ExtensionsAgencyEnablementTable {
 }
 
 export interface ExtensionsAgencyStorageSelectionTable {
+  id: Generated<string>
+  agency_id: string
+  provider_key: string
+  created_at: Generated<Date | string>
+  updated_at: Date | string | null
+  _deleted: Generated<boolean>
+}
+
+export interface ExtensionsAgencyNotificationSelectionTable {
   id: Generated<string>
   agency_id: string
   provider_key: string
@@ -2968,5 +2979,34 @@ export interface AgencyFieldTooltipTable {
   egcs_ay_screen_en: string
   egcs_ay_screen_fr: string
   egcs_ay_extension: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface CommonNotificationTable {
+  id: Generated<string>
+  egcs_cn_agency: string
+  egcs_cn_stream: string
+  egcs_cn_approval: string
+  egcs_cn_runtimeitem: string
+  egcs_cn_activation: string
+  egcs_cn_providerkey: string
+  egcs_cn_notifier: string
+  egcs_cn_recipientkind: 'user' | 'group'
+  egcs_cn_recipientid: string
+  egcs_cn_recipientemail: string
+  egcs_cn_recipientname: string
+  egcs_cn_payload: JsonValue
+  egcs_cn_deliverycontext?: JsonValue | null
+  egcs_cn_reference: string
+  egcs_cn_status: Generated<'pending' | 'processing' | 'uncertain' | 'completed' | 'cancelled' | 'unresolved'>
+  egcs_cn_attempts: Generated<number>
+  egcs_cn_nextattempt: Generated<Date>
+  egcs_cn_leaseowner?: string | null
+  egcs_cn_leaseexpiry?: Date | null
+  egcs_cn_lasterror?: string | null
+  egcs_cn_created: Generated<Date>
+  egcs_cn_updated: Generated<Date>
+  egcs_cn_firstsendat?: Date | null
+  egcs_cn_completedat?: Date | null
   _deleted: Generated<boolean>
 }

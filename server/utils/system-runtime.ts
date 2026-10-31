@@ -107,11 +107,16 @@ export const transitionRuntimeItem = async (
       'Common_Runtime.egcs_cn_attempt as attempt',
       'Common_Runtime.egcs_cn_previousruntime as previousRuntimeId',
       'Common_Runtime_Item.id as runtimeItemId',
+      'Common_Runtime_Item.egcs_cn_kind as runtimeItemKind',
       'Common_Runtime_Item.egcs_cn_state as runtimeItemState'
     ])
     .where('Common_Runtime_Item.id', '=', input.runtimeItemId)
     .where('Common_Runtime_Item.egcs_cn_runtime', '=', input.runtimeId)
     .executeTakeFirstOrThrow()
+  if (input.to === 'awaiting_action' && row.runtimeItemKind === 'approval_step') {
+    const { enqueueApprovalNotification } = await import('./notification-runtime')
+    await enqueueApprovalNotification(trx, input.runtimeItemId)
+  }
   return {
     runtimeId: String(row.runtimeId),
     runtimeItemId: String(row.runtimeItemId),

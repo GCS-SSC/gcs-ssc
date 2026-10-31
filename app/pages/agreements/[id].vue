@@ -29,7 +29,6 @@ import AgreementAmendmentsTab from '~/components/Agreement/AgreementAmendmentsTa
 import AgreementCloseoutsTab from '~/components/Agreement/AgreementCloseoutsTab.vue'
 import { useExtensionEntityTabs } from '~/composables/useExtensionEntityTabs'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
-import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
 import { isAgreementChildRoute } from '~/utils/agreement-child-route'
 import { useAgreementRiskSource } from '~/composables/useAgreementRiskSource'
 import { useUrlTabState } from '~/composables/useUrlTabState'
@@ -94,15 +93,6 @@ const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
 const { formatDate, toDateInput } = useDateHelpers()
 const { isRecordLocked } = useBusinessStatusState()
-const {
-  warnings: similarityWarnings,
-  isWarningOpen: isSimilarityWarningOpen,
-  requestPreview: requestSimilarityPreview,
-  handleMutationError: handleSimilarityMutationError,
-  confirmWarnings: confirmSimilarityWarnings,
-  cancelWarnings: cancelSimilarityWarnings,
-  getConfirmations: getSimilarityConfirmations
-} = useAgreementSimilarityConfirmation()
 const id = route.params.id as string
 const isChildDetailRoute = computed(() => isAgreementChildRoute(route))
 
@@ -370,23 +360,11 @@ const submit = async () => {
     const currentFields = profile.value?.egcs_fc_customfields ?? {}
     const changedFields = Object.fromEntries(Object.entries(body.egcs_fc_customfields ?? {}).filter(([key, value]) => value !== currentFields[key]))
     body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
-    const streamId = body.egcs_fc_transferpaymentstream
-    const agreementNumber = body.egcs_fc_agreementnumber
-    if (streamId === undefined || typeof agreementNumber !== 'string') return
-    const canContinue = await requestSimilarityPreview({
-      streamId,
-      agreementNumber,
-      excludeAgreementId: id
-    })
-    if (!canContinue || !proceed() || !await checkProfileAction('update', 'profile', proceed) || !proceed()) return
 
     const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        ...body,
-        confirmations: getSimilarityConfirmations()
-      })
+      body: JSON.stringify(body)
     })
     if (!response.ok) await throwFetchResponseError(response)
 
@@ -398,18 +376,10 @@ const submit = async () => {
       color: 'success'
     })
   } catch (caughtError: unknown) {
-    if (handleSimilarityMutationError(caughtError)) return
     showError(caughtError)
   } finally {
     isSaving.value = false
   }
-}
-
-/** Confirms the visible fingerprints and retries the complete preview-and-update path. */
-const confirmSimilarityAndSubmit = async () => {
-  if (isSaving.value) return
-  confirmSimilarityWarnings()
-  await submit()
 }
 
 /**
@@ -731,10 +701,5 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
         </div>
       </template>
     </CommonDetailPage>
-    <ApplicantRecipientFundingHistorySimilarityDialog
-      v-model:open="isSimilarityWarningOpen"
-      :warnings="similarityWarnings"
-      @confirm="confirmSimilarityAndSubmit"
-      @back="cancelSimilarityWarnings" />
   </div>
 </template>

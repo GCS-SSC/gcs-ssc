@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises'
 import path from 'node:path'
+import { DEMO_EXTENSION_SECRETS_KEY } from '../server/database/demo-extension-secrets'
 
 type DevChildProcess = {
   exited: Promise<number>
@@ -205,7 +206,7 @@ export const waitForDevChildExit = async (
 export const resolveDevExtensionEnvironment = (env: NodeJS.ProcessEnv): Record<string, string> => ({
   GCS_PORTAL_DEMO_SEED: env.GCS_PORTAL_DEMO_SEED ?? '1',
   GCS_EXTENSION_SECRETS_KEY: env.GCS_EXTENSION_SECRETS_KEY
-    ?? 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='
+    ?? DEMO_EXTENSION_SECRETS_KEY
 })
 
 /**

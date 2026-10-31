@@ -19,6 +19,7 @@ const E2E_POSTGRES_TEST_URL_ENV = 'E2E_POSTGRES_TEST_URL'
 const E2E_ACCESS_POSTGRES_TEST_URL_ENV = 'E2E_ACCESS_POSTGRES_TEST_URL'
 
 export const extensionProfileE2eSpecPath = 'tests/e2e/agreement-extension-persistence.spec.ts'
+export const notificationEditorE2eSpecPath = 'tests/e2e/notification-provider-editor-host.spec.ts'
 
 export const postgresE2eSpecPaths = [
   'tests/e2e/stream-wizard-budget-reference-review.spec.ts',
@@ -205,7 +206,7 @@ const escapedFreshResetE2eBasenames = freshResetE2eSpecPaths
   .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
   .join('|')
 
-export const pgliteE2eFilePattern = String.raw`^(?!.*\.tmp\.spec\.ts$)(?!.*(?:${escapedPostgresE2eBasenames})$)(?!.*(?:${escapedAmendmentRefreshE2eBasenames})$)(?!.*(?:${escapedAgreementCloseoutE2eBasenames})$)(?!.*(?:${escapedWorkflowRecommendationE2eBasenames})$)(?!.*(?:${escapedWorkflowSetupRetiredE2eBasenames})$)(?!.*(?:${escapedAgreementAmendmentsE2eBasenames})$)(?!.*(?:${escapedAttachmentsE2eBasenames})$)(?!.*(?:${escapedAgencyStatusesE2eBasenames})$)(?!.*(?:${escapedFreshResetE2eBasenames})$).*\.spec\.ts$`
+export const pgliteE2eFilePattern = String.raw`^(?!.*notification-provider-editor-host\.spec\.ts$)(?!.*\.tmp\.spec\.ts$)(?!.*(?:${escapedPostgresE2eBasenames})$)(?!.*(?:${escapedAmendmentRefreshE2eBasenames})$)(?!.*(?:${escapedAgreementCloseoutE2eBasenames})$)(?!.*(?:${escapedWorkflowRecommendationE2eBasenames})$)(?!.*(?:${escapedWorkflowSetupRetiredE2eBasenames})$)(?!.*(?:${escapedAgreementAmendmentsE2eBasenames})$)(?!.*(?:${escapedAttachmentsE2eBasenames})$)(?!.*(?:${escapedAgencyStatusesE2eBasenames})$)(?!.*(?:${escapedFreshResetE2eBasenames})$).*\.spec\.ts$`
 
 export type E2eSuite = 'pglite' | 'postgres' | 'review-scratch' | 'amendment-refresh' | 'agreement-closeout' | 'workflow-recommendation' | 'workflow-setup-retired' | 'agreement-amendments' | 'attachments' | 'agency-statuses' | 'fresh-reset'
 
@@ -541,6 +542,12 @@ const assertSpecBelongsToSuite = (suite: E2eSuite, selectedSpec: string): void =
   assertCanonicalExistingSpecPath(selectedSpec)
   const isReviewScratchSpec = selectedSpec.endsWith('.tmp.spec.ts')
   const isProfileFixtureSpec = selectedSpec === extensionProfileE2eSpecPath
+  if (selectedSpec === notificationEditorE2eSpecPath && process.env.GCS_E2E_NOTIFICATION_FIXTURE !== '1') {
+    throw new Error('The notification editor fixture requires bun run test:e2e:notification-provider.')
+  }
+  if (selectedSpec === notificationEditorE2eSpecPath && suite !== 'pglite') {
+    throw new Error('The notification editor fixture requires the managed PGlite suite.')
+  }
   if (isProfileFixtureSpec && process.env.GCS_E2E_PROFILE_FIXTURE !== '1') {
     throw new Error('The synthetic profile fixture requires bun run test:e2e:extension-profile.')
   }

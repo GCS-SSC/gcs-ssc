@@ -228,6 +228,10 @@ const findErrorCode = (error: unknown): string | undefined => {
 
 const checkSimilarity = async (continuation: () => Promise<void> | void): Promise<void> => {
   if (!state.value) return
+  if (state.value.historyId) {
+    await continuation()
+    return
+  }
   isCheckingSimilarity.value = true
   try {
     const fetchSimilarity = $fetch as unknown as SimilarityFetch

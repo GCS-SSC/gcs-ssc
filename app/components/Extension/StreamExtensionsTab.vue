@@ -151,7 +151,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
       :show-column-toggle="false"
       @retry="refresh">
       <template #name-cell="{ row }">
-        <div class="min-w-0 py-1">
+        <div class="max-w-96 py-1 break-words whitespace-normal">
           <div class="font-semibold text-zinc-900 dark:text-white">
             {{ extensionName(row.original) }}
           </div>

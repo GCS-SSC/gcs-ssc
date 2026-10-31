@@ -40,10 +40,6 @@ import { assertAgreementCloseoutWriteAllowed } from '~~/server/utils/agreement-w
 import { assertAgreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import { BusinessStatusViolation, lockBusinessStatus } from '~~/server/utils/business-status-runtime'
 import { isAgreementRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
-import {
-  collectFundingHistorySimilarityWarnings,
-  requireFundingHistorySimilarityConfirmation
-} from '~~/server/utils/funding-history'
 
 const readAgreementProfilePatchBody = async (event: H3Event) => {
   const rawBody = await readGcsExtensionRequestBody<Record<string, unknown>>(event)
@@ -413,34 +409,6 @@ export const patchAgreementProfile = async (
         )
         if (streamError) {
           return streamError
-        }
-
-        if (
-          Object.hasOwn(validated, 'egcs_fc_agreementnumber')
-          || Object.hasOwn(validated, 'egcs_fc_transferpaymentstream')
-        ) {
-          const nextStreamContext = await resolveAgreementStreamScopeContext(nextStreamId, trx)
-          const currentAgreement = await trx
-            .selectFrom('Funding_Case_Agreement_Profile')
-            .where('id', '=', agreementId)
-            .select('egcs_fc_agreementnumber')
-            .executeTakeFirstOrThrow()
-          const agreementNumber = typeof validated.egcs_fc_agreementnumber === 'string'
-            ? validated.egcs_fc_agreementnumber
-            : currentAgreement.egcs_fc_agreementnumber
-          const confirmations = Array.isArray(rawBody.confirmations)
-            ? rawBody.confirmations.filter((value): value is string => typeof value === 'string')
-            : []
-          if (nextStreamContext) {
-            const similarityWarnings = await collectFundingHistorySimilarityWarnings(context, {
-              egcs_ar_agencyname_en: nextStreamContext.agencyNameEn,
-              egcs_ar_agencyname_fr: nextStreamContext.agencyNameFr,
-              egcs_ar_programname_en: nextStreamContext.programNameEn,
-              egcs_ar_programname_fr: nextStreamContext.programNameFr,
-              egcs_ar_agreementnumber: agreementNumber
-            }, trx, { proposedSource: 'system', excludeAgreementId: agreementId })
-            await requireFundingHistorySimilarityConfirmation(event, similarityWarnings, confirmations)
-          }
         }
 
         if (nextStreamId !== existingContext.streamId) {

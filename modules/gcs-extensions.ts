@@ -78,7 +78,8 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'background-queue',
   'agency-only-configuration',
   'audit-ownership',
-  'file-storage-provider'
+  'file-storage-provider',
+  'notification-provider'
 ])
 const EXTENSION_LIFECYCLE_COMPLETION_CAPABILITIES = new Set(['supported', 'none'])
 const EXTENSION_LIFECYCLE_APPROVAL_SUBMISSION_CAPABILITIES = new Set(['on_completion', 'none'])
@@ -350,6 +351,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.auditOwnership?.length), 'audit-ownership')
   addImpliedCapability(capabilities, definition.configurationScope !== undefined, 'agency-only-configuration')
   addImpliedCapability(capabilities, Boolean(definition.fileStorageProvider), 'file-storage-provider')
+  addImpliedCapability(capabilities, Boolean(definition.notificationProvider), 'notification-provider')
 
   return capabilities
 }
@@ -549,6 +551,12 @@ export const validateExtensionDefinition = (definition: GcsExtensionDefinition, 
     validateLifecycleEntityDefinition(definition.key, entity, index, seenLocalEntityTypes)
   }
   validateFileStorageProviderDefinition(definition)
+  if (definition.notificationProvider && definition.configurationAccess !== 'manager') {
+    throw new Error(`Extension ${definition.key} notificationProvider requires configurationAccess "manager"`)
+  }
+  if (definition.notificationProvider && !definition.notificationProvider.adapter?.path) {
+    throw new Error(`Extension ${definition.key} field "notificationProvider.adapter.path" is required`)
+  }
 }
 
 const resolveServerHandler = async (
@@ -1066,6 +1074,19 @@ export const isDeferredExtensionNitroPlugin = (
   || extension.requiredHostCapabilities.includes('scheduled-intake-import')
   || extension.requiredHostCapabilities.includes('background-queue')))
 
+export const resolveNotificationProvider = async (
+  extensionDir: string,
+  definition: GcsExtensionDefinition
+) => {
+  const provider = definition.notificationProvider
+  if (!provider) return undefined
+  return {
+    adapter: {
+      path: await assertContainedPath(extensionDir, provider.adapter.path, 'notificationProvider.adapter.path')
+    }
+  }
+}
+
 export const resolveFileStorageProvider = async (
   extensionDir: string,
   definition: GcsExtensionDefinition
@@ -1125,6 +1146,7 @@ const resolveExtensionDirectory = async (
   const agreementNumberProvider = definition.agreementNumberProvider
     ? { path: await assertContainedPath(canonicalExtensionDir, definition.agreementNumberProvider.path, 'agreementNumberProvider.path') }
     : undefined
+  const notificationProvider = await resolveNotificationProvider(canonicalExtensionDir, definition)
   const fileStorageProvider = await resolveFileStorageProvider(canonicalExtensionDir, definition)
   const codingAllocator = definition.codingAllocator
     ? { ...definition.codingAllocator, path: await assertContainedPath(canonicalExtensionDir, definition.codingAllocator.path, 'codingAllocator.path') }
@@ -1152,6 +1174,7 @@ const resolveExtensionDirectory = async (
     nitroPlugin,
     agreementNumberProvider,
     codingAllocator,
+    notificationProvider,
     fileStorageProvider
   }
 }
@@ -1261,6 +1284,7 @@ const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClien
       )
     )
   },
+  notificationProvider: extension.notificationProvider ? {} : undefined,
   fileStorageProvider: extension.fileStorageProvider
     ? {
         ...(extension.fileStorageProvider.metadata
@@ -1284,7 +1308,7 @@ const serializeClientExtension = (extension: GcsResolvedExtension): string =>
   JSON.stringify(buildClientExtensionMetadata(extension))
 
 const registryContributionId = (
-  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number' | 'coding_allocator',
+  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number' | 'coding_allocator' | 'notification_adapter',
   extension: GcsResolvedExtension,
   identityParts: string[]
 ): string => {
@@ -1406,6 +1430,12 @@ export const buildExtensionServerRegistry = (
     if (codingAllocator && extension.codingAllocator) {
       registerContributionLoader(codingAllocator.id, extension.codingAllocator.path)
     }
+    const notificationProvider = extension.notificationProvider
+      ? { adapter: { id: registryContributionId('notification_adapter', extension, [extensionRelativePath(extension, extension.notificationProvider.adapter.path)]) } }
+      : undefined
+    if (notificationProvider && extension.notificationProvider) {
+      registerContributionLoader(notificationProvider.adapter.id, extension.notificationProvider.adapter.path)
+    }
     const fileStorageProvider = extension.fileStorageProvider
       ? (() => {
           const adapterId = registryContributionId('storage_adapter', extension, [
@@ -1443,6 +1473,7 @@ export const buildExtensionServerRegistry = (
       migrations,
       ...(entities.length > 0 ? { entities } : {}),
       fileStorageProvider,
+      notificationProvider,
       agreementNumberProvider,
       codingAllocator,
       runtime,
@@ -1672,6 +1703,12 @@ export default defineNuxtModule({
     }
 
     const extensions = await scanExtensions(nuxt)
+    if (nuxt.options.dev) {
+      nuxt.options.watch.push(...extensions.flatMap(extension => [
+        join(extension.rootDir, 'extension.config.ts'),
+        join(extension.rootDir, 'package.json')
+      ]))
+    }
 
     registerExtensionCssAndComponents(nuxt, extensions)
     const { imports, componentEntries } = buildExtensionComponentRegistry(extensions)

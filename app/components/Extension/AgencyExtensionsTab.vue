@@ -8,7 +8,7 @@ import { appRouteLocations } from '~/utils/route-locations'
 
 type ExtensionAgencyTableRow = ExtensionAgencyRegistryItem & Record<string, unknown>
 
-const { agencyId, canUpdate } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
+const { agencyId, canUpdate, canDelete } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
@@ -24,6 +24,7 @@ const {
   fallbackConfigText,
   fallbackConfigError,
   isSavingConfiguration,
+  isDirty,
   isRowBusy,
   setRowBusy,
   openConfigure,
@@ -92,7 +93,7 @@ const updateEnablement = async (item: ExtensionAgencyRegistryItem, enabled: bool
 }
 
 const saveConfiguration = async (item: ExtensionAgencyTableRow) => {
-  if (!canConfigure(item) || isRowBusy(item) || isSavingConfiguration.value) {
+  if (!canConfigure(item) || isRowBusy(item) || isSavingConfiguration.value || !isDirty.value) {
     return
   }
 
@@ -149,6 +150,21 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
     })
     await refresh()
     toast.add({ title: toast.localized('common.success'), description: toast.localized('extensions.storage_provider_selected'), color: 'success' })
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    setRowBusy(item.extension.key, false)
+  }
+}
+const selectNotificationProvider = async (item: ExtensionAgencyRegistryItem) => {
+  if (!canDelete || !item.canConfigure || !item.enabled || !item.extension.notificationProvider || isRowBusy(item)) return
+  try {
+    setRowBusy(item.extension.key, true)
+    await postJson(`/api/extensions/agency/${agencyId}/notification-provider`, 'PATCH', {
+      providerKey: item.extension.key
+    })
+    await refresh()
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('extensions.notification_provider_selected'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -223,6 +239,9 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
           <UBadge v-if="row.original.storageProvider?.selected" color="primary" variant="subtle">
             {{ t('extensions.storage_provider_selected_status') }}
           </UBadge>
+          <UBadge v-if="row.original.notificationProvider?.selected" color="primary" variant="subtle">
+            {{ t('extensions.notification_provider_selected_status') }}
+          </UBadge>
         </div>
       </template>
 
@@ -257,6 +276,18 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
               :disabled="!canEdit || !row.original.enabled || isRowBusy(row.original)"
               :aria-label="`${t('extensions.select_storage_provider')}: ${extensionName(row.original)}`"
               @click="selectStorageProvider(row.original)" />
+          </UTooltip>
+          <UTooltip
+            v-if="canDelete && row.original.extension.notificationProvider && !row.original.notificationProvider?.selected"
+            :text="t('extensions.select_notification_provider')">
+            <UButton
+              icon="i-lucide-bell"
+              color="primary"
+              variant="ghost"
+              size="sm"
+              :disabled="!canConfigure(row.original) || !row.original.enabled || isRowBusy(row.original)"
+              :aria-label="`${t('extensions.select_notification_provider')}: ${extensionName(row.original)}`"
+              @click="selectNotificationProvider(row.original)" />
           </UTooltip>
           <UTooltip v-if="row.original.extension.admin.agency" :text="t('extensions.configure')">
             <UButton
@@ -332,7 +363,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
               v-if="canConfigure(selectedItem)"
               :label="t('common.save')"
               :loading="isSavingConfiguration"
-              :disabled="isSavingConfiguration || !!fallbackConfigError"
+              :disabled="isSavingConfiguration || !!fallbackConfigError || !isDirty"
               @click="saveConfiguration(selectedItem)" />
           </div>
 

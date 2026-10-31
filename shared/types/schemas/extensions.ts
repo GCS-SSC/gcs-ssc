@@ -19,6 +19,10 @@ export const ExtensionKeySchema = z
   .max(120)
   .regex(/^[a-z][a-z0-9-]*$/, { error: 'validation.invalid_extension_key' })
 
+export const AgencyNotificationProviderSelectionSchema = z.object({
+  providerKey: ExtensionKeySchema
+})
+
 export const ExtensionToggleSchema = z.object({
   extensionKey: ExtensionKeySchema,
   enabled: z.boolean(),
@@ -60,6 +64,9 @@ export interface ExtensionAgencyRegistryItem {
   enabled: boolean
   config: GcsExtensionJsonConfig
   storageProvider?: {
+    selected: boolean
+  }
+  notificationProvider?: {
     selected: boolean
   }
 }

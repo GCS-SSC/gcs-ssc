@@ -51,6 +51,8 @@ export default defineEventHandler(async event => {
 
     const storageSelection = await trx.selectFrom('extensions.agency_storage_selection')
       .select('provider_key').where('agency_id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
+    const notificationSelection = await trx.selectFrom('extensions.agency_notification_selection')
+      .select('provider_key').where('agency_id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
     const items: ExtensionAgencyRegistryItem[] = extensions.map(extension => ({
       extension: toClientExtensionManifest(extension),
       canConfigure: auth.userAbilities.authorize('agency', getExtensionConfigurationAction(extension), scope),
@@ -59,6 +61,9 @@ export default defineEventHandler(async event => {
       config: (configByKey.get(extension.key) ?? {}) as ExtensionAgencyRegistryItem['config'],
       ...(extension.fileStorageProvider
         ? { storageProvider: { selected: storageSelection?.provider_key === extension.key } }
+        : {}),
+      ...(extension.notificationProvider
+        ? { notificationProvider: { selected: notificationSelection?.provider_key === extension.key } }
         : {})
     }))
 
@@ -68,7 +73,8 @@ export default defineEventHandler(async event => {
       stats: {
         total: items.length,
         active: items.filter(item => item.enabled).length,
-        selectedStorageProvider: storageSelection?.provider_key ?? null
+        selectedStorageProvider: storageSelection?.provider_key ?? null,
+        selectedNotificationProvider: notificationSelection?.provider_key ?? null
       },
       page: 1,
       limit: items.length || 10

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
-import type { Ref } from 'vue'
+import { computed, onScopeDispose, watch, type Ref } from 'vue'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import { AppFetchResponseError, throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -27,7 +27,7 @@ const localePath = useLocalePath()
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
-const extensionKey = route.params.id as string
+const extensionKey = computed(() => String(route.params.id))
 const streamId = computed(() => typeof route.query.streamId === 'string' ? route.query.streamId : '')
 const transferPaymentId = computed(() => typeof route.query.transferPaymentId === 'string' ? route.query.transferPaymentId : '')
 const agencyId = computed(() => typeof route.query.agencyId === 'string' ? route.query.agencyId : '')
@@ -42,7 +42,7 @@ const loadError: Ref<unknown | null> = ref(null)
 const extensionName = computed(() => {
   const extension = item.value?.extension
   if (!extension) {
-    return extensionKey
+    return extensionKey.value
   }
 
   return locale.value === 'fr' ? extension.name.fr : extension.name.en
@@ -99,8 +99,22 @@ const fetchOptionalJson = async (responsePromise: Promise<Response | null>): Pro
   }
 }
 
+let requestSequence = 0
+const configurationIdentity = computed(() => JSON.stringify([
+  extensionKey.value, streamId.value, transferPaymentId.value, agencyId.value
+]))
 const refresh = async () => {
-  if (!streamId.value) {
+  const sequence = ++requestSequence
+  const requestedExtension = extensionKey.value
+  const requestedStream = streamId.value
+  const requestedProfile = transferPaymentId.value
+  item.value = null
+  profile.value = null
+  stream.value = null
+  draftConfig.value = {}
+  loadError.value = null
+  if (!requestedStream) {
+    isLoading.value = false
     loadError.value = new Error(t('extensions.config_missing_stream'))
     return
   }
@@ -108,20 +122,23 @@ const refresh = async () => {
   try {
     isLoading.value = true
     loadError.value = null
-    const profileJson = transferPaymentId.value
-      ? fetchOptionalJson(fetch(getClientRequestUrl(`/api/transfer-payments/${transferPaymentId.value}`)))
+    const profileJson = requestedProfile
+      ? fetchOptionalJson(fetch(getClientRequestUrl(`/api/transfer-payments/${requestedProfile}`)))
       : Promise.resolve(null)
-    const streamJson = transferPaymentId.value
-      ? fetchOptionalJson(fetch(getClientRequestUrl(`/api/transfer-payments/${transferPaymentId.value}/streams/${streamId.value}`)))
+    const streamJson = requestedProfile
+      ? fetchOptionalJson(fetch(getClientRequestUrl(`/api/transfer-payments/${requestedProfile}/streams/${requestedStream}`)))
       : Promise.resolve(null)
-    const extensionResponse = await fetch(getClientRequestUrl(`/api/extensions/streams/${streamId.value}`))
+    const extensionResponse = await fetch(getClientRequestUrl(`/api/extensions/streams/${requestedStream}`))
 
     if (!extensionResponse.ok) await throwFetchResponseError(extensionResponse)
 
-    const payload = await extensionResponse.json() as ExtensionStreamRegistryResponse
-    item.value = payload.items.find(row => row.extension.key === extensionKey) ?? null
-    profile.value = await profileJson as TransferPaymentProfileItem | null
-    stream.value = await streamJson as TransferPaymentStreamItem | null
+    const [payload, loadedProfile, loadedStream] = await Promise.all([
+      extensionResponse.json() as Promise<ExtensionStreamRegistryResponse>, profileJson, streamJson
+    ])
+    if (sequence !== requestSequence) return
+    item.value = payload.items.find(row => row.extension.key === requestedExtension) ?? null
+    profile.value = loadedProfile as TransferPaymentProfileItem | null
+    stream.value = loadedStream as TransferPaymentStreamItem | null
 
     if (!item.value) {
       throw new Error(t('apiErrors.extensions.not_found'))
@@ -129,6 +146,7 @@ const refresh = async () => {
 
     resetDraft(item.value.config)
   } catch (error: unknown) {
+    if (sequence !== requestSequence) return
     loadError.value = error
     const responseData = error instanceof AppFetchResponseError && error.data && typeof error.data === 'object'
       ? error.data as Record<string, unknown>
@@ -142,11 +160,16 @@ const refresh = async () => {
       : t('common.unknown_error')
     showError({ data: { message } })
   } finally {
-    isLoading.value = false
+    if (sequence === requestSequence) isLoading.value = false
   }
 }
 
-await refresh()
+watch(configurationIdentity, () => {
+  void refresh()
+}, { immediate: true, flush: 'sync' })
+onScopeDispose(() => {
+  requestSequence++
+})
 </script>
 
 <template>
@@ -201,6 +224,7 @@ await refresh()
         <component
           :is="configComponent"
           v-else-if="item && configComponent"
+          :key="configurationIdentity"
           v-model="draftConfig"
           data-field-container="Composite editor; its individual field declarations own their identities."
           :extension="item.extension"

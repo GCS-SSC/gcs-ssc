@@ -51,3 +51,7 @@
 	url = https://github.com/GCS-SSC/gcs-machine-translation.git
 	branch = main
 	ignore = untracked
+[submodule "extensions/gcs-ssc-gcnotify"]
+	path = extensions/gcs-ssc-gcnotify
+	url = https://github.com/GCS-SSC/gcs-ssc-gcnotify.git
+	branch = main

@@ -119,7 +119,7 @@ const retryLoad = async () => {
 
 <template>
   <NuxtPage v-if="isNestedDetailRoute" />
-  <div v-else class="flex w-full flex-col">
+  <div v-else class="flex w-full min-w-0 flex-col">
     <div v-if="isLoadingDetail && (!stream || !profile)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
@@ -153,7 +153,7 @@ const retryLoad = async () => {
               onClick: openUpdateStream
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" :priority-values="['general', 'amendment-types', 'amendment-subtypes']">
             <div v-if="activeTabComponent" class="space-y-6">
               <component :is="activeTabComponent" v-bind="activeTabProps" />
             </div>

@@ -3,6 +3,7 @@ import type {
   GcsAuditTableOwnership,
   GcsExtensionEntityTabTarget,
   GcsExtensionHostCapability,
+  GcsRegisteredNotificationProviderDefinition,
   GcsRegisteredFileStorageProviderDefinition,
   GcsRegisteredExtensionLifecycleEntityDefinition,
   GcsExtensionServerHandlerDefinition
@@ -55,7 +56,7 @@ export interface GcsRegisteredExtensionRuntime {
  * Build-generated server metadata. Filesystem paths and build-only
  * contributions deliberately never cross this runtime boundary.
  */
-export interface GcsRegisteredExtension extends GcsClientExtensionManifest {
+export interface GcsRegisteredExtension extends Omit<GcsClientExtensionManifest, 'notificationProvider'> {
   auditOwnership?: GcsAuditTableOwnership[]
   agreementNumberProvider?: { id: string }
   codingAllocator?: { id: string }
@@ -66,6 +67,7 @@ export interface GcsRegisteredExtension extends GcsClientExtensionManifest {
   entities?: GcsRegisteredExtensionLifecycleEntityDefinition[]
   runtime?: GcsRegisteredExtensionRuntime
   nitroPlugin?: { id: string }
+  notificationProvider?: GcsRegisteredNotificationProviderDefinition
   fileStorageProvider?: GcsRegisteredFileStorageProviderDefinition
 }
 
@@ -82,6 +84,10 @@ export type {
   GcsExtensionEntityTabTarget,
   GcsExtensionHostCapability,
   GcsFileStorageMetadataContributionDefinition,
+  GcsNotificationProviderDefinition,
+  GcsNotificationTemplate,
+  GcsNotificationMapping,
+  GcsRegisteredNotificationProviderDefinition,
   GcsFileStorageProviderDefinition,
   GcsRegisteredFileStorageProviderDefinition,
   GcsResolvedFileStorageProviderDefinition,
