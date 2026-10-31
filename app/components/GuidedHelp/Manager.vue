@@ -421,7 +421,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
         <template #sidebar>
           <aside class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-default lg:pr-4">
             <div class="space-y-6 pt-6">
-              <CommonRouteTabs v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" :sort="false" orientation="vertical" external-panel-id="help-editor-panel" />
+              <CommonTranslatedTabs v-model="selectedTab" ordering="authored" data-field-container="Page navigation state, not a business input field." :items="tabs" orientation="vertical" external-panel-id="help-editor-panel" />
               <div class="space-y-3">
                 <p v-if="document" class="text-sm text-muted">
                   {{ t('guided_help.draft_explanation') }}

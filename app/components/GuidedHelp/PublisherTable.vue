@@ -90,8 +90,8 @@ watch(search, value => {
 </script>
 
 <template>
-  <CommonResourceLayoutPage
-    v-model:search="search" v-model:pagination="pagination" v-model:expanded="expanded"
+  <CommonResourceLayout
+    v-model:search="search" v-model:pagination="pagination" v-model:expanded="expanded" layout="page"
     :data="filtered" :columns="columns" :total-records="searchedGroups.length" :show-button="false"
     :grouping="['context']" :grouping-options="{ getGroupedRowModel: getGroupedRowModel() }"
     :column-visibility="{ context: false }" :get-row-id="(row: GuideRow) => row.id"
@@ -191,7 +191,7 @@ watch(search, value => {
     <template #footer-left>
       {{ searchedGroups.length }} {{ t('guided_help.owners') }}
     </template>
-  </CommonResourceLayoutPage>
+  </CommonResourceLayout>
 </template>
 
 <style scoped>

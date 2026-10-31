@@ -213,26 +213,7 @@ const deleteRole = async (role: RoleRow) => {
 </script>
 
 <template>
-  <UDashboardPanel id="roles">
-    <template #header>
-      <UDashboardNavbar :title="t('role.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="roles" v-model:collapsed="isHeroCollapsed" :title="t('role.title')">
     <template #body>
       <div class="flex flex-1 flex-col overflow-hidden">
         <CommonEntityHero
@@ -270,5 +251,5 @@ const deleteRole = async (role: RoleRow) => {
         @submit="saveRole"
       />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

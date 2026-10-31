@@ -546,15 +546,17 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                   {{ t('agreement.amendments.types_description') }}
                 </p>
                 <UFormField data-ui-target="agreements.amendments.amendments.types" :label="t('agreement.amendments.types')" required>
-                  <CommonServerLookupMultiSelect
-                    v-model="scopeTypeIds"
+                  <CommonServerLookupSelect
+                    v-model:values="scopeTypeIds"
+                    multiple
+                    :limit="100"
                     :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/types?amendmentId=${encodeURIComponent(amendmentId)}`"
                     value-key="id"
                     label-en-key="egcs_tp_name_en"
                     label-fr-key="egcs_tp_name_fr"
                     :disabled="!canEditAmendmentScope"
                     required
-                    @update:model-value="onScopeTypesChanged"
+                    @update:values="onScopeTypesChanged"
                     @resolved-items="onResolvedScopeTypes" />
                 </UFormField>
                 <UFormField v-if="scopeTypeIds.length > 0" data-ui-target="agreements.amendments.amendments.subtypes" :label="t('agreement.amendments.subtypes')" :required="scopeSubtypeRequired">
@@ -571,9 +573,11 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                       {{ t('common.none') }}
                     </span>
                   </div>
-                  <CommonServerLookupMultiSelect
+                  <CommonServerLookupSelect
                     v-else
-                    v-model="scopeSubtypeIds"
+                    v-model:values="scopeSubtypeIds"
+                    multiple
+                    :limit="100"
                     :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/subtypes`"
                     value-key="id"
                     label-en-key="egcs_tp_name_en"

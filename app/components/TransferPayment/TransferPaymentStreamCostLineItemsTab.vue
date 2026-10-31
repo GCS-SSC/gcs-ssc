@@ -142,7 +142,7 @@ const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) =
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="costLineSearch"
     v-model:pagination="costLinePagination"
     :data="costLines"
@@ -206,7 +206,7 @@ const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) =
           @click="deleteCostCategoryLine(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal
     v-if="selectedCostCategoryLine && canUpdateChild"

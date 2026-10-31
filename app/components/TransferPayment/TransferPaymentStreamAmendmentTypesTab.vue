@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TransferPaymentAmendmentTypeSchema } from '~~/shared/types/schemas/transfer-payment'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -106,7 +107,7 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
 
 <template>
   <div class="space-y-6">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="items"
@@ -162,15 +163,20 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
             @click="deleteItem(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
-    <TransferPaymentAmendmentTypeModal
+    <CommonFormDialog
       v-if="selectedItem"
       v-model:open="isModalOpen"
-      v-model:state="selectedItem"
+      :state="selectedItem"
+      :schema="TransferPaymentAmendmentTypeSchema"
       :title="selectedItem.id ? t('transfer_payment.amendment_type_update') : t('transfer_payment.amendment_type_create')"
       :submit-label="selectedItem.id ? t('common.update') : t('common.add')"
       :pending="isSavingItem"
-      @submit="saveItem" />
+      @submit="saveItem">
+      <template #default="{ state }">
+        <TransferPaymentFieldsTransferPaymentAmendmentTypeFields :model="state" />
+      </template>
+    </CommonFormDialog>
   </div>
 </template>

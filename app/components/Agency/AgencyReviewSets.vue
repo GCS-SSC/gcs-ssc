@@ -427,7 +427,7 @@ const updateExpandedRows = (value: ExpandedState) => {
 
 <template>
   <div data-field-scope="agency.review-sets">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -622,7 +622,7 @@ const updateExpandedRows = (value: ExpandedState) => {
 
         <span v-else>&nbsp;</span>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <TransferPaymentReviewSetupModal
       v-if="selected && canUpdateChild"
       v-model:open="isOpen"

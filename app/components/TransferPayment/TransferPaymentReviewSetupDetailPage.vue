@@ -315,7 +315,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
         role="region"
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
-        <TransferPaymentReviewSetupDetailHero :name="getBilingualValue(state, 'egcs_cn_name')" :entity-type="state.egcs_cn_entitytype" :entity-type-label-en="state.entityTypeLabelEn" :entity-type-label-fr="state.entityTypeLabelFr" :publication-state="state.publicationState" :publication-version="state.publicationVersion" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
+        <CommonPublicationDetailHero icon="i-lucide-list-checks" type-label-key="review_setup.setup_type" publish-label-key="review_setup.publish" retire-label-key="review_setup.retire" :name="getBilingualValue(state, 'egcs_cn_name')" :entity-type="state.egcs_cn_entitytype" :entity-type-label-en="state.entityTypeLabelEn" :entity-type-label-fr="state.entityTypeLabelFr" :publication-state="state.publicationState" :publication-version="state.publicationVersion" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
 
         <CommonDesignTimeEditorShell>
           <template #sidebar>
@@ -330,7 +330,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
               @save="saveSet" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
+                <CommonTranslatedTabs v-model="selectedSection" ordering="localized" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>

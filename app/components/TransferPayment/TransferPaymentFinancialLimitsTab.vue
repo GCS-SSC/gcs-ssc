@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TransferPaymentFinancialLimitsSchema } from '~~/shared/types/schemas/transfer-payment'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -139,7 +140,7 @@ const onDelete = async (id: string) => {
 
 <template>
   <div class="space-y-4">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:pagination="pagination"
       :title="t('transfer_payment.financial_limits')"
       :data="items"
@@ -191,13 +192,21 @@ const onDelete = async (id: string) => {
             @click="onDelete(row.original.id)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
-    <TransferPaymentFinancialLimitsModal
+    <CommonFormDialog
       v-if="selectedLimit"
       v-model:open="isModalOpen"
-      v-model:state="selectedLimit"
+      :state="selectedLimit"
+      :schema="TransferPaymentFinancialLimitsSchema"
+      :title="selectedLimit.id ? t('transfer_payment.financial_limit_update') : t('transfer_payment.financial_limit_create')"
+      :submit-label="selectedLimit.id ? t('common.update') : t('common.save')"
+      footer-class=""
       :pending="isSavingFinancialLimit"
-      @submit="saveFinancialLimit" />
+      @submit="saveFinancialLimit">
+      <template #default="{ state }">
+        <TransferPaymentFieldsTransferPaymentFinancialLimitFields :model="state" />
+      </template>
+    </CommonFormDialog>
   </div>
 </template>

@@ -153,7 +153,7 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
 
 <template>
   <div ref="detailContent" data-field-tooltip-context="agreement" data-field-scope="agreements.corrections" data-scope-label-en="Agreements > Corrections > Financial lines" data-scope-label-fr="Ententes > Corrections > Lignes financières" tabindex="-1" class="flex w-full min-w-0 flex-col">
-    <CorrectionApprovalWorkspace v-if="approvalOnly" :agreement-id="agreementId" :correction-id="correctionId" />
+    <CommonApprovalWorkspace v-if="approvalOnly" data-help-view="casework.correction.approval" :target="{ entityType: 'fundingcasecorrection', entityId: correctionId, agreementId }" />
     <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="retryLoad" />

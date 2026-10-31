@@ -432,7 +432,7 @@ const retryAttachmentList = async () => {
       </template>
     </UAlert>
 
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-else-if="!agencyRequired || selectedAgencyId"
       v-model:search="search"
       v-model:pagination="pagination"
@@ -472,7 +472,7 @@ const retryAttachmentList = async () => {
           <CommonActionButton v-if="row.original.can_delete_role" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal v-if="formState" v-model:open="isModalOpen" :title="t(isEditing ? 'attachments.edit' : 'attachments.upload')" :dismissible="!isSaving" @update:open="value => value ? undefined : closeModal()">
       <template #body>

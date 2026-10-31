@@ -59,7 +59,7 @@ const onDelete = async (id: string) => {
 
 <template>
   <div class="space-y-4">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :title="t('transfer_payment.chart_of_accounts.title')"
@@ -104,7 +104,7 @@ const onDelete = async (id: string) => {
             @click="onDelete(row.original.id)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <TransferPaymentStreamChartOfAccountModal
       v-if="canUpdateChild"

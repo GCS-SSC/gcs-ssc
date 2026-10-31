@@ -79,7 +79,7 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
 
 <template>
   <section data-help-target="proponent.agreements.content" data-help-kind="section" data-help-view="proponent.agreements" class="flex w-full min-w-0 flex-col">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" help-add-target="proponent.agreements.add" help-search-target="proponent.agreements.search"
 
       class="w-full"
@@ -131,6 +131,6 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
           :aria-label="t('common.open')"
           @click="openAgreement(row.original)" />
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
   </section>
 </template>

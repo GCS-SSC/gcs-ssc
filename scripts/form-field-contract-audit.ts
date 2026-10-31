@@ -218,7 +218,7 @@ export const auditFieldContracts = async (root: string): Promise<FieldContractAu
       let current = formExpression
       if (node.type === NodeTypes.ELEMENT) {
         const attrs = attrsOf(node)
-        if (['UForm', 'CommonResourceCrud'].includes(node.tag)) current = attrs[':validate'] ?? attrs[':schema'] ?? null
+        if (['UForm', 'CommonResourceCrud', 'CommonFormDialog'].includes(node.tag)) current = attrs[':validate'] ?? attrs[':schema'] ?? null
         usages.push({ file: path, tag: node.tag, attrs, formExpression: current })
       }
       for (const child of node.children) visit(child, current)

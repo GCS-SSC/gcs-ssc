@@ -22,7 +22,7 @@ const title = computed(() => selectedItem.value?.label ?? (selectedItem.value ? 
   <CommonEntityEditorWorkspace :content-test-id="contentTestId">
     <template #sidebar>
       <div :data-help-target="helpNavigationGroupTarget" data-help-kind="section">
-        <CommonRouteTabs v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="items" :help-navigation-target="helpNavigationTarget" :help-navigation-value="helpNavigationValue" :priority-values="priorityValues" :external-panel-id="panelId" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
+        <CommonTranslatedTabs v-model="selectedTab" ordering="localized" data-field-container="Page navigation state, not a business input field." :items="items" :help-navigation-target="helpNavigationTarget" :help-navigation-value="helpNavigationValue" :priority-values="priorityValues" :external-panel-id="panelId" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
       </div>
     </template>
     <CommonDetailSection :id="panelId" role="tabpanel" :aria-label="title" :title="title" :description="sectionDescription">

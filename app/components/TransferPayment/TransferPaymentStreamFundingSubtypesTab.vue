@@ -105,7 +105,7 @@ const remove = async (row: LinkedSubtype) => {
 
 <template>
   <div class="space-y-4" data-field-scope="transfer-payment.stream-funding-subtypes-tab">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="pageItems"
@@ -137,7 +137,7 @@ const remove = async (row: LinkedSubtype) => {
             :disabled="removing" @click="remove(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <UModal
       v-if="selected && canCreateChild" :open="Boolean(selected)" :title="t('agency.funding_types.add_subtype')"
       @update:open="value => { if (!value) selected = null }">

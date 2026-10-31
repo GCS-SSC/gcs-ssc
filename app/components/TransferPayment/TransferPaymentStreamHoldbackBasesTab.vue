@@ -149,7 +149,7 @@ const retryAgencyHoldbacks = async () => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :data="items"
@@ -170,7 +170,7 @@ const retryAgencyHoldbacks = async () => {
         <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" :disabled="isDeleting" @click="remove(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal v-if="selected && canCreateChild" v-model:open="isOpen" :title="t('common.add')">
     <template #body>

@@ -87,9 +87,9 @@ const buttonLabel: ComputedRef<string | undefined> = computed(() => (canCreate ?
 </script>
 
 <template>
-  <CommonResourceLayoutPage
+  <CommonResourceLayout
     v-model:search="search"
-    v-model:pagination="pagination"
+    v-model:pagination="pagination" layout="page"
     :columns="columns"
     :data="visibleRoles"
     :bilingual-columns="bilingualColumns"
@@ -145,5 +145,5 @@ const buttonLabel: ComputedRef<string | undefined> = computed(() => (canCreate ?
           @click.stop="emit('delete', row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutPage>
+  </CommonResourceLayout>
 </template>

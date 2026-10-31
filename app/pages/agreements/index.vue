@@ -132,26 +132,7 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
 </script>
 
 <template>
-  <UDashboardPanel id="agreements" data-field-scope="agreements">
-    <template #header>
-      <UDashboardNavbar :title="t('agreement.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="agreements" v-model:collapsed="isHeroCollapsed" data-field-scope="agreements" :title="t('agreement.title')">
     <template #body>
       <div class="flex flex-1 flex-col overflow-hidden">
         <CommonEntityHero
@@ -187,5 +168,5 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
         </section>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

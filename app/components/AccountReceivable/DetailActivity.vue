@@ -62,7 +62,7 @@ const deleteAdjustment = async (row: AccountReceivableAdjustmentRow) => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:pagination="pagination"
     :data="rows"
     :columns="columns"
@@ -103,5 +103,5 @@ const deleteAdjustment = async (row: AccountReceivableAdjustmentRow) => {
           :aria-label="`${t('common.view_details')}: ${row.original.reference}`" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 </template>

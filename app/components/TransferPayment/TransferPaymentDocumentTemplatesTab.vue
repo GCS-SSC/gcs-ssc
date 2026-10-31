@@ -70,7 +70,7 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :title="t('transfer_payment.document_templates.title')"
@@ -99,7 +99,7 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
         :aria-label="t('common.delete_named', { name: getBilingualValue(row.original, 'egcs_ay_name', row.original.id) })"
         @click="remove(row.original)" />
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
   <UModal v-if="selected" v-model:open="isOpen" :title="t('transfer_payment.document_templates.create')" :description="t('common.form_dialog_description')" data-field-scope="transfer-payment.document-templates-tab">
     <template #body>
       <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">

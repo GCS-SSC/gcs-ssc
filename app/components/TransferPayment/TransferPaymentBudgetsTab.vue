@@ -144,7 +144,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
 
 <template>
   <div class="space-y-6" data-field-scope="transfer-payment.budgets-tab">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="budgetSearch"
       v-model:pagination="budgetPagination"
       :data="budgets"
@@ -196,7 +196,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
             @click="deleteBudget(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-if="selectedBudget && agencyId"

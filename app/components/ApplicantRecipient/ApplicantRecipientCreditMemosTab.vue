@@ -137,7 +137,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
       <p class="text-sm text-muted">
         {{ t('account_receivable.credit_memos_description') }}
       </p>
-      <CommonResourceLayoutCard
+      <CommonResourceLayout
         v-model:search="search" v-model:pagination="pagination"
         help-add-target="proponent.credit-memos.add" help-search-target="proponent.credit-memos.search"
         :data="items" :columns="columns" :total-records="totalRecords"
@@ -209,7 +209,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
               @click="deleteMemo(row.original)" />
           </div>
         </template>
-      </CommonResourceLayoutCard>
+      </CommonResourceLayout>
     </CommonSection>
     <AccountReceivableCreditMemoCreateModal v-if="profile" v-model:open="createOpen" :context="createContext" @created="created" />
   </div>

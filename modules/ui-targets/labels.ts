@@ -12,10 +12,10 @@ export type UiTargetTranslatorCatalogs = Record<string, { en: unknown; fr: unkno
 const loaders = new Map<string, ReturnType<typeof createJiti>>()
 const headingOwners = new Set([
   'CommonDetailPage', 'CommonDetailSection', 'CommonDetailSectionHeader',
-  'CommonSection', 'CommonSectionHeader', 'CommonResourceLayoutPage', 'CommonResourceLayoutCard',
+  'CommonSection', 'CommonSectionHeader', 'CommonResourceLayout',
   'CommonPublicationDetailHero', 'CommonEntityHero', 'UModal',
   'ExtensionModal', 'ExtensionDetailPage', 'ExtensionDetailSection', 'ExtensionSection',
-  'ExtensionResourceLayoutPage', 'ExtensionResourceLayoutCard',
+  'ExtensionResourceLayout',
   'AssessmentSchemaPageSection', 'AssessmentSchemaAccordionSection', 'ExtensionAssessmentSchemaAccordionSection'
 ])
 

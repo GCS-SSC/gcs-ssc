@@ -202,7 +202,7 @@ const deleteMonitor = async (monitorId: string) => {
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors" data-scope-label-fr="Ententes > Surveillances" data-help-view="agreement.monitors" data-help-label-en="Agreements — Monitors" data-help-label-fr="Ententes — Surveillances" data-help-target="agreement.monitors.content" data-help-kind="section">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="monitors"
@@ -263,7 +263,7 @@ const deleteMonitor = async (monitorId: string) => {
             @click="deleteMonitor(String(row.original.id))" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-if="selectedMonitor"

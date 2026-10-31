@@ -589,7 +589,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.payments-tab" data-scope-label-en="Agreements > Payments > Update Payment" data-scope-label-fr="Ententes > Paiements > Mettre à jour le paiement" data-help-view="agreement.payments" data-help-label-en="Agreements — Payments" data-help-label-fr="Ententes — Paiements" data-help-target="agreement.payments.content" data-help-kind="section">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -761,7 +761,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
             @click="deletePayment(String(row.original.id))" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-if="selectedPayment"

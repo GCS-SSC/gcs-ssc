@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TransferPaymentObjectiveSchema } from '~~/shared/types/schemas/transfer-payment'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -122,7 +123,7 @@ const deleteObjective = async (objective: TransferPaymentObjectiveRow) => {
 
 <template>
   <div class="space-y-6">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="objectiveSearch"
       v-model:pagination="objectivePagination"
       :data="objectives"
@@ -167,15 +168,20 @@ const deleteObjective = async (objective: TransferPaymentObjectiveRow) => {
             @click="deleteObjective(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
-    <TransferPaymentObjectiveModal
+    <CommonFormDialog
       v-if="selectedObjective && canUpdateChild"
       v-model:open="isObjectiveModalOpen"
-      v-model:state="selectedObjective"
+      :state="selectedObjective"
+      :schema="TransferPaymentObjectiveSchema"
       :title="selectedObjective.id ? t('common.update') : t('common.add')"
       :submit-label="selectedObjective.id ? t('common.update') : t('common.add')"
       :pending="isSavingObjective"
-      @submit="saveObjective" />
+      @submit="saveObjective">
+      <template #default="{ state }">
+        <TransferPaymentFieldsTransferPaymentObjectiveFields :model="state" />
+      </template>
+    </CommonFormDialog>
   </div>
 </template>

@@ -175,8 +175,8 @@ onBeforeUnmount(() => {
         <UButton :label="t('common.retry')" @click="reload()" />
       </template>
     </UAlert>
-    <CommonResourceLayoutPage
-      v-model:search="search" v-model:pagination="pagination" :data="rows" :columns="columns"
+    <CommonResourceLayout
+      v-model:search="search" v-model:pagination="pagination" layout="page" :data="rows" :columns="columns"
       :total-records="filtered.length" :loading="loading" :show-button="Boolean(catalog?.capabilities.canCreate)"
       :button-label="t('field_tooltips.add')" :request-status="loading ? 'pending' : failed ? 'error' : 'success'"
       @add="edit(null)" @retry="reload()">
@@ -209,7 +209,7 @@ onBeforeUnmount(() => {
             :aria-label="`${t('common.delete')}: ${fieldLabel(row.original)}`" @click="remove(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutPage>
+    </CommonResourceLayout>
     <UModal v-model:open="open" :dismissible="!saving" :close="saving ? false : undefined" :title="t(selected ? 'field_tooltips.edit' : 'field_tooltips.add')" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <UForm v-if="draft" data-field-scope="agency.field-help" data-scope-label-en="Agency — Field help" data-scope-label-fr="Organisme — Aide aux champs" :state="draft" :validate="createValidator(FieldTooltipSaveSchema)" class="space-y-4" @submit="save">

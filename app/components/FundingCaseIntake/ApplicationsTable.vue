@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
-import { CommonResourceLayoutCard, CommonResourceLayoutPage } from '#components'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -107,7 +106,7 @@ const submit = async () => {
 
 <template>
   <div class="space-y-5">
-    <component :is="opportunityId ? CommonResourceLayoutCard : CommonResourceLayoutPage" v-model:search="search" v-model:pagination="pagination" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t(opportunityId ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" @add="openCreate" @retry="retry">
+    <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" :layout="opportunityId ? 'card' : 'page'" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t(opportunityId ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" @add="openCreate" @retry="retry">
       <template #id-cell="{ row }">
         <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
           {{ row.original.id }}
@@ -130,7 +129,7 @@ const submit = async () => {
           <CommonActionButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_case_intake.view_details')" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
         </div>
       </template>
-    </component>
+    </CommonResourceLayout>
     <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" :lock-opportunity="!!opportunityId" @submit="submit" />
   </div>
 </template>

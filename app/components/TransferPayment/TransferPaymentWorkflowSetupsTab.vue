@@ -131,7 +131,7 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
 
 <template>
   <div class="space-y-5" data-field-scope="transfer-payment.workflow-setups-tab">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="pageItems"
@@ -162,7 +162,7 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
             :aria-label="t('common.delete_named', { name: name(row.original) })" :disabled="isDeleting" @click="remove(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <UModal :open="isLinkOpen" :title="t('workflow.title')" @update:open="value => { isLinkOpen = value }">
       <template #body>
         <UForm v-if="agencyId" :state="linkState" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="add">

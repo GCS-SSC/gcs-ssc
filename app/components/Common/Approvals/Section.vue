@@ -1034,7 +1034,7 @@ const submitReassign = async () => {
       variant="indicator" />
 
     <div class="space-y-4 pl-4 md:pl-6">
-      <CommonResourceLayoutCard
+      <CommonResourceLayout
         v-model:search="search"
         v-model:pagination="pagination"
         :data="filteredRows"
@@ -1204,7 +1204,7 @@ const submitReassign = async () => {
         <template #footer-left>
           {{ filteredTotalRecords }} {{ t('common.records') }}
         </template>
-      </CommonResourceLayoutCard>
+      </CommonResourceLayout>
     </div>
 
     <CommonApprovalsReassignModal

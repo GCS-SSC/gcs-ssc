@@ -193,7 +193,7 @@ const remove = async (id: string): Promise<void> => {
       icon="i-lucide-circle-alert"
       :title="t('funding_opportunity.attachment_save_failed')" />
 
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="pageRows"
@@ -230,7 +230,7 @@ const remove = async (id: string): Promise<void> => {
             @click="remove(row.original.id)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal :open="draft !== null" :title="t('funding_opportunity.add_attachment_type')" :description="t('funding_opportunity.attachment_types_help')" @update:open="value => { if (!value) closeAdd() }">
       <template #body>

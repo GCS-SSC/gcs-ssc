@@ -139,7 +139,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
 
 <template>
   <div class="space-y-6" data-field-scope="extension.stream-extensions-tab">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="items"
@@ -188,7 +188,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
           </UTooltip>
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-model:open="isModalOpen"

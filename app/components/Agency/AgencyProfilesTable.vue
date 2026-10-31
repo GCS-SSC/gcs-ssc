@@ -57,10 +57,10 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
 </script>
 
 <template>
-  <CommonResourceLayoutPage
+  <CommonResourceLayout
     v-model:search="search"
     v-model:status-filter="statusFilter"
-    v-model:pagination="pagination"
+    v-model:pagination="pagination" layout="page"
     :data="agencies"
     :columns="columns"
     :bilingual-columns="bilingualColumns"
@@ -123,5 +123,5 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
           @click.stop="emit('edit', row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutPage>
+  </CommonResourceLayout>
 </template>

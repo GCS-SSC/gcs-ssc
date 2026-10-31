@@ -364,7 +364,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.claims-tab" data-scope-label-en="Agreements > Claims" data-scope-label-fr="Ententes > Demandes de remboursement" data-help-view="agreement.claims" data-help-label-en="Agreements — Claims" data-help-label-fr="Ententes — Demandes de remboursement" data-help-target="agreement.claims.content" data-help-kind="section">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -472,7 +472,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
             :aria-label="`${t('common.open')}: ${t('agreement.claims.claim_label', { id: row.original.id })}`" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal v-if="selectedClaim" v-model:open="isClaimModalOpen" :description="t('common.form_dialog_description')" :title="selectedClaim.id ? t('agreement.claims.edit') : t('agreement.claims.add')">
       <template #body>

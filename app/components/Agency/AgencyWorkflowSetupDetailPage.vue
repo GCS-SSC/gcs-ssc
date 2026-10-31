@@ -524,7 +524,11 @@ const deleteMember = async (member: WorkflowMember) => {
         role="region"
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
-        <TransferPaymentWorkflowSetupDetailHero
+        <CommonPublicationDetailHero
+          icon="i-lucide-git-branch"
+          type-label-key="workflow.setup_type"
+          publish-label-key="workflow.publish"
+          retire-label-key="workflow.retire"
           :is-collapsed="isHeroCollapsed"
           :name="getBilingualValue(state, 'egcs_cn_name')"
           :entity-type="state.egcs_cn_entitytype"

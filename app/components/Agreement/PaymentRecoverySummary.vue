@@ -63,7 +63,7 @@ const memoColumns = computed<TableColumnInput<AccountReceivablePaymentCreditMemo
     <p v-if="payment.egcs_fc_recoverycontrol === 'recovery_pending'" class="text-sm text-muted">
       {{ t('agreement.payments.offset_reserved') }}
     </p>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-if="payment.egcs_fc_creditmemos?.length"
       v-model:pagination="pagination"
       :data="payment.egcs_fc_creditmemos" :columns="memoColumns"
@@ -94,7 +94,7 @@ const memoColumns = computed<TableColumnInput<AccountReceivablePaymentCreditMemo
       <template #available-cell="{ row }">
         <span class="tabular-nums">{{ amount(row.original.egcs_fc_receivableavailable) }}</span>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <p v-if="showMemoBalances" class="text-sm text-muted">
       {{ t('account_receivable.memo_ar_balance_description') }}
     </p>

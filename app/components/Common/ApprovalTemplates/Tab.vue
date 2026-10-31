@@ -116,7 +116,7 @@ const deleteTemplate = async (templateId: string) => {
 
 <template>
   <div>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -173,7 +173,7 @@ const deleteTemplate = async (templateId: string) => {
       <template #footer-left>
         {{ totalRecords }} {{ t('common.records') }}
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <CommonApprovalTemplatesModal
       v-model:open="isOpen"

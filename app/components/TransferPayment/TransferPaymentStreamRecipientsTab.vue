@@ -196,7 +196,7 @@ const retryRecipientReferences = async () => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="recipientSearch"
     v-model:pagination="recipientPagination"
     :data="recipients"
@@ -235,7 +235,7 @@ const retryRecipientReferences = async () => {
           @click="deleteRecipient(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal
     v-if="selectedRecipient && canUpdateChild"

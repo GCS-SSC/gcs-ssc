@@ -337,7 +337,7 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
                 </div>
 
                 <section data-help-target="casework.payments.lines.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="search"
                     v-model:pagination="pagination"
                     help-search-target="casework.payments.lines.search"
@@ -370,7 +370,7 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
                         <CommonActionButton v-if="canDeletePaymentLine" icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('common.delete')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="deleteLine(String(row.original.id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
 
                 <div class="flex justify-end">

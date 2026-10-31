@@ -164,7 +164,7 @@ watch(baseUrl, () => {
     <div v-if="canUpdateChild" class="mb-4 flex justify-end">
       <UButton icon="i-lucide-plus" color="neutral" variant="outline" :label="t('custom_fields.assign_field')" @click="openAssignment(null)" />
     </div>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
       :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
       :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="filteredSections.length"
@@ -231,7 +231,7 @@ watch(baseUrl, () => {
           <CommonActionButton v-if="canUpdateChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${assignmentUrl}/${row.original.field.assignmentId}`)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <UModal v-model:open="sectionModal.isOpen.value" :title="t('custom_fields.section')">
       <template #body>
         <UForm v-if="sectionModal.selected.value" data-field-scope="transfer-payment.custom-field-section" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4" @submit="saveSection">

@@ -85,7 +85,7 @@
       "name": "@gcs-ssc/gcs-agreement-number",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.4.0",
         "kysely": "^0.28.11",
         "re2js": "^1.0.0",
         "zod": "^4.3.6",
@@ -113,7 +113,7 @@
     "extensions/gcs-automated-payments": {
       "name": "@gcs-ssc/gcs-automated-payments",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.13",
+        "@gcs-ssc/extensions": "^0.4.0",
         "zod": "^4.3.6",
       },
       "devDependencies": {
@@ -138,7 +138,7 @@
       "name": "@gcs-ssc/gcs-gcforms-integration",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.4.0",
         "zod": "^4.3.6",
       },
       "devDependencies": {
@@ -168,7 +168,7 @@
       "name": "@gcs-ssc/gcs-machine-translation",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.9",
+        "@gcs-ssc/extensions": "^0.4.0",
         "@huggingface/transformers": "4.1.0",
         "nanoid": "^5.1.6",
         "nmt-enfr": "github:omarmir/nmt-enfr#6bb66e0fcb45391e363d4da88a7329241c515c89",
@@ -195,7 +195,7 @@
       "name": "@gcs-ssc/gcs-narrative-quality",
       "dependencies": {
         "@browser-quality-scorer/core": "github:omarmir/quality-meter#pkg-v1.0.2",
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.4.0",
         "@huggingface/transformers": "^4.1.0",
         "nanoid": "^5.1.6",
       },
@@ -222,7 +222,7 @@
       "name": "@gcs-ssc/gcs-narrative-tags",
       "dependencies": {
         "@browser-tag-extractor/core": "github:omarmir/tag-extractor#pkg-v0.1.0",
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.4.0",
         "@huggingface/transformers": "^4.1.0",
         "onnxruntime-web": "1.26.0-dev.20260416-b7804b056c",
       },
@@ -248,7 +248,7 @@
       "name": "@gcs-ssc/gcs-outcome-cost-allocation",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.19",
+        "@gcs-ssc/extensions": "^0.4.0",
       },
       "devDependencies": {
         "@electric-sql/pglite": "0.3.16",
@@ -276,7 +276,7 @@
       "name": "@gcs-ssc/gcs-ssc-gcnotify",
       "version": "0.2.3",
       "dependencies": {
-        "@gcs-ssc/extensions": "https://github.com/GCS-SSC/gcs-ssc-extensions/releases/download/v0.3.25/gcs-ssc-extensions-0.3.25.tgz",
+        "@gcs-ssc/extensions": "^0.4.0",
         "kysely": "^0.28.11",
         "zod": "^4.3.6",
       },
@@ -300,7 +300,7 @@
       "name": "@gcs-ssc/gcs-ssc-portal-connector",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.19",
+        "@gcs-ssc/extensions": "^0.4.0",
         "@gcs-ssc/survey": "file:vendor/survey",
         "nanoid": "^5.1.6",
         "zod": "^4.3.6",
@@ -327,7 +327,7 @@
       "name": "@gcs-ssc/gcs-storage-local",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.4.0",
         "nanoid": "^5.1.6",
       },
       "devDependencies": {
@@ -344,7 +344,7 @@
       "dependencies": {
         "@aws-sdk/client-s3": "^3.883.0",
         "@aws-sdk/credential-providers": "^3.883.0",
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.4.0",
         "kysely": "^0.28.11",
         "nanoid": "^5.1.6",
         "zod": "^4.3.6",
@@ -376,13 +376,13 @@
       "name": "@gcs-ssc/diagrams",
       "version": "0.1.0",
       "peerDependencies": {
-        "@gcs-ssc/extensions": "^0.3.14",
+        "@gcs-ssc/extensions": "^0.4.0",
         "vue": "^3.5.28",
       },
     },
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
-      "version": "0.3.25",
+      "version": "0.4.0",
       "devDependencies": {
         "@types/node": "^25.3.0",
         "@vitest/coverage-v8": "^4.1.12",
@@ -3219,8 +3219,6 @@
     "@gcs-ssc/gcs-outcome-cost-allocation/vue-tsc": ["vue-tsc@3.3.11", "", { "dependencies": { "@volar/typescript": "2.4.28", "@vue/language-core": "3.3.11" }, "peerDependencies": { "typescript": ">=5.0.0" }, "bin": { "vue-tsc": "bin/vue-tsc.js" } }, "sha512-gOb0B9rtU2+f1dszwPqSH5kAieIF9ReeLhD3kSRNHv5WZZUQz/JdVXW0RTdqhNTMlQkqKzrTTviqKr/4FYZraQ=="],
 
     "@gcs-ssc/gcs-outcome-cost-allocation/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
-
-    "@gcs-ssc/gcs-ssc-gcnotify/@gcs-ssc/extensions": ["@gcs-ssc/extensions@https://github.com/GCS-SSC/gcs-ssc-extensions/releases/download/v0.3.25/gcs-ssc-extensions-0.3.25.tgz", { "peerDependencies": { "h3": "^1.15.5", "kysely": "^0.28.11", "vue": "^3.5.28", "zod": "^4.3.6" } }, "sha512-SSMM6Get+vpABCHvwjjEUFAiLAySnWluVp74DChhonuK+pyORgeYTVBxY8sTCZmMBqa4MRjsA4IQusHKEtFN7Q=="],
 
     "@gcs-ssc/gcs-ssc-gcnotify/@vitejs/plugin-vue": ["@vitejs/plugin-vue@6.0.10", "", { "dependencies": { "@rolldown/pluginutils": "^1.0.1" }, "peerDependencies": { "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0", "vue": "^3.2.25 || ^3.6.0-rc.10" } }, "sha512-b80aUQh3n+qEzzZm5oQp3rT2QImeCx58K6eFl/RkJ3d65KW0kTuv5lNsLRVAjbW9YRUpo/wzmvzMgV34bTAItA=="],
 

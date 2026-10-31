@@ -334,7 +334,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.commitments-tab" data-scope-label-en="Agreements > Commitments" data-scope-label-fr="Ententes > Engagements" data-help-view="agreement.commitments" data-help-label-en="Agreements — Commitments" data-help-label-fr="Ententes — Engagements" data-help-target="agreement.commitments.content" data-help-kind="section">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -448,7 +448,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
             @click="deleteCommitment(String(row.original.id))" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-if="selectedCommitment"

@@ -226,7 +226,7 @@ const onDeleteMember = async (row: RecommendationRow) => {
 
 <template>
   <div>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -291,7 +291,7 @@ const onDeleteMember = async (row: RecommendationRow) => {
           <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === row.original.id" :aria-label="t('common.delete')" @click="onDeleteMember(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <AgencyRecommendationSetModal v-if="selected && canUpdateChild" v-model:open="isOpen" v-model:state="selected" :agency-id="agencyId" :capture-session="captureSession" :close-session="closeSession" @saved="refresh" />
     <AgencyRecommendationSetItemModal v-if="selectedItem && selectedItemParent && canUpdateChild" v-model:open="isItemModalOpen" v-model:state="selectedItem" :recommendation-setup-id="String(selectedItemParent.id)" :agency-id="agencyId" @saved="refresh" />
     <AgencyRecommendationSetSchemaCreateModal v-if="schemaCreateState && schemaCreateParent && canUpdateChild" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :recommendation-setup-id="String(schemaCreateParent.id)" :agency-id="agencyId" @created="onSchemaCreated" />

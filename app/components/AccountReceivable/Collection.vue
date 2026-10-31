@@ -77,7 +77,7 @@ const created = async (id: string) => {
       {{ t('account_receivable.description') }}
     </p>
     <section data-help-target="casework.account-receivable.collection.records">
-      <CommonResourceLayoutCard
+      <CommonResourceLayout
         v-model:search="search" v-model:pagination="pagination"
         help-add-target="casework.account-receivable.collection.add" help-search-target="casework.account-receivable.collection.search"
         :data="tableRows" :columns="columns" :total-records="totalRecords"
@@ -129,7 +129,7 @@ const created = async (id: string) => {
               :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.id))" />
           </div>
         </template>
-      </CommonResourceLayoutCard>
+      </CommonResourceLayout>
     </section>
     <AccountReceivableCreateModal v-model:open="createOpen" :agreement-id="agreementId" @created="created" />
   </div>

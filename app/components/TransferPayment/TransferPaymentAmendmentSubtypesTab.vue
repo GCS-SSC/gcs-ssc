@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TransferPaymentAmendmentSubtypesSchema } from '~~/shared/types/schemas'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -114,7 +115,7 @@ const remove = async (row: AmendmentSubtypeRow) => {
 
 <template>
   <div>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="items"
@@ -170,17 +171,23 @@ const remove = async (row: AmendmentSubtypeRow) => {
             @click="remove(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
-    <TransferPaymentAmendmentSubtypeModal
+    <CommonFormDialog
       v-if="selected"
       v-model:open="isOpen"
-      v-model:state="selected"
+      :state="selected"
+      :schema="TransferPaymentAmendmentSubtypesSchema"
       :title="selected.id ? t('transfer_payment.amendment_subtype_update') : t('transfer_payment.amendment_subtype_create')"
       :submit-label="selected.id ? t('common.update') : t('common.add')"
-      :amendment-types-fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types`"
       :pending="isSaving"
-      @submit="save"
-    />
+      @submit="save">
+      <template #default="{ state }">
+        <TransferPaymentFieldsTransferPaymentAmendmentSubtypeFields
+          :model="state"
+          :amendment-types-fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types`"
+          amendment-type-field="amendment_type_ids" />
+      </template>
+    </CommonFormDialog>
   </div>
 </template>

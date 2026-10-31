@@ -31,7 +31,7 @@ const amount = (value: string, currency: string) =>
       <p class="text-sm text-muted">
         {{ t('account_receivable.proponent_description') }}
       </p>
-      <CommonResourceLayoutCard
+      <CommonResourceLayout
         v-model:search="search"
         v-model:pagination="pagination" help-search-target="proponent.account-receivables.search"
         :data="items" :columns="columns" :total-records="totalRecords"
@@ -70,7 +70,7 @@ const amount = (value: string, currency: string) =>
               :to="localePath(appRouteLocations.agreementAccountReceivableDetail(row.original.egcs_fc_fundingagreement, row.original.id))" />
           </div>
         </template>
-      </CommonResourceLayoutCard>
+      </CommonResourceLayout>
     </CommonSection>
   </div>
 </template>

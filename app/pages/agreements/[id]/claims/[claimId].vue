@@ -1177,7 +1177,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               <div class="space-y-8">
                 <div class="space-y-4">
                   <section data-help-target="casework.claims.submission.records">
-                    <CommonResourceLayoutCard
+                    <CommonResourceLayout
                       v-model:search="submissionSearch"
                       v-model:pagination="submissionPagination"
                       help-search-target="casework.claims.submission.search"
@@ -1332,7 +1332,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                           <span class="text-primary">{{ t('agreement.claims.balance') }}: {{ formatMoney(balanceAll) }}</span>
                         </div>
                       </template>
-                    </CommonResourceLayoutCard>
+                    </CommonResourceLayout>
                   </section>
                 </div>
 

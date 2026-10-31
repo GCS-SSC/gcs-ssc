@@ -67,8 +67,8 @@ const columns = computed(() => [
 </script>
 
 <template>
-  <CommonResourceLayoutPage
-    v-model:pagination="pagination"
+  <CommonResourceLayout
+    v-model:pagination="pagination" layout="page"
     :data="data?.items ?? []"
     :columns="columns"
     :request-status="status"
@@ -87,5 +87,5 @@ const columns = computed(() => [
     <template #footer-left>
       {{ t('audit.accessPageRecords', { count: data?.items.length ?? 0 }) }}
     </template>
-  </CommonResourceLayoutPage>
+  </CommonResourceLayout>
 </template>

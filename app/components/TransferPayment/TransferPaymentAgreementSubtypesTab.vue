@@ -181,7 +181,7 @@ const retryAgreementTypes = async () => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :data="items"
@@ -224,7 +224,7 @@ const retryAgreementTypes = async () => {
           @click="remove(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal v-if="selected && canUpdateChild" v-model:open="isOpen" :title="selected.id ? t('common.update') : t('common.add')">
     <template #body>

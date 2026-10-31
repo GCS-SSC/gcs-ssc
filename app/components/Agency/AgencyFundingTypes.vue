@@ -267,7 +267,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
 
 <template>
   <div class="w-full" data-field-scope="agency.funding-types">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination"
       :data="rows" :columns="columns" :grouping="grouping" :grouping-options="groupingOptions"
       :expanded-options="expandedOptions" :column-visibility="columnVisibility" :expanded="expandedRows"
@@ -339,7 +339,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
         <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
         {{ subtypes.length }} {{ t('agency.funding_types.subtypes') }}
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal v-if="selectedType" v-model:open="typeModalOpen" :title="t('agency.funding_types.type')">
       <template #body>

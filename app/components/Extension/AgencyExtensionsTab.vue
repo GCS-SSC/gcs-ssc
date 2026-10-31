@@ -210,7 +210,7 @@ const selectNotificationProvider = async (item: ExtensionAgencyRegistryItem) => 
       {{ t('extensions.none_available') }}
     </div>
 
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-else
       v-model:pagination="pagination"
       :data="items"
@@ -310,7 +310,7 @@ const selectNotificationProvider = async (item: ExtensionAgencyRegistryItem) => 
         </span>
         {{ t('common.records') }}
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-model:open="isModalOpen"

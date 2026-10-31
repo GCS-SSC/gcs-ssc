@@ -191,7 +191,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
 
 <template>
   <div class="min-w-0 space-y-4" data-testid="account-receivable-lines" data-field-tooltip-context="agreement" data-field-scope="account-receivable.detail-lines" data-scope-label-en="Agreements > Receivables > Lines" data-scope-label-fr="Ententes > Créances > Lignes">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="filtered" :columns="columns"
       :total-records="filtered.length" :pagination-options="{ manualPagination: false }"
       :show-button="canEdit" :button-label="t('account_receivable.add_line')"
@@ -213,7 +213,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
           <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="deleteLine(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <dl class="flex items-baseline justify-end gap-4 text-sm" data-testid="account-receivable-lines-total">
       <dt class="text-muted">
         {{ t('account_receivable.established_amount') }}

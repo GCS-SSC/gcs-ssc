@@ -194,24 +194,11 @@ const removeMember = async (group: Group, member: Member) => {
 </script>
 
 <template>
-  <UDashboardPanel id="groups" data-field-scope="groups">
-    <template #header>
-      <UDashboardNavbar :title="t('groups.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="groups" v-model:collapsed="isHeroCollapsed" data-field-scope="groups" :title="t('groups.title')">
     <template #body>
       <div class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-users" :title="t('groups.title')" :description="t('groups.description')" :stats="heroStats" />
-        <CommonResourceLayoutPage v-model:search="search" v-model:pagination="pagination" :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('common.add')" :get-row-id="(row: GroupRow) => row.id" @add="openCreate" @retry="refreshGroups">
+        <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" layout="page" :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('common.add')" :get-row-id="(row: GroupRow) => row.id" @add="openCreate" @retry="refreshGroups">
           <template #filters>
             <USelect v-model="selectedAgency" data-ui-target="groups.selected-agency" :items="agencyOptions" :aria-label="t('groups.agency_filter')" class="min-w-48" />
           </template>
@@ -239,7 +226,7 @@ const removeMember = async (group: Group, member: Member) => {
               <CommonActionButton v-else-if="row.original.member && can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" :loading="removingMemberIds.includes(row.original.id)" :disabled="removingMemberIds.includes(row.original.id)" @click="removeMember(row.original.group, row.original.member)" />
             </div>
           </template>
-        </CommonResourceLayoutPage>
+        </CommonResourceLayout>
       </div>
       <UModal v-model:open="memberModalOpen" :dismissible="!addingMember" :close="!addingMember" :title="t('groups.add_member')">
         <template #body>
@@ -285,5 +272,5 @@ const removeMember = async (group: Group, member: Member) => {
         </template>
       </UModal>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { TransferPaymentPerformanceIndicatorSchema } from '~~/shared/types/schemas'
+
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -14,6 +16,7 @@ const { programId, canUpdateChild, canDeleteChild, outcomesRefreshKey = 0 } = de
   outcomesRefreshKey?: number
 }>()
 
+const { t } = useI18n()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -170,12 +173,22 @@ const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
       @edit="openUpdateIndicator"
       @delete="deleteIndicator" />
 
-    <TransferPaymentPerformanceIndicatorModal
+    <CommonFormDialog
       v-if="selectedIndicator"
       v-model:open="isIndicatorModalOpen"
-      v-model:state="selectedIndicator"
-      :outcomes="outcomes"
+      :state="selectedIndicator"
+      :schema="TransferPaymentPerformanceIndicatorSchema"
+      :title="selectedIndicator.id ? t('common.update') : t('common.add')"
+      :submit-label="selectedIndicator.id ? t('common.update') : t('common.add')"
       :pending="isSavingIndicator"
-      @submit="saveIndicator" />
+      @submit="saveIndicator">
+      <template #default="{ state }">
+        <TransferPaymentFieldsTransferPaymentPerformanceIndicatorFields
+          :model="state"
+          :outcomes="outcomes"
+          outcome-field="egcs_tp_transferpaymentoutcome"
+          outcome-value-key="id" />
+      </template>
+    </CommonFormDialog>
   </div>
 </template>

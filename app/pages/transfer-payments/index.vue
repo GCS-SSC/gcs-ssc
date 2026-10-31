@@ -166,26 +166,7 @@ const canDeleteProfile = (profile: TransferPaymentProfileRow) => {
 </script>
 
 <template>
-  <UDashboardPanel id="transfer-payments">
-    <template #header>
-      <UDashboardNavbar :title="t('transfer_payment.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="transfer-payments" v-model:collapsed="isHeroCollapsed" :title="t('transfer_payment.title')">
     <template #body>
       <div class="flex flex-1 flex-col overflow-hidden">
         <CommonEntityHero
@@ -229,5 +210,5 @@ const canDeleteProfile = (profile: TransferPaymentProfileRow) => {
         :pending="isSavingProfile"
         @submit="saveProfile" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

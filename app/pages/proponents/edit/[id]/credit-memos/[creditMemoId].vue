@@ -151,7 +151,7 @@ const save = async () => {
 
 <template>
   <div ref="content" data-field-scope="proponents.edit.credit-memos" tabindex="-1" class="flex w-full min-w-0 flex-col">
-    <AccountReceivableCreditMemoApprovalWorkspace v-if="approvalOnly" :proponent-id="proponentId" :credit-memo-id="creditMemoId" />
+    <CommonApprovalWorkspace v-if="approvalOnly" data-help-view="casework.account-receivable.credit-memo-approval" :target="{ entityType: 'fundingcaseaccountreceivablecreditmemo', entityId: creditMemoId, proponentId }" />
     <UAlert v-else-if="status === 'error'" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton :label="t('common.retry')" color="error" variant="soft" @click="retry" />

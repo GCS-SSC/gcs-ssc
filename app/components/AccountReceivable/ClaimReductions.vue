@@ -206,7 +206,7 @@ const save = async () => {
       </template>
     </UAlert>
     <div v-else-if="state" ref="recoveryFocusTarget" tabindex="-1" class="outline-none">
-      <CommonResourceLayoutCard
+      <CommonResourceLayout
         v-model:pagination="pagination"
         :data="tableRows" :columns="columns" :total-records="tableRows.length"
         :show-toolbar="false" :grouping="grouping" :grouping-options="groupingOptions"
@@ -254,7 +254,7 @@ const save = async () => {
             <span class="text-primary">{{ t('agreement.claims.balance') }}: {{ totalAmount('balance') }}</span>
           </div>
         </template>
-      </CommonResourceLayoutCard>
+      </CommonResourceLayout>
     </div>
     <UModal
       v-if="selectedLine && selectedChoice"

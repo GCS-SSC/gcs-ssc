@@ -28,11 +28,11 @@ const { t } = useI18n()
 <template>
   <aside class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
     <div class="space-y-5 pt-6">
-      <CommonRouteTabs
+      <CommonTranslatedTabs
         v-model="selectedSection"
         data-field-container="Page navigation state, not a business input field."
         :items="sectionTabs"
-        :sort="sort"
+        :ordering="sort ? 'localized' : 'authored'"
         orientation="vertical"
         :ui="{
           root: 'w-full',

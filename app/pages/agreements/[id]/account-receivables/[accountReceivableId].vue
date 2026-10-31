@@ -183,7 +183,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
 
 <template>
   <div ref="detailContent" data-field-tooltip-context="agreement" data-field-scope="agreements.account-receivables" data-scope-label-en="Agreements > Receivables > General" data-scope-label-fr="Ententes > Créances > Général" tabindex="-1" class="flex w-full min-w-0 flex-col">
-    <AccountReceivableApprovalWorkspace v-if="approvalOnly" :agreement-id="agreementId" :account-receivable-id="accountReceivableId" :entity-type="entityType" />
+    <CommonApprovalWorkspace v-if="approvalOnly" data-help-view="casework.account-receivable.approval" :target="{ entityType, entityId: accountReceivableId, agreementId }" />
     <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="retryLoad" />

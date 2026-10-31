@@ -192,7 +192,7 @@ defineExpose({
 
 <template>
   <div ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" class="min-w-0">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       ref="tableRef"
       v-model:search="search"
       v-model:status-filter="statusFilter"
@@ -241,7 +241,7 @@ defineExpose({
           </div>
         </slot>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-model:open="isModalOpen"

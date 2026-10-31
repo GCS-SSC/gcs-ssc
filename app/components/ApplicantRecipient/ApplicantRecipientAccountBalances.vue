@@ -26,7 +26,7 @@ const amount = (value: string, currency: string) =>
     <p class="text-sm text-muted">
       {{ t('account_receivable.pool_balance_description') }}
     </p>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:pagination="pagination"
       :data="items" :columns="columns" :total-records="totalRecords"
       :loading="status === 'pending'" :request-status="status"
@@ -49,6 +49,6 @@ const amount = (value: string, currency: string) =>
       <template #owedTo-cell="{ row }">
         <span class="text-sm font-semibold tabular-nums">{{ amount(row.original.egcs_fc_refundableamount, row.original.egcs_fc_currency) }}</span>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
   </CommonSection>
 </template>

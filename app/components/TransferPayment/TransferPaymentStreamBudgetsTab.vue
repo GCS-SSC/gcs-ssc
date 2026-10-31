@@ -150,7 +150,7 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="streamBudgetSearch"
     v-model:pagination="streamBudgetPagination"
     :data="streamBudgets"
@@ -207,7 +207,7 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
           @click="deleteStreamBudget(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal
     v-if="selectedStreamBudget"

@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="space-y-6" data-field-scope="transfer-payment.streams-tab">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="streamSearch"
       v-model:status-filter="streamStatus"
       v-model:pagination="streamPagination"
@@ -260,7 +260,7 @@ onBeforeUnmount(() => {
             @click="deleteStream(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <TransferPaymentStreamModal
       v-if="selectedStream && canUpdateChild"

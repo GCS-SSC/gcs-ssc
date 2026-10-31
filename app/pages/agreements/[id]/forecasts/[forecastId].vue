@@ -747,7 +747,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                 </div>
 
                 <section data-help-target="casework.forecasts.breakdown.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="breakdownSearch"
                     v-model:pagination="breakdownPagination"
                     help-search-target="casework.forecasts.breakdown.search"
@@ -891,7 +891,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                         <span class="text-primary">{{ t('agreement.forecasts.total') }}: {{ formatMoney(getGrandDraftTotal()) }}</span>
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
               </div>
             </CommonSection>

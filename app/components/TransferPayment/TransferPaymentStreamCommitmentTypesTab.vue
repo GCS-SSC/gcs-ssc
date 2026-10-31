@@ -61,7 +61,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :title="t('transfer_payment.commitment_types.title')"
@@ -86,7 +86,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
         <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" @click="onDelete(row.original.id)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
   <TransferPaymentStreamCommitmentTypeModal
     v-if="selected && canCreateChild"
     v-model:open="isOpen"

@@ -282,14 +282,14 @@ const runMemberMutation: EditorMutationRunner = async request => {
         role="region"
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
-        <TransferPaymentRecommendationSetupDetailHero :name="getBilingualValue(state, 'egcs_cn_name')" :publication-version="state.publicationVersion" :publication-state="state.publicationState" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
+        <CommonPublicationDetailHero icon="i-lucide-message-square-quote" type-label-key="transfer_payment.recommendation_setup" publish-label-key="recommendation_setup.publish" retire-label-key="recommendation_setup.retire" :name="getBilingualValue(state, 'egcs_cn_name')" :publication-version="state.publicationVersion" :publication-state="state.publicationState" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
         <UForm ref="recommendationSetupForm" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col" @submit="save">
           <CommonDesignTimeEditorShell>
             <template #sidebar>
               <AssessmentSchemaDetailSidebar v-if="canUpdate" v-model="selectedSection" data-field-container="Composite editor; its individual field declarations own their identities." :section-tabs="sectionTabs" :is-saving="isSaving" :disabled="mutation.isPending.value" :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }" @save="save" />
               <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
                 <div class="pt-6">
-                  <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
+                  <CommonTranslatedTabs v-model="selectedSection" ordering="localized" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
                 </div>
               </aside>
             </template>

@@ -883,7 +883,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget" data-scope-label-fr="Ententes > Budget" data-help-view="agreement.budget" data-help-label-en="Agreements — Budget" data-help-label-fr="Ententes — Budget" data-help-target="agreement.budget.content" data-help-kind="section">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :embedded="embedded"
@@ -1177,7 +1177,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
         {{ t('agreement.budget.other_funding_total') }}: {{ formatTableTotalMoney('otherFunding') }}
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UAlert
       v-for="budgetDifference in budgetDifferences"

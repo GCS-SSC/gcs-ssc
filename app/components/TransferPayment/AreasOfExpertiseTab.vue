@@ -175,7 +175,7 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :data="items"
@@ -207,7 +207,7 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
           @click="deleteItem(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal
     v-if="selectedItem"

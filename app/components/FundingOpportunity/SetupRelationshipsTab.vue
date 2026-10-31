@@ -161,7 +161,7 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="linkedSearch"
     v-model:pagination="linkedPagination"
     :data="linkedPage"
@@ -188,7 +188,7 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
           @click="saveLinks(row.original, 'disassociate')" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <UModal
     v-if="canEdit"

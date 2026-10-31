@@ -359,7 +359,7 @@ const expandedOptions = { autoResetExpanded: false }
 
 <template>
   <div class="w-full">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :title="t('reviews.title')"
@@ -469,7 +469,7 @@ const expandedOptions = { autoResetExpanded: false }
             @click="cloneDeniedReview(row.original.id)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-model:open="isCreateModalOpen"

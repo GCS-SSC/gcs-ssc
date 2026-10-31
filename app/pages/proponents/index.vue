@@ -150,26 +150,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
 </script>
 
 <template>
-  <UDashboardPanel id="applicant-recipients" data-field-scope="proponents">
-    <template #header>
-      <UDashboardNavbar :title="t('applicant_recipient.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="applicant-recipients" v-model:collapsed="isHeroCollapsed" data-field-scope="proponents" :title="t('applicant_recipient.title')">
     <template #body>
       <div class="flex flex-1 flex-col overflow-hidden">
         <CommonEntityHero
@@ -199,5 +180,5 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
           @delete="deleteProfile" />
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

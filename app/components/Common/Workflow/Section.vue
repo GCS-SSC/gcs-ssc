@@ -1006,7 +1006,7 @@ const handleApprovalChanged = async () => {
           icon="i-lucide-circle-alert"
           :title="t('workflow.recommendation_validation_title')"
           :description="t('workflow.recommendation_validation_description')" />
-        <RecommendationForm
+        <CommonQuestionnaireForm
           v-model:responses="responses"
           :definition="selectedRecommendation.egcs_cn_definition"
           :issues="validationIssues"

@@ -90,9 +90,9 @@ const columns: TableColumnInput<Row>[] = [
           :title="t('assignment_management.title')"
           :description="t('assignment_management.description')"
           :stats="heroStats" />
-        <CommonResourceLayoutPage
+        <CommonResourceLayout
           v-model:search="search"
-          v-model:pagination="pagination"
+          v-model:pagination="pagination" layout="page"
           :columns="columns"
           :data="items"
           :total-records="totalRecords"
@@ -150,7 +150,7 @@ const columns: TableColumnInput<Row>[] = [
                 @click="selected = row.original" />
             </div>
           </template>
-        </CommonResourceLayoutPage>
+        </CommonResourceLayout>
       </div>
       <UModal
         :open="selected !== null"

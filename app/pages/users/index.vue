@@ -201,26 +201,7 @@ const columns: TableColumnInput<UserListItem>[] = [
 </script>
 
 <template>
-  <UDashboardPanel id="users" data-field-tooltip-unavailable="No owning agency exists for global user administration or authentication.">
-    <template #header>
-      <UDashboardNavbar :title="t('nav.users')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="users" v-model:collapsed="isHeroCollapsed" data-field-tooltip-unavailable="No owning agency exists for global user administration or authentication." :title="t('nav.users')">
     <template #body>
       <div class="flex flex-1 flex-col overflow-hidden">
         <CommonEntityHero
@@ -230,9 +211,10 @@ const columns: TableColumnInput<UserListItem>[] = [
           :description="t('user.description')"
           :stats="userHeroStats" />
 
-        <CommonResourceLayoutPage
+        <CommonResourceLayout
           v-model:search="search"
           v-model:pagination="pagination"
+          layout="page"
           :columns="columns"
           :data="items"
           :total-records="totalRecords"
@@ -290,7 +272,7 @@ const columns: TableColumnInput<UserListItem>[] = [
                 @click.stop="deleteUser(row.original)" />
             </div>
           </template>
-        </CommonResourceLayoutPage>
+        </CommonResourceLayout>
       </div>
 
       <UserModal
@@ -308,5 +290,5 @@ const columns: TableColumnInput<UserListItem>[] = [
         :pending="isActivatingUser"
         @submit="activateUser" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

@@ -273,7 +273,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
         <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.documents.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="retryTemplates" />
       </template>
     </UAlert>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="items"
@@ -323,7 +323,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
             @click="deleteDocument(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal v-if="canCreate && generateState" v-model:open="isGenerateOpen" :title="t('agreement.documents.generate')">
       <template #body>

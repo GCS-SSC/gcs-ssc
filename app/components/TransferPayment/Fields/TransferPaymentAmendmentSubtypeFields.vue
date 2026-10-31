@@ -38,15 +38,17 @@ const updateAmendmentTypeIds = (value: string[]) => {
 
 <template>
   <UFormField :label="t('transfer_payment.amendment_subtype_type')" :name="field(amendmentTypeField)" data-ui-target="transfer-payment.fields.amendment-subtype-fields.field-amendmentTypeField" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
-    <CommonServerLookupMultiSelect
+    <CommonServerLookupSelect
       v-if="amendmentTypesFetchUrl"
-      :model-value="amendmentTypeIds()"
+      multiple
+      :limit="100"
+      :values="amendmentTypeIds()"
       :fetch-url="amendmentTypesFetchUrl"
       value-key="id"
       label-en-key="egcs_tp_name_en"
       label-fr-key="egcs_tp_name_fr"
       required
-      @update:model-value="updateAmendmentTypeIds" />
+      @update:values="updateAmendmentTypeIds" />
     <CommonBilingualMultiSelectMenu
       v-else
       :model-value="amendmentTypeIds()"

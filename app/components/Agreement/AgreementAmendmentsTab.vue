@@ -289,7 +289,7 @@ const createAmendment = async () => {
       color="info"
       icon="i-lucide-info"
       :title="t('agreement.amendments.open_exists')" />
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="amendments"
@@ -355,7 +355,7 @@ const createAmendment = async () => {
             :aria-label="t('common.open')" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-model:open="isCreateOpen"
@@ -378,8 +378,10 @@ const createAmendment = async () => {
             {{ t('agreement.amendments.type_help') }}
           </p>
           <UFormField :label="t('agreement.amendments.type')" required data-ui-target="agreement.amendments-tab.agreement.amendments.type">
-            <CommonServerLookupMultiSelect
-              v-model="selectedTypeIds"
+            <CommonServerLookupSelect
+              v-model:values="selectedTypeIds"
+              multiple
+              :limit="100"
               :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/types`"
               value-key="id"
               label-en-key="egcs_tp_name_en"
@@ -391,8 +393,10 @@ const createAmendment = async () => {
             v-if="selectedTypeIds.length > 0"
             :label="t('agreement.amendments.subtypes')"
             :required="subtypeRequired" data-ui-target="agreement.amendments-tab.agreement.amendments.subtypes">
-            <CommonServerLookupMultiSelect
-              v-model="selectedSubtypeIds"
+            <CommonServerLookupSelect
+              v-model:values="selectedSubtypeIds"
+              multiple
+              :limit="100"
               :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/subtypes`"
               value-key="id"
               label-en-key="egcs_tp_name_en"

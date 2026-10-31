@@ -72,23 +72,10 @@ const submit = async () => {
 </script>
 
 <template>
-  <UDashboardPanel id="funding-opportunities">
-    <template #header>
-      <UDashboardNavbar :title="t('funding_opportunity.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="funding-opportunities" v-model:collapsed="isHeroCollapsed" :title="t('funding_opportunity.title')">
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="t('funding_opportunity.title')" :description="t('funding_opportunity.description')" />
-      <CommonResourceLayoutPage v-model:search="search" v-model:pagination="pagination" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('funding_opportunity.create')" @add="openCreate" @retry="retry">
+      <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" layout="page" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('funding_opportunity.create')" @add="openCreate" @retry="retry">
         <template #egcs_fo_name_en-cell="{ row }">
           <CommonBilingualName :name-en="row.original.egcs_fo_name_en" :name-fr="row.original.egcs_fo_name_fr" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
         </template>
@@ -109,8 +96,8 @@ const submit = async () => {
             <CommonActionButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_opportunity.view_details')" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
           </div>
         </template>
-      </CommonResourceLayoutPage>
+      </CommonResourceLayout>
       <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

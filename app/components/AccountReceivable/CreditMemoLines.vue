@@ -145,7 +145,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
 
 <template>
   <div class="min-w-0 space-y-4" data-testid="credit-memo-lines" data-field-scope="account-receivable.credit-memo-lines">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="filtered" :columns="columns"
       :total-records="filtered.length" :pagination-options="{ manualPagination: false }"
       :show-button="canEdit" :button-label="t('account_receivable.credit_memo_add_line')"
@@ -166,7 +166,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
           <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_linenumber}`" @click="deleteLine(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <dl class="flex items-baseline justify-end gap-4 text-sm" data-testid="credit-memo-lines-total">
       <dt class="text-muted">
         {{ t('account_receivable.credit_memo_amount') }}

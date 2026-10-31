@@ -334,7 +334,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
       icon="i-lucide-triangle-alert"
       :title="`${forecast.fiscal_year_display ?? t('common.unavailable')}, ${t('agreement.forecasts.version_label', { version: forecast.egcs_fc_version })}`"
       :description="t('agreement.budget_controls.forecast_revision_required')" />
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="versionRows"
@@ -441,7 +441,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
             :aria-label="`${t('common.open')}: ${row.original.fiscalYearDisplay}, ${t('agreement.forecasts.version')} ${row.original.version}`" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-if="selectedForecast"

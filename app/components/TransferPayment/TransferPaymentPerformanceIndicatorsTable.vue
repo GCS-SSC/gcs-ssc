@@ -76,7 +76,7 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :data="indicators"
@@ -144,5 +144,5 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
           @click="emit('delete', row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 </template>

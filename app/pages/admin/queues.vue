@@ -213,10 +213,10 @@ onBeforeUnmount(clear)
               <UButton color="error" variant="outline" :label="t('queues.retry')" :loading="status === 'pending'" @click="refreshSnapshot()" />
             </template>
           </UAlert>
-          <CommonResourceLayoutPage
+          <CommonResourceLayout
             v-if="!accessDenied"
             v-model:search="search"
-            v-model:pagination="pagination"
+            v-model:pagination="pagination" layout="page"
             :data="snapshot ? pagedHandlers : []"
             :columns="columns"
             :total-records="filteredHandlers.length"
@@ -401,7 +401,7 @@ onBeforeUnmount(clear)
                 </template>
               </CommonEmptyState>
             </template>
-          </CommonResourceLayoutPage>
+          </CommonResourceLayout>
         </section>
       </div>
     </template>

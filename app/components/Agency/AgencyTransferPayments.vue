@@ -108,7 +108,7 @@ const saveProfile = async () => {
 
 <template>
   <div class="space-y-6" data-field-scope="agency.transfer-payments">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:status-filter="statusFilter"
       v-model:pagination="pagination"
@@ -157,7 +157,7 @@ const saveProfile = async () => {
           {{ formatDate(row.original.egcs_tp_dateend) }}
         </span>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <TransferPaymentWizardModal
       v-model:open="isWizardOpen"

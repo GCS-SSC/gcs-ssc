@@ -82,7 +82,7 @@ const remove = async (item: WorkflowSetupItem) => {
 
 <template>
   <div>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="items" :columns="columns"
       :bilingual-columns="[{ id: 'name', accessorKey: { en: 'egcs_cn_name_en', fr: 'egcs_cn_name_fr' } }]"
       :total-records="totalRecords" :loading="status === 'pending'" :show-button="canUpdateChild"
@@ -109,7 +109,7 @@ const remove = async (item: WorkflowSetupItem) => {
           <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" variant="ghost" color="error" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: getSetupLabel(row.original) })" @click="remove(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <AgencyWorkflowSetupModal v-if="selected" v-model:open="isOpen" v-model:state="selected" :agency-id="agencyId" @saved="refresh" />
   </div>
 </template>

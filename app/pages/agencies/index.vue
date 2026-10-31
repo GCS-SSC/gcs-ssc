@@ -90,26 +90,7 @@ const canUpdateAgency = (agency: AgencyProfileItem) => can('agency', 'update', {
 </script>
 
 <template>
-  <UDashboardPanel id="agencies">
-    <template #header>
-      <UDashboardNavbar :title="t('agency.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="agencies" v-model:collapsed="isHeroCollapsed" :title="t('agency.title')">
     <template #body>
       <div class="flex flex-1 flex-col overflow-hidden">
         <CommonEntityHero
@@ -146,5 +127,5 @@ const canUpdateAgency = (agency: AgencyProfileItem) => can('agency', 'update', {
         :pending="isSavingAgency"
         @submit="saveAgency" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

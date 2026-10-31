@@ -108,7 +108,7 @@ const removeLink = async (link: ReviewSetLink) => {
     <h2 v-if="showHeader" class="text-lg font-semibold">
       {{ t('transfer_payment.review_setups') }}
     </h2>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="pageItems"
@@ -138,7 +138,7 @@ const removeLink = async (link: ReviewSetLink) => {
             @click="removeLink(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
     <UModal :open="state !== null" :title="t('transfer_payment.review_setups')" @update:open="value => { if (!value) closeLink() }">
       <template #body>
         <UForm v-if="state && agencyId" :state="state" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="saveLink">

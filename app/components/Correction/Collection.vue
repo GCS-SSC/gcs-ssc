@@ -94,7 +94,7 @@ const exportCorrections = async () => {
       {{ t('correction.description') }}
     </p>
     <section data-help-target="casework.correction.collection.records">
-      <CommonResourceLayoutCard
+      <CommonResourceLayout
         v-model:search="search" v-model:pagination="pagination"
         help-add-target="casework.correction.collection.add"
         help-search-target="casework.correction.collection.search"
@@ -142,7 +142,7 @@ const exportCorrections = async () => {
               :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, String(row.original.id)))" />
           </div>
         </template>
-      </CommonResourceLayoutCard>
+      </CommonResourceLayout>
     </section>
     <CorrectionCreateModal v-model:open="createOpen" :agreement-id="agreementId" @created="created" />
   </div>

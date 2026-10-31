@@ -183,7 +183,7 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
 
 <template>
   <div class="space-y-6" data-field-scope="agency.document-templates">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="items"
@@ -270,7 +270,7 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
           <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: getTemplateActionTarget(row.original) })" @click="deleteTemplate(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal
       v-if="selectedTemplate"

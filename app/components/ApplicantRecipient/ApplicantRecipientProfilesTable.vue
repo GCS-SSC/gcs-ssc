@@ -79,8 +79,8 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
 
 <template>
   <section data-help-view="proponents.list" data-help-target="proponents.list.records" data-help-kind="section" class="flex w-full min-w-0 flex-col">
-    <CommonResourceLayoutPage
-      v-model:search="search" v-model:status-filter="statusFilter" v-model:pagination="pagination" help-search-target="proponents.list.search"
+    <CommonResourceLayout
+      v-model:search="search" v-model:status-filter="statusFilter" v-model:pagination="pagination" layout="page" help-search-target="proponents.list.search"
       help-add-target="proponents.list.add"
 
       :data="profiles"
@@ -145,6 +145,6 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
             @click="emit('delete', row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutPage>
+    </CommonResourceLayout>
   </section>
 </template>

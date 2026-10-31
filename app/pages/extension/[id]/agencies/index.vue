@@ -74,12 +74,12 @@ const columns: TableColumnInput<Agency>[] = [
           :is-collapsed="isHeroCollapsed" :icon="workspace?.icon ?? 'i-lucide-panels-top-left'"
           :title="title" :description="t('extensions.workspace_agencies_description')"
           :stats="[{ label: t('nav.agencies'), value: workspace?.agencies.length ?? 0 }]" />
-        <CommonResourceLayoutPage
-          v-if="workspace" v-model:search="search" v-model:pagination="pagination"
+        <CommonResourceLayout
+          v-if="workspace" v-model:search="search" v-model:pagination="pagination" layout="page"
           :data="agencies" :columns="columns" :total-records="agencies.length"
           :loading="status === 'pending'" :request-status="status"
           :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
-          :show-button="false" :show-column-toggle="false" @retry="refresh">
+          :show-button="false" @retry="refresh">
           <template #name-cell="{ row }">
             <CommonBilingualName
               :name-en="row.original.nameEn" :name-fr="row.original.nameFr"
@@ -93,7 +93,7 @@ const columns: TableColumnInput<Agency>[] = [
                 :aria-label="`${t('common.view_details')}: ${locale === 'fr' ? row.original.nameFr : row.original.nameEn}`" />
             </div>
           </template>
-        </CommonResourceLayoutPage>
+        </CommonResourceLayout>
         <UAlert v-else-if="status === 'error'" color="error" :title="t('common.resource_table_load_failed')">
           <template #actions>
             <UButton :label="t('common.retry')" @click="() => refresh()" />

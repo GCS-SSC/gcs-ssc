@@ -115,9 +115,9 @@ const isHeroCollapsed = getHeroCollapsed(panelId.value)
           <AdminAuditLogFilters v-model="filters" data-field-container="Composite editor; its individual field declarations own their identities." :kind="kind" />
         </template>
       </AdminAuditAccessHistory>
-      <CommonResourceLayoutPage
+      <CommonResourceLayout
         v-else
-        v-model:pagination="pagination"
+        v-model:pagination="pagination" layout="page"
         :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-search="false" :show-button="false" @retry="refresh()">
         <template #filters>
           <AdminAuditLogFilters v-model="filters" data-field-container="Composite editor; its individual field declarations own their identities." :kind="kind" />
@@ -127,7 +127,7 @@ const isHeroCollapsed = getHeroCollapsed(panelId.value)
             <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('audit.details')" @click="openDetail(row.original)" />
           </div>
         </template>
-      </CommonResourceLayoutPage>
+      </CommonResourceLayout>
       <UModal :open="selected !== null" :title="t('audit.details')" :ui="{ content: 'sm:max-w-2xl' }" @update:open="value => { if (!value) { selected = null; clearDetail() } }">
         <template #body>
           <p v-if="detailStatus === 'pending'">

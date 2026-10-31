@@ -67,9 +67,9 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
 
 <template>
   <section data-help-view="agreements.list" data-help-target="agreements.list.records" data-help-kind="section" class="flex min-w-0 flex-1 flex-col overflow-hidden">
-    <CommonResourceLayoutPage
+    <CommonResourceLayout
       v-model:search="search"
-      v-model:pagination="pagination"
+      v-model:pagination="pagination" layout="page"
       :data="agreements"
       :columns="columns"
       :bilingual-columns="bilingualColumns"
@@ -156,6 +156,6 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
             @click="emit('delete', row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutPage>
+    </CommonResourceLayout>
   </section>
 </template>

@@ -25,23 +25,11 @@ const created = async (id: string) => await navigateTo(localePath(appRouteLocati
 </script>
 
 <template>
-  <UDashboardPanel id="journal-vouchers" data-help-view="journal-vouchers.list">
-    <template #header>
-      <UDashboardNavbar :title="t('journal_voucher.title')">
-        <template #leading>
-          <UDashboardSidebarCollapse />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <CommonActionButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="journal-vouchers" v-model:collapsed="isHeroCollapsed" data-help-view="journal-vouchers.list" :title="t('journal_voucher.title')">
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-book-open-check" :title="t('journal_voucher.title')" :description="t('journal_voucher.description')" />
       <section data-help-target="journal-vouchers.list.records">
-        <CommonResourceLayoutCard v-model:search="search" v-model:pagination="pagination" help-add-target="journal-vouchers.list.add" help-search-target="journal-vouchers.list.search" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :loading="status === 'pending'" :button-label="t('journal_voucher.create')" :show-button="canAny('journal_voucher', 'create') && canAny('agreement', 'read')" @add="open = true" @retry="retry">
+        <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" help-add-target="journal-vouchers.list.add" help-search-target="journal-vouchers.list.search" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :loading="status === 'pending'" :button-label="t('journal_voucher.create')" :show-button="canAny('journal_voucher', 'create') && canAny('agreement', 'read')" @add="open = true" @retry="retry">
           <template #requesteddate-cell="{ row }">
             <span class="whitespace-nowrap">{{ formatDate(row.original.egcs_fc_requesteddate) }}</span>
           </template>
@@ -53,9 +41,9 @@ const created = async (id: string) => await navigateTo(localePath(appRouteLocati
               <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(appRouteLocations.journalVoucherDetail(row.original.id))" />
             </div>
           </template>
-        </CommonResourceLayoutCard>
+        </CommonResourceLayout>
       </section>
       <JournalVoucherCreateModal v-model:open="open" @created="created" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

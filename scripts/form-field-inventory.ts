@@ -38,7 +38,7 @@ const attributeMap = (node: ElementNode): Record<string, string> => Object.fromE
 }))
 const value = (attributes: Record<string, string>, name: string): string | null => attributes[`:${name}`] ?? attributes[name] ?? null
 const fieldTag = (tag: string): boolean => /^(U|Common|Extension)FormField$/.test(tag)
-const formTag = (tag: string): boolean => tag === 'form' || tag === 'CommonResourceCrud' || /^(U|Common|Extension)Form$/.test(tag)
+const formTag = (tag: string): boolean => tag === 'form' || tag === 'CommonResourceCrud' || tag === 'CommonFormDialog' || /^(U|Common|Extension)Form$/.test(tag)
 const classifyControl = (tag: string, attributes: Record<string, string>): FieldControl['classification'] | null => {
   if (/^(input|textarea|select)$/.test(tag)) return 'native'
   if (tag === 'component') return 'dynamic'

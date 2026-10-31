@@ -202,7 +202,7 @@ const visibleRows = computed(() => items.value)
       </p>
     </div>
 
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination"
       help-add-target="proponent.funding-history.add"
       help-search-target="proponent.funding-history.search"
@@ -300,7 +300,7 @@ const visibleRows = computed(() => items.value)
           </UDropdownMenu>
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <ApplicantRecipientFundingHistoryWizardModal
       v-model:open="isWizardOpen"

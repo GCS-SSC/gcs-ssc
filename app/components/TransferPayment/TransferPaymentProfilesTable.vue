@@ -58,10 +58,10 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
 </script>
 
 <template>
-  <CommonResourceLayoutPage
+  <CommonResourceLayout
     v-model:search="search"
     v-model:status-filter="statusFilter"
-    v-model:pagination="pagination"
+    v-model:pagination="pagination" layout="page"
     :data="profiles"
     :columns="columns"
     :bilingual-columns="bilingualColumns"
@@ -131,5 +131,5 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
           @click="emit('delete', row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutPage>
+  </CommonResourceLayout>
 </template>

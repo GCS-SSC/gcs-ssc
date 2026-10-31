@@ -77,7 +77,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :data="items"
@@ -122,7 +122,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
           @click="onDelete(row.original)" />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <TransferPaymentStreamRiskRatingModal
     v-if="selected && canUpdateChild"

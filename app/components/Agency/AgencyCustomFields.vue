@@ -178,7 +178,7 @@ const remove = async (path: string) => {
       </h2>
       <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('custom_fields.add_field')" @click="fieldModal.openCreate()" />
     </div>
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
       :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
       :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="filteredFields.length"
@@ -243,7 +243,7 @@ const remove = async (path: string) => {
           <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.option)}`" @click="remove(`${url}/${row.original.field.id}/options/${row.original.option.id}`)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal v-model:open="fieldModal.isOpen.value" :title="t('custom_fields.title')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>

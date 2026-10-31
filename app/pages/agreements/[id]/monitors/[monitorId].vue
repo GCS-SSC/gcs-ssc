@@ -518,7 +518,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             <div v-if="selectedMonitorTab === 'planning'" data-help-view="casework.monitors.planning" data-help-target="casework.monitors.detail.planning" data-help-kind="section" class="w-full min-w-0">
               <div class="space-y-6">
                 <section data-help-target="casework.monitors.planning.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="planningSearch" v-model:pagination="planningPagination"
                     help-add-target="casework.monitors.planning.add"
                     help-search-target="casework.monitors.planning.search"
@@ -538,7 +538,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                         <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
               </div>
             </div>
@@ -549,7 +549,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                   <UButton v-if="canCreateMonitorResource" data-help-target="casework.monitors.detail.items-add" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.items.add')" @click="openResourceEditor('create', () => itemModal.openCreate())" />
                 </div>
                 <section data-help-target="casework.monitors.items.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="itemSearch"
                     v-model:pagination="itemPagination"
                     help-search-target="casework.monitors.items.search"
@@ -580,7 +580,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                         <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
               </div>
             </div>
@@ -591,7 +591,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                   <UButton v-if="canCreateMonitorResource" data-help-target="casework.monitors.detail.findings-add" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.findings.add')" @click="openResourceEditor('create', () => findingModal.openCreate())" />
                 </div>
                 <section data-help-target="casework.monitors.findings.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="findingSearch"
                     v-model:pagination="findingPagination"
                     help-search-target="casework.monitors.findings.search"
@@ -618,7 +618,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                         <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
               </div>
             </div>
@@ -629,7 +629,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                   <UButton v-if="canCreateMonitorResource" data-help-target="casework.monitors.detail.followups-add" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.followups.add')" @click="openResourceEditor('create', () => followupModal.openCreate())" />
                 </div>
                 <section data-help-target="casework.monitors.followups.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="followupSearch"
                     v-model:pagination="followupPagination"
                     help-search-target="casework.monitors.followups.search"
@@ -669,7 +669,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                         <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
               </div>
             </div>
@@ -677,7 +677,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             <div v-else-if="selectedMonitorTab === 'promising-practices'" data-help-target="casework.monitors.promising-practices.content" data-help-kind="section" data-help-view="casework.monitors.promising-practices" class="w-full min-w-0">
               <div class="space-y-3">
                 <section data-help-target="casework.monitors.promising-practices.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="practiceSearch" v-model:pagination="practicePagination"
                     help-add-target="casework.monitors.promising-practices.add"
                     help-search-target="casework.monitors.promising-practices.search"
@@ -697,7 +697,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                         <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
               </div>
             </div>

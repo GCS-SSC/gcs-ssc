@@ -311,7 +311,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
                   :title="t('agreement.commitments.allocation_required')"
                   :description="t('agreement.commitments.allocation_total_help', { total: formatMoney(commitment.egcs_fc_totalamount), allocated: formatMoney(totalAmount) })" />
                 <section data-help-target="casework.commitments.lines.records">
-                  <CommonResourceLayoutCard
+                  <CommonResourceLayout
                     v-model:search="search" v-model:pagination="pagination"
                     help-add-target="casework.commitments.lines.add"
                     help-search-target="casework.commitments.lines.search"
@@ -373,7 +373,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
                           @click="deleteLine(String(row.original.id))" />
                       </div>
                     </template>
-                  </CommonResourceLayoutCard>
+                  </CommonResourceLayout>
                 </section>
 
                 <div class="flex justify-end">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TransferPaymentOutcomeSchema } from '~~/shared/types/schemas'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -133,7 +134,7 @@ const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
 
 <template>
   <div class="space-y-6">
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="outcomeSearch"
       v-model:pagination="outcomePagination"
       :data="outcomes"
@@ -178,15 +179,20 @@ const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
             @click="deleteOutcome(row.original)" />
         </div>
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
-    <TransferPaymentOutcomeModal
+    <CommonFormDialog
       v-if="selectedOutcome && canUpdateChild"
       v-model:open="isOutcomeModalOpen"
-      v-model:state="selectedOutcome"
+      :state="selectedOutcome"
+      :schema="TransferPaymentOutcomeSchema"
       :title="selectedOutcome.id ? t('common.update') : t('common.add')"
       :submit-label="selectedOutcome.id ? t('common.update') : t('common.add')"
       :pending="isSavingOutcome"
-      @submit="saveOutcome" />
+      @submit="saveOutcome">
+      <template #default="{ state }">
+        <TransferPaymentFieldsTransferPaymentOutcomeFields :model="state" />
+      </template>
+    </CommonFormDialog>
   </div>
 </template>

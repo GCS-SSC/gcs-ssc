@@ -389,7 +389,7 @@ const deleteLineItem = async (lineItemId: string) => {
       class="mb-4"
       @retry="refresh" />
 
-    <CommonResourceLayoutCard
+    <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
       :data="tableRows"
@@ -522,7 +522,7 @@ const deleteLineItem = async (lineItemId: string) => {
         <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
         {{ realLineItemRows.length }} {{ t('agency.tabs.budget_line_items') }}
       </template>
-    </CommonResourceLayoutCard>
+    </CommonResourceLayout>
 
     <UModal v-if="selectedCategory" v-model:open="isCategoryModalOpen" :title="t('agency.tabs.cost_categories')">
       <template #body>

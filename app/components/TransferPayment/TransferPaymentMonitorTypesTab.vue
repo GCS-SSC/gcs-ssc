@@ -80,7 +80,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
 </script>
 
 <template>
-  <CommonResourceLayoutCard
+  <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
     :data="items"
@@ -114,7 +114,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
         />
       </div>
     </template>
-  </CommonResourceLayoutCard>
+  </CommonResourceLayout>
 
   <TransferPaymentMonitorTypeModal
     v-if="selected && canCreateChild"
