@@ -148,40 +148,50 @@ export const validateAssessmentCalculationGraph = (
     })
   })
 
-  const visiting = new Set<string>()
-  const visited = new Set<string>()
-  const seenCycles = new Set<string>()
+  const nodes = new Map<string, { index: number, lowLink: number }>()
+  const active = new Set<string>()
+  const componentStack: string[] = []
+  const createFrame = (key: string) => {
+    const node = { index: nodes.size, lowLink: nodes.size }
+    nodes.set(key, node)
+    active.add(key)
+    componentStack.push(key)
+    return { key, node, references: referencedCalculationKeysByItem.get(key)?.values() }
+  }
 
   for (const item of items) {
-    if (visited.has(item.key)) continue
-    const path: string[] = []
-    const frames = [{ key: item.key, references: referencedCalculationKeysByItem.get(item.key)?.values(), entered: false }]
+    if (nodes.has(item.key)) continue
+    const frames = [createFrame(item.key)]
     while (frames.length > 0) {
       const frame = frames[frames.length - 1]
       if (!frame) break
-      if (!frame.entered) {
-        visiting.add(frame.key)
-        path.push(frame.key)
-        frame.entered = true
-      }
       const next = frame.references?.next()
       if (!next || next.done) {
-        visiting.delete(frame.key)
-        visited.add(frame.key)
-        path.pop()
         frames.pop()
+        const parent = frames[frames.length - 1]
+        if (parent) parent.node.lowLink = Math.min(parent.node.lowLink, frame.node.lowLink)
+        if (frame.node.lowLink === frame.node.index) {
+          const itemKeys: string[] = []
+          let member: string | undefined
+          do {
+            member = componentStack.pop()
+            if (member !== undefined) {
+              active.delete(member)
+              itemKeys.push(member)
+            }
+          } while (member !== frame.key && member !== undefined)
+          if (itemKeys.length > 1 || referencedCalculationKeysByItem.get(frame.key)?.has(frame.key)) {
+            issues.push({ type: 'cycle', itemKeys })
+          }
+        }
         continue
       }
       const referenceKey = next.value
-      if (visiting.has(referenceKey)) {
-        const cycleKeys = path.slice(path.indexOf(referenceKey))
-        const normalizedCycle = [...cycleKeys].sort().join('|')
-        if (!seenCycles.has(normalizedCycle)) {
-          seenCycles.add(normalizedCycle)
-          issues.push({ type: 'cycle', itemKeys: cycleKeys })
-        }
-      } else if (!visited.has(referenceKey)) {
-        frames.push({ key: referenceKey, references: referencedCalculationKeysByItem.get(referenceKey)?.values(), entered: false })
+      const reference = nodes.get(referenceKey)
+      if (!reference) {
+        frames.push(createFrame(referenceKey))
+      } else if (active.has(referenceKey)) {
+        frame.node.lowLink = Math.min(frame.node.lowLink, reference.index)
       }
     }
   }

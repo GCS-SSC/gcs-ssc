@@ -35,8 +35,11 @@ const readApprovalTarget = async (db: Db, runtimeItemId: string) => await db.sel
 
 const readRecipient = async (db: Db, target: NonNullable<Awaited<ReturnType<typeof readApprovalTarget>>>) => {
   if (target.userId !== null) {
-    const user = await db.selectFrom('Common_User').select(['egcs_cn_email', 'egcs_cn_name'])
-      .where('id', '=', String(target.userId)).where('_deleted', '=', false).executeTakeFirst()
+    const user = await db.selectFrom('Common_User')
+      .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
+      .select(['Common_User.egcs_cn_email', 'Common_User.egcs_cn_name'])
+      .where('Common_User.id', '=', String(target.userId)).where('Common_User._deleted', '=', false)
+      .where('user._deleted', '=', false).executeTakeFirst()
     return user
       ? { kind: 'user' as const, id: String(target.userId), email: user.egcs_cn_email,
           name: user.egcs_cn_name, nameEn: user.egcs_cn_name, nameFr: user.egcs_cn_name }

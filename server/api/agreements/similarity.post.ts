@@ -9,11 +9,11 @@ import {
   resolveAgreementStreamScopeContext
 } from '~~/server/utils/agreement'
 import { collectFundingHistorySimilarityWarnings } from '~~/server/utils/funding-history'
-import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementProfileBaseSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 
 const BodySchema = z.object({
   streamId: PositivePostgresBigintIdSchema,
-  agreementNumber: z.string().trim().min(1),
+  agreementNumber: FundingCaseAgreementProfileBaseSchema.shape.egcs_fc_agreementnumber,
   excludeAgreementId: PositivePostgresBigintIdSchema.optional()
 })
 

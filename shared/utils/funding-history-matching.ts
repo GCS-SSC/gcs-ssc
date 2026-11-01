@@ -80,6 +80,8 @@ export const isNearFundingAgreementNumber = (left: string, right: string): boole
   if (normalizedLeft === normalizedRight || normalizedLeft.length < 3 || normalizedRight.length < 3) return false
 
   const maximumLength = Math.max(normalizedLeft.length, normalizedRight.length)
+  const maximumDistance = maximumLength <= 5 ? 1 : Math.floor(maximumLength / 5)
+  if (Math.abs([...normalizedLeft].length - [...normalizedRight].length) > maximumDistance) return false
   const distance = damerauLevenshteinDistance(normalizedLeft, normalizedRight)
   if (maximumLength <= 5) return distance === 1
   return 1 - distance / maximumLength >= 0.8

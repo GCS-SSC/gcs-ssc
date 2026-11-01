@@ -7,6 +7,8 @@ import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { formatCorrectionReference } from '~~/shared/utils/correction'
+import { CorrectionExportSchema } from '~~/shared/types/schemas/correction-export'
+import { serializeCsvExport } from '~/utils/csv-export'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
 const { agreementId, showDescription = true } = defineProps<{ agreementId: string, showDescription?: boolean }>()
@@ -72,8 +74,9 @@ const exportCorrections = async () => {
     if (fiscalYear.value) url.searchParams.set('egcs_fc_agencyfiscalyear', fiscalYear.value)
     const result = await fetch(url)
     if (!result.ok) await throwFetchResponseError(result)
-    const blob = await result.blob()
+    const { fields, data } = CorrectionExportSchema.parse(await result.json())
     if (ownerAgreement !== agreementId) return
+    const blob = new Blob([serializeCsvExport(fields, data)], { type: 'text/csv; charset=utf-8' })
     const downloadUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = downloadUrl

@@ -1,4 +1,4 @@
-import { defineEventHandler } from 'h3'
+import { defineEventHandler, getRouterParam } from 'h3'
 import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { FundingCaseAgreementMonitorFollowupUpdateCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -7,12 +7,16 @@ import {
   prepareAgreementMonitorRoute,
   syncAgreementMonitorFollowupStatus
 } from '~~/server/utils/agreement-monitor'
+import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { badRequest } from '~~/server/utils/api-errors'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
-import { requireAuthContext } from '~~/server/utils/authorize'
+import { authorize } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {
-  await requireAuthContext(event)
+  await authorize(event, 'agreement', 'create', async () => ({
+    scope: (await resolveAgreementScopeContext(getRouterParam(event, 'id') ?? '', event.context.$db))?.scope
+      ?? { type: 'global' as const }
+  }))
   const validated = await readAgreementMonitorBody(event, FundingCaseAgreementMonitorFollowupUpdateCreateSchema)
   const followup = await event.context.$db
     .selectFrom('Funding_Case_Agreement_Monitor_Followup')

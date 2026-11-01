@@ -8,7 +8,30 @@ export const DOCX_MAX_RENDER_DEPTH = 32
 
 export class DocumentRenderBudgetError extends Error {
   constructor() {
-    super('DOCX rendering budget exceeded')
+    super('Document rendering budget exceeded')
+  }
+}
+
+export const createHtmlRenderBudget = () => {
+  let iterations = 0
+  let parts = 0
+  let bytes = 0
+  const chargeBytes = (size: number): void => {
+    bytes += size
+    if (bytes > DOCX_MAX_RENDERED_BYTES) throw new DocumentRenderBudgetError()
+  }
+  return {
+    inspectTemplate: (template: string, depth: number): void => {
+      parts += 1
+      if (parts > DOCX_MAX_RENDER_PARTS || depth > DOCX_MAX_RENDER_DEPTH) throw new DocumentRenderBudgetError()
+      // Count source on each visit before repetition creates intermediate strings.
+      chargeBytes(Buffer.byteLength(template))
+    },
+    inspectSection: (count: number): void => {
+      iterations += count
+      if (iterations > DOCX_MAX_RENDER_ITERATIONS) throw new DocumentRenderBudgetError()
+    },
+    inspectValue: (text: string): void => chargeBytes(Buffer.byteLength(text) * 6)
   }
 }
 

@@ -25,10 +25,3 @@ export const correctionCollectionQuery = (db: Kysely<Database>, agreementId: str
     sql<boolean>`correction.egcs_fc_number::text ILIKE ${`%${escapeLikePattern(input.search!)}%`}`]))
   return query
 }
-
-export const correctionCsvCell = (value: unknown): string => {
-  const text = value === null || value === undefined ? '' : String(value)
-  // Spreadsheet formula-like authored text is exported as literal evidence.
-  const literal = /^[=+\-@\t\r]/.test(text) && !/^-?\d+(?:\.\d+)?$/.test(text) ? `'${text}` : text
-  return `"${literal.replace(/"/g, '""')}"`
-}

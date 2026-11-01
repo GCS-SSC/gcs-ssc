@@ -1,2 +1,2 @@
 #!/usr/bin/env sh
-exec flatpak run --filesystem=/tmp org.libreoffice.LibreOffice "$@"
+exec flatpak run --die-with-parent --filesystem=/tmp org.libreoffice.LibreOffice "$@"

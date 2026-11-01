@@ -3,10 +3,9 @@ import Docxtemplater from 'docxtemplater'
 import { DocumentConditionError, evaluateDocumentCondition, resolveDocumentConditionPath } from './document-conditions'
 import { prepareWordConditionTags, type CompiledDocumentConditions } from './document-word-conditions'
 import { loadBoundedDocx } from './document-docx-budget'
-import { createDocumentRenderBudget } from './document-render-budget'
+import { createDocumentRenderBudget, createHtmlRenderBudget } from './document-render-budget'
 import puppeteer, { type Browser } from 'puppeteer'
-import libreOfficeConvert from 'libreoffice-convert'
-import { join } from 'node:path'
+import { convertLibreOfficeDocument } from './document-libreoffice'
 
 type Language_Preference = 'eng' | 'fra'
 
@@ -24,8 +23,6 @@ const fallbackValues: Record<Language_Preference, string> = {
 }
 export const DEFAULT_CHROMIUM_RENDER_BUDGET_MS = 30_000
 export const DEFAULT_CHROMIUM_CLEANUP_TIMEOUT_MS = 2_000
-export const DEFAULT_LIBREOFFICE_CONVERSION_TIMEOUT_MS = 30_000
-const localSofficeWrapper = join(process.cwd(), 'scripts', 'soffice-flatpak')
 let pdfBrowserPromise: Promise<Browser> | null = null
 const pdfBrowserWaiters = new Map<Promise<Browser>, number>()
 
@@ -33,12 +30,6 @@ export interface DocumentRenderingOptions {
   chromiumCleanupTimeoutMs?: number
   chromiumRenderBudgetMs?: number
   libreOfficeConversionTimeoutMs?: number
-}
-
-export interface LibreOfficeConversionOptions {
-  sofficeBinaryPaths?: string[]
-  temporaryDirectory?: string
-  timeoutMs?: number
 }
 
 const getTimeoutMs = (value: number | undefined, fallback: number): number =>
@@ -90,14 +81,6 @@ const awaitWithinRenderBudget = async <T>(
   getRemainingRenderBudgetMs(deadline, totalBudgetMs),
   `Chromium document rendering timed out after ${String(totalBudgetMs)} ms`
 )
-
-export const resolveSofficeBinaryPaths = (): string[] => {
-  if (process.env.LIBREOFFICE_SOFFICE_PATH) {
-    return [process.env.LIBREOFFICE_SOFFICE_PATH]
-  }
-
-  return [localSofficeWrapper]
-}
 
 export const getFallbackValue = (language: Language_Preference = 'eng'): string => fallbackValues[language]
 
@@ -157,18 +140,26 @@ const escapeHtml = (value: string): string => value
 const renderHtmlTemplate = (
   template: string,
   context: Record<string, unknown>,
-  language: Language_Preference = 'eng'
+  language: Language_Preference = 'eng',
+  budget = createHtmlRenderBudget(),
+  depth = 1
 ): string => {
+  budget.inspectTemplate(template, depth)
   const withLoops = template.replace(/\{\{\s*#\s*([\w.]+)\s*}}([\s\S]*?)\{\{\s*\/\s*\1\s*}}/g, (_match, key: string, body: string) => {
     const values = getPathValue(context, key)
     if (!Array.isArray(values) || values.length === 0) {
       return ''
     }
 
-    return values.map(item => renderHtmlTemplate(body, { ...context, this: item }, language)).join('')
+    budget.inspectSection(values.length)
+    return values.map(item => renderHtmlTemplate(body, { ...context, this: item }, language, budget, depth + 1)).join('')
   })
 
-  return withLoops.replace(/\{\{\s*([\w.]+)\s*}}/g, (_match, key: string) => escapeHtml(valueOrFallback(getPathValue(context, key), language)))
+  return withLoops.replace(/\{\{\s*([\w.]+)\s*}}/g, (_match, key: string) => {
+    const text = valueOrFallback(getPathValue(context, key), language)
+    budget.inspectValue(text)
+    return escapeHtml(text)
+  })
 }
 
 export const normalizeDocumentTemplateTags = (xml: string): string => xml
@@ -382,75 +373,6 @@ const renderPdfFromHtml = async (
     throw new Error('Chromium document rendering returned no document bytes')
   }
   return renderedPdf
-}
-
-export const convertLibreOfficeDocument = async (
-  bytes: Buffer,
-  options: LibreOfficeConversionOptions = {}
-): Promise<Buffer> => {
-  type ConvertOptions = Parameters<typeof libreOfficeConvert.convertWithOptions>[3] & {
-    execOptions: {
-      killSignal: NodeJS.Signals
-      timeout: number
-    }
-  }
-  const convertOptions: ConvertOptions = {
-    fileName: 'source.docx',
-    sofficeBinaryPaths: options.sofficeBinaryPaths ?? resolveSofficeBinaryPaths(),
-    execOptions: {
-      killSignal: 'SIGKILL',
-      timeout: getTimeoutMs(options.timeoutMs, DEFAULT_LIBREOFFICE_CONVERSION_TIMEOUT_MS)
-    },
-    ...(options.temporaryDirectory ? { tmpOptions: { dir: options.temporaryDirectory } } : {})
-  }
-  let conversionError: unknown
-  let convertedPdf: Buffer | undefined
-  let finishCallback: (() => void) | undefined
-  const callbackFinished = new Promise<void>(resolve => {
-    finishCallback = resolve
-  })
-  // libreoffice-convert's declaration says void, but its runtime returns the async.auto
-  // promise whose finalizer removes both temporary directories. Await it so cleanup
-  // completes before the authorization transaction can settle.
-  const convertWithPromise = libreOfficeConvert.convertWithOptions as unknown as (
-    document: Buffer,
-    format: string,
-    filter: string | undefined,
-    inputOptions: ConvertOptions,
-    callback: (error: NodeJS.ErrnoException | null, data: Buffer) => void
-  ) => unknown
-  const conversionOperation = convertWithPromise(
-    bytes,
-    'pdf',
-    undefined,
-    convertOptions,
-    (error, pdf) => {
-      conversionError = error ?? undefined
-      convertedPdf = error ? undefined : pdf
-      finishCallback?.()
-    }
-  )
-
-  await callbackFinished
-  if (conversionOperation && typeof (conversionOperation as PromiseLike<unknown>).then === 'function') {
-    try {
-      await conversionOperation
-    } catch (cleanupError: unknown) {
-      if (conversionError === undefined) {
-        throw cleanupError
-      }
-      console.error('Failed to clean up temporary LibreOffice conversion files.', {
-        error: getErrorMessage(cleanupError)
-      })
-    }
-  }
-  if (conversionError !== undefined) {
-    throw conversionError
-  }
-  if (!convertedPdf) {
-    throw new Error('LibreOffice conversion returned no document bytes')
-  }
-  return convertedPdf
 }
 
 const convertDocxToPdf = async (bytes: Buffer, options: DocumentRenderingOptions): Promise<Buffer> => {

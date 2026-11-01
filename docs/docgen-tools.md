@@ -39,3 +39,5 @@ PUPPETEER_BROWSER=chrome-headless-shell@stable bun run bun:docgen:install
 ```
 
 This still relies on normal Linux runtime libraries being present in WSL/Linux, but it avoids a system-wide LibreOffice or Chrome install.
+
+Native conversion runs each render in a private temporary directory/profile and a dedicated POSIX process group. The host terminates that group at its deadline and before releasing render admission. The bundled Flatpak fallback uses `--die-with-parent`; custom `LIBREOFFICE_SOFFICE_PATH` wrappers must keep descendants in the group or provide equivalent containment. Native Windows conversion is unsupported; use WSL.

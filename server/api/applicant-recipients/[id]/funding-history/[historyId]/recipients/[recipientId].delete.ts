@@ -25,6 +25,11 @@ export default defineEventHandler(async event => {
     const context = await requireFreshAuthContext(event, trx)
     await assertFundingHistoryExistsForRecipient(event, historyId, applicantRecipientId, trx, true)
     const currentRecipientIds = await listFundingHistoryRecipientIds(historyId, trx)
+    // Serialize exact-assignment checks with Proponent roster changes.
+    await trx.selectFrom('Applicant_Recipient_Profile')
+      .where('id', 'in', currentRecipientIds)
+      .where('_deleted', '=', false)
+      .select('id').orderBy('id').forUpdate().execute()
     await authorizeWithFreshAuthContext(event, context, 'applicant_recipient', 'update', async () => {
       await assertFundingHistoryRecipientAccess(event, context, currentRecipientIds, 'update', trx)
       return { bypass: true }

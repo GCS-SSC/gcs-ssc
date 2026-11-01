@@ -1,9 +1,10 @@
+import type { CorrectionExport } from '~~/shared/types/schemas/correction-export'
 import { majorMoneyText } from '~~/shared/utils/money'
-import { defineEventHandler, getRouterParam, setHeader } from 'h3'
+import { defineEventHandler, getRouterParam } from 'h3'
 import { useTranslation } from '@intlify/h3'
 import { authorizeCorrectionAgreement, readCorrectionLines } from '~~/server/utils/correction'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { correctionCollectionQuery, CorrectionCollectionQuerySchema, correctionCsvCell } from '~~/server/utils/correction-reporting'
+import { correctionCollectionQuery, CorrectionCollectionQuerySchema } from '~~/server/utils/correction-reporting'
 import { resolveRequestLocale } from '~~/server/utils/request-locale'
 import { formatCorrectionReference } from '~~/shared/utils/correction'
 
@@ -14,18 +15,16 @@ export default defineEventHandler(async event => {
   const rows = await correctionCollectionQuery(event.context.$db, agreementId, input).selectAll('correction').orderBy('correction.id').execute()
   const french = resolveRequestLocale(event) === 'fr'
   const t = await useTranslation(event)
-  const csv: unknown[][] = [['reference', 'outcome', 'fiscal_year', 'line', 'currency', 'adjustment', 'rationale', 'creator', 'decision_actor', 'decision_date', 'posting_runtime']
-    .map(key => t(`correction.export.${key}`))]
+  const fields = ['reference', 'outcome', 'fiscal_year', 'line', 'currency', 'adjustment', 'rationale', 'creator', 'decision_actor', 'decision_date', 'posting_runtime'].map(key => t(`correction.export.${key}`))
+  const data: CorrectionExport['data'] = []
   for (const row of rows) {
     for (const line of await readCorrectionLines(event.context.$db, String(row.id))) {
       if (input.egcs_fc_agencyfiscalyear && String(line.egcs_fc_agencyfiscalyear) !== input.egcs_fc_agencyfiscalyear) continue
-      csv.push([formatCorrectionReference(row), t(`correction.outcomes.${row.egcs_fc_outcome}`),
-        line.egcs_fc_fiscalyeardisplay, line.egcs_fc_commitmentlinenumber, row.egcs_fc_currency,
+      data.push([formatCorrectionReference(row), t(`correction.outcomes.${row.egcs_fc_outcome}`),
+        line.egcs_fc_fiscalyeardisplay, String(line.egcs_fc_commitmentlinenumber), row.egcs_fc_currency,
         majorMoneyText(line.egcs_fc_adjustment), french ? row.egcs_fc_narrative_fr || row.egcs_fc_narrative_en : row.egcs_fc_narrative_en || row.egcs_fc_narrative_fr,
-        row.egcs_fc_createdby, row.egcs_fc_terminalby, row.egcs_fc_terminalat, row.egcs_fc_postingruntime])
+        row.egcs_fc_createdby, row.egcs_fc_terminalby, row.egcs_fc_terminalat instanceof Date ? row.egcs_fc_terminalat.toISOString() : row.egcs_fc_terminalat, row.egcs_fc_postingruntime])
     }
   }
-  setHeader(event, 'Content-Type', 'text/csv; charset=utf-8')
-  setHeader(event, 'Content-Disposition', 'attachment; filename="corrections.csv"')
-  return '\uFEFF' + csv.map(row => row.map(correctionCsvCell).join(',')).join('\r\n')
+  return { fields, data } satisfies CorrectionExport
 })
