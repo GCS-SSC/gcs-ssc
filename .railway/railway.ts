@@ -16,15 +16,15 @@ export default defineRailway((ctx) => {
   const accessDatabase = postgres('GCS Access DB', { region: 'us-east4-eqdc4a' })
   accessDatabase.deploy = { sleepApplication: true }
   accessDatabase.networking = { privateNetworkEndpoint: 'gcs-access-db' }
-  const accessVolume = volume('gcs-access-db-volume', { allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
-  accessDatabase.volumeAttachments = { 'gcs-access-db-volume': { volume: accessVolume.address, mountPath: '/var/lib/postgresql/data' } }
+  const accessVolume = volume('gcs-access-db-volume-clean-reset-20261101', { allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
+  accessDatabase.volumeAttachments = { 'gcs-access-db-volume-clean-reset-20261101': { volume: accessVolume.address, mountPath: '/var/lib/postgresql/data' } }
   const metabaseDatabase = postgres('Metabase DB', { region: 'us-east4-eqdc4a' })
   metabaseDatabase.deploy = { sleepApplication: true }
   metabaseDatabase.networking = { privateNetworkEndpoint: 'postgres-xwyo' }
   // The imported Metabase DB has no managed source in Railway. Keep its image unchanged.
   delete metabaseDatabase.source
-  const freshPostgresVolume = volume('gcs-db-volume-queues-reset-20261023', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
-  database.volumeAttachments = { 'gcs-db-volume-queues-reset-20261023': { volume: freshPostgresVolume.address, mountPath: '/var/lib/postgresql/data' } }
+  const freshPostgresVolume = volume('gcs-db-volume-clean-reset-20261101', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
+  database.volumeAttachments = { 'gcs-db-volume-clean-reset-20261101': { volume: freshPostgresVolume.address, mountPath: '/var/lib/postgresql/data' } }
   const gcsSscVolume = volume('gcs-ssc-volume', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
   const metabaseVolume = volume('postgres-volume-4aPn', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
   const portalVolume = volume('portal-db-volume', { allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
@@ -38,7 +38,7 @@ export default defineRailway((ctx) => {
     replicas: { 'us-east4-eqdc4a': 1 },
     deploy: { healthcheckPath: '/api/health', healthcheckTimeout: 300, sleepApplication: true, limitOverride: { containers: { cpu: 8, memoryBytes: 8000000000 } } },
     volumeMounts: { '/app/.data': gcsSscVolume },
-    env: { DATABASE_URL: preserve(), GCS_ACCESS_DATABASE_URL: accessDatabase.env.DATABASE_URL, BETTER_AUTH_SECRET: preserve(), BETTER_AUTH_TRUSTED_ORIGINS: preserve(), BETTER_AUTH_URL: preserve(), ENVIRONMENT_TYPE: 'demo', GCS_EXTENSION_SECRETS_KEY: preserve(), RAILWAY_RUN_UID: preserve() }
+    env: { DATABASE_URL: preserve(), GCS_ACCESS_DATABASE_URL: accessDatabase.env.DATABASE_URL, GCS_ACCESS_RETENTION_DAYS: '7', GCS_QUEUE_LEVEL_0_ENABLED: 'false', GCS_QUEUE_LEVEL_1_ENABLED: 'false', GCS_QUEUE_LEVEL_2_ENABLED: 'true', GCS_QUEUE_LEVEL_3_ENABLED: 'true', BETTER_AUTH_SECRET: preserve(), BETTER_AUTH_TRUSTED_ORIGINS: preserve(), BETTER_AUTH_URL: preserve(), ENVIRONMENT_TYPE: 'demo', GCS_EXTENSION_SECRETS_KEY: preserve(), RAILWAY_RUN_UID: preserve() }
   })
   const metabase = service('Metabase', {
     source: image('metabase/metabase'),

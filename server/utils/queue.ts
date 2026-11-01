@@ -12,9 +12,12 @@ const currentCycleSql = (cadenceMs: number) =>
   sql<Date>`to_timestamp(floor(extract(epoch from statement_timestamp()) * 1000 / ${cadenceMs}) * ${cadenceMs} / 1000)`
 
 /** Publishes shared aligned cycles; new subscriptions join the next future beat. */
-export const prepareQueueSchedules = async (db: Kysely<Database>, handlers: ClusterQueueHandler[]): Promise<void> => {
+export const prepareQueueSchedules = async (
+  db: Kysely<Database>, handlers: ClusterQueueHandler[], levels: ReadonlyArray<typeof QUEUE_LEVELS[number]> = QUEUE_LEVELS
+): Promise<void> => {
+  if (!levels.length) return
   await withoutAccessLogCapture(() => db.transaction().execute(async trx => {
-    for (const definition of QUEUE_LEVELS) {
+    for (const definition of levels) {
       const cycle = currentCycleSql(definition.cadenceMs)
       await trx.insertInto('background_queue_schedule').values({
         queue_level: definition.level,
@@ -39,7 +42,7 @@ export const prepareQueueSchedules = async (db: Kysely<Database>, handlers: Clus
           AND (background_queue_handler.lease_owner IS NULL
             OR background_queue_handler.lease_expires_at <= clock_timestamp())`.execute(trx)
     }
-    for (const definition of QUEUE_LEVELS) {
+    for (const definition of levels) {
       const cycle = currentCycleSql(definition.cadenceMs)
       await trx.updateTable('background_queue_schedule').set({
         current_cycle_at: cycle,

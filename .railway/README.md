@@ -6,13 +6,13 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Access history: separate `GCS Access DB` PostgreSQL service with its own
-  `gcs-access-db-volume`; the app references its private `DATABASE_URL` through
+  `gcs-access-db-volume-clean-reset-20261101`; the app references its private `DATABASE_URL` through
   `GCS_ACCESS_DATABASE_URL`. Applying this change provisions that service and
   requires reviewing the plan before deployment. Existing access rows in the
   business database are not automatically moved. The business database, Portal,
   Metabase and existing volumes retain their identities.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-queues-reset-20261023` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-clean-reset-20261101` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -103,6 +103,68 @@ Update this configuration to match the live replacement before
 the next IaC apply. Verify the live attachment independently: Railway's plan
 readback can omit the former database attachment. Preserve the application
 attachment volume, Portal volume, and Metabase volume.
+
+### 2026-11-01 clean reset and queue controls
+
+The authorized clean cutover replaced only GCS business and access-history storage.
+The active image is
+`ghcr.io/gcs-ssc/gcs-ssc-demo@sha256:342e5695cea864ebbbbff3db6bacccd284175121d3fcf43e0e561dd6aa63e00f`.
+It contains main `980d92559181234cf4c0e6d5a3ea3b90ffc722b0` plus the local,
+uncommitted queue-level configuration changes. The image was built locally with
+the canonical Dockerfile and demo/RDS build arguments, passed the complete
+container smoke check, and was published under
+`queue-levels-980d9255-railway-20261101`; an anonymous digest pull passed.
+Deployment `8615386a-c7b3-4272-9d3f-8d8e3a98e24a` reached `SUCCESS`.
+The preceding clean-main deployment `1fe477e5-8f81-45b8-a5d8-13a7f12107d9`
+also reached `SUCCESS` before the queue-only rollout and is now removed.
+
+The earlier GitHub build
+[41336250171](https://github.com/GCS-SSC/gcs-ssc/actions/runs/41336250171)
+built successfully but did not publish: its private smoke check still expected
+Payment amounts in major units. The local verifier now checks the seeded minor-unit
+amounts `2100000` and `1000000`, preserving the same CAD 21,000/CAD 10,000 examples.
+
+The new 5000 MB volumes, both mounted at `/var/lib/postgresql/data`, are:
+
+- `gcs-db-volume-clean-reset-20261101`
+  (`9160d3c2-c9ce-4ef0-8542-ee42eed1656c`), on GCS DB;
+  deployment `e0432dc1-62f6-4fa2-b573-3cea37ad6c3e` reached `SUCCESS`.
+- `gcs-access-db-volume-clean-reset-20261101`
+  (`8b7abde2-fcdf-4b1f-9835-5b5b3e85acb1`), on GCS Access DB;
+  deployment `b452a977-935e-46f4-b4d0-4d612870913f` reached `SUCCESS`.
+
+Their former volumes `d1719894-5251-48ff-a90a-59091fc74e26` and
+`40802d7e-28db-4063-9ee2-edadd845bdea` were explicitly detached and marked
+pending deletion; physical deletion has not been observed. The old access store
+contained 2,719,854 events and filled its volume. After cutover, the active access
+volume used 66 MB (2%) and its database was approximately 8.7 MiB.
+The app attachment volume `694b3ed2-c5ec-4eac-aa84-8188d9322c13`, Portal volume
+`87fb3dc0-ad6b-4ed8-ad49-3e21031445d3`, Metabase volume
+`a1710bdf-1f9a-4d63-831a-83911e2c6ab5`, and all Portal/Metabase deployments
+retained their prior identities.
+
+Runtime readback confirmed `GCS_ACCESS_RETENTION_DAYS=7` and explicit
+`GCS_QUEUE_LEVEL_0_ENABLED=false`, `GCS_QUEUE_LEVEL_1_ENABLED=false`,
+`GCS_QUEUE_LEVEL_2_ENABLED=true`, `GCS_QUEUE_LEVEL_3_ENABLED=true`.
+The disabled levels' schedule timestamps and handler-state digest stayed unchanged
+across repeated live checks after the final deployment. Levels 2/3 remain enabled
+with their next boundary at 19:00 UTC. This removes frequent queue database polling;
+actual Railway sleep still depends on the absence of other network traffic.
+Level 0 disablement permits access-buffer loss, and Level 1 disablement pauses
+notifications, Portal sync and file cleanup. See the
+[queue deployment switches](../tooling/gcs-ssc/architecture/queues.md#deployment-switches).
+
+Public readiness, real demo login, English/French pages and NCIA's thirteen
+Agreements passed. Payments 168/172 retained terminal Paid status and their exact
+minor-unit amounts. All 28 seeded bilingual template files matched their recorded
+sizes on the retained attachment volume. Claim-based and unspent-advance Receivable
+creation/read passed; verification drafts 10139/10140 were soft-deleted afterward.
+The fresh database contains `Agency_Catalog_Revision`, `Agency_Field_Tooltip` and
+`9999_seed`. Configuration/shared-image checks passed (25 tests), and the queue
+change passed full lint, full typecheck, 297 queue tests with coverage, and 19 real
+PostgreSQL tests. No repository commits were made.
+
+### Earlier cutovers
 
 The 2026-10-23 queue release uses runtime source
 `60e553f4037c91040ef4fb18c2dca851995a56d2` and public image

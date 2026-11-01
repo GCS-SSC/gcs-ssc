@@ -9,8 +9,12 @@ import { prepareQueueSchedules, runQueueHandler } from '../utils/queue'
 import { getRegisteredQueueHandlers, getQueueEnabledExtensionKeys } from '../utils/queue-registry'
 import type { HostQueueContext } from '../utils/queue-registry'
 import { runProcessQueueHandler } from '../utils/queue-process'
+import { queuePollDelayMs, resolveEnabledQueueLevels } from '../utils/queue-config'
 
 export default defineNitroPlugin(app => {
+  const levels = resolveEnabledQueueLevels()
+  if (!levels.length) return
+  const enabled = (level: number) => levels.some(definition => definition.level === level)
   const running = new Map<string, Promise<void>>()
   let lease: DatabaseLease | undefined
   let stopped = false
@@ -39,9 +43,11 @@ export default defineNitroPlugin(app => {
     const db = currentLease.database
     await activateEnabledExtensionNitroPlugins(db, app, await getRegisteredExtensions())
     const handlers = getRegisteredQueueHandlers(app).filter(handler => handler.executionScope !== 'process')
+      .filter(handler => enabled(handler.queueLevel))
+    if (!handlers.length) return
     const enabledKeys = await withoutAccessLogCapture(() => getQueueEnabledExtensionKeys(db))
     if (stopped) return
-    await prepareQueueSchedules(db, handlers)
+    await prepareQueueSchedules(db, handlers, levels)
     if (stopped) return
     const context: HostQueueContext = {
       db,
@@ -67,7 +73,7 @@ export default defineNitroPlugin(app => {
   const poll = (): void => withSystemAudit(() => {
     if (stopped) return
     for (const handler of getRegisteredQueueHandlers(app)) {
-      if (handler.executionScope !== 'process' || running.has(handler.id)) continue
+      if (!enabled(handler.queueLevel) || handler.executionScope !== 'process' || running.has(handler.id)) continue
       const work = runProcessQueueHandler(handler, app).then(() => {})
         .catch(error => console.error(`Process queue dispatch failed: ${handler.id}`, error))
         .finally(() => { running.delete(handler.id) })
@@ -77,7 +83,7 @@ export default defineNitroPlugin(app => {
       active = tickCluster().catch(error => console.error('Queue tick failed', error))
         .finally(() => { active = undefined })
     }
-    timer = setTimeout(poll, 5000)
+    timer = setTimeout(poll, queuePollDelayMs(levels, Date.now()))
     timer.unref?.()
   })
 
