@@ -136,6 +136,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
     accountReceivablePayees?: Array<{ applicantRecipientId: string; currency: Currency_Codes }>
     accountReceivableReadOnly?: boolean
     paymentRecovery?: boolean
+    relatedAgreementId?: string
   } = {}
 ): Promise<T> => {
   let lockContext = initialContext
@@ -147,11 +148,20 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
       return await db.transaction().execute(async trx => {
         // Global protected-write order starts with the caller's grant graph.
         const authContext = await requireFreshAuthContext(event, trx, { lockUserIds: options.lockUserIds })
-        await lockRegisteredExtensionAgreementScopes(
-          trx,
-          lockContext.agencyId,
-          [lockContext.streamId]
-        )
+        const relatedContext = options.relatedAgreementId
+          ? await resolveAgreementScopeContext(options.relatedAgreementId, trx)
+          : null
+        if (options.relatedAgreementId && (!relatedContext || relatedContext.agencyId !== lockContext.agencyId)) {
+          return await throwApiError(event, {
+            statusCode: 400,
+            code: 'INVALID_AGREEMENT_RELATIONSHIP',
+            key: 'apiErrors.agreement.invalid_relationship'
+          })
+        }
+        const streamIds = relatedContext
+          ? [...new Set([lockContext.streamId, relatedContext.streamId])]
+          : [lockContext.streamId]
+        await lockRegisteredExtensionAgreementScopes(trx, lockContext.agencyId, streamIds)
         const agency = await trx
           .selectFrom('Agency_Profile')
           .select('id')
@@ -159,7 +169,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
           .where('_deleted', '=', false)
           .forShare('Agency_Profile')
           .executeTakeFirst()
-        const lockedStreams = await lockTransferPaymentStreams(trx, [lockContext.streamId])
+        const lockedStreams = await lockTransferPaymentStreams(trx, streamIds)
         if (!lockedStreams.has(lockContext.streamId)) {
           return await throwApiError(event, {
             statusCode: 404,
@@ -186,6 +196,17 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
           currentStreamId: lockContext.streamId,
           targetStreamIds: [lockContext.streamId]
         })
+
+        if (options.relatedAgreementId) {
+          // Reciprocal links take every scope and Agreement lock in the same order.
+          await trx.selectFrom('Funding_Case_Agreement_Profile').select('id')
+            .where('id', 'in', [agreementId, options.relatedAgreementId])
+            .where('_deleted', '=', false).orderBy('id').forUpdate().execute()
+          const currentRelatedContext = await resolveAgreementScopeContext(options.relatedAgreementId, trx)
+          if (!relatedContext || !currentRelatedContext || !agreementScopeMatches(relatedContext, currentRelatedContext)) {
+            throw new AgreementWriteScopeChanged(lockContext)
+          }
+        }
 
         const lockedAgreement = await lockAgreementProfileForUpdate(trx, agreementId)
         if (!lockedAgreement) {

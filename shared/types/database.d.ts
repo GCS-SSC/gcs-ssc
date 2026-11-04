@@ -340,6 +340,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Commitment_Type: AgencyCommitmentTypeTable
   Agency_Monitor_Type: AgencyMonitorTypeTable
   Agency_Document_Template: AgencyDocumentTemplateTable
+  Agency_Agreement_Relationship_Type: AgencyAgreementRelationshipTypeTable
   Agency_Address_Type: AgencyAddressTypeTable
   Agency_Applicant_Recipient_Subtype: AgencyApplicantRecipientSubtypeTable
   Agency_Approval_Behalf_Type: AgencyApprovalBehalfTypeTable
@@ -377,6 +378,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Revision: FundingCaseAgreementRevisionTable
   Funding_Case_Agreement_Approval_Submission: FundingCaseAgreementApprovalSubmissionTable
   Funding_Case_Agreement_Applicant_Recipient: FundingCaseAgreementApplicantRecipientTable
+  Funding_Case_Agreement_Relationship: FundingCaseAgreementRelationshipTable
   Funding_Case_Agreement_Address: FundingCaseAgreementAddressTable
   Funding_Case_Agreement_Budget_Fiscal_Year: FundingCaseAgreementBudgetFiscalYearTable
   Funding_Case_Agreement_Budget_Line_Item: FundingCaseAgreementBudgetLineItemTable
@@ -1487,6 +1489,7 @@ export interface FundingCaseAgreementAddressTable {
   egcs_fc_fundingagreement: string
   egcs_fc_addresstype: string
   egcs_fc_address: string
+  egcs_fc_description: string | null
   _deleted: Generated<boolean>
 }
 
@@ -2926,5 +2929,22 @@ export interface CommonNotificationTable {
   egcs_cn_updated: Generated<Date>
   egcs_cn_firstsendat?: Date | null
   egcs_cn_completedat?: Date | null
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyAgreementRelationshipTypeTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_typename_en: string
+  egcs_ay_typename_fr: string
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementRelationshipTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_relatedagreement: string
+  egcs_fc_relationshiptype: string
+  egcs_fc_description: string | null
   _deleted: Generated<boolean>
 }

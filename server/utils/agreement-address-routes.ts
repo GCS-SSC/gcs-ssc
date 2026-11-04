@@ -172,7 +172,7 @@ export const patchAgreementAddress = async (
     }
   }
 
-  const { egcs_fc_addresstype: addressTypeId, ...addressValues } = values
+  const { egcs_fc_addresstype: addressTypeId, egcs_fc_description: description, ...addressValues } = values
 
   let hasAddressChanges = false
   if (Object.keys(addressValues).length) {
@@ -214,10 +214,13 @@ export const patchAgreementAddress = async (
     }
   }
 
-  if (addressTypeId) {
+  if (addressTypeId !== undefined || description !== undefined) {
     await db
       .updateTable('Funding_Case_Agreement_Address')
-      .set({ egcs_fc_addresstype: String(addressTypeId) })
+      .set({
+        egcs_fc_addresstype: validated.egcs_fc_addresstype,
+        egcs_fc_description: validated.egcs_fc_description
+      })
       .where('id', '=', childId)
       .where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false)

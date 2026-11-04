@@ -5,7 +5,7 @@ export type AgreementChildActionTarget =
   | { kind: 'agreement'; agreementId: string }
   | { kind: 'amendment'; agreementId: string; amendmentId: string }
 export type AgreementChildAction = 'create' | 'update' | 'delete'
-export type AgreementChildArea = 'activity' | 'budget-line' | 'budget-year' | 'address' | 'proponent-relationship' | 'profile' | 'note'
+export type AgreementChildArea = 'activity' | 'budget-line' | 'budget-year' | 'address' | 'proponent-relationship' | 'profile' | 'note' | 'agreement-relationship'
 
 type AmendmentPrerequisites = {
   egcs_fc_status: string
@@ -64,7 +64,7 @@ export const useAgreementChildActionPrerequisites = (target: MaybeRefOrGetter<Ag
           : action === 'create' ? record.can_create_child_records : action === 'update' ? record.can_update_child_records : record.can_delete_child_records
         if (role === true && capability === true && status && !status.deleted && !status.readOnly && !status.terminal && record.isCompleted !== true) return true
       } else {
-        if (area === 'address' || area === 'proponent-relationship' || area === 'profile' || area === 'note') {
+        if (area === 'agreement-relationship' || area === 'address' || area === 'proponent-relationship' || area === 'profile' || area === 'note') {
           if (shouldProceed()) warn()
           return false
         }

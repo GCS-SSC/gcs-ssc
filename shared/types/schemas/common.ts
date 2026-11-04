@@ -10,6 +10,12 @@ import {
 
 export type WithId<T> = T & { id: string }
 
+/** Optional short user-facing text; empty strings explicitly clear an existing description. */
+export const OptionalShortDescriptionSchema = z.string().trim()
+  .max(255, { error: 'validation.max_length' })
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+  .nullable().optional()
+
 /**
  * Creates a required string ID schema that normalizes numeric IDs to strings.
  *

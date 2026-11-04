@@ -18,6 +18,18 @@ CREATE TABLE "Agency_Catalog_Revision" (
   CONSTRAINT ay_chk_catalogrevisionactive CHECK (NOT _deleted)
 );
 
+CREATE TABLE "Agency_Agreement_Relationship_Type" (
+  id bigserial CONSTRAINT ay_pk_agreement_relationship_type PRIMARY KEY,
+  egcs_ay_organizationagency bigint NOT NULL,
+  egcs_ay_typename_en varchar(255) NOT NULL,
+  egcs_ay_typename_fr varchar(255) NOT NULL,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_chk_agreement_relationship_type_name_en CHECK (length(btrim(egcs_ay_typename_en)) > 0),
+  CONSTRAINT ay_chk_agreement_relationship_type_name_fr CHECK (length(btrim(egcs_ay_typename_fr)) > 0)
+);
+CREATE UNIQUE INDEX ay_uq_agreement_relationship_type_name_en ON "Agency_Agreement_Relationship_Type" (egcs_ay_organizationagency, lower(btrim(egcs_ay_typename_en))) WHERE NOT _deleted;
+CREATE UNIQUE INDEX ay_uq_agreement_relationship_type_name_fr ON "Agency_Agreement_Relationship_Type" (egcs_ay_organizationagency, lower(btrim(egcs_ay_typename_fr))) WHERE NOT _deleted;
+
 CREATE SEQUENCE "Agency_Account_Receivable_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Agency_Address_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
@@ -737,6 +749,7 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+ALTER TABLE "Agency_Agreement_Relationship_Type" ADD CONSTRAINT ay_fk_agreement_relationship_type_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Catalog_Revision" ADD CONSTRAINT ay_fk_catalogrevisionagency FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Account_Receivable_Type" ADD CONSTRAINT "Agency_Account_Receivable_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 

@@ -51,12 +51,14 @@ const beforeDelete = async (_id: string, current: () => boolean) => {
 }
 
 const { items: jurisdictionItems } = useEnumSelectOptions({ name: 'jurisdiction' })
+const initialNewItem: FundingCaseAgreementAddressForm = { egcs_cn_addresscountry: 'ca' }
 
 const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
   { id: 'address_type_name', accessorKey: 'address_type_name_en', headerKey: 'agreement.addresses.address_type' },
   { accessorKey: 'egcs_cn_street1', headerKey: 'admin_common.fields.egcs_cn_street1' },
   { accessorKey: 'egcs_cn_addresscity', headerKey: 'admin_common.fields.egcs_cn_addresscity' },
   { accessorKey: 'egcs_cn_postalcodezipcode', headerKey: 'admin_common.fields.egcs_cn_postalcodezipcode' },
+  { id: 'egcs_fc_description', accessorKey: 'egcs_fc_description', headerKey: 'common.description' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -137,7 +139,9 @@ const getAddressTypeLookupUrl = (state: FundingCaseAgreementAddressForm) => {
     :before-open="beforeOpen"
     :before-save="beforeSave"
     :before-delete="beforeDelete"
+    :modal-ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] overflow-y-auto' }"
     :schema="FundingCaseAgreementAddressCreateSchema"
+    :initial-new-item="initialNewItem"
     :columns="columns"
     :bilingual-columns="bilingualColumns"
     :button-label="t('common.add')"
@@ -146,62 +150,67 @@ const getAddressTypeLookupUrl = (state: FundingCaseAgreementAddressForm) => {
     :update-title="t('agreement.addresses.edit')"
     :search-placeholder="t('agreement.addresses.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.addresses-tab" data-scope-label-en="Agreements > Addresses" data-scope-label-fr="Ententes > Adresses" data-help-view="agreement.addresses" data-help-label-en="Agreements — Addresses" data-help-label-fr="Ententes — Adresses" data-help-target="agreement.addresses.content" data-help-kind="section" help-save-target="agreement.addresses.save" help-add-target="agreement.addresses.add" help-search-target="agreement.addresses.search">
     <template #form="{ state }">
-      <UFormField :label="t('agreement.addresses.address_type')" name="egcs_fc_addresstype">
-        <CommonServerLookupSelect
-          :model-value="(state as FundingCaseAgreementAddressForm).egcs_fc_addresstype"
-          :fetch-url="getAddressTypeLookupUrl(state as FundingCaseAgreementAddressForm)"
-          :query="state.id ? { address_id: String(state.id) } : {}"
-          selected-values-query-key="selected_ids"
-          value-key="id"
-          label-en-key="label_en"
-          label-fr-key="label_fr"
-          searchable
-          @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_fc_addresstype = value as string | undefined" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_street1')" name="egcs_cn_street1">
-        <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_street1 ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_street1 = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_street2')" name="egcs_cn_street2">
-        <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_street2 ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_street2 = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_street3')" name="egcs_cn_street3">
-        <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_street3 ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_street3 = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_addresscity')" name="egcs_cn_addresscity">
-        <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_addresscity ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_addresscity = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_addresscountry')" name="egcs_cn_addresscountry">
-        <CommonEnumSelect
-          :model-value="(state as FundingCaseAgreementAddressForm).egcs_cn_addresscountry"
-          name="countries"
-          @update:model-value="value => updateAddressCountry(state as FundingCaseAgreementAddressForm, value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_addresssubdivision')" name="egcs_cn_addresssubdivision">
-        <CommonEnumSelect
-          v-if="isCanadianAddress(state as FundingCaseAgreementAddressForm)"
-          v-model="(state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision"
-          name="jurisdiction"
-          :items="jurisdictionItems" />
-        <UInput
-          v-else
-          :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision ?? '')"
-          @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_gcaddressid')" name="egcs_cn_gcaddressid">
-        <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gcaddressid')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gcaddressid', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_federalridingid')" name="egcs_cn_federalridingid">
-        <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_federalridingid')" type="number" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_federalridingid', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_mainphone')" name="egcs_cn_mainphone">
-        <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphone')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphone', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_mainphoneextension')" name="egcs_cn_mainphoneextension">
-        <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphoneextension')" type="number" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphoneextension', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_postalcodezipcode')" name="egcs_cn_postalcodezipcode">
-        <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_postalcodezipcode ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_postalcodezipcode = value" />
-      </UFormField>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <UFormField :label="t('agreement.addresses.address_type')" name="egcs_fc_addresstype">
+          <CommonServerLookupSelect
+            :model-value="(state as FundingCaseAgreementAddressForm).egcs_fc_addresstype"
+            :fetch-url="getAddressTypeLookupUrl(state as FundingCaseAgreementAddressForm)"
+            :query="state.id ? { address_id: String(state.id) } : {}"
+            selected-values-query-key="selected_ids"
+            value-key="id"
+            label-en-key="label_en"
+            label-fr-key="label_fr"
+            searchable
+            @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_fc_addresstype = value as string | undefined" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_addresscountry')" name="egcs_cn_addresscountry">
+          <CommonEnumSelect
+            :model-value="(state as FundingCaseAgreementAddressForm).egcs_cn_addresscountry"
+            name="countries"
+            @update:model-value="value => updateAddressCountry(state as FundingCaseAgreementAddressForm, value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_street1')" name="egcs_cn_street1">
+          <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_street1 ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_street1 = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_street2')" name="egcs_cn_street2">
+          <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_street2 ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_street2 = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_street3')" name="egcs_cn_street3">
+          <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_street3 ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_street3 = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_addresscity')" name="egcs_cn_addresscity">
+          <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_addresscity ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_addresscity = value" />
+        </UFormField>
+        <UFormField :label="t('agreement.addresses.subdivision')" name="egcs_cn_addresssubdivision">
+          <CommonEnumSelect
+            v-if="isCanadianAddress(state as FundingCaseAgreementAddressForm)"
+            v-model="(state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision"
+            name="jurisdiction"
+            :items="jurisdictionItems" />
+          <UInput
+            v-else
+            :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision ?? '')"
+            @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_gcaddressid')" name="egcs_cn_gcaddressid">
+          <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gcaddressid')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gcaddressid', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_federalridingid')" name="egcs_cn_federalridingid">
+          <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_federalridingid')" type="number" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_federalridingid', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_mainphone')" name="egcs_cn_mainphone">
+          <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphone')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphone', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_mainphoneextension')" name="egcs_cn_mainphoneextension">
+          <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphoneextension')" type="number" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_mainphoneextension', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_postalcodezipcode')" name="egcs_cn_postalcodezipcode">
+          <UInput :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_postalcodezipcode ?? '')" @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_postalcodezipcode = value" />
+        </UFormField>
+        <UFormField class="md:col-span-2" :label="t('common.description')" name="egcs_fc_description">
+          <CommonTextarea v-model="(state as FundingCaseAgreementAddressForm).egcs_fc_description" :rows="2" :maxlength="255" />
+        </UFormField>
+      </div>
     </template>
   </CommonResourceCrud>
 </template>

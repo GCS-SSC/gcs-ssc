@@ -252,6 +252,20 @@ export const AgencyAddressTypeInitial: AgencyAddressTypeItem = {
   egcs_ay_typename_fr: ''
 }
 
+// --- Agreement Relationship Type ---
+export const AgencyAgreementRelationshipTypeSchema = z.object({
+  egcs_ay_typename_en: AgencyLabelSchema('validation.type_en_required'),
+  egcs_ay_typename_fr: AgencyLabelSchema('validation.type_fr_required')
+})
+export type AgencyAgreementRelationshipType = z.infer<typeof AgencyAgreementRelationshipTypeSchema>
+export type AgencyAgreementRelationshipTypeItem = WithId<AgencyAgreementRelationshipType>
+
+export const AgencyAgreementRelationshipTypeInitial: AgencyAgreementRelationshipTypeItem = {
+  id: '',
+  egcs_ay_typename_en: '',
+  egcs_ay_typename_fr: ''
+}
+
 // --- Applicant/Recipient Subtype ---
 export const AgencyApplicantRecipientSubtypeSchema = z.object({
   egcs_ay_applicantrecipienttype: z.enum(APPLICANT_RECIPIENT_TYPE_ENUM),

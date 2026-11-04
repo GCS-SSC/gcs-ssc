@@ -871,7 +871,8 @@
       "approval_templates": "Approval Templates",
       "workflow_setups": "Workflows",
       "review_schemas": "Review Schemas",
-      "account_receivable_types": "Receivable Types"
+      "account_receivable_types": "Receivable Types",
+      "agreement_relationship_types": "Agreement relationship types"
     },
     "monitor_types": {
       "receivable_eligible": "Allow receivable follow-ups",
@@ -1350,7 +1351,11 @@
       "account_receivable_chart_in_use": "This account is used by an accounts receivable and cannot be deleted.",
       "duplicate_account_receivable_type_name_en": "A receivable type with this English title already exists for the Agency.",
       "duplicate_account_receivable_type_name_fr": "A receivable type with this French title already exists for the Agency.",
-      "chart_in_use": "This accounting line is already in use and cannot be edited or deleted. Deactivate it to prevent new selections."
+      "chart_in_use": "This accounting line is already in use and cannot be edited or deleted. Deactivate it to prevent new selections.",
+      "agreement_relationship_type_not_found": "Agreement relationship type not found.",
+      "agreement_relationship_type_in_use": "This relationship type is used by an agreement.",
+      "duplicate_agreement_relationship_type_name_en": "An agreement relationship type with this English name already exists.",
+      "duplicate_agreement_relationship_type_name_fr": "An agreement relationship type with this French name already exists."
     },
     "admin_common": {
       "not_found": "Admin resource record not found.",
@@ -1543,7 +1548,10 @@
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
       "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
       "forecast_cell_occupied": "A forecast line already exists for this budget line and month.",
-      "forecast_breakdown_conflict": "The forecast breakdown changed. Reload the saved amounts to review your edits. Saving again will replace the saved amounts in your edited cells."
+      "forecast_breakdown_conflict": "The forecast breakdown changed. Reload the saved amounts to review your edits. Saving again will replace the saved amounts in your edited cells.",
+      "invalid_relationship": "Select another agreement in this agency and an available relationship type.",
+      "relationship_not_found": "Agreement relationship not found.",
+      "duplicate_relationship": "These agreements are already related."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
@@ -2625,7 +2633,8 @@
       "add": "Add Address",
       "edit": "Update Address",
       "search": "Search addresses",
-      "address_type": "Address type"
+      "address_type": "Address type",
+      "subdivision": "Subdivision/Province/Territory"
     },
     "financial_summary": {
       "title": "Financial Summary",
@@ -3273,6 +3282,19 @@
     "child_records": {
       "work_prerequisite": "You must be assigned to this record, and both it and its Agreement must remain editable, to make changes.",
       "create_prerequisite": "You must be assigned to this Agreement, and it must remain editable, to create a record."
+    },
+    "related_agreements": {
+      "title": "Related agreements",
+      "number": "Agreement #",
+      "program": "Program",
+      "stream": "Stream",
+      "agreement_title": "Title",
+      "agreement": "Agreement",
+      "relationship_type": "Relationship type",
+      "add": "Add related agreement",
+      "edit": "Edit agreement relationship",
+      "search": "Search related agreements",
+      "remove_confirm": "Remove this relationship from both agreements?"
     }
   },
   "applicant_recipient": {

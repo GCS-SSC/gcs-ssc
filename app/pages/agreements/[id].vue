@@ -14,6 +14,7 @@ import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } 
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
+import AgreementRelatedAgreementsTab from '~/components/Agreement/AgreementRelatedAgreementsTab.vue'
 import AgreementAddressesTab from '~/components/Agreement/AgreementAddressesTab.vue'
 import AgreementNotesTab from '~/components/Agreement/AgreementNotesTab.vue'
 import AgreementApplicantRecipientsTab from '~/components/Agreement/AgreementApplicantRecipientsTab.vue'
@@ -194,6 +195,7 @@ const tabs = computed(() => {
       value: 'addresses',
       icon: 'i-lucide-map-pinned'
     })
+    nextTabs.push({ key: 'agreement.related_agreements.title', value: 'related-agreements', icon: 'i-lucide-link' })
     nextTabs.push({ key: 'notes.title', value: 'notes', icon: 'i-lucide-sticky-note' })
     nextTabs.push({
       key: 'agreement.applicant_recipients.title',
@@ -453,6 +455,13 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <AgreementAddressesTab
               v-else-if="selectedTab === 'addresses'"
+              :agreement-id="id"
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
+
+            <AgreementRelatedAgreementsTab
+              v-else-if="selectedTab === 'related-agreements'"
               :agreement-id="id"
               :can-create="canCreateFinancialChildRole"
               :can-update="canUpdateFinancialChildRole"

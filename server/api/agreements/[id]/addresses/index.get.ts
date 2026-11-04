@@ -39,6 +39,7 @@ export default defineEventHandler(async event => {
     if (search) {
       const escapedSearch = escapeLikePattern(search)
       baseQuery = baseQuery.where(eb => eb.or([
+        eb('Funding_Case_Agreement_Address.egcs_fc_description', 'ilike', `%${escapedSearch}%`),
         eb('Common_Address.egcs_cn_addresscity', 'ilike', `%${escapedSearch}%`),
         eb('Common_Address.egcs_cn_addresssubdivision', 'ilike', `%${escapedSearch}%`),
         eb('Common_Address.egcs_cn_postalcodezipcode', 'ilike', `%${escapedSearch}%`),

@@ -12,7 +12,7 @@ import {
   MONITOR_RESPONSIBLE_PARTY_ENUM,
   PAYMENT_TYPE_ENUM
 } from '~~/shared/constants/enums'
-import { PositivePostgresBigintIdSchema, type WithId } from './common'
+import { OptionalShortDescriptionSchema, PositivePostgresBigintIdSchema, type WithId } from './common'
 import { CommonAddressBaseSchema, CommonAddressCreateSchema } from './admin-common'
 import { isRepresentableByNumeric } from '~~/shared/utils/decimal'
 import { isCanonicalNonNegativePostgresBigintText } from '~~/shared/utils/database-id'
@@ -208,13 +208,15 @@ export const FundingCaseAgreementAddressCreateSchema = z.preprocess(input => {
 }, z.intersection(
   CommonAddressCreateSchema,
   z.object({
-    egcs_fc_addresstype: RequiredBigintSelectionId()
+    egcs_fc_addresstype: RequiredBigintSelectionId(),
+    egcs_fc_description: OptionalShortDescriptionSchema
   })
 )).meta({ formPreservesInputPaths: true })
 export const FundingCaseAgreementAddressPatchSchema = z.intersection(
   CommonAddressBaseSchema.partial(),
   z.object({
-    egcs_fc_addresstype: RequiredBigintSelectionId().optional()
+    egcs_fc_addresstype: RequiredBigintSelectionId().optional(),
+    egcs_fc_description: OptionalShortDescriptionSchema
   })
 )
 export type FundingCaseAgreementAddress = z.infer<typeof FundingCaseAgreementAddressCreateSchema>

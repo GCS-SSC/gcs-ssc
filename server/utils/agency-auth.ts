@@ -18,6 +18,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export type AgencySubentityTable =
   | 'Agency_Address_Type'
+  | 'Agency_Agreement_Relationship_Type'
   | 'Agency_Approval_Behalf_Type'
   | 'Agency_Agreement_Type'
   | 'Agency_Holdback_Basis'

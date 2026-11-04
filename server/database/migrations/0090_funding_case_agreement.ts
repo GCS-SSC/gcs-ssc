@@ -11,6 +11,20 @@ import type { Database } from '../../../shared/types/database'
 /** Installs the current up definitions for this subject on a fresh database. */
 export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TABLE "Funding_Case_Agreement_Relationship" (
+  id bigserial CONSTRAINT fc_pk_agreement_relationship PRIMARY KEY,
+  egcs_fc_fundingagreement bigint NOT NULL,
+  egcs_fc_relatedagreement bigint NOT NULL,
+  egcs_fc_relationshiptype bigint NOT NULL,
+  egcs_fc_description varchar(255),
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT fc_chk_agreement_relationship_distinct CHECK (egcs_fc_fundingagreement <> egcs_fc_relatedagreement)
+);
+CREATE UNIQUE INDEX fc_uq_agreement_relationship_pair ON "Funding_Case_Agreement_Relationship" (LEAST(egcs_fc_fundingagreement, egcs_fc_relatedagreement), GREATEST(egcs_fc_fundingagreement, egcs_fc_relatedagreement)) WHERE NOT _deleted;
+CREATE INDEX fc_idx_agreement_relationship_source ON "Funding_Case_Agreement_Relationship" (egcs_fc_fundingagreement) WHERE NOT _deleted;
+CREATE INDEX fc_idx_agreement_relationship_target ON "Funding_Case_Agreement_Relationship" (egcs_fc_relatedagreement) WHERE NOT _deleted;
+CREATE INDEX fc_idx_agreement_relationship_type ON "Funding_Case_Agreement_Relationship" (egcs_fc_relationshiptype) WHERE NOT _deleted;
+
 CREATE SEQUENCE "Funding_Case_Account_Receivable_Offset_Memo_Application_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Funding_Case_Account_Receivable_Offset_Memo_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
@@ -389,6 +403,7 @@ CREATE TABLE "Funding_Case_Agreement_Address" (
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_addresstype" bigint NOT NULL,
   "egcs_fc_address" bigint NOT NULL,
+  "egcs_fc_description" character varying(255),
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Address_pkey" PRIMARY KEY (id)
 );
@@ -1265,6 +1280,51 @@ END $baseline$`.execute(db)
 /** Installs the current installFunctions definitions for this subject on a fresh database. */
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE FUNCTION protect_agreement_relationship_owner()
+ RETURNS trigger LANGUAGE plpgsql AS $function$
+ BEGIN
+   IF (NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency OR NEW._deleted)
+     AND EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Relationship" link WHERE link.egcs_fc_relationshiptype = OLD.id AND NOT link._deleted) THEN
+     RAISE EXCEPTION 'Relationship type is in use' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_agreement_relationship_type_in_use';
+   END IF;
+   RETURN NEW;
+ END $function$;
+
+CREATE FUNCTION validate_agreement_relationship()
+ RETURNS trigger LANGUAGE plpgsql AS $function$
+ DECLARE source_agency bigint; target_agency bigint; type_agency bigint;
+ BEGIN
+   IF NEW._deleted THEN RETURN NEW; END IF;
+   IF TG_OP = 'INSERT' OR OLD._deleted OR
+     (NEW.egcs_fc_fundingagreement, NEW.egcs_fc_relatedagreement) IS DISTINCT FROM
+     (OLD.egcs_fc_fundingagreement, OLD.egcs_fc_relatedagreement) THEN
+     PERFORM id FROM "Funding_Case_Agreement_Profile"
+       WHERE id IN (NEW.egcs_fc_fundingagreement, NEW.egcs_fc_relatedagreement) ORDER BY id FOR SHARE;
+     PERFORM stream.id FROM "Transfer_Payment_Stream" stream
+       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile
+       JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.egcs_fc_transferpaymentstream = stream.id
+       WHERE agreement.id IN (NEW.egcs_fc_fundingagreement, NEW.egcs_fc_relatedagreement)
+       ORDER BY stream.id FOR SHARE OF stream, program;
+   END IF;
+   SELECT program.egcs_tp_agency INTO source_agency
+     FROM "Funding_Case_Agreement_Profile" agreement
+     JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
+     JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile
+     WHERE agreement.id = NEW.egcs_fc_fundingagreement AND NOT agreement._deleted;
+   SELECT program.egcs_tp_agency INTO target_agency
+     FROM "Funding_Case_Agreement_Profile" agreement
+     JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
+     JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile
+     WHERE agreement.id = NEW.egcs_fc_relatedagreement AND NOT agreement._deleted;
+   SELECT egcs_ay_organizationagency INTO type_agency FROM "Agency_Agreement_Relationship_Type"
+     WHERE id = NEW.egcs_fc_relationshiptype AND NOT _deleted FOR SHARE;
+   IF source_agency IS NULL OR target_agency IS DISTINCT FROM source_agency OR type_agency IS DISTINCT FROM source_agency THEN
+     RAISE EXCEPTION 'Related agreements and relationship type must belong to the same Agency'
+       USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_agreement_relationship_agency';
+   END IF;
+   RETURN NEW;
+ END $function$;
+
 CREATE FUNCTION trg_fn_guard_payment_evidence() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF OLD.egcs_fc_evidence IS DISTINCT FROM NEW.egcs_fc_evidence AND (
@@ -2972,6 +3032,10 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_source FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_target FOREIGN KEY (egcs_fc_relatedagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_type FOREIGN KEY (egcs_fc_relationshiptype) REFERENCES "Agency_Agreement_Relationship_Type"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" ADD CONSTRAINT "fc_fk_credit_line_receivable" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_receivable_credit_memo_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
@@ -3411,6 +3475,9 @@ END $baseline$`.execute(db)
 /** Installs the current installTriggers definitions for this subject on a fresh database. */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TRIGGER protect_agreement_relationship_owner BEFORE UPDATE ON "Agency_Agreement_Relationship_Type" FOR EACH ROW EXECUTE FUNCTION protect_agreement_relationship_owner();
+CREATE TRIGGER validate_agreement_relationship BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Relationship" FOR EACH ROW EXECUTE FUNCTION validate_agreement_relationship();
+
 CREATE TRIGGER trg_validate_ar_creditmemo_line BEFORE INSERT OR UPDATE OR DELETE ON "Funding_Case_Account_Receivable_Credit_Memo_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_line();
 
 CREATE CONSTRAINT TRIGGER trg_validate_ar_creditmemo_lines_total AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Credit_Memo_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_lines_total();

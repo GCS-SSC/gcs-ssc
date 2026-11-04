@@ -66,13 +66,14 @@ export default defineEventHandler(async event => {
     const linkValues: Insertable<FundingCaseAgreementAddressTable> = {
       egcs_fc_fundingagreement: agreementId,
       egcs_fc_addresstype: validated.egcs_fc_addresstype,
+      egcs_fc_description: validated.egcs_fc_description,
       egcs_fc_address: address.id
     }
 
     const link = await trx
       .insertInto('Funding_Case_Agreement_Address')
       .values(linkValues)
-      .returning(['id', 'egcs_fc_fundingagreement', 'egcs_fc_addresstype', 'egcs_fc_address'])
+      .returning(['id', 'egcs_fc_fundingagreement', 'egcs_fc_addresstype', 'egcs_fc_address', 'egcs_fc_description'])
       .executeTakeFirstOrThrow()
     return {
       ...link,

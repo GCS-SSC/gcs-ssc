@@ -871,7 +871,8 @@
       "approval_templates": "Modèles d’approbation",
       "workflow_setups": "Processus",
       "review_schemas": "Schémas d’examen",
-      "account_receivable_types": "Types de comptes débiteurs"
+      "account_receivable_types": "Types de comptes débiteurs",
+      "agreement_relationship_types": "Types de relations entre ententes"
     },
     "monitor_types": {
       "receivable_eligible": "Autoriser les suivis liés aux comptes débiteurs",
@@ -1350,7 +1351,11 @@
       "account_receivable_chart_in_use": "Ce compte est utilisé par un compte débiteur et ne peut pas être supprimé.",
       "duplicate_account_receivable_type_name_en": "Un type de compte débiteur avec ce titre anglais existe déjà pour l’organisme.",
       "duplicate_account_receivable_type_name_fr": "Un type de compte débiteur avec ce titre français existe déjà pour l’organisme.",
-      "chart_in_use": "Cette ligne comptable est déjà utilisée et ne peut pas être modifiée ni supprimée. Désactivez-la pour empêcher de nouvelles sélections."
+      "chart_in_use": "Cette ligne comptable est déjà utilisée et ne peut pas être modifiée ni supprimée. Désactivez-la pour empêcher de nouvelles sélections.",
+      "agreement_relationship_type_not_found": "Type de relation entre ententes introuvable.",
+      "agreement_relationship_type_in_use": "Ce type de relation est utilisé par une entente.",
+      "duplicate_agreement_relationship_type_name_en": "Un type de relation entre ententes portant ce nom anglais existe déjà.",
+      "duplicate_agreement_relationship_type_name_fr": "Un type de relation entre ententes portant ce nom français existe déjà."
     },
     "admin_common": {
       "not_found": "Enregistrement de ressource administrateur introuvable.",
@@ -1543,7 +1548,10 @@
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",
       "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
       "forecast_cell_occupied": "Une ligne de prévision existe déjà pour cette ligne budgétaire et ce mois.",
-      "forecast_breakdown_conflict": "La ventilation des prévisions a changé. Rechargez les montants enregistrés pour vérifier vos modifications. Un nouvel enregistrement remplacera les montants enregistrés dans les cellules modifiées."
+      "forecast_breakdown_conflict": "La ventilation des prévisions a changé. Rechargez les montants enregistrés pour vérifier vos modifications. Un nouvel enregistrement remplacera les montants enregistrés dans les cellules modifiées.",
+      "invalid_relationship": "Sélectionnez une autre entente de cet organisme et un type de relation disponible.",
+      "relationship_not_found": "Relation entre ententes introuvable.",
+      "duplicate_relationship": "Ces ententes sont déjà liées."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’organisme de ce volet.",
@@ -2625,7 +2633,8 @@
       "add": "Ajouter une adresse",
       "edit": "Mettre à jour une adresse",
       "search": "Rechercher des adresses",
-      "address_type": "Type d'adresse"
+      "address_type": "Type d'adresse",
+      "subdivision": "Subdivision/Province/Territoire"
     },
     "financial_summary": {
       "title": "Sommaire financier",
@@ -3273,6 +3282,19 @@
     "child_records": {
       "work_prerequisite": "Vous devez être affecté à ce dossier, et celui-ci ainsi que son entente doivent demeurer modifiables, pour apporter des changements.",
       "create_prerequisite": "Vous devez être affecté à cette entente, et celle-ci doit demeurer modifiable, pour créer un dossier."
+    },
+    "related_agreements": {
+      "title": "Ententes liées",
+      "number": "N° d’entente",
+      "program": "Programme",
+      "stream": "Volet",
+      "agreement_title": "Titre",
+      "agreement": "Entente",
+      "relationship_type": "Type de relation",
+      "add": "Ajouter une entente liée",
+      "edit": "Modifier la relation entre ententes",
+      "search": "Rechercher des ententes liées",
+      "remove_confirm": "Supprimer cette relation des deux ententes?"
     }
   },
   "applicant_recipient": {

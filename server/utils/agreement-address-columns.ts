@@ -5,6 +5,7 @@ export const AGREEMENT_ADDRESS_SELECT_COLUMNS = [
   'Funding_Case_Agreement_Address.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
   'Funding_Case_Agreement_Address.egcs_fc_addresstype as egcs_fc_addresstype',
   'Funding_Case_Agreement_Address.egcs_fc_address as egcs_fc_address',
+  'Funding_Case_Agreement_Address.egcs_fc_description as egcs_fc_description',
   'Agency_Address_Type.egcs_ay_typename_en as address_type_name_en',
   'Agency_Address_Type.egcs_ay_typename_fr as address_type_name_fr',
   'Common_Address.egcs_cn_federalridingid as egcs_cn_federalridingid',
