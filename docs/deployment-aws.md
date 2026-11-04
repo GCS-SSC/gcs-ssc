@@ -232,11 +232,10 @@ A preflight task verifies the new image can connect to RDS using injected secret
 and verified TLS. Reset then stops GCS, waits for every old service task to reach
 `STOPPED`, and transactionally drops the `public`, `extensions`, and `audit`
 schemas. It restarts only after the reset task exits successfully. This causes
-GCS downtime and permanently removes its demo data, users, audit history, and
-extension configuration. Without `--reset-db`, the database is preserved. Baseline-only schema changes
-require an explicit reset; the authorized Commitment budget hotfix supplies
-`9999_z_commitment_budget_payment_hold` as an incremental migration for existing
-databases, so this release needs no reset or seed replay.
+GCS downtime and permanently removes its demo data, users, change and security
+audit history, and extension configuration. The separate `gcs_access` database
+and its access history are preserved. Without `--reset-db`, the database is
+preserved. Baseline-only schema changes require an explicit reset.
 
 The helper verifies ECS deployment completion, the actual running image digest,
 and public readiness. The approved `deployment/demo-image.json` pin remains the

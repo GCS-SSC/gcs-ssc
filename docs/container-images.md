@@ -86,11 +86,12 @@ digest pin does not protect an image from registry deletion.
 
 ### AWS
 
-For routine GCS refreshes, `bun run aws:demo:refresh` automatically resolves the
-verified `:latest` tag and deploys its digest. Add `--reset-db` for an explicit
-GCS demo database wipe and reseed, or `--preview` to inspect the target. The
+For routine GCS refreshes, `bun run aws:demo:refresh` deploys the approved immutable
+digest in `deployment/demo-image.json`. Approve the published release digest in
+that manifest before refresh. Add `--reset-db` for an explicit GCS demo database
+wipe and reseed, or `--preview` to inspect the target. The
 [AWS runbook](deployment-aws.md#one-command-demo-refresh) documents failure
-recovery, retained attachments, and the local release pin update.
+recovery and retained storage. Refresh leaves the release pin unchanged.
 
 From `infra/aws`, run the usual `bun run cdk diff GcsSscDemo` and
 `bun run cdk deploy GcsSscDemo`, preserving any budget context values. CDK
