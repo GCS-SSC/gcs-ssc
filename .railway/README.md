@@ -86,23 +86,29 @@ Payments 168/172, and file persistence across container replacement. Seeded clai
 need the final flag for receivable creation; seeded payment workflows must end in
 the owning agency's successful terminal payment status.
 
-Stop the existing `gcs-ssc` deployment before changing database storage. Stop
-`GCS DB`, explicitly detach its current database volume, and verify the former
-volume's `serviceId` is null. Mount changes can redeploy the database; remove any
-intermediate deployment while the application remains stopped. Create a uniquely
-named unattached replacement, delete the exact detached former volume, and verify
-its deletion or pending-deletion state. Omission from the authoring graph alone
-may retain unused volumes.
+For a business-only reset that preserves all volumes, stop the existing
+`gcs-ssc` deployment and verify it has no active replicas before changing the
+business database. Connect only to the `GCS DB` service, verify the `railway`
+database and `postgres` role, and require the existing `9999_seed` journal entry
+and NCIA Agency 21 before executing the reset. In one transaction, drop the
+`audit`, `extensions`, and `public` schemas, recreate `public` owned by `postgres`,
+and restore public schema usage. Use `ON_ERROR_STOP`, a five-second lock timeout
+and a sixty-second statement timeout. Verify the transaction committed and the
+business migration journal is absent before starting the new image. Never retry
+an ambiguous reset result without inspecting the actual database state.
 
-Attach the replacement to `GCS DB` at `/var/lib/postgresql/data`, verify `READY`
-storage and a successful database deployment. Set the `demo` service instance's
-image source and verify its resolved `source.image` before deploying from source;
-a global source connection can leave the previous environment image override in
-place. Confirm the new deployment's image matches the verified immutable digest.
-Update this configuration to match the live replacement before
-the next IaC apply. Verify the live attachment independently: Railway's plan
-readback can omit the former database attachment. Preserve the application
-attachment volume, Portal volume, and Metabase volume.
+This preserves the existing business database volume and credentials. Do not
+reset the separate `GCS Access DB`, delete any volume, or remove attachment files.
+Portal and Metabase services and databases remain outside this cutover. Volume
+replacement is a separate destructive operation requiring explicit authorization.
+
+Stage only the `demo` GCS service image source and inspect all pending changes
+before committing them. Verify its resolved `source.image` and the exact new
+deployment's `SUCCESS` status against the immutable digest. Startup reapplies the
+complete baseline and demo seed. Verify public readiness, English/French login,
+NCIA's thirteen agreements, terminal Payments 168/172 and retained template
+files. Compare service deployment IDs and volume attachments with the pre-cutover
+snapshot; only the GCS application deployment should change.
 
 ### 2026-11-01 clean reset and queue controls
 
