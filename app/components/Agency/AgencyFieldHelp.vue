@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { computed, inject, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 import type { FieldTooltipList, FieldTooltipItem, FieldTooltipSave } from '~~/shared/types/schemas/field-tooltip'
 import { FieldTooltipSaveSchema } from '~~/shared/types/schemas/field-tooltip'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -14,17 +18,38 @@ const { createValidator } = useZodI18n()
 const refreshTooltips = inject(fieldTooltipRefreshKey, undefined)
 const catalog: Ref<FieldTooltipList | null> = ref(null)
 const selected: Ref<FieldTooltipItem | null> = ref(null)
+const { can } = useCan()
+const createActionContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => can('help', 'create', { type: 'agency', agencyId }),
+  eligible: () => Boolean(catalog.value?.capabilities.canCreate)
+})
+const updateActionContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => can('help', 'update', { type: 'agency', agencyId }),
+  eligible: () => Boolean(catalog.value?.capabilities.canEdit && catalog.value.items.some(row => row.id === selected.value?.id))
+})
+const formActionContext = () => selected.value ? updateActionContext : createActionContext
+const deleteActionContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => can('help', 'delete', { type: 'agency', agencyId })
+})
 const draft: Ref<FieldTooltipSave | null> = ref(null)
-const open = ref(false)
+const modal = useModalSession()
+const open = modal.isOpen
 const loading = ref(false)
 const failed = ref(false)
-const saving = ref(false)
+const modalPending = useCrudModalPending(modal.captureSession)
+const saving = modalPending.isPending
 const search = ref('')
 const screenFilter = ref('all')
 const statusFilter = ref('all')
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
 const url = computed(() => `/api/agency/${agencyId}/tooltips`)
 let generation = 0
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (context: number) => !disposed && context === contextGeneration
 const label = (value: { en: string, fr: string }) => value[locale.value === 'fr' ? 'fr' : 'en']
 const targets = computed(() => catalog.value?.targets ?? [])
 const fieldNames = (item: FieldTooltipItem) => targets.value.find(target => target.key === item.egcs_ay_targetkey)?.label
@@ -69,8 +94,12 @@ const columns = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
-/** Loads only the current agency's field catalog and retained tooltip entries. */
-const reload = async () => {
+/**
+ * Loads the current Agency's catalog while retaining the initiating operation's feedback owner.
+ * @param ownsFeedback - Whether this reload may report an error to its initiating editor.
+ */
+const reload = async (ownsFeedback: () => boolean = () => true) => {
+  if (disposed) return
   const request = ++generation
   const endpoint = url.value
   loading.value = true
@@ -79,14 +108,14 @@ const reload = async () => {
     const response = await fetch(getClientRequestUrl(endpoint))
     if (!response.ok) await throwFetchResponseError(response)
     const result: FieldTooltipList = await response.json()
-    if (request === generation) catalog.value = result
+    if (!disposed && request === generation) catalog.value = result
   } catch (error) {
-    if (request === generation) {
+    if (!disposed && request === generation) {
       failed.value = true
-      showError(error)
+      if (ownsFeedback()) showError(error)
     }
   } finally {
-    if (request === generation) loading.value = false
+    if (!disposed && request === generation) loading.value = false
   }
 }
 
@@ -95,7 +124,8 @@ const reload = async () => {
  * @param item - Existing tooltip, or null for a new entry.
  */
 const edit = (item: FieldTooltipItem | null) => {
-  if (saving.value) return
+  if (disposed || saving.value) return
+  open.value = false
   selected.value = item
   draft.value = item
     ? {
@@ -110,36 +140,59 @@ const edit = (item: FieldTooltipItem | null) => {
 
 /** Saves without overwriting a tooltip already attached to the destination field. */
 const save = async () => {
-  if (!draft.value || saving.value || conflict.value) return
-  const request = generation
-  const endpoint = `${url.value}${selected.value ? `/${selected.value.id}` : ''}`
-  const body = { ...draft.value }
-  saving.value = true
+  const operation = formActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const session = modal.captureSession()
+  const context = contextGeneration
+  const item = selected.value
+  const form = draft.value
+  if (!form || session === null || disposed || conflict.value
+    || (item ? !catalog.value?.capabilities.canEdit : !catalog.value?.capabilities.canCreate)
+    || !modalPending.begin(session)) return
+  const endpoint = `${url.value}${item ? `/${item.id}` : ''}`
+  const body = { ...form }
+  const ownsEditor = () => operation.isCurrent() && isCurrentContext(context) && modal.isCurrentSession(session)
+  let closed = false
+  const ownsFeedback = () => operation.isCurrent() && isCurrentContext(context) && draft.value === form
+    && (modal.isCurrentSession(session) || (closed && modal.captureSession() === null))
   try {
     const response = await fetch(getClientRequestUrl(endpoint), {
-      method: selected.value ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+      method: item ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (request !== generation) return
-    open.value = false
-    await Promise.all([reload(), refreshTooltips?.()])
+    if (!operation.isCurrent() || !isCurrentContext(context)) return
+    if (ownsEditor()) {
+      open.value = false
+      closed = true
+    }
+    await Promise.all([reload(ownsFeedback), refreshTooltips?.()])
   } catch (error) {
-    if (request === generation) showError(error)
-  } finally { saving.value = false }
+    if (ownsFeedback()) showError(error)
+  } finally { modalPending.end(session) }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: formActionContext }, submit: save })
 
 /**
  * Confirms deletion against the original agency and rejects a changed context.
  * @param item - Saved tooltip to delete.
  */
 const remove = async (item: FieldTooltipItem) => {
-  const request = generation
+  const context = contextGeneration
+  const operation = deleteActionContext.capture()
+  const id = item.id
+  const isCurrent = () => isCurrentContext(context) && Boolean(operation?.isCurrent())
+  const canProceed = () => isCurrentContext(context) && Boolean(catalog.value?.capabilities.canDelete)
+  if (!canProceed()) return
   try {
-    if (await confirmDeleteRequest(`${url.value}/${item.id}`, { shouldProceed: () => request === generation })) {
+    if (await confirmDeleteRequest(`${url.value}/${id}`, {
+      operation,
+      target: { id, resolve: () => catalog.value?.items.find(row => row.id === id), eligible: () => Boolean(catalog.value?.capabilities.canDelete) },
+      shouldProceed: canProceed
+    }) && isCurrent()) {
       await Promise.all([reload(), refreshTooltips?.()])
     }
   } catch (error) {
-    if (request === generation) showError(error)
+    if (isCurrent()) showError(error)
   }
 }
 
@@ -150,6 +203,7 @@ watch(() => [filtered.value.length, pagination.value.pageSize], () => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(filtered.value.length / pagination.value.pageSize) - 1))
 })
 watch(url, () => {
+  contextGeneration += 1
   catalog.value = null
   selected.value = null
   draft.value = null
@@ -159,9 +213,11 @@ watch(url, () => {
   statusFilter.value = 'all'
   pagination.value.pageIndex = 0
   void reload()
-}, { immediate: true })
-onBeforeUnmount(() => {
-  generation++
+}, { immediate: true, flush: 'sync' })
+onScopeDispose(() => {
+  disposed = true
+  contextGeneration += 1
+  generation += 1
 })
 </script>
 
@@ -212,7 +268,7 @@ onBeforeUnmount(() => {
     </CommonResourceLayout>
     <UModal v-model:open="open" :dismissible="!saving" :close="saving ? false : undefined" :title="t(selected ? 'field_tooltips.edit' : 'field_tooltips.add')" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="draft" data-field-scope="agency.field-help" data-scope-label-en="Agency — Field help" data-scope-label-fr="Organisme — Aide aux champs" :state="draft" :validate="createValidator(FieldTooltipSaveSchema)" class="space-y-4" @submit="save">
+        <UForm v-if="draft" v-bind="formSession" data-field-scope="agency.field-help" data-scope-label-en="Agency — Field help" data-scope-label-fr="Organisme — Aide aux champs" :state="draft" :validate="createValidator(FieldTooltipSaveSchema)" class="space-y-4">
           <UAlert
             v-if="selected && selected.availability !== 'available'" color="warning"
             :title="t(`field_tooltips.status.${selected.availability}`)" :description="t(`field_tooltips.${selected.availability}_help`)" />

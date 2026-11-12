@@ -2,6 +2,13 @@ import type { Pool, PoolClient } from 'pg'
 
 export type PostgresHealthQuery = (client: PoolClient) => Promise<unknown>
 
+type HealthQueryState =
+  | { kind: 'acquiring' }
+  | { kind: 'acquisition_expired' }
+  | { kind: 'querying'; client: PoolClient }
+  | { kind: 'query_expired'; client: PoolClient }
+  | { kind: 'released' }
+
 const defaultHealthQuery: PostgresHealthQuery = async client => await client.query('SELECT 1')
 
 interface DestroyablePostgresClient extends PoolClient {
@@ -47,9 +54,8 @@ export const executeBoundedPostgresHealthQuery = async (
   executeQuery: PostgresHealthQuery = defaultHealthQuery
 ): Promise<void> => {
   const deadlineError = new Error('PostgreSQL health query exceeded its configured deadline')
-  let client: PoolClient | undefined
-  let released = false
-  let deadlineExpired = false
+  let state: HealthQueryState = { kind: 'acquiring' }
+  const deadlineExpired = (): boolean => state.kind === 'acquisition_expired' || state.kind === 'query_expired'
   /** Prevents a forced socket close from becoming an unhandled EventEmitter error. */
   const handleClientError = (): void => {}
 
@@ -59,35 +65,39 @@ export const executeBoundedPostgresHealthQuery = async (
    * @param error - Optional error that removes the client from the pool.
    */
   const release = (error?: Error): void => {
-    if (!client || released) return
-    released = true
-    client.release(error)
+    const current = state
+    state = { kind: 'released' }
+    if (current.kind !== 'querying' && current.kind !== 'query_expired') return
+    current.client.release(error)
+    current.client.removeListener('error', handleClientError)
   }
 
   const timer = setTimeout(() => {
-    deadlineExpired = true
-    if (client) destroyUnderlyingConnection(client, deadlineError)
+    if (state.kind === 'acquiring') {
+      state = { kind: 'acquisition_expired' }
+    } else if (state.kind === 'querying') {
+      const { client } = state
+      state = { kind: 'query_expired', client }
+      destroyUnderlyingConnection(client, deadlineError)
+    }
   }, timeoutMs)
   timer.unref?.()
 
   try {
-    client = await pool.connect()
+    const client = await pool.connect()
+    state = { kind: deadlineExpired() ? 'query_expired' : 'querying', client }
     client.on('error', handleClientError)
-    if (deadlineExpired) {
-      release(deadlineError)
-      throw deadlineError
-    }
+    if (deadlineExpired()) throw deadlineError
 
     await executeQuery(client)
-    if (deadlineExpired) throw deadlineError
+    if (deadlineExpired()) throw deadlineError
   } catch (error: unknown) {
-    if (deadlineExpired) throw deadlineError
+    if (deadlineExpired()) throw deadlineError
     throw error
   } finally {
     clearTimeout(timer)
     // Keep the client checked out until its forced-close error has settled;
     // releasing it earlier attaches pg-pool's idle error listener to active I/O.
-    release(deadlineExpired ? deadlineError : undefined)
-    client?.removeListener('error', handleClientError)
+    release(deadlineExpired() ? deadlineError : undefined)
   }
 }

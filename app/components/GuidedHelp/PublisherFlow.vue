@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Modal editing mirrors the app's review-question editor. */
 import GuidedHelpPublisherBranches from './PublisherBranches.vue'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { flowBranchLayout } from '@gcs-ssc/diagrams'
@@ -17,9 +19,19 @@ const emit = defineEmits<{ pick: [target: { stepId: string, view: string, target
 const { t, locale } = useI18n()
 const { createValidator } = useZodI18n()
 const validate = createValidator(GuideDraftSchema)
-const open = ref(false)
-const draft: Ref<GuideDraft | null> = ref(null)
-const creating = ref(false)
+type StepEditorState = { kind: 'closed' } | { kind: 'creating'; draft: GuideDraft } | { kind: 'editing'; draft: GuideDraft }
+const editor: Ref<StepEditorState> = ref({ kind: 'closed' })
+const open = computed({
+  get: () => editor.value.kind !== 'closed',
+  set: (value: boolean) => { if (!value) reset() }
+})
+const draft = computed({
+  get: () => editor.value.kind === 'closed' ? null : editor.value.draft,
+  set: (value: GuideDraft | null) => {
+    if (value && editor.value.kind !== 'closed') editor.value = { ...editor.value, draft: value }
+  }
+})
+const creating = computed(() => editor.value.kind === 'creating')
 const label = (value: { en: string, fr: string }) => value[locale.value === 'fr' ? 'fr' : 'en']
 const afterStep = ref<string | undefined>()
 const viewName = (key: string) => label(guidedHelpLedger.views.find(view => view.key === key)?.label ?? { en: key, fr: key })
@@ -40,29 +52,30 @@ const flow = computed<FlowDiagramDefinition>(() => {
   const positions = flowBranchLayout(definition).nodes
   return { ...definition, nodes: definition.nodes.map(node => node.kind === 'step' ? { ...node, eyebrow: t('guided_help.step_number', { number: positions[node.id]!.row + 1 }) } : node) }
 })
-const branchStep = ref('')
-const branchOpen = ref(false)
+type BranchEditorState = { kind: 'closed' } | { kind: 'editing'; stepId: string }
+const branchEditor: Ref<BranchEditorState> = ref({ kind: 'closed' })
+const branchStep = computed(() => branchEditor.value.kind === 'editing' ? branchEditor.value.stepId : '')
+const branchOpen = computed({
+  get: () => branchEditor.value.kind === 'editing',
+  set: (value: boolean) => { if (!value) branchEditor.value = { kind: 'closed' } }
+})
 const branchLabel = (branch: { target: string, equals: string | boolean }) => {
   const target = guidedHelpLedger.views.flatMap(view => view.targets).find(target => target.key === branch.target)
   const value = typeof branch.equals === 'boolean' ? t(branch.equals ? 'common.yes' : 'common.no') : label(target?.choices?.find(choice => choice.value === branch.equals)?.label ?? { en: String(branch.equals), fr: String(branch.equals) })
   return (target ? label(target.label) : branch.target) + ' = ' + value
 }
 const addBranch = (id: string) => {
-  branchStep.value = id
-  branchOpen.value = true
+  branchEditor.value = { kind: 'editing', stepId: id }
 }
 const reset = () => {
-  open.value = false
-  draft.value = null
+  editor.value = { kind: 'closed' }
   selectedStep.value = ''
-  creating.value = false
   removeErrorKey.value = ''
 }
 const edit = (id: string) => {
   if (!document.value.steps.some(step => step.id === id)) return
-  draft.value = JSON.parse(JSON.stringify(document.value))
+  editor.value = { kind: 'editing', draft: JSON.parse(JSON.stringify(document.value)) }
   selectedStep.value = id
-  open.value = true
 }
 watch(selectedStep, id => {
   if (id && !open.value) edit(id)
@@ -83,10 +96,8 @@ const create = (id?: string) => {
     guideStepIds: item.id === stage.id && !templateKey ? nextDraft.steps.filter(candidate => candidate.id === step.id || item.guideStepIds.includes(candidate.id)).map(candidate => candidate.id) : item.guideStepIds,
     ...(item.kind === 'tasks' && item.taskTemplates ? { taskTemplates: item.taskTemplates.map(template => ({ ...template, guideStepIds: item.id === stage.id && template.key === templateKey ? nextDraft.steps.filter(candidate => candidate.id === step.id || template.guideStepIds.includes(candidate.id)).map(candidate => candidate.id) : template.guideStepIds })) } : {})
   }))
-  draft.value = nextDraft
-  open.value = true
+  editor.value = { kind: 'creating', draft: nextDraft }
   selectedStep.value = step.id
-  creating.value = true
 }
 const commit = () => {
   const edited = draft.value?.steps.find(step => step.id === selectedStep.value)
@@ -94,6 +105,12 @@ const commit = () => {
   document.value = JSON.parse(JSON.stringify(draft.value!))
   reset()
 }
+const formOwner = useModalSession()
+watch([open, draft], () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = open.value && draft.value !== null
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'local-draft', purpose: 'guided-help-step' }, submit: commit })
 const pick = (target: { stepId: string, view: string, target: string }) => {
   const edited = draft.value?.steps.find(step => step.id === target.stepId)
   if (!edited || disabled) return
@@ -159,9 +176,9 @@ const remove = () => {
     </p>
     <CommonFlowDiagram :definition="flow" :selected-node-id="selectedStep" :editable="!disabled" :branch-node-ids="branchable" direction="vertical" layout="branches" filename="guided-help" @select-node="edit" @add-node="create" @add-branch="addBranch" />
     <GuidedHelpPublisherBranches v-if="!document.journey" v-model="document" v-model:open="branchOpen" data-field-container="Composite editor; its individual field declarations own their identities." :step-id="branchStep" :disabled="disabled" />
-    <UModal v-model:open="open" :title="t(creating ? 'guided_help.create_step' : disabled ? 'guided_help.step_details' : 'guided_help.edit_step')" :description="t('guided_help.publication_required')" fullscreen :ui="{ content: 'rounded-none shadow-none ring-0' }" @after:leave="reset">
+    <UModal v-model:open="open" :title="t(creating ? 'guided_help.create_step' : disabled ? 'guided_help.step_details' : 'guided_help.edit_step')" :description="t('guided_help.publication_required')" fullscreen :ui="{ content: 'rounded-none shadow-none ring-0' }">
       <template #body>
-        <UForm v-if="draft" :state="draft" :validate="validate" class="flex h-full flex-col" @submit="commit">
+        <UForm v-if="draft" v-bind="formSession" :state="draft" :validate="validate" class="flex h-full flex-col">
           <div class="flex-1 overflow-y-auto p-6 lg:p-8">
             <div class="mx-auto w-full max-w-6xl space-y-8 pb-12">
               <div v-if="!disabled && !creating" class="flex flex-wrap items-center gap-3">

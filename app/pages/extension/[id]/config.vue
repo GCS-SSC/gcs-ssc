@@ -26,6 +26,7 @@ const route = useRoute()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
+const { permissionRevision } = useAuth()
 const { getBilingualValue } = useBilingualValue()
 const extensionKey = computed(() => String(route.params.id))
 const streamId = computed(() => typeof route.query.streamId === 'string' ? route.query.streamId : '')
@@ -58,7 +59,7 @@ const extensionDescription = computed(() => {
 })
 
 const configComponent = computed(() => {
-  if (item.value?.extension.configurationAccess === 'manager' && !item.value.canConfigure) return null
+  if (!item.value?.canConfigure) return null
   const componentName = item.value?.extension.admin.streamConfigPage?.componentName
     || item.value?.extension.admin.streamConfig?.componentName
   return componentName ? getGcsExtensionComponent(componentName) : null
@@ -101,7 +102,7 @@ const fetchOptionalJson = async (responsePromise: Promise<Response | null>): Pro
 
 let requestSequence = 0
 const configurationIdentity = computed(() => JSON.stringify([
-  extensionKey.value, streamId.value, transferPaymentId.value, agencyId.value
+  extensionKey.value, streamId.value, transferPaymentId.value, agencyId.value, permissionRevision.value
 ]))
 const refresh = async () => {
   const sequence = ++requestSequence

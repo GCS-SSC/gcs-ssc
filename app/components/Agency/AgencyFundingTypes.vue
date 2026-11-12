@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, @stylistic/comma-dangle -- local table helpers; generic Vue arrows need parser disambiguation */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
 import { useTableListState } from '~/composables/useTableListState'
 import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { AgencyFundingTypeBaseSchema, AgencyFundingSubtypeBaseSchema } from '~~/shared/types/schemas/funding-sources'
@@ -63,14 +66,50 @@ const { search, pagination } = useTableListState()
 const types: Ref<FundingType[]> = ref([])
 const subtypes: Ref<FundingSubtype[]> = ref([])
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
-const selectedType: Ref<Partial<FundingType> | null> = ref(null)
-const selectedSubtype: Ref<Partial<FundingSubtype> | null> = ref(null)
+const typeModal = useCrudModal<FundingType>({
+  createState: () => ({
+    egcs_ay_name_en: '', egcs_ay_name_fr: '', egcs_ay_instacking: false,
+    egcs_ay_incostsharing: false, egcs_ay_active: true
+  }),
+  updateState: item => ({ ...item })
+})
+const subtypeModal = useCrudModal<FundingSubtype>({
+  createState: () => ({ egcs_ay_name_en: '', egcs_ay_name_fr: '', egcs_ay_active: true }),
+  updateState: item => ({ ...item })
+})
+const { selected: selectedType, isOpen: typeModalOpen } = typeModal
+const { selected: selectedSubtype, isOpen: subtypeModalOpen } = subtypeModal
 const selectedSubtypeTypeId: Ref<string | null> = ref(null)
-const typeModalOpen = ref(false)
-const subtypeModalOpen = ref(false)
-const savingType = ref(false)
-const savingSubtype = ref(false)
+const typePending = useCrudModalPending(typeModal.captureSession)
+const subtypePending = useCrudModalPending(subtypeModal.captureSession)
+const savingType = typePending.isPending
+const savingSubtype = subtypePending.isPending
+type PageContext = { kind: 'active'; agencyId: string } | { kind: 'disposed' }
+const pageContext: Ref<PageContext> = shallowRef({ kind: 'active', agencyId })
+const ownsContext = (context: PageContext) => context.kind === 'active' && pageContext.value === context
 let refreshGeneration = 0
+const typeCreateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canCreate
+})
+const typeUpdateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canUpdate,
+  eligible: () => types.value.some(row => row.id === selectedType.value?.id)
+})
+const typeActionContext = () => selectedType.value?.id ? typeUpdateContext : typeCreateContext
+const subtypeCreateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canCreate,
+  eligible: () => Boolean(selectedSubtypeTypeId.value) && types.value.some(row => row.id === selectedSubtypeTypeId.value)
+})
+const subtypeUpdateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canUpdate,
+  eligible: () => subtypes.value.some(row => row.id === selectedSubtype.value?.id) && types.value.some(row => row.id === selectedSubtypeTypeId.value)
+})
+const subtypeActionContext = () => selectedSubtype.value?.id ? subtypeUpdateContext : subtypeCreateContext
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDelete })
 
 const columns: TableColumnInput<FundingRow>[] = [
   { id: GROUP_COLUMN, accessorKey: GROUP_COLUMN, headerKey: 'agency.funding_types.type' },
@@ -96,25 +135,28 @@ const getAllTypes = async (id: string): Promise<FundingType[]> => {
   }
 }
 
-const refresh = async () => {
+const refreshForOwner = async (shouldReportError: () => boolean) => {
+  const context = pageContext.value
+  if (context.kind !== 'active' || !ownsContext(context)) return
   const generation = ++refreshGeneration
-  const id = agencyId
+  const id = context.agencyId
   try {
     status.value = 'pending'
     const [nextTypes, nextSubtypes] = await Promise.all([
       getAllTypes(id),
       getJson<{ items: FundingSubtype[] }>(`/api/agency/${id}/funding-subtypes`)
     ])
-    if (generation !== refreshGeneration || id !== agencyId) return
+    if (!ownsContext(context) || generation !== refreshGeneration || id !== agencyId) return
     types.value = nextTypes
     subtypes.value = nextSubtypes.items
     status.value = 'success'
   } catch (error: unknown) {
-    if (generation !== refreshGeneration || id !== agencyId) return
+    if (!ownsContext(context) || generation !== refreshGeneration || id !== agencyId) return
     status.value = 'error'
-    showError(error)
+    if (shouldReportError()) showError(error)
   }
 }
+const refresh = () => refreshForOwner(() => true)
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
 const matchesName = (nameEn: string, nameFr: string) =>
@@ -165,28 +207,23 @@ const selectedSubtypeTypeName = computed(() => {
 })
 
 const closeType = () => {
-  typeModalOpen.value = false
-  selectedType.value = null
+  typeModal.close()
 }
 const closeSubtype = () => {
-  subtypeModalOpen.value = false
-  selectedSubtype.value = null
+  subtypeModal.close()
   selectedSubtypeTypeId.value = null
 }
 const createType = () => {
-  selectedType.value = { egcs_ay_name_en: '', egcs_ay_name_fr: '', egcs_ay_instacking: false, egcs_ay_incostsharing: false, egcs_ay_active: true }
-  typeModalOpen.value = true
+  typeModal.openCreate()
 }
 const editType = (id: string) => {
   const type = types.value.find(item => item.id === id)
   if (!canUpdate || !type) return
-  selectedType.value = { ...type }
-  typeModalOpen.value = true
+  typeModal.openUpdate(type)
 }
 const createSubtype = (typeId: string) => {
   selectedSubtypeTypeId.value = typeId
-  selectedSubtype.value = { egcs_ay_name_en: '', egcs_ay_name_fr: '', egcs_ay_active: true }
-  subtypeModalOpen.value = true
+  subtypeModal.openCreate()
 }
 const expandType = (typeId: string) => {
   const row = rows.value.find(item => item.typeId === typeId)
@@ -199,17 +236,23 @@ const editSubtype = (id: string) => {
   const subtype = subtypes.value.find(item => item.id === id)
   if (!canUpdate || !subtype) return
   selectedSubtypeTypeId.value = subtype.egcs_ay_fundingtype
-  selectedSubtype.value = { ...subtype }
-  subtypeModalOpen.value = true
+  subtypeModal.openUpdate(subtype)
 }
 watch(() => agencyId, () => {
+  pageContext.value = { kind: 'active', agencyId }
   refreshGeneration += 1
   types.value = []
   subtypes.value = []
   closeType()
   closeSubtype()
   void refresh()
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
+onScopeDispose(() => {
+  pageContext.value = { kind: 'disposed' }
+  refreshGeneration += 1
+  closeType()
+  closeSubtype()
+})
 
 const saveJson = async (url: string, method: 'POST' | 'PATCH', body: unknown) => {
   const response = await fetch(getClientRequestUrl(url), {
@@ -218,50 +261,81 @@ const saveJson = async (url: string, method: 'POST' | 'PATCH', body: unknown) =>
   if (!response.ok) await throwFetchResponseError(response)
 }
 const saveType = async () => {
-  if (!selectedType.value || savingType.value) return
+  const operation = typeActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const context = pageContext.value
+  const session = typeModal.captureSession()
   const state = selectedType.value
+  if (context.kind !== 'active' || !ownsContext(context) || session === null || !state) return
   const updating = Boolean(state.id)
-  if (updating ? !canUpdate : !canCreate) return
-  const generation = refreshGeneration
+  if ((updating ? !canUpdate : !canCreate) || !typePending.begin(session)) return
   let committed = false
+  let closed = false
+  const ownsFeedback = () => operation.isCurrent() && ownsContext(context) && (
+    typeModal.isCurrentSession(session) || (closed && typeModal.isLatestSession(session))
+  )
   try {
-    savingType.value = true
-    await saveJson(`/api/agency/${agencyId}/funding-types${updating ? `/${state.id}` : ''}`, updating ? 'PATCH' : 'POST', state)
+    await saveJson(`/api/agency/${context.agencyId}/funding-types${updating ? `/${state.id}` : ''}`, updating ? 'PATCH' : 'POST', state)
     committed = true
-    if (generation !== refreshGeneration) return
-    if (selectedType.value === state) closeType()
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
-    await refresh()
+    if (!operation.isCurrent() || !ownsContext(context)) return
+    closed = typeModal.closeSession(session)
+    if (ownsFeedback()) {
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    }
+    await refreshForOwner(ownsFeedback)
   } catch (error: unknown) {
-    if (!committed) showError(error)
-  } finally { savingType.value = false }
+    if (!committed && ownsFeedback()) showError(error)
+  } finally { typePending.end(session) }
 }
 const saveSubtype = async () => {
-  if (!selectedSubtype.value || !selectedSubtypeTypeId.value || savingSubtype.value) return
+  const operation = subtypeActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const context = pageContext.value
+  const session = subtypeModal.captureSession()
   const state = selectedSubtype.value
   const typeId = selectedSubtypeTypeId.value
+  if (context.kind !== 'active' || !ownsContext(context) || session === null || !state || !typeId) return
   const updating = Boolean(state.id)
-  if (updating ? !canUpdate : !canCreate) return
-  const generation = refreshGeneration
+  if ((updating ? !canUpdate : !canCreate) || !subtypePending.begin(session)) return
   let committed = false
+  let closed = false
+  const ownsFeedback = () => operation.isCurrent() && ownsContext(context) && (
+    subtypeModal.isCurrentSession(session) || (closed && subtypeModal.isLatestSession(session))
+  )
   try {
-    savingSubtype.value = true
-    await saveJson(`/api/agency/${agencyId}/funding-types/${selectedSubtypeTypeId.value}/subtypes${updating ? `/${state.id}` : ''}`, updating ? 'PATCH' : 'POST', state)
+    await saveJson(`/api/agency/${context.agencyId}/funding-types/${typeId}/subtypes${updating ? `/${state.id}` : ''}`, updating ? 'PATCH' : 'POST', state)
     committed = true
-    if (generation !== refreshGeneration) return
-    if (selectedSubtype.value === state) closeSubtype()
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
-    await refresh()
-    expandType(typeId)
+    if (!operation.isCurrent() || !ownsContext(context)) return
+    closed = subtypeModal.closeSession(session)
+    if (closed) selectedSubtypeTypeId.value = null
+    if (ownsFeedback()) {
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    }
+    await refreshForOwner(ownsFeedback)
+    if (ownsFeedback()) expandType(typeId)
   } catch (error: unknown) {
-    if (!committed) showError(error)
-  } finally { savingSubtype.value = false }
+    if (!committed && ownsFeedback()) showError(error)
+  } finally { subtypePending.end(session) }
 }
+const typeFormSession = useFormSession({ owner: typeModal, action: { kind: 'remote', context: typeActionContext }, submit: saveType })
+const subtypeFormSession = useFormSession({ owner: subtypeModal, action: { kind: 'remote', context: subtypeActionContext }, submit: saveSubtype })
 const deleteType = async (id: string) => {
-  await confirmDeleteWithToast(`/api/agency/${agencyId}/funding-types/${id}`, { refresh, confirmOptions: { description: t('agency.delete_confirm') } })
+  const context = pageContext.value
+  await confirmDeleteWithToast(`/api/agency/${agencyId}/funding-types/${id}`, {
+    operation: deleteActionContext.capture(),
+    target: { id: id, resolve: () => types.value.find(row => row.id === id), eligible: () => canDelete },
+    refresh, shouldProceed: () => ownsContext(context) && canDelete,
+    confirmOptions: { description: t('agency.delete_confirm') }
+  })
 }
 const deleteSubtype = async (typeId: string, id: string) => {
-  await confirmDeleteWithToast(`/api/agency/${agencyId}/funding-types/${typeId}/subtypes/${id}`, { refresh, confirmOptions: { description: t('agency.delete_confirm') } })
+  const context = pageContext.value
+  await confirmDeleteWithToast(`/api/agency/${agencyId}/funding-types/${typeId}/subtypes/${id}`, {
+    operation: deleteActionContext.capture(),
+    target: { id: id, resolve: () => subtypes.value.find(row => row.id === id), eligible: row => canDelete && row.egcs_ay_fundingtype === typeId },
+    refresh, shouldProceed: () => ownsContext(context) && canDelete,
+    confirmOptions: { description: t('agency.delete_confirm') }
+  })
 }
 </script>
 
@@ -343,7 +417,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
 
     <UModal v-if="selectedType" v-model:open="typeModalOpen" :title="t('agency.funding_types.type')">
       <template #body>
-        <UForm data-field-scope="agency.funding-type" :state="selectedType" :validate="createValidator(AgencyFundingTypeBaseSchema)" :validate-on="[]" class="space-y-4" @submit="saveType">
+        <UForm v-bind="typeFormSession" data-field-scope="agency.funding-type" :state="selectedType" :validate="createValidator(AgencyFundingTypeBaseSchema)" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="selectedType.egcs_ay_name_en" />
           </UFormField>
@@ -365,7 +439,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
     </UModal>
     <UModal v-if="selectedSubtype" v-model:open="subtypeModalOpen" :title="t('agency.funding_types.subtypes_for', { name: selectedSubtypeTypeName })">
       <template #body>
-        <UForm data-field-scope="agency.funding-subtype" :state="selectedSubtype" :validate="createValidator(AgencyFundingSubtypeBaseSchema)" :validate-on="[]" class="space-y-4" @submit="saveSubtype">
+        <UForm v-bind="subtypeFormSession" data-field-scope="agency.funding-subtype" :state="selectedSubtype" :validate="createValidator(AgencyFundingSubtypeBaseSchema)" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="selectedSubtype.egcs_ay_name_en" />
           </UFormField>

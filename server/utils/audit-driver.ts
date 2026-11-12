@@ -20,7 +20,7 @@ export interface AuditIdentity {
 }
 interface Lease {
   raw: DatabaseConnection
-  transaction: boolean
+  transaction: false | 'active' | 'committing'
   transactionId: string | null
   events: AccessEvidence[]
   access: { released: boolean }
@@ -238,7 +238,7 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
                 }
             const started = performance.now()
             const standalone = !lease.transaction
-            let began = false
+            let transactionPhase: 'unstarted' | 'active' | 'committing' = 'unstarted'
             try {
               if (/^\s*(begin|commit|rollback|savepoint|release)\b/i.test(query.sql)) {
                 throw new Error('Use Kysely transaction and savepoint APIs for audited connections')
@@ -247,7 +247,7 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
               // Even SELECT can invoke a mutating function; transaction-local context is always installed.
               if (standalone) {
                 await driver.beginTransaction(raw, {})
-                began = true
+                transactionPhase = 'active'
               }
               const readStatement = control.ownershipEnabled && event
                 ? instrumentAuditRead(query, identity.actorUserId, queryId)
@@ -362,6 +362,7 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
                 event.row_count = String(result.numAffectedRows ?? result.rows.length)
               }
               if (standalone) {
+                transactionPhase = 'committing'
                 await driver.commitTransaction(raw)
                 if (event) event.transaction_outcome = 'committed'
               }
@@ -377,9 +378,10 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
                   event.attribution_error = 'failed_statement_ownership_unavailable'
                 }
               }
-              if (standalone) {
-                if (event) event.transaction_outcome = 'rolled_back'
-                if (began) await driver.rollbackTransaction(raw)
+              if (standalone && transactionPhase !== 'unstarted') {
+                await driver.rollbackTransaction(raw)
+                // A rejected COMMIT may already have committed; cleanup cannot prove otherwise.
+                if (event && transactionPhase === 'active') event.transaction_outcome = 'rolled_back'
               }
               throw error
             } finally {
@@ -406,19 +408,20 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
           const mode = settings.accessMode ? ` ${settings.accessMode}` : ''
           await lease.raw.executeQuery(CompiledQuery.raw(`BEGIN${isolation}${mode}`))
         } else await driver.beginTransaction(lease.raw, settings)
-        if (!control.enabled) await lease.raw.executeQuery(CompiledQuery.raw('SELECT set_config(\'app.audit_bootstrap\', \'on\', true)'))
-        lease.transaction = true
+        lease.transaction = 'active'
         lease.transactionId = randomUUID()
+        if (!control.enabled) await lease.raw.executeQuery(CompiledQuery.raw('SELECT set_config(\'app.audit_bootstrap\', \'on\', true)'))
       },
       commitTransaction: async connection => {
         const lease = state(connection)
+        lease.transaction = 'committing'
         await driver.commitTransaction(lease.raw)
         finish(lease, 'committed')
       },
       rollbackTransaction: async connection => {
         const lease = state(connection)
         await driver.rollbackTransaction(lease.raw)
-        finish(lease, 'rolled_back')
+        finish(lease, lease.transaction === 'committing' ? 'pending' : 'rolled_back')
       },
       savepoint: async (connection, name, compile) => {
         const lease = state(connection)
@@ -441,17 +444,23 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
       },
       releaseConnection: async connection => {
         const lease = state(connection)
+        leases.delete(connection)
+        let releaseFailure: { error: unknown } | undefined
         try {
           if (lease.transaction) {
             await driver.rollbackTransaction(lease.raw)
-            finish(lease, 'rolled_back')
+            finish(lease, lease.transaction === 'committing' ? 'pending' : 'rolled_back')
           }
-          await driver.releaseConnection(lease.raw)
         } finally {
-          leases.delete(connection)
+          try {
+            await driver.releaseConnection(lease.raw)
+          } catch (error) {
+            releaseFailure = { error }
+          }
           lease.unlock()
           lease.access.released = true
         }
+        if (releaseFailure) throw releaseFailure.error
       },
       destroy: async () => {
         try {

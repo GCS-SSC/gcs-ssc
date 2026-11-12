@@ -1,6 +1,12 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- Page-local request and form handlers are clear from their names. */
 import type { Ref } from 'vue'
+import { nextTick, onBeforeUnmount } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { GroupCreateSchema, GroupMemberSchema } from '~~/shared/types/schemas/group'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -11,6 +17,7 @@ definePageMeta({ i18n: { paths: { en: '/groups', fr: '/groupes' } } })
 type Group = { id: string; egcs_cn_agency: string; egcs_cn_name_en: string; egcs_cn_name_fr: string; egcs_cn_email: string }
 type Agency = { id: string; egcs_ay_name_en: string; egcs_ay_name_fr: string }
 type Member = { egcs_cn_user: string; egcs_cn_name: string }
+type MemberRead = { kind: 'pending' | 'success' | 'error'; token: symbol }
 type UserOption = { id: string; egcs_cn_name_en: string; egcs_cn_name_fr: string }
 type GroupRow = { id: string; group: Group; member: Member | null; placeholder: boolean; name: string; email: string }
 const { t } = useI18n()
@@ -19,6 +26,14 @@ const { getBilingualValue } = useBilingualValue()
 const { createValidator } = useZodI18n()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { canAny, can } = useCan()
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
+const deleteContext = useActionContext({
+  identity: [],
+  authority: () => canAny('group', 'delete', ['global', 'agency'])
+})
 const canCreate = computed(() => canAny('group', 'create', ['global', 'agency']))
 // eslint-disable-next-line prefer-arrow/prefer-arrow-functions -- Generic arrow syntax conflicts with Vue SFC parsing.
 async function loadJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -36,35 +51,57 @@ watch(selectedAgency, () => {
   pagination.value.pageIndex = 0
 })
 void loadJson<{ items: Agency[] }>('/api/groups/agencies').then(value => {
+  if (disposed) return
   agencyResponse.value = value
-}).catch(showError)
+}).catch(error => { if (!disposed) showError(error) })
 const selectedGroup: Ref<Group | null> = ref(null)
 const expandedGroupIds: Ref<string[]> = ref([])
 const membersByGroup: Ref<Record<string, Member[]>> = ref({})
-const userResponse: Ref<{ items: UserOption[] } | null> = ref(null)
-const memberModalOpen: Ref<boolean> = ref(false)
-const addingMember = ref(false)
+const memberReads: Ref<Record<string, MemberRead>> = ref({})
+const memberSession = useModalSession()
+const memberModalOpen = memberSession.isOpen
+const memberPending = useCrudModalPending(memberSession.captureSession)
+const addingMember = memberPending.isPending
 const removingMemberIds = ref<string[]>([])
 const memberForm = reactive({ egcs_cn_user: '' })
 const validateMember = createValidator(GroupMemberSchema)
+const users = useResourceRequest<{ items: UserOption[] }>({
+  identity: () => selectedGroup.value?.id ?? '',
+  enabled: () => memberModalOpen.value && selectedGroup.value !== null
+    && can('group', 'update', { type: 'agency', agencyId: selectedGroup.value.egcs_cn_agency }),
+  trigger: 'refresh',
+  refreshData: 'clear',
+  failureData: 'clear',
+  load: signal => loadJson(`/api/groups/${selectedGroup.value?.id}/members/lookups`, { signal })
+})
+const userResponse = users.data
 const availableUsers = computed(() => (userResponse.value?.items ?? [])
   .filter(user => !(membersByGroup.value[selectedGroup.value?.id ?? ''] ?? []).some(member => member.egcs_cn_user === user.id))
   .map(user => ({ label: getBilingualValue(user, 'egcs_cn_name', user.id), value: user.id })))
-const refreshMembers = async (groupId: string) => {
-  const response = await loadJson<{ items: Member[] }>(`/api/groups/${groupId}/members`)
-  membersByGroup.value = { ...membersByGroup.value, [groupId]: response.items }
-}
-const refreshUsers = async (groupId: string) => {
-  const response = await loadJson<{ items: UserOption[] }>(`/api/groups/${groupId}/members/lookups`)
-  if (selectedGroup.value?.id === groupId) userResponse.value = response
+const refreshMembers = async (groupId: string, token = Symbol(groupId)) => {
+  if (disposed) return null
+  memberReads.value = { ...memberReads.value, [groupId]: { kind: 'pending', token } }
+  const isCurrent = () => !disposed && memberReads.value[groupId]?.token === token
+  try {
+    const response = await loadJson<{ items: Member[] }>(`/api/groups/${groupId}/members`)
+    if (!isCurrent()) return null
+    membersByGroup.value = { ...membersByGroup.value, [groupId]: response.items }
+    memberReads.value = { ...memberReads.value, [groupId]: { kind: 'success', token } }
+    return token
+  } catch (error) {
+    if (!isCurrent()) return null
+    memberReads.value = { ...memberReads.value, [groupId]: { kind: 'error', token } }
+    throw error
+  }
 }
 const loadGroupMembers = async (group: Group) => {
+  const token = Symbol(group.id)
+  if (selectedGroup.value?.id === group.id) users.reset()
   try {
-    userResponse.value = null
-    await refreshMembers(group.id)
-    if (selectedGroup.value?.id === group.id && can('group', 'update', { type: 'agency', agencyId: group.egcs_cn_agency })) await refreshUsers(group.id)
+    const accepted = await refreshMembers(group.id, token)
+    if (accepted !== null && !disposed && memberReads.value[group.id]?.token === token && selectedGroup.value?.id === group.id) await users.refresh()
   } catch (error) {
-    showError(error)
+    if (!disposed && memberReads.value[group.id]?.token === token && selectedGroup.value?.id === group.id) showError(error)
   }
 }
 const toggleGroup = (group: Group) => {
@@ -77,6 +114,8 @@ const toggleGroup = (group: Group) => {
   void loadGroupMembers(group)
 }
 const openMemberPicker = (group: Group) => {
+  if (disposed || !can('group', 'update', { type: 'agency', agencyId: group.egcs_cn_agency })) return
+  memberModalOpen.value = false
   selectedGroup.value = group
   void loadGroupMembers(group)
   memberForm.egcs_cn_user = ''
@@ -86,9 +125,12 @@ const openMemberPicker = (group: Group) => {
 const rows = computed<GroupRow[]>(() => groups.value.flatMap(group => [
   { id: `group:${group.id}`, group, member: null, placeholder: false, name: getBilingualValue(group, 'egcs_cn_name', group.id), email: group.egcs_cn_email },
   ...(expandedGroupIds.value.includes(group.id)
-    ? (membersByGroup.value[group.id]?.length
-        ? membersByGroup.value[group.id]!.map(member => ({ id: `member:${group.id}:${member.egcs_cn_user}`, group, member, placeholder: false, name: member.egcs_cn_name, email: '' }))
-        : [{ id: `empty:${group.id}`, group, member: null, placeholder: true, name: t('common.no_data'), email: '' }])
+    ? [
+        ...(membersByGroup.value[group.id] ?? []).map(member => ({ id: `member:${group.id}:${member.egcs_cn_user}`, group, member, placeholder: false, name: member.egcs_cn_name, email: '' })),
+        ...(!membersByGroup.value[group.id]?.length || memberReads.value[group.id]?.kind === 'error'
+          ? [{ id: `empty:${group.id}`, group, member: null, placeholder: true, name: t(memberReads.value[group.id]?.kind === 'error' ? 'common.load_failed' : memberReads.value[group.id]?.kind === 'success' ? 'common.no_data' : 'common.loading'), email: '' }]
+          : [])
+      ]
     : [])
 ]))
 const columns: TableColumnInput<GroupRow>[] = [
@@ -97,21 +139,35 @@ const columns: TableColumnInput<GroupRow>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const { getGroupedDisclosureControlsId } = useGroupedDisclosureIds()
+const retryGroupMembers = async (group: Group, event: MouseEvent) => {
+  const restoreFocus = event.currentTarget === document.activeElement
+  await loadGroupMembers(group)
+  await nextTick()
+  if (disposed || !restoreFocus || document.activeElement !== document.body) return
+  const control = document.querySelector(`[aria-controls="${getGroupedDisclosureControlsId(`group:${group.id}`)}"]`)
+  if (control instanceof HTMLElement) control.focus()
+}
 const isHeroCollapsed = useDashboard().getHeroCollapsed('groups')
 const heroStats = computed(() => [{ label: t('admin_common.total'), value: totalRecords.value }])
 const agencyOptions = computed(() => [
   { label: t('groups.all_agencies'), value: 'all' },
   ...(agencyResponse.value?.items ?? []).map(agency => ({ label: getBilingualValue(agency, 'egcs_ay_name', agency.id), value: agency.id }))
 ])
-const modalOpen: Ref<boolean> = ref(false)
+const editSession = useModalSession()
+let groupOpeningGeneration = 0
+const modalOpen = editSession.isOpen
 const editing: Ref<Group | null> = ref(null)
-const saving: Ref<boolean> = ref(false)
+const editPending = useCrudModalPending(editSession.captureSession)
+const saving = editPending.isPending
 const form = reactive({ egcs_cn_agency: '', egcs_cn_name_en: '', egcs_cn_name_fr: '', egcs_cn_email: '' })
 const validate = createValidator(GroupCreateSchema)
 /**
  *
  */
 const openCreate = () => {
+  if (disposed || !canCreate.value) return
+  groupOpeningGeneration += 1
+  modalOpen.value = false
   editing.value = null
   Object.assign(form, { egcs_cn_agency: '', egcs_cn_name_en: '', egcs_cn_name_fr: '', egcs_cn_email: '' })
   modalOpen.value = true
@@ -120,6 +176,9 @@ const openCreate = () => {
  *
  */
 const openEdit = (group: Group) => {
+  if (disposed || !can('group', 'update', { type: 'agency', agencyId: group.egcs_cn_agency })) return
+  groupOpeningGeneration += 1
+  modalOpen.value = false
   editing.value = group
   Object.assign(form, { egcs_cn_agency: group.egcs_cn_agency, egcs_cn_name_en: group.egcs_cn_name_en, egcs_cn_name_fr: group.egcs_cn_name_fr, egcs_cn_email: group.egcs_cn_email })
   modalOpen.value = true
@@ -128,67 +187,123 @@ const openEdit = (group: Group) => {
  *
  */
 const save = async () => {
-  if (saving.value) return
+  const session = editSession.captureSession()
+  const requestedGroup = editing.value
+  const operation = editContext.capture()
+  if (!operation?.canDispatch()) return
+  const openingGeneration = groupOpeningGeneration
+  if (disposed || session === null || (requestedGroup
+    ? !can('group', 'update', { type: 'agency', agencyId: requestedGroup.egcs_cn_agency })
+    : !canCreate.value) || !editPending.begin(session)) return
+  let committed = false
   try {
-    saving.value = true
-    const body = editing.value
+    const body = requestedGroup
       ? { egcs_cn_name_en: form.egcs_cn_name_en, egcs_cn_name_fr: form.egcs_cn_name_fr, egcs_cn_email: form.egcs_cn_email }
       : { ...form }
-    await loadJson(editing.value ? `/api/groups/${editing.value.id}` : '/api/groups', { method: editing.value ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    await loadJson(requestedGroup ? `/api/groups/${requestedGroup.id}` : '/api/groups', { method: requestedGroup ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    if (!operation.isCurrent() || !editSession.isCurrentSession(session)) return
+    committed = true
     modalOpen.value = false
     await refreshGroups()
   } catch (error) {
-    showError(error)
+    if (!disposed && operation.isCurrent() && openingGeneration === groupOpeningGeneration
+      && (editSession.isCurrentSession(session) || (committed && editSession.captureSession() === null))) showError(error)
   } finally {
-    saving.value = false
+    editPending.end(session)
   }
 }
+const editContext = useActionContext({
+  identity: [() => editing.value?.id, () => editing.value?.egcs_cn_agency ?? form.egcs_cn_agency],
+  authority: () => editing.value
+    ? can('group', 'update', { type: 'agency', agencyId: editing.value.egcs_cn_agency })
+    : canCreate.value,
+  eligible: () => {
+    const target = editing.value
+    return !target || groups.value.some(row => row.id === target.id && row.egcs_cn_agency === target.egcs_cn_agency)
+  }
+})
+const groupForm = useFormSession({ owner: editSession, action: { kind: 'remote', context: editContext }, submit: save })
 /**
  *
  */
 const remove = async (group: Group) => {
+  const operation = deleteContext.capture()
+  const groupId = group.id
+  const agencyId = group.egcs_cn_agency
+  if (!operation?.canDispatch()) return
   try {
-    const deleted = await confirmDeleteRequest(`/api/groups/${group.id}`, { description: t('groups.delete_confirm') })
-    if (!deleted) return
-    if (selectedGroup.value?.id === group.id) selectedGroup.value = null
-    expandedGroupIds.value = expandedGroupIds.value.filter(id => id !== group.id)
+    const deleted = await confirmDeleteRequest(`/api/groups/${groupId}`, {
+      description: t('groups.delete_confirm'),
+      operation,
+      target: {
+        id: groupId,
+        resolve: () => groups.value.find(row => row.id === groupId),
+        eligible: current => current.egcs_cn_agency === agencyId
+          && can('group', 'delete', { type: 'agency', agencyId })
+      },
+      shouldProceed: () => {
+        const current = groups.value.find(row => row.id === groupId && row.egcs_cn_agency === agencyId)
+        return !disposed && Boolean(current && can('group', 'delete', { type: 'agency', agencyId }))
+      }
+    })
+    if (!deleted || !operation.isCurrent()) return
+    if (selectedGroup.value?.id === groupId) selectedGroup.value = null
+    expandedGroupIds.value = expandedGroupIds.value.filter(id => id !== groupId)
     await refreshGroups()
-  } catch (error) { showError(error) }
+  } catch (error) { if (!disposed && operation.isCurrent()) showError(error) }
 }
 /**
  *
  */
 const addMember = async () => {
-  if (addingMember.value || !selectedGroup.value || !memberForm.egcs_cn_user) return
-  const groupId = selectedGroup.value.id
-  addingMember.value = true
+  const session = memberSession.captureSession()
+  const requestedGroup = selectedGroup.value
+  const operation = memberContext.capture()
+  if (!operation?.canDispatch()) return
+  if (disposed || session === null || !requestedGroup || !memberForm.egcs_cn_user
+    || !can('group', 'update', { type: 'agency', agencyId: requestedGroup.egcs_cn_agency })
+    || !memberPending.begin(session)) return
+  const groupId = requestedGroup.id
   try {
     await loadJson(`/api/groups/${groupId}/members`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memberForm) })
+    if (!operation.isCurrent() || !memberSession.isCurrentSession(session)) return
     await refreshMembers(groupId)
-    if (selectedGroup.value?.id === groupId) {
+    if (operation.isCurrent() && memberSession.isCurrentSession(session) && selectedGroup.value?.id === groupId) {
       memberForm.egcs_cn_user = ''
       memberModalOpen.value = false
     }
   } catch (error) {
-    showError(error)
+    if (operation.isCurrent() && memberSession.isCurrentSession(session)) showError(error)
   } finally {
-    addingMember.value = false
+    memberPending.end(session)
   }
 }
+const memberContext = useActionContext({
+  identity: [() => selectedGroup.value?.id, () => selectedGroup.value?.egcs_cn_agency],
+  authority: () => Boolean(selectedGroup.value && can('group', 'update', {
+    type: 'agency', agencyId: selectedGroup.value.egcs_cn_agency
+  })),
+  eligible: () => {
+    const target = selectedGroup.value
+    return Boolean(target && groups.value.some(row => row.id === target.id && row.egcs_cn_agency === target.egcs_cn_agency))
+  }
+})
+const memberFormBinding = useFormSession({ owner: memberSession, action: { kind: 'remote', context: memberContext }, submit: addMember })
 /**
  *
  */
 const removeMember = async (group: Group, member: Member) => {
   const rowId = `member:${group.id}:${member.egcs_cn_user}`
-  if (removingMemberIds.value.includes(rowId)) return
+  if (disposed || removingMemberIds.value.includes(rowId) || !can('group', 'update', { type: 'agency', agencyId: group.egcs_cn_agency })) return
   removingMemberIds.value = [...removingMemberIds.value, rowId]
   try {
     await loadJson(`/api/groups/${group.id}/members/${member.egcs_cn_user}`, { method: 'DELETE' })
+    if (disposed) return
     await refreshMembers(group.id)
   } catch (error) {
-    showError(error)
+    if (!disposed) showError(error)
   } finally {
-    removingMemberIds.value = removingMemberIds.value.filter(id => id !== rowId)
+    if (!disposed) removingMemberIds.value = removingMemberIds.value.filter(id => id !== rowId)
   }
 }
 </script>
@@ -203,9 +318,12 @@ const removeMember = async (group: Group, member: Member) => {
             <USelect v-model="selectedAgency" data-ui-target="groups.selected-agency" :items="agencyOptions" :aria-label="t('groups.agency_filter')" class="min-w-48" />
           </template>
           <template #name-cell="{ row }">
-            <div v-if="row.original.member || row.original.placeholder" :id="row.original.placeholder || membersByGroup[row.original.group.id]?.[0]?.egcs_cn_user === row.original.member?.egcs_cn_user ? getGroupedDisclosureControlsId(`group:${row.original.group.id}`) : undefined" class="flex items-center gap-2 pl-8">
+            <div v-if="row.original.member || row.original.placeholder" :id="(row.original.placeholder && !membersByGroup[row.original.group.id]?.length) || membersByGroup[row.original.group.id]?.[0]?.egcs_cn_user === row.original.member?.egcs_cn_user ? getGroupedDisclosureControlsId(`group:${row.original.group.id}`) : undefined" class="flex items-center gap-2 pl-8">
               <UIcon name="i-lucide-corner-down-right" class="size-4 text-muted" />
-              <span>{{ row.original.member?.egcs_cn_name ?? t('common.no_data') }}</span>
+              <span :role="row.original.placeholder ? memberReads[row.original.group.id]?.kind === 'error' ? 'alert' : 'status' : undefined">{{ row.original.name }}</span>
+              <UButton v-if="row.original.placeholder && memberReads[row.original.group.id]?.kind === 'error'" color="neutral" variant="link" :aria-label="`${t('common.retry')}: ${getBilingualValue(row.original.group, 'egcs_cn_name', row.original.group.id)}`" @click="retryGroupMembers(row.original.group, $event)">
+                {{ t('common.retry') }}
+              </UButton>
             </div>
             <CommonGroupedDisclosureButton v-else class="flex items-center gap-2 text-left" :expanded="expandedGroupIds.includes(row.original.group.id)" :controls="getGroupedDisclosureControlsId(row.original.id)" :label-en="row.original.group.egcs_cn_name_en" :label-fr="row.original.group.egcs_cn_name_fr" @toggle="toggleGroup(row.original.group)">
               <UIcon :name="expandedGroupIds.includes(row.original.group.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4" />
@@ -230,7 +348,14 @@ const removeMember = async (group: Group, member: Member) => {
       </div>
       <UModal v-model:open="memberModalOpen" :dismissible="!addingMember" :close="!addingMember" :title="t('groups.add_member')">
         <template #body>
-          <UForm :state="memberForm" :validate="validateMember" class="space-y-4" @submit="addMember">
+          <UForm v-bind="memberFormBinding" :state="memberForm" :validate="validateMember" class="space-y-4">
+            <UAlert v-if="users.status.value === 'error'" color="error" :title="t('common.lookup_load_failed')">
+              <template #actions>
+                <UButton color="neutral" variant="link" @click="users.refresh()">
+                  {{ t('common.retry') }}
+                </UButton>
+              </template>
+            </UAlert>
             <UFormField :label="t('groups.user')" name="egcs_cn_user" required>
               <USelectMenu
                 v-model="memberForm.egcs_cn_user"
@@ -252,7 +377,7 @@ const removeMember = async (group: Group, member: Member) => {
       </UModal>
       <UModal v-model:open="modalOpen" :dismissible="!saving" :close="!saving" :title="t('groups.title')">
         <template #body>
-          <UForm :state="form" :validate="validate" class="space-y-4" @submit="save">
+          <UForm v-bind="groupForm" :state="form" :validate="validate" class="space-y-4">
             <UFormField v-if="!editing" :label="t('nav.agencies')" name="egcs_cn_agency" required>
               <USelect v-model="form.egcs_cn_agency" :items="(agencyResponse?.items ?? []).map(agency => ({ label: getBilingualValue(agency, 'egcs_ay_name', agency.id), value: agency.id }))" required />
             </UFormField>

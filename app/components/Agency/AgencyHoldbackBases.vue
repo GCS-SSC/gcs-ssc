@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyHoldbackBasisWriteSchema, type AgencyHoldbackBasisItem } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 
@@ -15,10 +17,18 @@ const columns: TableColumnInput<AgencyHoldbackBasisItem>[] = [
 const bilingualColumns: BilingualColumnConfig<AgencyHoldbackBasisItem>[] = [
   { id: 'name', accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' } }
 ]
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.holdback_bases')"
     icon="i-lucide-percent"
     :fetch-url="`/api/agency/${agencyId}/holdback-bases`"

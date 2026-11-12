@@ -9,6 +9,7 @@ import { normalizeAssessmentDefinitionEditorState } from '~/composables/useAsses
 
 const {
   schema,
+  writeContext,
   loadError,
   loadStatus,
   retryLoad,
@@ -67,6 +68,7 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
       </UAlert>
       <div v-else-if="schema" class="flex flex-1 flex-col">
         <AssessmentSchemaDetailHero
+          :action-context="writeContext"
           :name="heroName"
           :entity-type="schema?.egcs_cn_entitytype"
           :publication-version="schema?.publicationVersion"

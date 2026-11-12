@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { computed, onScopeDispose, watch } from 'vue'
 import type { TransferPaymentStreamChartOfAccountItem } from '~~/shared/types/schemas/transfer-payment'
 
 const { profileId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
@@ -9,6 +10,14 @@ const { profileId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
   canDeleteChild: boolean
 }>()
 
+const writeContext = useActionContext({
+  identity: [() => profileId, () => streamId],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => profileId, () => streamId],
+  authority: () => canDeleteChild
+})
 const { t, locale } = useI18n()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const {
@@ -41,6 +50,14 @@ const { isOpen, openCreate, close, captureSession, closeSession } = useCrudModal
 
 watch(() => [profileId, streamId], close, { flush: 'sync' })
 
+let deletionContext: { kind: 'active' } | { kind: 'disposed' } = { kind: 'active' }
+watch(() => [profileId, streamId, canDeleteChild], () => {
+  deletionContext = { kind: 'active' }
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  deletionContext = { kind: 'disposed' }
+})
+
 const getActionTarget = (item: TransferPaymentStreamChartOfAccountItem & { fiscal_year_display: string }) =>
   `${item.fiscal_year_display || String(item.egcs_ay_fiscalyear)} [${item.id}]`
 
@@ -50,10 +67,16 @@ const getActionTarget = (item: TransferPaymentStreamChartOfAccountItem & { fisca
  * @param id - Chart of accounts entry identifier.
  */
 const onDelete = async (id: string) => {
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const requestedContext = deletionContext
+  const isCurrent = () => deletionContext.kind === 'active' && deletionContext === requestedContext && canDeleteChild
+  if (!isCurrent()) return
   const success = await confirmDeleteRequest(
-    `/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts/${id}`
+    `/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts/${id}`,
+    { operation, target: { id, resolve: () => items.value.find(current => current.id === id), eligible: current => current.id === id }, shouldProceed: isCurrent }
   )
-  if (success) await refresh()
+  if (success && operation.isCurrent() && isCurrent()) await refresh()
 }
 </script>
 
@@ -109,11 +132,12 @@ const onDelete = async (id: string) => {
     <TransferPaymentStreamChartOfAccountModal
       v-if="canUpdateChild"
       v-model="isOpen"
+      :action-context="writeContext"
       data-field-container="Composite editor; its individual field declarations own their identities."
       :stream-id="streamId"
       :profile-id="profileId"
       :capture-session="captureSession"
       :close-session="closeSession"
-      @save="refresh" />
+      :refresh-collection="refresh" />
   </div>
 </template>

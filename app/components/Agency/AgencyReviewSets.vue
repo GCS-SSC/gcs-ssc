@@ -3,9 +3,11 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
+import { useActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import type {
   TransferPaymentStreamReviewSetupItem,
   TransferPaymentStreamReviewSetupMember
@@ -23,6 +25,8 @@ const {
   canDeleteChild: boolean
 }>()
 
+const updateActionContext = useActionContext({ identity: [() => agencyId], authority: () => canUpdateChild })
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDeleteChild })
 const { t } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const localePath = useLocalePath()
@@ -47,6 +51,9 @@ type ReviewSetupWithMembers = TransferPaymentStreamReviewSetupItem & {
   publicationState: PublicationState
 }
 let reviewSetupModalIntent = 0
+type CatalogContext = { kind: 'active'; agencyId: string } | { kind: 'disposed' }
+let context: CatalogContext = { kind: 'active', agencyId }
+const isCurrentContext = (owner: CatalogContext) => owner.kind === 'active' && context === owner
 
 const beginReviewSetupModalIntent = () => {
   reviewSetupModalIntent += 1
@@ -120,9 +127,47 @@ const columnVisibility = ref<Record<string, boolean>>({
 const reviewSetQuery = computed(() => entityTypeFilter.value === 'all'
   ? {}
   : { entityType: entityTypeFilter.value })
-const { search, pagination, items, totalRecords, refresh, status } = useResourceTable<ReviewSetupWithMembers>({
-  fetchUrl: `/api/agency/${agencyId}/review-sets`,
+const { search, pagination, items, totalRecords, refresh, retry, status, error } = useResourceTable<ReviewSetupWithMembers>({
+  fetchUrl: computed(() => `/api/agency/${agencyId}/review-sets`),
   query: reviewSetQuery
+})
+const associateActionContext = useActionContext({
+  identity: [() => agencyId, () => associateReviewSetup.value?.id],
+  authority: () => canUpdateChild,
+  eligible: () => items.value.some(item => String(item.id) === String(associateReviewSetup.value?.id))
+})
+const schemaCreateActionContext = useActionContext({
+  identity: [() => agencyId, () => schemaCreateReviewSetup.value?.id],
+  authority: () => canUpdateChild,
+  eligible: () => items.value.some(item => String(item.id) === String(schemaCreateReviewSetup.value?.id))
+})
+watch([() => agencyId, () => canUpdateChild, () => canDeleteChild], () => {
+  context = { kind: 'active', agencyId }
+  beginReviewSetupModalIntent()
+  isFetchingNextOrder.value = false
+}, { flush: 'sync' })
+watch(() => agencyId, () => {
+  isOpen.value = false
+  isAssociateModalOpen.value = false
+  associateState.value = null
+  associateReviewSetup.value = null
+  isSchemaCreateModalOpen.value = false
+  schemaCreateState.value = null
+  schemaCreateReviewSetup.value = null
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context = { kind: 'disposed' }
+  beginReviewSetupModalIntent()
+})
+const captureCommitted = useCommittedSettlement({
+  context: updateActionContext,
+  /** @returns Explicit readback evidence for the parent table. */
+  settle: async () => {
+    await refresh()
+    return status.value === 'success'
+      ? { kind: 'available' }
+      : { kind: 'unavailable', error: error.value }
+  }
 })
 watch(entityTypeFilter, () => {
   pagination.value.pageIndex = 0
@@ -281,10 +326,11 @@ const expandedOptions = { autoResetExpanded: false }
 /**
  * Loads the next available review-setup order from the server for this stream scope.
  *
+ * @param ownerAgencyId - Agency captured when the create intent began.
  * @returns Server-calculated next execution order for a new review setup.
  */
-const getNextReviewSetupOrder = async () => {
-  const fetchResponse = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/review-sets/next-order`))
+const getNextReviewSetupOrder = async (ownerAgencyId: string) => {
+  const fetchResponse = await fetch(getClientRequestUrl(`/api/agency/${ownerAgencyId}/review-sets/next-order`))
   if (!fetchResponse.ok) await throwFetchResponseError(fetchResponse)
   const response = await fetchResponse.json() as { nextOrder: number }
   return response.nextOrder
@@ -296,15 +342,18 @@ const getNextReviewSetupOrder = async () => {
  * @param entityType - Optional entity type to prefill and lock for contextual create flows.
  */
 const onAdd = async (entityType?: ReviewSetupWithMembers['egcs_cn_entitytype']) => {
-  if (!canUpdateChild) {
+  const owner = context
+  if (owner.kind !== 'active' || !canUpdateChild) {
     return
   }
 
+  const operation = updateActionContext.capture()
+  if (!operation) return
   const intent = beginReviewSetupModalIntent()
   try {
     isFetchingNextOrder.value = true
-    const nextOrder = await getNextReviewSetupOrder()
-    if (intent !== reviewSetupModalIntent) {
+    const nextOrder = await getNextReviewSetupOrder(owner.agencyId)
+    if (!operation.canDispatch() || !isCurrentContext(owner) || intent !== reviewSetupModalIntent || !canUpdateChild) {
       return
     }
     openCreate()
@@ -316,11 +365,11 @@ const onAdd = async (entityType?: ReviewSetupWithMembers['egcs_cn_entitytype']) 
       }
     }
   } catch (error: unknown) {
-    if (intent === reviewSetupModalIntent) {
+    if (operation.isCurrent() && isCurrentContext(owner) && intent === reviewSetupModalIntent) {
       showError(error)
     }
   } finally {
-    if (intent === reviewSetupModalIntent) {
+    if (isCurrentContext(owner) && intent === reviewSetupModalIntent) {
       isFetchingNextOrder.value = false
     }
   }
@@ -332,6 +381,7 @@ const onAdd = async (entityType?: ReviewSetupWithMembers['egcs_cn_entitytype']) 
  * @param row - Review set selected from the overview.
  */
 const openReviewSetupDetail = async (row: ReviewSetupWithMembers) => {
+  if (context.kind !== 'active') return
   beginReviewSetupModalIntent()
   isFetchingNextOrder.value = false
   await router.push(localePath(appRouteLocations.agencyReviewSetDetail(agencyId, String(row.id))))
@@ -343,13 +393,23 @@ const openReviewSetupDetail = async (row: ReviewSetupWithMembers) => {
  * @param row - Review set selected from the overview.
  */
 const deleteReviewSetup = async (row: ReviewSetupWithMembers) => {
+  const owner = context
+  if (owner.kind !== 'active' || !canDeleteChild) return
+  const id = String(row.id)
+  const operation = deleteActionContext.capture()
+  const shouldProceed = () => isCurrentContext(owner) && canDeleteChild
   try {
     const deleted = await confirmDeleteRequest(
-      `/api/agency/${agencyId}/review-sets/${row.id}`
+      `/api/agency/${owner.agencyId}/review-sets/${id}`,
+      {
+        operation,
+        target: { id, resolve: () => items.value.find(current => String(current.id) === id), eligible: () => canDeleteChild },
+        shouldProceed
+      }
     )
-    if (deleted) await refresh()
+    if (deleted && operation?.isCurrent() && isCurrentContext(owner)) await refresh()
   } catch (error) {
-    showError(error)
+    if (operation?.isCurrent() && isCurrentContext(owner)) showError(error)
   }
 }
 
@@ -359,6 +419,8 @@ const deleteReviewSetup = async (row: ReviewSetupWithMembers) => {
  * @param row - Review set receiving the associated schema.
  */
 const openAssociateSchema = (row: ReviewSetupWithMembers) => {
+  if (context.kind !== 'active' || !canUpdateChild) return
+  beginReviewSetupModalIntent()
   const memberOrders = row.members?.map(member => member.egcs_cn_order) ?? []
   associateReviewSetup.value = row
   associateState.value = { egcs_cn_order: memberOrders.length ? Math.max(...memberOrders) + 1 : 1 }
@@ -371,6 +433,8 @@ const openAssociateSchema = (row: ReviewSetupWithMembers) => {
  * @param row - Review set receiving the new schema.
  */
 const openCreateSchema = (row: ReviewSetupWithMembers) => {
+  if (context.kind !== 'active' || !canUpdateChild) return
+  beginReviewSetupModalIntent()
   const memberOrders = row.members?.map(member => member.egcs_cn_order) ?? []
   schemaCreateReviewSetup.value = row
   schemaCreateState.value = {
@@ -388,10 +452,16 @@ const openCreateSchema = (row: ReviewSetupWithMembers) => {
  * @param payload.reviewType - Assessment or checklist discriminator.
  */
 const onSchemaCreated = async (payload: { schemaId: string, reviewType: 'assessment' | 'checklist' }) => {
-  await refresh()
-  await router.push(localePath(payload.reviewType === 'checklist'
-    ? appRouteLocations.agencyReviewSchemaDetail(agencyId, payload.schemaId)
-    : appRouteLocations.agencyReviewSchemaDetail(agencyId, payload.schemaId)))
+  const owner = context
+  const operation = updateActionContext.capture()
+  const intent = reviewSetupModalIntent
+  const isCurrent = () => Boolean(operation?.isCurrent()) && isCurrentContext(owner) && intent === reviewSetupModalIntent && canUpdateChild
+  if (owner.kind !== 'active' || !isCurrent()) return
+  try {
+    if (isCurrent()) await router.push(localePath(appRouteLocations.agencyReviewSchemaDetail(owner.agencyId, payload.schemaId)))
+  } catch (error) {
+    if (isCurrent()) showError(error)
+  }
 }
 
 /**
@@ -400,6 +470,8 @@ const onSchemaCreated = async (payload: { schemaId: string, reviewType: 'assessm
  * @param row - Review-set member row to open.
  */
 const openReviewSchema = async (row: ReviewSetupGroupedLeafRow) => {
+  if (context.kind !== 'active') return
+  beginReviewSetupModalIntent()
   await router.push(localePath(row.reviewType === 'checklist'
     ? appRouteLocations.agencyReviewSchemaDetail(agencyId, row.reviewSchemaId)
     : appRouteLocations.agencyReviewSchemaDetail(agencyId, row.reviewSchemaId)))
@@ -440,9 +512,11 @@ const updateExpandedRows = (value: ExpandedState) => {
       :expanded="expandedRows"
       :total-records="totalRecords"
       :loading="status === 'pending' || isFetchingNextOrder"
+      :request-status="status"
       :button-label="canUpdateChild ? t('common.add') : undefined"
       :show-button="canUpdateChild"
       @add="onAdd"
+      @retry="retry"
       @update:expanded="updateExpandedRows">
       <template #filters>
         <UFormField :label="t('transfer_payment.entity_type')" name="reviewSetEntityTypeFilter">
@@ -627,24 +701,27 @@ const updateExpandedRows = (value: ExpandedState) => {
       v-if="selected && canUpdateChild"
       v-model:open="isOpen"
       v-model:state="selected"
+      :action-context="updateActionContext"
       :agency-id="agencyId"
       :capture-session="captureSession"
       :close-session="closeSession"
-      @saved="refresh" />
+      :capture-committed="captureCommitted" />
     <TransferPaymentReviewSetupItemModal
       v-if="associateReviewSetup && associateState && canUpdateChild"
       v-model:open="isAssociateModalOpen"
       v-model:state="associateState"
+      :action-context="associateActionContext"
       :review-setup-id="String(associateReviewSetup.id)"
       :agency-id="agencyId"
       :entity-type="associateReviewSetup.egcs_cn_entitytype"
-      @saved="refresh" />
+      :capture-committed="captureCommitted" />
     <TransferPaymentReviewSetupSchemaCreateModal
       v-if="schemaCreateReviewSetup && schemaCreateState && canUpdateChild"
       v-model:open="isSchemaCreateModalOpen"
       v-model:state="schemaCreateState"
+      :action-context="schemaCreateActionContext"
       :review-setup-id="String(schemaCreateReviewSetup.id)"
       :agency-id="agencyId"
-      @created="onSchemaCreated" />
+      :capture-committed="captureCommitted" @created="onSchemaCreated" />
   </div>
 </template>

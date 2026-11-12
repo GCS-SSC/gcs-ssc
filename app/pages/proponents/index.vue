@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -46,6 +47,12 @@ const {
   fetchUrl: '/api/applicant-recipients'
 })
 
+const deleteContext = useActionContext({
+  identity: [deletingId, listView],
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']),
+  eligible: () => profiles.value.some(item => String(item.id) === deletingId.value && item.can_delete_role === true && item.can_delete === true)
+})
+
 watch(listView, () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
@@ -87,24 +94,34 @@ const deleteProfile = async (profile: ApplicantRecipientProfileRow) => {
   const ownerId = String(profile.id)
   const current = () => !disposed && status.value === 'success' && profiles.value.some(item => String(item.id) === ownerId && item.can_delete_role === true)
   deletingId.value = ownerId
+  const operation = deleteContext.capture()
+  if (!operation?.canDispatch()) {
+    deletingId.value = null
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+    return
+  }
   try {
     const live = await $fetch<Pick<ApplicantRecipientProfileRow, 'can_delete'>, string>(`/api/applicant-recipients/${ownerId}`)
-    if (!current()) return
+    if (!current() || !operation.canDispatch()) return
     if (!live.can_delete) {
       toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
       return
     }
-    const deleted = await confirmDeleteRequest(`/api/applicant-recipients/${ownerId}`, { shouldProceed: current })
-    if (!deleted || !current()) return
+    const deleted = await confirmDeleteRequest(`/api/applicant-recipients/${ownerId}`, {
+      operation,
+      target: { id: ownerId, resolve: () => profiles.value.find(item => String(item.id) === ownerId), eligible: row => row.can_delete_role === true && row.can_delete === true },
+      shouldProceed: current
+    })
+    if (!deleted || !operation.isCurrent()) return
     await refresh()
-    if (disposed) return
+    if (disposed || !operation.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (operation.isCurrent()) showError(error)
   } finally {
     deletingId.value = null
   }

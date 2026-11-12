@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
+import { useActionContext } from '~/composables/useActionContext'
+import type { CapturedActionContext } from '~/composables/useActionContext'
 import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc */
 import { onBeforeUnmount, computed, ref, watch } from 'vue'
+import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useAgreementOverview } from '~/composables/useAgreementOverview'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
@@ -38,11 +43,11 @@ type FiscalYearLookupItem = {
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 
-const { agreementId, currency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency, canCreate, canCreateRole, canUpdate, canDelete } = defineProps<{
   agreementId: string
   currency: string
   canCreate: boolean
-  canCreateRole?: boolean
+  canCreateRole: boolean
   canUpdate: boolean
   canDelete: boolean
 }>()
@@ -73,6 +78,7 @@ const { saveJson } = useJsonRequest()
 const { isRecordLocked } = useBusinessStatusState()
 
 const { search, pagination } = useTableListState()
+const claimTargetId: Ref<string | null> = ref(null)
 const claimModal = useCrudModal<FundingCaseAgreementClaimRow, FundingCaseAgreementClaimForm>({
   createState: () => ({
     egcs_fc_isfinalforyear: false,
@@ -110,6 +116,25 @@ const {
 } = useAgreementOverview<FundingCaseAgreementClaimOverviewRow>(computed(() => `/api/agreements/${agreementId}/claims-overview`))
 
 const claims = computed<FundingCaseAgreementClaimOverviewRow['claims']>(() => overview.value?.claims ?? [])
+const createContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canCreateRole
+})
+const updateContext = useActionContext({ identity: [agreementIdRef], authority: () => canUpdate })
+const deleteContext = useActionContext({ identity: [agreementIdRef], authority: () => canDelete })
+const committedReadback = async () => await refreshOverview()
+  ? { kind: 'available' as const }
+  : { kind: 'unavailable' as const, error: new Error('Claim collection refresh failed') }
+const captureCreateCommitted = useCommittedSettlement({ context: createContext, settle: committedReadback })
+const captureUpdateCommitted = useCommittedSettlement({ context: updateContext, settle: committedReadback })
+const writeContext = useActionContext({
+  identity: [agreementIdRef, claimTargetId],
+  authority: () => claimTargetId.value === null ? canCreateRole : canUpdate,
+  eligible: () => claimTargetId.value === null
+    ? canCreate
+    : claims.value.some(claim => String(claim.id) === claimTargetId.value
+      && !isRecordLocked(claim) && claim.fiscal_year_available !== false)
+})
 const budgetLineItems = computed<FundingCaseAgreementClaimOverviewRow['budgetLineItems']>(() => overview.value?.budgetLineItems ?? [])
 const claimLineItems = computed<FundingCaseAgreementClaimOverviewRow['lineItems']>(() => overview.value?.lineItems ?? [])
 const reconciles = computed<FundingCaseAgreementClaimOverviewRow['reconciles']>(() => overview.value?.reconciles ?? [])
@@ -217,6 +242,7 @@ const warnUnavailableFiscalYear = () => toast.add({
   color: 'warning'
 })
 const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementClaimRow | null> => {
+  if (!isCurrent()) return null
   const owner = agreementId
   const generation = recordActionGeneration
   const current = tableRows.value.find(row => String(row.id) === recordId)
@@ -251,16 +277,25 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete',
     return null
   }
 }
-const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementClaimRow) => void | Promise<void>) => {
+const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementClaimRow, operation: CapturedActionContext) => void | Promise<void>) => {
   if (pendingRecordActions.value.has(recordId)) return
+  const operation = (action === 'update' ? updateContext : deleteContext).capture()
+  if (!operation) return
   const intent = action === 'update' ? ++modalIntent : modalIntent
   const session = claimModal.captureSession()
-  const isCurrent = () => action === 'delete' || (intent === modalIntent && claimModal.captureSession() === session)
+  const isCurrent = () => operation.canDispatch()
+    && (action === 'delete' || (intent === modalIntent && claimModal.captureSession() === session))
   const token = Symbol(recordId)
   pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
   try {
-    const record = await loadWorkableRecord(recordId, action, isCurrent)
-    if (record && isCurrent()) await work(record)
+    const record = action === 'delete'
+      ? claims.value.find(claim => String(claim.id) === recordId)
+      : await loadWorkableRecord(recordId, action, isCurrent)
+    if (action === 'delete' && record && isRecordLocked(record)) {
+      warnRecordPrerequisite()
+      return
+    }
+    if (record && isCurrent()) await work(record, operation)
   } finally {
     if (pendingRecordActions.value.get(recordId) === token) {
       const remaining = new Map(pendingRecordActions.value)
@@ -271,6 +306,7 @@ const runRecordAction = async (recordId: string, action: 'update' | 'delete', wo
 }
 
 const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true): Promise<boolean> => {
+  if (!isCurrent()) return false
   const owner = agreementId
   const generation = recordActionGeneration
   try {
@@ -286,19 +322,23 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
 }
 const openCreateClaim = async () => {
   if (isOpeningCreate.value) return
+  const operation = createContext.capture()
+  if (!operation) return
   const intent = ++modalIntent
   const session = claimModal.captureSession()
-  const isCurrent = () => intent === modalIntent && claimModal.captureSession() === session
+  const isCurrent = () => operation.canDispatch() && intent === modalIntent && claimModal.captureSession() === session
   isOpeningCreate.value = true
   const generation = recordActionGeneration
   try {
     if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
+    claimTargetId.value = null
     claimModal.openCreate()
   } finally {
     if (generation === recordActionGeneration) isOpeningCreate.value = false
   }
 }
 const openUpdateClaim = (claimId: string) => runRecordAction(claimId, 'update', claim => {
+  claimTargetId.value = String(claim.id)
   claimModal.openUpdate(claim)
 })
 
@@ -307,33 +347,43 @@ const saveClaim = async () => {
     return
   }
   const claimState = selectedClaim.value
-  const isUpdate = Boolean(claimState.id)
+  const targetId = claimTargetId.value
+  if ((claimState.id ?? null) !== targetId) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  const owner = agreementId
+  const isUpdate = targetId !== null
+  const committed = (isUpdate ? captureUpdateCommitted : captureCreateCommitted)()
+  if (!committed) return
   const session = claimModal.captureSession()
   if (!claimPending.begin(session)) return
 
   try {
-    if (isUpdate && !await loadWorkableRecord(String(claimState.id), 'update',
-      () => isClaimModalOpen.value && claimModal.captureSession() === session)) return
-    if (!isUpdate && !await checkCreationPrerequisites(
-      () => isClaimModalOpen.value && claimModal.captureSession() === session)) return
-    if (disposed || claimModal.captureSession() !== session) return
-    await saveJson(
-      isUpdate
-        ? `/api/agreements/${agreementId}/claims/${claimState.id}`
-        : `/api/agreements/${agreementId}/claims`,
-      isUpdate ? 'PATCH' : 'POST',
-      claimState
-    )
-
-    if (!claimModal.closeSession(session)) return
-    if (!await refreshOverview()) return
+    try {
+      if (isUpdate && !await loadWorkableRecord(targetId, 'update',
+        () => operation.canDispatch() && isClaimModalOpen.value && claimModal.captureSession() === session)) return
+      if (!isUpdate && !await checkCreationPrerequisites(
+        () => operation.canDispatch() && isClaimModalOpen.value && claimModal.captureSession() === session)) return
+      if (!operation.canDispatch() || !committed.canDispatch() || disposed || claimModal.captureSession() !== session) return
+      await saveJson(
+        isUpdate
+          ? `/api/agreements/${owner}/claims/${targetId}`
+          : `/api/agreements/${owner}/claims`,
+        isUpdate ? 'PATCH' : 'POST',
+        claimState
+      )
+    } catch (error: unknown) {
+      if (operation.isCurrent() && !disposed && claimModal.isCurrentSession(session)) showError(error)
+      return
+    }
+    const closesInitiatingSession = operation.isCurrent() && claimModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (settlement.kind !== 'refreshed' || !claimModal.isLatestSession(session) || !closesInitiatingSession) return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
-  } catch (error: unknown) {
-    if (!disposed && isClaimModalOpen.value && claimModal.captureSession() === session) showError(error)
   } finally {
     claimPending.end(session)
   }
@@ -341,16 +391,23 @@ const saveClaim = async () => {
 
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const confirmDelete = useDeleteConfirm()
-const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', async () => {
+const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', async (_record, operation) => {
   const owner = agreementId
   const generation = recordActionGeneration
-  const shouldProceed = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  const shouldProceed = () => operation.isCurrent() && !disposed && owner === agreementId && generation === recordActionGeneration
   try {
     const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/claims/${recordId}`, {
+      operation,
+      target: {
+        id: recordId,
+        resolve: () => claims.value.find(claim => String(claim.id) === recordId),
+        eligible: claim => !isRecordLocked(claim)
+      },
       shouldProceed,
       confirm: async () => {
+        if (!await loadWorkableRecord(recordId, 'delete', () => operation.canDispatch())) return false
         if (!await confirmDelete() || !shouldProceed()) return false
-        return Boolean(await loadWorkableRecord(recordId, 'delete')) && shouldProceed()
+        return Boolean(await loadWorkableRecord(recordId, 'delete', () => operation.canDispatch())) && shouldProceed()
       }
     })
     if (!deleted || !shouldProceed()) return
@@ -360,6 +417,16 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
   } catch (error: unknown) {
     if (shouldProceed()) showError(error)
   }
+})
+const formSession = useFormSession({
+  owner: claimModal,
+  action: { kind: 'remote', context: writeContext },
+  onDenied: () => {
+    if (claimTargetId.value === null) return
+    const claim = claims.value.find(row => String(row.id) === claimTargetId.value)
+    if (canUpdate && claim?.fiscal_year_available === false) warnUnavailableFiscalYear()
+  },
+  submit: saveClaim
 })
 </script>
 
@@ -477,7 +544,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
 
     <UModal v-if="selectedClaim" v-model:open="isClaimModalOpen" :description="t('common.form_dialog_description')" :title="selectedClaim.id ? t('agreement.claims.edit') : t('agreement.claims.add')">
       <template #body>
-        <UForm :state="selectedClaim" :validate="validateClaim" :validate-on="[]" class="space-y-4" data-help-view="agreement.claims.claim-dialog" data-help-label-en="Agreements — Claim editor" data-help-label-fr="Ententes — Éditeur de demande de remboursement" @submit="saveClaim">
+        <UForm v-bind="formSession" :state="selectedClaim" :validate="validateClaim" :validate-on="[]" class="space-y-4" data-help-view="agreement.claims.claim-dialog" data-help-label-en="Agreements — Claim editor" data-help-label-fr="Ententes — Éditeur de demande de remboursement">
           <UFormField :label="t('agreement.claims.submitting_proponent')" name="egcs_fc_applicantrecipient" :description="t('agreement.claims.submitting_proponent_description')">
             <CommonServerLookupSelect
               v-model="selectedClaim.egcs_fc_applicantrecipient"

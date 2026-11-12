@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { Money } from '~~/shared/utils/money'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -26,6 +27,12 @@ const toast = useLocalizedToast()
 const warnPrerequisite = () => toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
 const { search, pagination, items, totalRecords, status, retry, refresh, response } = useResourceTable<ProponentCreditMemoRow>({
   fetchUrl: computed(() => `/api/applicant-recipients/${applicantRecipientId}/credit-memos`)
+})
+const { canAny } = useCan()
+const deleteContext = useActionContext({
+  identity: [() => applicantRecipientId, deletingId],
+  authority: () => canAny('account_receivable', 'delete', ['global', 'agency', 'program']),
+  eligible: () => items.value.some(item => item.id === deletingId.value && item.egcs_fc_kind === 'cash' && item.egcs_fc_candelete_role === true && item.egcs_fc_candelete)
 })
 const canCreate = computed(() => status.value === 'success' && profile !== null
   && (response.value as { egcs_fc_cancreate_role?: boolean } | undefined)?.egcs_fc_cancreate_role === true)
@@ -80,13 +87,20 @@ const created = async (id: string, proponentId: string) => {
 const deleteMemo = async (memo: ProponentCreditMemoRow) => {
   if (memo.egcs_fc_kind !== 'cash' || !memo.egcs_fc_candelete_role || deletingId.value || status.value !== 'success') return
   const ownerId = applicantRecipientId
-  deletingId.value = memo.id
+  const memoId = memo.id
+  deletingId.value = memoId
+  const operation = deleteContext.capture()
+  if (!operation?.canDispatch()) {
+    deletingId.value = null
+    warnPrerequisite()
+    return
+  }
   try {
     let page = 1
     let current: ProponentCreditMemoRow | undefined
     while (true) {
       const result = await $fetch<{ items: ProponentCreditMemoRow[]; total: number }, string>(`/api/applicant-recipients/${ownerId}/credit-memos`, { query: { page, limit: 100, search: memo.id } })
-      if (disposed || ownerId !== applicantRecipientId) return
+      if (disposed || ownerId !== applicantRecipientId || !operation.canDispatch()) return
       current = result.items.find(item => item.id === memo.id && item.egcs_fc_kind === 'cash')
       if (current || page * 100 >= result.total || result.items.length === 0) break
       page += 1
@@ -95,13 +109,15 @@ const deleteMemo = async (memo: ProponentCreditMemoRow) => {
       warnPrerequisite()
       return
     }
-    const deleted = await confirmDeleteRequest(`/api/account-receivable-credit-memos/${memo.id}`, {
+    const deleted = await confirmDeleteRequest(`/api/account-receivable-credit-memos/${memoId}`, {
+      operation,
+      target: { id: memoId, resolve: () => items.value.find(item => item.id === memoId), eligible: row => row.egcs_fc_kind === 'cash' && row.egcs_fc_candelete_role === true && row.egcs_fc_candelete },
       shouldProceed: () => !disposed && applicantRecipientId === ownerId && status.value === 'success' && items.value.some(item => item.id === memo.id
         && item.egcs_fc_kind === 'cash' && item.egcs_fc_candelete_role)
     })
-    if (deleted && !disposed && applicantRecipientId === ownerId) await refresh()
+    if (deleted && operation.isCurrent()) await refresh()
   } catch (error: unknown) {
-    if (!disposed && applicantRecipientId === ownerId) showError(error)
+    if (operation.isCurrent()) showError(error)
   } finally {
     deletingId.value = null
   }

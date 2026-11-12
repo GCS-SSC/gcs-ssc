@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import type { CommittedReadbackResult, CommittedSettlementResult } from '~/composables/useCommittedSettlement'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent AR casework follows the Correction request and workspace shell. */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowReactive, watch } from 'vue'
 import type { Ref } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 import { useUrlTabState } from '~/composables/useUrlTabState'
@@ -37,6 +42,12 @@ onBeforeUnmount(() => {
 const isHeroCollapsed = getHeroCollapsed('agreement-account-receivable-detail')
 const { data: receivable, status, error: detailError, refresh } = useAccountReceivableDetail(agreementId, accountReceivableId)
 
+const editContext = useActionContext({
+  identity: [agreementId, accountReceivableId],
+  authority: () => receivable.value?.egcs_fc_caneditrole === true,
+  eligible: () => !disposed && receivable.value?.id === accountReceivableId.value && receivable.value.egcs_fc_canedit
+})
+
 const entityType = computed(() => receivable.value?.egcs_fc_entitytype ?? (route.query.entityType === 'fundingcaseaccountreceivableadjustment' ? 'fundingcaseaccountreceivableadjustment' : 'fundingcaseaccountreceivable'))
 const approvalOnly = computed(() => !receivable.value && status.value === 'error'
   && detailError.value instanceof AppFetchResponseError && detailError.value.response.status === 403)
@@ -48,8 +59,8 @@ usePageResourceError({
 })
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
-const isEditOpen: Ref<boolean> = ref(false)
-let editSession = 0
+const editModal = useModalSession()
+const isEditOpen = editModal.isOpen
 const adjustmentOpen: Ref<boolean> = ref(false)
 const creditMemoOpen: Ref<boolean> = ref(false)
 const detailContent: Ref<HTMLElement | null> = ref(null)
@@ -89,7 +100,6 @@ const openEdit = () => {
   isEditOpen.value = true
 }
 watch(isEditOpen, open => {
-  editSession += 1
   if (!open && receivable.value && !saving.value) hydrate(receivable.value)
 }, { flush: 'sync' })
 watch(receivable, detail => {
@@ -138,6 +148,42 @@ const refreshPage = async () => {
   await refresh()
   refreshKey.value += 1
 }
+const readbackLines = async (): Promise<CommittedReadbackResult> => {
+  if (!await refresh()) return { kind: 'unavailable', error: detailError.value }
+  refreshKey.value += 1
+  return { kind: 'available' }
+}
+const captureLineCommitted = useCommittedSettlement({ context: editContext, settle: readbackLines })
+const pendingReductionPlans = shallowReactive(new Set<string>())
+const reductionContext = useActionContext({
+  identity: [agreementId, accountReceivableId, () => receivable.value?.egcs_fc_currency],
+  authority: () => receivable.value?.egcs_fc_caneditrole === true,
+  eligible: () => !disposed && receivable.value?.id === accountReceivableId.value
+    && receivable.value.egcs_fc_canedit && !receivable.value.egcs_fc_claimreductionlocked
+    && status.value === 'success' && !saving.value
+})
+const captureReductionCommitted = useCommittedSettlement({ context: reductionContext, settle: readbackLines })
+const { canAny } = useAuth()
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const lineDeleteContext = useActionContext({
+  identity: [agreementId, accountReceivableId, () => receivable.value?.egcs_fc_agencyfiscalyear, () => receivable.value?.egcs_fc_currency, () => Boolean(receivable.value?.egcs_fc_linkedreceivable)],
+  authority: () => canAny('account_receivable', 'delete'),
+  eligible: () => !disposed && receivable.value?.id === accountReceivableId.value
+    && receivable.value.egcs_fc_candeletelines && status.value === 'success' && !saving.value
+})
+const captureLineDeleted = useCommittedSettlement({ context: lineDeleteContext, settle: readbackLines })
+const removeLine = async (lineId: string, shouldProceed: () => boolean): Promise<CommittedSettlementResult | null> => {
+  const operation = lineDeleteContext.capture()
+  const committed = captureLineDeleted()
+  if (!operation?.canDispatch() || !committed?.canDispatch()) return null
+  const owner = accountReceivableId.value
+  if (!await confirmDeleteRequest(`/api/account-receivables/${owner}/lines/${lineId}`, {
+    operation,
+    target: { id: lineId, resolve: () => receivable.value?.egcs_fc_lines.find(line => line.id === lineId), eligible: () => receivable.value?.egcs_fc_candeletelines === true },
+    shouldProceed: () => committed.canDispatch() && shouldProceed()
+  })) return null
+  return committed.settle()
+}
 const retryLoad = async () => {
   if (await refresh()) {
     await nextTick()
@@ -146,16 +192,18 @@ const retryLoad = async () => {
 }
 const save = async () => {
   if (disposed || !isEditOpen.value || !state.value || !receivable.value?.egcs_fc_canedit || saving.value || status.value !== 'success') return
+  const operation = editContext.capture()
+  if (!operation?.canDispatch()) return
   const owner = accountReceivableId.value
   const requestIdentity = identity.value
   const submitted = JSON.stringify(state.value)
-  const session = editSession
+  const session = editModal.captureSession()
   saving.value = true
   try {
     await sendJson(`/api/account-receivables/${owner}`, 'PATCH', AccountReceivableSummaryEditSchema.parse(state.value))
-    if (disposed || requestIdentity !== identity.value || session !== editSession) return
+    if (disposed || !operation.isCurrent() || requestIdentity !== identity.value || !editModal.isCurrentSession(session)) return
     const refreshed = await refresh()
-    if (disposed || requestIdentity !== identity.value || session !== editSession) return
+    if (disposed || !operation.isCurrent() || requestIdentity !== identity.value || !editModal.isCurrentSession(session)) return
     if (refreshed && receivable.value && JSON.stringify(state.value) === submitted) {
       hydrate(receivable.value)
       isEditOpen.value = false
@@ -163,7 +211,7 @@ const save = async () => {
     refreshKey.value += 1
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
-    if (!disposed && requestIdentity === identity.value && session === editSession) showError(failure)
+    if (!disposed && operation.isCurrent() && requestIdentity === identity.value && editModal.isCurrentSession(session)) showError(failure)
   } finally {
     if (!disposed && requestIdentity === identity.value) saving.value = false
   }
@@ -179,6 +227,7 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
 }
 
 useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) === String(route.params.accountReceivableId) ? { entityType: 'fundingcaseaccountreceivable', entityId: receivable.value.id } : null)
+const formSession = useFormSession({ owner: editModal, action: { kind: 'remote', context: editContext }, submit: save })
 </script>
 
 <template>
@@ -197,7 +246,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="accountReceivableReference(receivable)" :meta-items="[getBilingualValue(receivable, 'egcs_fc_debtorname', t('common.not_available')), receivable.egcs_fc_fiscalyeardisplay, receivable.egcs_fc_currency.toUpperCase()]" :badges="heroBadges" :actions="heroActions" />
         <ULink v-if="receivable.egcs_fc_linkedreceivable && receivable.egcs_fc_parentreadable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, receivable.egcs_fc_linkedreceivable))" class="mb-4 text-sm">{{ t('account_receivable.linked_receivable') }}</ULink>
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.account-receivables.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-account-receivable-detail-content">
-          <AccountReceivableDetailLines v-if="selectedTab === 'lines'" data-help-view="casework.account-receivables.lines" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_canedit && !saving && status === 'success'" :can-delete="receivable.egcs_fc_candeletelines && !saving && status === 'success'" :can-update="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_caneditrole" @changed="refreshPage" />
+          <AccountReceivableDetailLines v-if="selectedTab === 'lines'" :capture-committed="captureLineCommitted" :remove-line="removeLine" data-help-view="casework.account-receivables.lines" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_canedit" :resource-pending="saving || status !== 'success'" :can-delete="receivable.egcs_fc_candeletelines" :can-update="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_caneditrole" />
           <div v-else-if="selectedTab === 'summary'" data-help-target="casework.account-receivables.summary.content" data-help-kind="section" data-help-view="casework.account-receivables.summary" class="space-y-8" data-testid="receivable-summary">
             <CommonSection :title="t('account_receivable.financial_summary')" badge="01">
               <CommonValueCard :label="t('account_receivable.type')" :value="getBilingualValue(receivable, 'egcs_fc_typename', t('common.not_available'))" :sub-value="getBilingualValue(receivable, 'egcs_fc_typedescription', '')" />
@@ -246,11 +295,11 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
             <ULink v-if="receivable.egcs_fc_proponentreadable" :to="localePath(appRouteLocations.proponentCreditMemoCollection(receivable.egcs_fc_applicantrecipient))" class="text-sm">{{ t('account_receivable.view_proponent_financial_activity') }}</ULink>
           </CommonSection>
           <section v-else-if="selectedTab === 'completion'" data-help-view="casework.account-receivables.completion" data-help-target="casework.account-receivables.detail.completion" data-help-kind="section" class="space-y-6">
-            <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel :entity-type="entityType" :entity-id="accountReceivableId" :can-complete="receivable.egcs_fc_canedit && !dirty && !saving && status === 'success'" :can-work-workflow="receivable.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.completion.title" description-key="account_receivable.completion.description" status-complete-key="account_receivable.completion.status_complete" status-locked-key="account_receivable.completion.status_locked" comment-placeholder-key="account_receivable.completion.comment_placeholder" complete-action-key="account_receivable.completion.complete" completed-success-key="account_receivable.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+            <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel :mutation-role-allowed="receivable.egcs_fc_caneditrole" :entity-type="entityType" :entity-id="accountReceivableId" :can-complete="receivable.egcs_fc_canedit && !dirty && !saving && status === 'success'" :can-work-workflow="receivable.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.completion.title" description-key="account_receivable.completion.description" status-complete-key="account_receivable.completion.status_complete" status-locked-key="account_receivable.completion.status_locked" comment-placeholder-key="account_receivable.completion.comment_placeholder" complete-action-key="account_receivable.completion.complete" completed-success-key="account_receivable.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
-          <AccountReceivableClaimReductions v-else-if="selectedTab === 'claim-reductions' && receivable.egcs_fc_claimrelated && !receivable.egcs_fc_linkedreceivable" data-help-view="casework.account-receivables.claim-reductions" :account-receivable-id="accountReceivableId" :currency="receivable.egcs_fc_currency" :declared-amount="receivable.egcs_fc_amount" :reductions="receivable.egcs_fc_claimreductions ?? []" :can-edit="receivable.egcs_fc_canedit" :can-update="receivable.egcs_fc_caneditrole" :read-only="receivable.egcs_fc_claimreductionlocked" @changed="refreshPage" />
+          <AccountReceivableClaimReductions v-else-if="selectedTab === 'claim-reductions' && receivable.egcs_fc_claimrelated && !receivable.egcs_fc_linkedreceivable" :capture-committed="captureReductionCommitted" :pending-receivables="pendingReductionPlans" :resource-pending="saving || status !== 'success'" data-help-view="casework.account-receivables.claim-reductions" :account-receivable-id="accountReceivableId" :currency="receivable.egcs_fc_currency" :declared-amount="receivable.egcs_fc_amount" :reductions="receivable.egcs_fc_claimreductions ?? []" :can-edit="receivable.egcs_fc_canedit" :can-update="receivable.egcs_fc_caneditrole" :read-only="receivable.egcs_fc_claimreductionlocked" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.account-receivables.reviews" :entity-type="entityType" :entity-id="accountReceivableId" :can-update="receivable.egcs_fc_canedit" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.account-receivables.workflows" :entity-type="entityType" :entity-id="accountReceivableId" purpose="standard" :can-edit="receivable.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="receivable.egcs_fc_caneditrole" data-help-view="casework.account-receivables.workflows" :entity-type="entityType" :entity-id="accountReceivableId" purpose="standard" :can-edit="receivable.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
           <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.account-receivables.supplementary-information" data-help-target="casework.account-receivables.supplementary-information.content">
             <CommonWorkflowSupplementaryInformation :show-header="false" :entity-type="entityType" :entity-id="accountReceivableId" />
           </section>
@@ -261,7 +310,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
     </CommonDetailPage>
     <UModal v-if="isEditOpen && receivable && state" v-model:open="isEditOpen" data-help-view="casework.account-receivables.detail.is-edit-open" :title="t('common.edit')" :description="t('common.form_dialog_description')" :dismissible="!saving" :close="{ disabled: saving }" :ui="{ content: 'sm:max-w-4xl' }">
       <template #body>
-        <UForm :state="state" :validate="createValidator(AccountReceivableSummaryEditSchema)" class="space-y-6" @submit="save">
+        <UForm v-bind="formSession" :state="state" :validate="createValidator(AccountReceivableSummaryEditSchema)" class="space-y-6">
           <UFormField v-if="receivable.egcs_fc_linkedreceivable" name="egcs_fc_agencyfinancialid" :label="t('account_receivable.financial_id')" required>
             <CommonServerLookupSelect v-model="state.egcs_fc_agencyfinancialid" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/financial-ids`" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="saving || !receivable.egcs_fc_canedit" close-on-select />
           </UFormField>

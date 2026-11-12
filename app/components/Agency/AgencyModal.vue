@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
-import { computed, nextTick, ref, useId } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import { AgencyProfileSchema, type AgencyProfileItem } from '~~/shared/types/schemas'
 
-const { title, submitLabel, pending = false } = defineProps<{
+const { title, submitLabel, pending = false, actionContext } = defineProps<{
   title: string
   submitLabel: string
   pending?: boolean
+  actionContext: ActionContext
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -41,8 +45,15 @@ const helpVisitId = useId()
 const helpContext = computed<GuideObservedContext>(() => ({ kind: 'owner', binding: null, execution: null, view: 'agency.edit', facts: [], visitId: helpVisitId, draftRevision: 0 }))
 
 const onSubmit = () => {
+  if (pending) return
   emit('submit')
 }
+const modalSession = useModalSession()
+watch([() => open.value, () => state.value, () => state.value.id], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 /** Signal a real structured-field edit after Vue updates the business control. */
 const completeActiveHelp = async () => {
   const complete = beginGuidedHelpAction(guidedHelpActions, helpForm.value?.$el ?? null, 'agency.edit.active', 'field-change', helpContext.value)
@@ -54,7 +65,7 @@ const completeActiveHelp = async () => {
 <template>
   <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" data-field-scope="agency.modal">
     <template #body>
-      <UForm ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="state" :validate="validate" class="space-y-4" data-help-view="agency.edit" @submit="onSubmit">
+      <UForm ref="helpForm" v-bind="formSession" :data-help-context="JSON.stringify(helpContext)" :state="state" :validate="validate" :disabled="pending" class="space-y-4" data-help-view="agency.edit">
         <UFormField :label="t('agency.gwcoa_number')" name="egcs_ay_gwcoanumber">
           <CommonServerLookupSelect
             v-model="state.egcs_ay_gwcoanumber"

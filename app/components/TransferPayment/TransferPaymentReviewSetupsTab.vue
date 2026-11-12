@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
@@ -7,7 +9,16 @@ import { z } from 'zod'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { appRouteLocations } from '~/utils/route-locations'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild
+})
 const { transferPaymentId, streamId, agencyId, canUpdateChild, showHeader = true } = defineProps<{
   transferPaymentId: string
   streamId: string
@@ -34,8 +45,21 @@ const { createValidator } = useZodI18n()
 const LinkSchema = z.object({
   egcs_tp_reviewset: z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' })
 }).strict()
-const state: Ref<{ egcs_tp_reviewset: string } | null> = ref(null)
-const isSaving: Ref<boolean> = ref(false)
+type LinkDraft = { egcs_tp_reviewset: string }
+type ViewLifecycle = { kind: 'active' } | { kind: 'disposed' }
+const lifecycle: Ref<ViewLifecycle> = shallowRef({ kind: 'active' })
+const modal = useCrudModal<LinkDraft, LinkDraft>({
+  createState: () => ({ egcs_tp_reviewset: '' }),
+  updateState: item => ({ ...item })
+})
+const { selected: state, isOpen: isLinkOpen } = modal
+const pending = useCrudModalPending(modal.captureSession)
+const isSaving = pending.isPending
+const isCurrentContext = (captured: ViewLifecycle) => captured.kind === 'active' && captured === lifecycle.value
+onBeforeUnmount(() => {
+  lifecycle.value = { kind: 'disposed' }
+  modal.close()
+})
 const endpoint = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-sets`)
 const { data, refresh, status } = await useFetch<{ items: ReviewSetLink[] }, FetchError, string>(endpoint)
 const items = computed(() => data.value?.items ?? [])
@@ -60,34 +84,45 @@ watch(() => items.value.length, () => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex,
     Math.max(0, Math.ceil(filteredItems.value.length / pagination.value.pageSize) - 1))
 })
-watch(endpoint, () => {
-  state.value = null
+watch([endpoint, () => agencyId, () => canUpdateChild], () => {
+  if (lifecycle.value.kind === 'disposed') return
+  lifecycle.value = { kind: 'active' }
+  modal.close()
   search.value = ''
   pagination.value.pageIndex = 0
-})
+}, { flush: 'sync' })
 const openLink = () => {
-  state.value = { egcs_tp_reviewset: '' }
+  if (lifecycle.value.kind === 'active' && canUpdateChild && agencyId) modal.openCreate()
 }
-const closeLink = () => {
-  state.value = null
-}
+const closeLink = modal.close
 /** Saves a selected Agency Review Set link on this Stream. */
 const saveLink = async () => {
-  if (!state.value || isSaving.value) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  if (!state.value || !canUpdateChild || lifecycle.value.kind === 'disposed') return
+  const session = modal.captureSession()
+  if (!pending.begin(session)) return
+  const context = lifecycle.value
+  const capturedEndpoint = endpoint.value
+  const body = JSON.stringify(state.value)
   try {
-    isSaving.value = true
-    const response = await fetch(getClientRequestUrl(endpoint.value), {
+    const response = await fetch(getClientRequestUrl(capturedEndpoint), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(state.value)
+      body
     })
     if (!response.ok) await throwFetchResponseError(response)
-    closeLink()
-    await refresh()
+    if (!(operation.isCurrent() && isCurrentContext(context))) return
+    const closedSession = modal.closeSession(session)
+    try {
+      await refresh()
+    } catch (error: unknown) {
+      if ((operation.isCurrent() && isCurrentContext(context)) && (modal.isCurrentSession(session) || (closedSession && modal.isLatestSession(session)))) showError(error)
+    }
   } catch (error: unknown) {
-    showError(error)
+    if ((operation.isCurrent() && isCurrentContext(context)) && modal.isCurrentSession(session)) showError(error)
   } finally {
-    isSaving.value = false
+    pending.end(session)
   }
 }
 /**
@@ -95,12 +130,23 @@ const saveLink = async () => {
  * @param link - The selected link.
  */
 const removeLink = async (link: ReviewSetLink) => {
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const id = link.id
+  if (!canUpdateChild || lifecycle.value.kind === 'disposed') return
+  const context = lifecycle.value
+  const capturedEndpoint = endpoint.value
   try {
-    if (await confirmDeleteRequest(`${endpoint.value}/${link.id}`)) await refresh()
+    const removed = await confirmDeleteRequest(`${capturedEndpoint}/${id}`, {
+      operation, target: { id, resolve: () => items.value.find(current => current.id === id), eligible: current => current.id === id },
+      shouldProceed: () => operation.isCurrent() && isCurrentContext(context) && canUpdateChild
+    })
+    if (removed && operation.isCurrent() && isCurrentContext(context)) await refresh()
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && isCurrentContext(context)) showError(error)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: writeContext }, submit: saveLink })
 </script>
 
 <template>
@@ -139,9 +185,9 @@ const removeLink = async (link: ReviewSetLink) => {
         </div>
       </template>
     </CommonResourceLayout>
-    <UModal :open="state !== null" :title="t('transfer_payment.review_setups')" @update:open="value => { if (!value) closeLink() }">
+    <UModal :open="isLinkOpen" :title="t('transfer_payment.review_setups')" @update:open="value => { if (!value) closeLink() }">
       <template #body>
-        <UForm v-if="state && agencyId" :state="state" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="saveLink">
+        <UForm v-if="state && agencyId" v-bind="formSession" :state="state" :validate="createValidator(LinkSchema)" class="space-y-4">
           <UFormField :label="t('transfer_payment.review_set')" name="egcs_tp_reviewset" required>
             <CommonServerLookupSelect
               v-model="state.egcs_tp_reviewset"

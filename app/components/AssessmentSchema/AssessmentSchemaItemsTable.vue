@@ -1,7 +1,7 @@
 <!-- eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Ref } from 'vue'
+import { useLocalRowEditor } from '~/composables/useLocalRowEditor'
 import { toRaw } from 'vue'
 import type { AssessmentItemRow } from '~/composables/useAssessmentSchemaEditorState'
 import {
@@ -29,10 +29,8 @@ const {
 
 const { t } = useI18n()
 
-const isEditorOpen: Ref<boolean> = ref(false)
-const editorMode: Ref<'create' | 'edit'> = ref('create')
-const editingKey: Ref<string | null> = ref(null)
-const draftItem: Ref<AssessmentItemRow | null> = ref(null)
+const rowEditor = useLocalRowEditor<AssessmentItemRow, string>()
+const { isOpen: isEditorOpen, mode: editorMode, target: editingKey, draft: draftItem, close: resetEditor } = rowEditor
 
 const weightTypeLabelMap = computed<Record<'fixed' | 'adjustable' | 'array', string>>(() => ({
   fixed: t('transfer_payment.fixed_weight'),
@@ -99,25 +97,12 @@ const columns = computed<TableColumn<AssessmentItemTableRow>[]>(() => [
 
 /**
  *
- */
-const resetEditor = () => {
-  isEditorOpen.value = false
-  editorMode.value = 'create'
-  editingKey.value = null
-  draftItem.value = null
-}
-
-/**
- *
  * @param type
  */
 const openCreateEditor = (type: 'question' | 'calculation') => {
-  editorMode.value = 'create'
-  editingKey.value = null
-  draftItem.value = type === 'question'
+  rowEditor.openCreate(type === 'question'
     ? structuredClone(createAssessmentQuestionRow())
-    : structuredClone(createAssessmentCalculationRow())
-  isEditorOpen.value = true
+    : structuredClone(createAssessmentCalculationRow()))
 }
 
 /**
@@ -130,10 +115,7 @@ const openEditEditor = (index: number) => {
     return
   }
 
-  editorMode.value = 'edit'
-  editingKey.value = currentItem._key
-  draftItem.value = structuredClone(toRaw(currentItem))
-  isEditorOpen.value = true
+  rowEditor.openEdit(currentItem._key, structuredClone(toRaw(currentItem)))
 }
 
 /**

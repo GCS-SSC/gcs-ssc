@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { z } from 'zod'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { Ref } from 'vue'
@@ -9,6 +11,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { PublicationState } from '~~/shared/constants/system-lifecycle'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 
 type LinkedWorkflow = {
   id: string
@@ -19,6 +22,14 @@ type LinkedWorkflow = {
   egcs_cn_purpose: string
   publicationState: PublicationState
 }
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId, () => entityType],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild
+})
 const { transferPaymentId, streamId, agencyId, canUpdateChild, entityType } = defineProps<{
   transferPaymentId: string
   streamId: string
@@ -31,15 +42,21 @@ const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
-const selectedWorkflowId: Ref<string | undefined> = ref(undefined)
-const isLinkOpen = ref(false)
-const isSaving = ref(false)
+type LinkDraft = { egcs_tp_workflow: string }
+type ViewLifecycle = { kind: 'active' } | { kind: 'disposed' }
+const lifecycle: Ref<ViewLifecycle> = shallowRef({ kind: 'active' })
+const modal = useCrudModal<LinkDraft, LinkDraft>({
+  createState: () => ({ egcs_tp_workflow: '' }),
+  updateState: item => ({ ...item })
+})
+const { selected: linkState, isOpen: isLinkOpen } = modal
+const pending = useCrudModalPending(modal.captureSession)
+const isSaving = pending.isPending
 const isDeleting = ref(false)
 const { createValidator } = useZodI18n()
 const LinkSchema = z.object({
   egcs_tp_workflow: z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' })
 }).strict()
-const linkState = computed(() => ({ egcs_tp_workflow: selectedWorkflowId.value }))
 const endpoint = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/workflows`)
 const { data, refresh, status } = await useFetch<{ items: LinkedWorkflow[] }, FetchError, string>(endpoint)
 const items = computed(() => (data.value?.items ?? [])
@@ -66,67 +83,72 @@ watch(() => items.value.length, () => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex,
     Math.max(0, Math.ceil(filteredItems.value.length / pagination.value.pageSize) - 1))
 })
-let session = 0
-let disposed = false
-const isCurrentSession = (captured: number) => !disposed && captured === session
-watch(isLinkOpen, () => {
-  session += 1
+const isCurrentContext = (captured: ViewLifecycle) => captured.kind === 'active' && captured === lifecycle.value
+watch(modal.captureSession, () => {
+  if (lifecycle.value.kind === 'active') lifecycle.value = { kind: 'active' }
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
-  disposed = true
+  lifecycle.value = { kind: 'disposed' }
+  modal.close()
 })
-watch([endpoint, () => entityType, () => canUpdateChild], () => {
-  session += 1
-  selectedWorkflowId.value = undefined
-  isLinkOpen.value = false
+watch([endpoint, () => agencyId, () => entityType, () => canUpdateChild], () => {
+  if (lifecycle.value.kind === 'disposed') return
+  lifecycle.value = { kind: 'active' }
+  modal.close()
   search.value = ''
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
 const openLink = () => {
-  selectedWorkflowId.value = undefined
-  session += 1
-  isLinkOpen.value = true
+  if (lifecycle.value.kind === 'active' && canUpdateChild && agencyId) modal.openCreate()
 }
 const add = async () => {
-  if (!canUpdateChild || !selectedWorkflowId.value || isSaving.value) return
-  const capturedSession = session
+  const operation = writeContext.capture()
+  if (!operation) return
+  if (!canUpdateChild || !linkState.value?.egcs_tp_workflow || lifecycle.value.kind === 'disposed') return
+  const session = modal.captureSession()
+  if (!pending.begin(session)) return
   const capturedEndpoint = endpoint.value
-  isSaving.value = true
+  const body = JSON.stringify(linkState.value)
   try {
     const response = await fetch(getClientRequestUrl(capturedEndpoint), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ egcs_tp_workflow: selectedWorkflowId.value })
+      body
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!isCurrentSession(capturedSession)) return
+    if (!operation.isCurrent()) return
     await refresh()
-    if (!isCurrentSession(capturedSession)) return
-    selectedWorkflowId.value = undefined
-    isLinkOpen.value = false
+    if (!operation.isCurrent() || !modal.isCurrentSession(session)) return
+    modal.closeSession(session)
   } catch (error) {
-    if (isCurrentSession(capturedSession)) showError(error)
+    if (operation.isCurrent() && modal.isCurrentSession(session)) showError(error)
   } finally {
-    isSaving.value = false
+    pending.end(session)
   }
 }
 const remove = async (item: LinkedWorkflow) => {
-  if (!canUpdateChild || disposed || isDeleting.value) return
-  const capturedSession = session
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const id = item.id
+  if (!canUpdateChild || lifecycle.value.kind === 'disposed' || isDeleting.value) return
+  const context = lifecycle.value
+  const capturedEndpoint = endpoint.value
   isDeleting.value = true
   try {
-    const removed = await confirmDeleteRequest(`${endpoint.value}/${item.id}`, {
-      shouldProceed: () => isCurrentSession(capturedSession) && canUpdateChild
+    const removed = await confirmDeleteRequest(`${capturedEndpoint}/${id}`, {
+      operation, target: { id, resolve: () => items.value.find(current => current.id === id), eligible: current => current.id === id },
+      shouldProceed: () => operation.isCurrent() && isCurrentContext(context) && canUpdateChild
     })
-    if (removed && isCurrentSession(capturedSession)) await refresh()
+    if (removed && operation.isCurrent() && isCurrentContext(context)) await refresh()
   } catch (error) {
-    if (isCurrentSession(capturedSession)) showError(error)
+    if (operation.isCurrent() && isCurrentContext(context)) showError(error)
   } finally {
     isDeleting.value = false
   }
 }
 const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_name_fr : item.egcs_cn_name_en)
   || item.egcs_cn_name_en || item.egcs_cn_name_fr || item.egcs_tp_workflow
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: writeContext }, submit: add })
 </script>
 
 <template>
@@ -165,10 +187,10 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
     </CommonResourceLayout>
     <UModal :open="isLinkOpen" :title="t('workflow.title')" @update:open="value => { isLinkOpen = value }">
       <template #body>
-        <UForm v-if="agencyId" :state="linkState" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="add">
+        <UForm v-if="linkState && agencyId" v-bind="formSession" :state="linkState" :validate="createValidator(LinkSchema)" class="space-y-4">
           <UFormField :label="t('workflow.title')" name="egcs_tp_workflow" required>
             <CommonServerLookupSelect
-              v-model="selectedWorkflowId" :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/workflows`" value-key="id"
+              v-model="linkState.egcs_tp_workflow" :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/workflows`" value-key="id"
               :include-deleted-query="false" selected-values-query-key="ids" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr"
               :query="{ limit: 100, ...(entityType ? { entityType } : {}) }" aria-required="true" />
           </UFormField>

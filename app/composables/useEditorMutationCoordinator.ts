@@ -1,11 +1,13 @@
 /* eslint-disable jsdoc/require-jsdoc -- returned closures are documented by the coordinator contract */
-import { computed, ref, shallowRef } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref, shallowRef } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
+import type { ActionContext, CapturedActionContext } from '~/composables/useActionContext'
 
 export type EditorMutationToken = {
   readonly id: number
   readonly session: number
   expectedDraft: string
+  readonly operation: CapturedActionContext
 }
 
 export type EditorMutationRunner = (
@@ -14,6 +16,7 @@ export type EditorMutationRunner = (
 
 type EditorMutationCoordinatorOptions = {
   getDraft: () => unknown
+  context: ActionContext
 }
 
 type ApplyMutationRefreshOptions = {
@@ -21,17 +24,24 @@ type ApplyMutationRefreshOptions = {
   mergeMetadata?: () => void
 }
 
+type EditorMutationState =
+  | { kind: 'idle' }
+  | { kind: 'pending'; action: string; token: EditorMutationToken }
+  | { kind: 'disposed' }
+
 type EditorMutationCoordinator = {
-  activeAction: Ref<string | null>
+  activeAction: ComputedRef<string | null>
   isDirty: ComputedRef<boolean>
   isPending: ComputedRef<boolean>
   isActionPending: (action: string) => boolean
   replaceSessionDraft: (apply: () => void) => void
+  acceptCommittedDraft: (token: EditorMutationToken, draft?: unknown) => boolean
   applyMutationRefresh: (
     token: EditorMutationToken,
     options: ApplyMutationRefreshOptions
   ) => boolean
   isTokenCurrent: (token: EditorMutationToken) => boolean
+  canContinue: (token: EditorMutationToken) => boolean
   run: <T>(
     action: string,
     mutation: (token: EditorMutationToken) => Promise<T>
@@ -46,6 +56,10 @@ const serializeDraft = (value: unknown) => JSON.stringify(value) ?? 'undefined'
  * The caller owns the draft shape and server requests. A completed mutation may replace
  * the draft only while its session is current and the user has not changed the draft
  * since dispatch. A same-session stale completion may still merge non-editable metadata.
+ * Confirmed whole-draft writes accept their committed baseline before refresh; child
+ * and metadata writes leave that baseline unchanged.
+ * Required action context separates canContinue admission from committed settlement.
+ * Ending the owning Vue scope invalidates its writes and refreshes.
  *
  * @param options - Current editable-draft serializer.
  * @returns Mutation ownership, dirty-state, and guarded refresh helpers.
@@ -53,18 +67,25 @@ const serializeDraft = (value: unknown) => JSON.stringify(value) ?? 'undefined'
 export const useEditorMutationCoordinator = (
   options: EditorMutationCoordinatorOptions
 ): EditorMutationCoordinator => {
-  const activeAction: Ref<string | null> = ref(null)
-  const activeToken: Ref<EditorMutationToken | null> = shallowRef(null)
+  const mutationState: Ref<EditorMutationState> = shallowRef({ kind: 'idle' })
+  const activeAction = computed(() => (
+    mutationState.value.kind === 'pending' ? mutationState.value.action : null
+  ))
   const persistedDraft: Ref<string | null> = ref(null)
   const session: Ref<number> = ref(0)
   let mutationSequence = 0
 
   const currentDraft = () => serializeDraft(options.getDraft())
   const isTokenCurrent = (token: EditorMutationToken) => (
-    activeToken.value === token && token.session === session.value
+    mutationState.value.kind === 'pending'
+    && mutationState.value.token === token
+    && token.session === session.value
+    && token.operation.isCurrent()
   )
+  const canContinue = (token: EditorMutationToken) => isTokenCurrent(token)
+    && token.operation.canDispatch()
   const isPending = computed(() => (
-    activeToken.value !== null && activeToken.value.session === session.value
+    mutationState.value.kind === 'pending' && mutationState.value.token.session === session.value
   ))
   const isDirty = computed(() => (
     persistedDraft.value !== null && persistedDraft.value !== currentDraft()
@@ -72,9 +93,9 @@ export const useEditorMutationCoordinator = (
   const isActionPending = (action: string) => isPending.value && activeAction.value === action
 
   const replaceSessionDraft = (apply: () => void) => {
+    if (mutationState.value.kind === 'disposed') return
     session.value += 1
-    activeAction.value = null
-    activeToken.value = null
+    mutationState.value = { kind: 'idle' }
     apply()
     persistedDraft.value = currentDraft()
   }
@@ -95,27 +116,40 @@ export const useEditorMutationCoordinator = (
     return true
   }
 
+  const acceptCommittedDraft = (token: EditorMutationToken, draft?: unknown) => {
+    if (!isTokenCurrent(token)) return false
+    persistedDraft.value = draft === undefined ? token.expectedDraft : serializeDraft(draft)
+    return true
+  }
+
   const run = async <T>(
     action: string,
     mutation: (token: EditorMutationToken) => Promise<T>
   ): Promise<T | undefined> => {
-    if (isPending.value) return undefined
+    if (mutationState.value.kind === 'disposed' || isPending.value) return undefined
+    const operation = options.context.capture()
+    if (!operation) return undefined
 
     const token: EditorMutationToken = {
       id: ++mutationSequence,
       session: session.value,
-      expectedDraft: currentDraft()
+      expectedDraft: currentDraft(),
+      operation
     }
-    activeAction.value = action
-    activeToken.value = token
+    mutationState.value = { kind: 'pending', action, token }
     try {
       return await mutation(token)
     } finally {
-      if (activeToken.value === token) {
-        activeToken.value = null
-        activeAction.value = null
+      if (mutationState.value.kind === 'pending' && mutationState.value.token === token) {
+        mutationState.value = { kind: 'idle' }
       }
     }
+  }
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      mutationState.value = { kind: 'disposed' }
+    })
   }
 
   return {
@@ -124,8 +158,10 @@ export const useEditorMutationCoordinator = (
     isPending,
     isActionPending,
     replaceSessionDraft,
+    acceptCommittedDraft,
     applyMutationRefresh,
     isTokenCurrent,
+    canContinue,
     run
   }
 }

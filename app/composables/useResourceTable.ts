@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid'
-import { computed, ref, shallowRef, unref, watch } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, unref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { UseResourceTableOptions, ResourceTableReturn, ResourceTableStatus } from '~~/shared/types/resource-table'
 import type { ListResponse } from '~~/shared/types/admin'
@@ -112,62 +112,61 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
   })
 
   const hasAcceptedInitialResponse = initialRequest.canFetch && requestStatus.value === 'success'
-  let initialRequestPending = initialRequest.canFetch
+  let initialRequestState: 'pending' | 'settled' = initialRequest.canFetch
     && requestStatus.value !== 'success'
     && requestStatus.value !== 'error'
+    ? 'pending'
+    : 'settled'
   let resolveInitialRequest: () => void = () => {}
   const initialRequestCompletion = new Promise<void>(resolve => {
     resolveInitialRequest = resolve
   })
-  if (!initialRequestPending) {
+  if (initialRequestState === 'settled') {
     resolveInitialRequest()
   }
-  const acceptedResponse: Ref<ListResponse<T> | undefined> = shallowRef(
-    hasAcceptedInitialResponse ? requestResponse.value : undefined
-  )
-  const acceptedQuery: Ref<Record<string, unknown> | undefined> = shallowRef(
-    hasAcceptedInitialResponse ? initialRequest.query : undefined
-  )
-  const acceptedResourceIdentity: Ref<string | null> = ref(
-    hasAcceptedInitialResponse
-      ? initialRequest.resourceIdentity
-      : null
-  )
+  type AcceptedEvidence = { kind: 'absent' } | {
+    kind: 'accepted'
+    response: ListResponse<T> | null | undefined
+    query: Record<string, unknown>
+    resourceIdentity: string
+  }
+  const evidence: Ref<AcceptedEvidence> = shallowRef(hasAcceptedInitialResponse
+    ? { kind: 'accepted', response: requestResponse.value, query: initialRequest.query, resourceIdentity: initialRequest.resourceIdentity }
+    : { kind: 'absent' })
   const status: Ref<ResourceTableStatus> = ref(requestStatus.value)
   const error: Ref<FetchError | undefined> = shallowRef(requestError.value)
-  let requestGeneration = 0
-  let activeRefreshRequest: Promise<void> | null = null
+  type RequestOwner = { kind: 'initial' } | { kind: 'refresh'; token: object } | { kind: 'disabled' } | { kind: 'disposed' }
+  let requestOwner: RequestOwner = { kind: 'initial' }
+  let refreshTransport: { kind: 'idle' } | { kind: 'running'; request: Promise<void> } = { kind: 'idle' }
   watch([requestResponse, requestStatus, requestError], ([nextResponse, nextStatus, nextError]) => {
-    if (initialRequestPending && (nextStatus === 'success' || nextStatus === 'error')) {
-      initialRequestPending = false
+    if (initialRequestState === 'pending' && (nextStatus === 'success' || nextStatus === 'error')) {
+      initialRequestState = 'settled'
       resolveInitialRequest()
     }
 
-    if (requestGeneration !== 0) {
+    if (requestOwner.kind !== 'initial') {
       return
     }
 
     status.value = nextStatus
     error.value = nextError
     if (initialRequest.canFetch && nextStatus === 'success') {
-      acceptedResponse.value = nextResponse
-      acceptedQuery.value = initialRequest.query
-      acceptedResourceIdentity.value = initialRequest.resourceIdentity
+      evidence.value = { kind: 'accepted', response: nextResponse, query: initialRequest.query, resourceIdentity: initialRequest.resourceIdentity }
     }
   })
   const displayedResponse = computed(() => {
-    if (acceptedResourceIdentity.value !== resourceIdentity.value) {
+    if (evidence.value.kind !== 'accepted' || evidence.value.resourceIdentity !== resourceIdentity.value) {
       return undefined
     }
 
-    return acceptedResponse.value
+    return evidence.value.response
   })
   const displayedQuery = computed(() => {
-    if (acceptedResourceIdentity.value !== resourceIdentity.value) {
+    if (evidence.value.kind !== 'accepted' || evidence.value.resourceIdentity !== resourceIdentity.value) {
       return undefined
     }
 
-    return acceptedQuery.value
+    return evidence.value.query
   })
   const items = computed(() => {
     const responseItems: unknown = displayedResponse.value?.items
@@ -184,36 +183,38 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
 
   /** Refreshes the current request and commits only the newest matching result. */
   const refresh = async (): Promise<void> => {
-    if (!isFetchable.value) {
+    if (!isFetchable.value || requestOwner.kind === 'disposed') {
       return
     }
 
-    const currentGeneration = ++requestGeneration
+    const token = {}
+    requestOwner = { kind: 'refresh', token }
+    const ownsRequest = () => requestOwner.kind === 'refresh' && requestOwner.token === token
     const requestedResourceIdentity = resourceIdentity.value
     const requestedQuery = { ...query.value }
     status.value = 'pending'
     error.value = undefined
 
-    if (initialRequestPending) {
+    if (initialRequestState === 'pending') {
       await initialRequestCompletion
     }
 
     if (
-      currentGeneration !== requestGeneration
+      !ownsRequest()
       || requestedResourceIdentity !== resourceIdentity.value
     ) {
       return
     }
 
-    while (activeRefreshRequest) {
+    while (refreshTransport.kind === 'running') {
       try {
-        await activeRefreshRequest
+        await refreshTransport.request
       } catch {
         // The request owner publishes the current error; queued refreshes only wait for isolation.
       }
 
       if (
-        currentGeneration !== requestGeneration
+        !ownsRequest()
         || requestedResourceIdentity !== resourceIdentity.value
       ) {
         return
@@ -221,12 +222,12 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
     }
 
     const currentRefreshRequest = refreshRequest()
-    activeRefreshRequest = currentRefreshRequest
+    refreshTransport = { kind: 'running', request: currentRefreshRequest }
     try {
       await currentRefreshRequest
     } catch (requestFailure: unknown) {
       if (
-        currentGeneration === requestGeneration
+        ownsRequest()
         && requestedResourceIdentity === resourceIdentity.value
       ) {
         status.value = 'error'
@@ -235,13 +236,13 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
       }
       return
     } finally {
-      if (activeRefreshRequest === currentRefreshRequest) {
-        activeRefreshRequest = null
+      if (refreshTransport.kind === 'running' && refreshTransport.request === currentRefreshRequest) {
+        refreshTransport = { kind: 'idle' }
       }
     }
 
     if (
-      currentGeneration !== requestGeneration
+      !ownsRequest()
       || requestedResourceIdentity !== resourceIdentity.value
     ) {
       return
@@ -250,9 +251,7 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
     status.value = requestStatus.value
     error.value = requestError.value
     if (requestStatus.value === 'success') {
-      acceptedResponse.value = requestResponse.value
-      acceptedQuery.value = requestedQuery
-      acceptedResourceIdentity.value = requestedResourceIdentity
+      evidence.value = { kind: 'accepted', response: requestResponse.value, query: requestedQuery, resourceIdentity: requestedResourceIdentity }
     }
   }
 
@@ -267,14 +266,12 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
 
   watch(isFetchable, canFetch => {
     if (!canFetch) {
-      requestGeneration += 1
-      if (initialRequestPending) {
-        initialRequestPending = false
+      if (requestOwner.kind !== 'disposed') requestOwner = { kind: 'disabled' }
+      if (initialRequestState === 'pending') {
+        initialRequestState = 'settled'
         resolveInitialRequest()
       }
-      acceptedResponse.value = undefined
-      acceptedQuery.value = undefined
-      acceptedResourceIdentity.value = null
+      evidence.value = { kind: 'absent' }
       clear()
       status.value = 'idle'
       error.value = undefined
@@ -288,6 +285,14 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
 
     void refresh().catch(() => undefined)
   }, { deep: true })
+
+  onScopeDispose(() => {
+    requestOwner = { kind: 'disposed' }
+    if (initialRequestState === 'pending') {
+      initialRequestState = 'settled'
+      resolveInitialRequest()
+    }
+  }, true)
 
   return {
     search,

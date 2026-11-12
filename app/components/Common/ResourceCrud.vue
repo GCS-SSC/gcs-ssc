@@ -1,14 +1,19 @@
 <script setup lang="ts" generic="T extends { id: string } & Record<string, unknown>">
 import { useGuidedHelpDiscovery } from '~/composables/useGuidedHelpDiscovery'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { useResourceCrudState } from '~/composables/useResourceCrudState'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import type { z } from 'zod'
-import { useId, useSlots, type Ref } from 'vue'
+import { useId, useSlots, watch, type Ref } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { EnumKey } from '~/types/enums'
 
 const {
+  action,
+  deleteEligible,
   title,
   fetchUrl,
   staticItems,
@@ -43,6 +48,8 @@ const {
   modalUi,
   embedded = false
 } = defineProps<{
+  action: ResourceCrudAction
+  deleteEligible?: (row: T) => boolean
   title: string
   icon: string
   fetchUrl: string
@@ -79,9 +86,9 @@ const {
   embedded?: boolean
 }>()
 
-const effectivePostUrl = computed(() => staticMode || !createAllowed ? undefined : postUrl)
-const effectiveUpdateUrlBase = computed(() => staticMode || !updateAllowed ? undefined : updateUrlBase)
-const effectiveDeleteUrlBase = computed(() => staticMode || !deleteAllowed ? undefined : deleteUrlBase)
+const effectivePostUrl = computed(() => action.kind === 'read-only' || staticMode || !createAllowed ? undefined : postUrl)
+const effectiveUpdateUrlBase = computed(() => action.kind === 'read-only' || staticMode || !updateAllowed ? undefined : updateUrlBase)
+const effectiveDeleteUrlBase = computed(() => action.kind === 'read-only' || staticMode || !deleteAllowed ? undefined : deleteUrlBase)
 
 const emit = defineEmits(['added', 'updated', 'deleted', 'update:statusFilter'])
 
@@ -104,9 +111,9 @@ const helpContext = computed<GuideObservedContext>(() => ({
   facts: [], visitId: `${helpInstanceId}:${helpModalVisit.value}`, draftRevision: 0
 }))
 let helpCreateCompleted: (() => void) | null = null
-let helpSaveCompleted: (() => void) | null = null
 
 const {
+  formActionContext,
   validate,
   search,
   pagination,
@@ -128,6 +135,8 @@ const {
   saveItem,
   deleteItem
 } = useResourceCrudState<T>({
+  action: () => action,
+  deleteEligible,
   title,
   fetchUrl: computed(() => fetchUrl),
   createAllowed: () => createAllowed && !staticMode,
@@ -137,7 +146,7 @@ const {
   deleteUrlBase: effectiveDeleteUrlBase,
   updateMethod,
   schema,
-  initialNewItem,
+  initialNewItem: () => initialNewItem ?? null,
   beforeOpen,
   beforeSave,
   beforeDelete,
@@ -146,14 +155,8 @@ const {
   updateTitle,
   deleteConfirmKey,
   statusFilter,
-  emitAdded: () => {
-    emit('added')
-    helpSaveCompleted?.()
-  },
-  emitUpdated: () => {
-    emit('updated')
-    helpSaveCompleted?.()
-  },
+  emitAdded: () => emit('added'),
+  emitUpdated: () => emit('updated'),
   emitDeleted: () => emit('deleted')
 })
 
@@ -173,13 +176,16 @@ const completeHelpModal = () => {
 /** Retains the submitted control identity when successful Save closes its modal. */
 const saveGuidedItem = async () => {
   if (isSaving.value) return
-  helpSaveCompleted = beginGuidedHelpAction(guidedHelpActions, helpForm.value?.$el ?? null, helpSaveTarget, 'save-success', helpContext.value)
-  try {
-    await saveItem()
-  } finally {
-    helpSaveCompleted = null
-  }
+  const onSaved = beginGuidedHelpAction(guidedHelpActions, helpForm.value?.$el ?? null, helpSaveTarget, 'save-success', helpContext.value)
+  await saveItem({ onSaved })
 }
+
+const formOwner = useModalSession()
+watch([isModalOpen, formState], () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = isModalOpen.value && formState.value !== null
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: formActionContext }, submit: saveGuidedItem })
 
 defineExpose({
   search,
@@ -202,7 +208,7 @@ defineExpose({
       :button-label="buttonLabel"
       :help-add-target="helpAddTarget"
       :help-search-target="helpSearchTarget"
-      :show-button="showButton && createAllowed && !staticMode"
+      :show-button="showButton && action.kind === 'remote' && createAllowed && !staticMode"
       :search-placeholder="searchPlaceholder"
       :data="items"
       :columns="columns"
@@ -252,7 +258,7 @@ defineExpose({
       @after:enter="completeHelpModal"
       @after:leave="helpCreateCompleted = null">
       <template #body>
-        <UForm v-if="formState" ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="formState" :validate="validate" :validate-on="helpSaveTarget && guidedHelpActive ? ['input', 'blur', 'change'] : []" :disabled="isSaving" class="space-y-4" @submit="saveGuidedItem">
+        <UForm v-if="formState" v-bind="formSession" ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="formState" :validate="validate" :validate-on="helpSaveTarget && guidedHelpActive ? ['input', 'blur', 'change'] : []" :disabled="isSaving" class="space-y-4">
           <slot name="form" :state="formState" />
 
           <div class="flex justify-end gap-2 pt-4">

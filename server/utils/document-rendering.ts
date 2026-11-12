@@ -76,11 +76,15 @@ const awaitWithinRenderBudget = async <T>(
   operation: Promise<T>,
   deadline: number,
   totalBudgetMs: number
-): Promise<T> => await awaitWithTimeout(
-  operation,
-  getRemainingRenderBudgetMs(deadline, totalBudgetMs),
-  `Chromium document rendering timed out after ${String(totalBudgetMs)} ms`
-)
+): Promise<T> => {
+  // Dispatch has already started; observe rejection even if the budget check throws.
+  void operation.catch(() => undefined)
+  return await awaitWithTimeout(
+    operation,
+    getRemainingRenderBudgetMs(deadline, totalBudgetMs),
+    `Chromium document rendering timed out after ${String(totalBudgetMs)} ms`
+  )
+}
 
 export const getFallbackValue = (language: Language_Preference = 'eng'): string => fallbackValues[language]
 

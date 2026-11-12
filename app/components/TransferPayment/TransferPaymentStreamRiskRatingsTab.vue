@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { TransferPaymentStreamRiskRatingItem } from '~~/shared/types/schemas/transfer-payment'
 import type { TableColumnInput, BilingualColumnConfig } from '~/composables/useTableColumns'
-import { watch } from 'vue'
+import { onScopeDispose, watch } from 'vue'
 
 const {
   transferPaymentId,
@@ -15,6 +16,14 @@ const {
   canDeleteChild: boolean
 }>()
 
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canDeleteChild
+})
 const { t } = useI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -23,8 +32,11 @@ const modal = useCrudModal<TransferPaymentStreamRiskRatingItem>({
   updateState: item => ({ ...item })
 })
 const { isOpen, openUpdate, selected, captureSession, closeSession } = modal
+type DeleteContext = { kind: 'active' } | { kind: 'disposed' }
+let deleteContext: DeleteContext = { kind: 'active' }
+const ownsDeleteContext = (owner: DeleteContext) => owner.kind === 'active' && deleteContext === owner
 const openCreate = () => {
-  if (canUpdateChild) modal.openCreate()
+  if (canUpdateChild && deleteContext.kind === 'active') modal.openCreate()
 }
 const { getBilingualValue } = useBilingualValue()
 const getActionTarget = (row: TransferPaymentStreamRiskRatingItem) =>
@@ -57,23 +69,39 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentStreamRiskRatingIte
  * @param row - Risk rating row selected for deletion.
  */
 const onDelete = async (row: TransferPaymentStreamRiskRatingItem) => {
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const id = row.id
+  const owner = deleteContext
+  const shouldProceed = () => ownsDeleteContext(owner) && canDeleteChild
+  if (!shouldProceed()) return
   try {
-    const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/risk-ratings/${row.id}`
+    const deleted = await confirmDeleteRequest(
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/risk-ratings/${id}`,
+      { operation, target: { id, resolve: () => items.value.find(current => current.id === id), eligible: current => current.id === id }, shouldProceed }
     )
-    if (!ok) return
-  } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
+    if (!deleted || !operation.isCurrent() || !shouldProceed()) return
     await refresh()
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && shouldProceed()) showError(error)
   }
 }
 
-watch([() => transferPaymentId, () => streamId], () => modal.close())
+watch([() => transferPaymentId, () => streamId], () => {
+  if (deleteContext.kind !== 'active') return
+  deleteContext = { kind: 'active' }
+  modal.close()
+}, { flush: 'sync' })
+watch(() => canDeleteChild, () => {
+  if (deleteContext.kind === 'active') deleteContext = { kind: 'active' }
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) modal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  deleteContext = { kind: 'disposed' }
+  modal.close()
+})
 </script>
 
 <template>
@@ -128,9 +156,10 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
     v-if="selected && canUpdateChild"
     v-model:open="isOpen"
     v-model:state="selected"
+    :action-context="writeContext"
     :transfer-payment-id="transferPaymentId"
     :stream-id="streamId"
     :capture-session="captureSession"
     :close-session="closeSession"
-    @saved="refresh" />
+    :refresh-collection="refresh" />
 </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyCostCategoryLineItemSchema, AgencyCostCategoryLineItemInitial, type AgencyCostCategoryLineItemItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -22,10 +24,18 @@ const columns: TableColumnInput<AgencyCostCategoryLineItemItem>[] = [
 ]
 
 const initialNewItem = { ...AgencyCostCategoryLineItemInitial }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => categoryId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => categoryId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => categoryId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.budget_line_items')"
     icon="i-lucide-list-checks"
     :fetch-url="`/api/agency/cost-categories/${categoryId}/line-items`"

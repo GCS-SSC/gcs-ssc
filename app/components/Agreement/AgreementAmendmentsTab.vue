@@ -260,9 +260,10 @@ const createAmendment = async () => {
   createOperation = token
   const shouldProceed = () => !createDisposed && agreementId === owner && canCreate
     && createGeneration === generation && createOperation === token
+  const canDispatch = () => shouldProceed() && isCreateOpen.value
   try {
     isSaving.value = true
-    if (!await checkCreatePrerequisites(owner, shouldProceed) || !shouldProceed()) return
+    if (!await checkCreatePrerequisites(owner, canDispatch) || !canDispatch()) return
     await saveJson(`/api/agreements/${owner}/amendments`, 'POST', payload)
     if (!shouldProceed()) return
     isCreateOpen.value = false
@@ -364,10 +365,10 @@ const createAmendment = async () => {
         <form class="space-y-4" data-help-view="agreement.amendments.create-dialog" data-help-label-en="Agreements — Create amendment" data-help-label-fr="Ententes — Créer une modification" @submit.prevent="createAmendment">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('agreement.amendments.name_en')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_en">
-              <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" />
+              <UInput v-model="amendmentNameEn" :disabled="isSaving" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
             <UFormField :label="t('agreement.amendments.name_fr')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_fr">
-              <UInput v-model="amendmentNameFr" :aria-describedby="nameRequirementId" class="w-full" />
+              <UInput v-model="amendmentNameFr" :disabled="isSaving" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
           </div>
           <p :id="nameRequirementId" class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -379,6 +380,7 @@ const createAmendment = async () => {
           <UFormField :label="t('agreement.amendments.type')" required data-ui-target="agreement.amendments-tab.agreement.amendments.type">
             <CommonServerLookupSelect
               v-model:values="selectedTypeIds"
+              :disabled="isSaving"
               multiple
               :limit="100"
               :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/types`"
@@ -394,6 +396,7 @@ const createAmendment = async () => {
             :required="subtypeRequired" data-ui-target="agreement.amendments-tab.agreement.amendments.subtypes">
             <CommonServerLookupSelect
               v-model:values="selectedSubtypeIds"
+              :disabled="isSaving"
               multiple
               :limit="100"
               :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/subtypes`"

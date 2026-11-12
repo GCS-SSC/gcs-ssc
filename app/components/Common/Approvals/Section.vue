@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-returns -- legacy approval helpers remain concise during request hardening */
 /* eslint-disable @stylistic/comma-dangle -- generic Vue arrows need parser-disambiguating commas */
+import { useActionContext } from '~/composables/useActionContext'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
@@ -8,7 +10,7 @@ import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
 import type { FetchError } from 'ofetch'
 import { nanoid } from 'nanoid'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { ListResponse, UserOptionItem } from '~~/shared/types/admin'
@@ -135,22 +137,44 @@ const grouping: Ref<string[]> = ref([ROUTING_SLIP_GROUP_COLUMN_ID])
 const columnVisibility: Ref<Record<string, boolean>> = ref({
   [ROUTING_SLIP_GROUP_COLUMN_ID]: false
 })
-const isActionModalOpen: Ref<boolean> = ref(false)
+type ActionSession = { step: ApprovalStepItem; draft: ActionModalState }
+type ReassignSession = { step: ApprovalStepItem; draft: ReassignModalState }
+type AddStepSession = { step: ApprovalStepItem; routingSlip: ApprovalRoutingSlipItem; draft: AddApprovalModalState }
+const actionModal = useCrudModal<ActionSession, ActionSession>({ updateState: session => session })
+const reassignModal = useCrudModal<ReassignSession, ReassignSession>({ updateState: session => session })
+const addStepModal = useCrudModal<AddStepSession, AddStepSession>({ updateState: session => session })
+const actionPending = useCrudModalPending(actionModal.captureSession)
+const reassignPending = useCrudModalPending(reassignModal.captureSession)
+const addStepPending = useCrudModalPending(addStepModal.captureSession)
+const isSubmittingAction = actionPending.isPending
+const isSubmittingReassign = reassignPending.isPending
+const isSubmittingAddStep = addStepPending.isPending
+const isActionModalOpen = actionModal.isOpen
+const isReassignModalOpen = computed({
+  get: () => reassignModal.isOpen.value,
+  set: (open: boolean) => { if (!open) closeReassignModal() }
+})
+const isAddStepModalOpen = computed({
+  get: () => addStepModal.isOpen.value,
+  set: (open: boolean) => { if (!open) closeAddStepModal() }
+})
 watch(isActionModalOpen, open => {
   if (open) void checkBehalfTypes()
 }, { flush: 'sync' })
-const isReassignModalOpen: Ref<boolean> = ref(false)
-const isAddStepModalOpen: Ref<boolean> = ref(false)
-const selectedActionStep: Ref<ApprovalStepItem | null> = ref(null)
-const selectedActionState: Ref<ActionModalState | null> = ref(null)
-const selectedReassignStep: Ref<ApprovalStepItem | null> = ref(null)
-const selectedReassignState: Ref<ReassignModalState | null> = ref(null)
-const selectedAddStep: Ref<ApprovalStepItem | null> = ref(null)
-const selectedAddStepRoutingSlip: Ref<ApprovalRoutingSlipItem | null> = ref(null)
-const selectedAddStepState: Ref<AddApprovalModalState | null> = ref(null)
-const isSubmittingAction: Ref<boolean> = ref(false)
-const isSubmittingReassign: Ref<boolean> = ref(false)
-const isSubmittingAddStep: Ref<boolean> = ref(false)
+const selectedActionStep = computed(() => actionModal.selected.value?.step ?? null)
+const selectedActionState = computed({
+  get: () => actionModal.selected.value?.draft ?? null,
+  set: (draft: ActionModalState | null) => { if (draft && actionModal.selected.value) actionModal.selected.value.draft = draft }
+})
+const selectedReassignStep = computed(() => reassignModal.selected.value?.step ?? null)
+const selectedReassignState = computed(() => reassignModal.selected.value?.draft ?? null)
+const selectedAddStep = computed(() => addStepModal.selected.value?.step ?? null)
+const selectedAddStepRoutingSlip = computed(() => addStepModal.selected.value?.routingSlip ?? null)
+const selectedAddStepState = computed({
+  get: () => addStepModal.selected.value?.draft ?? null,
+  set: (draft: AddApprovalModalState | null) => { if (draft && addStepModal.selected.value) addStepModal.selected.value.draft = draft }
+})
+
 const entityIdentity = computed(() => `${entityType}:${entityId}`)
 let entityGeneration = 0
 
@@ -189,6 +213,28 @@ const routingSlips = computed<ApprovalRoutingSlipItem[]>(() => {
   const slips = response.routingSlips ?? []
   if (routingSlipId === undefined || routingSlipId === null) return slips
   return slips.filter(slip => String(slip.id) === String(routingSlipId))
+})
+
+const currentAddStepRoutingSlip = computed(() => routingSlips.value.find(
+  item => String(item.id) === String(selectedAddStepRoutingSlip.value?.id)
+))
+const currentAddStep = computed(() => currentAddStepRoutingSlip.value?.steps.find(
+  item => String(item.id) === selectedAddStepState.value?.anchorApprovalId
+))
+const addStepContext = useActionContext({
+  identity: [
+    () => entityType,
+    () => entityId,
+    () => currentAddStepRoutingSlip.value?.id,
+    () => currentAddStepRoutingSlip.value?.approvalRuntimeId,
+    () => currentAddStep.value?.id,
+    () => currentAddStep.value?.runtimeItemId,
+    () => selectedAddStepState.value?.position
+  ],
+  // The server projection includes both business-work and assigned-approver authority.
+  authority: () => selectedAddStepState.value?.position === 'before'
+    ? currentAddStep.value?.can_add_before === true
+    : currentAddStep.value?.can_add_after === true
 })
 
 const userOptions = computed(() => (userLookupResponse.value?.items ?? []).map(user => ({
@@ -381,10 +427,13 @@ const buildExpandedRowsForRoutingSlips = (
  *
  */
 const refreshApprovalsPreservingExpandedRows = async () => {
+  const refreshedGeneration = entityGeneration
   const preservedExpandedRows = getExpandedRowRecord()
 
   await refreshApprovals()
+  if (refreshedGeneration !== entityGeneration) return
   await nextTick()
+  if (refreshedGeneration !== entityGeneration) return
 
   if (routingSlips.value.length === 0) {
     expandedRows.value = preservedExpandedRows
@@ -480,7 +529,7 @@ const openActionModal = (row: ApprovalTableRow) => {
     return
   }
 
-  selectedActionStep.value = {
+  const step: ApprovalStepItem = {
     id: row.stepId,
     runtimeItemId: row.stepRuntimeItemId,
     runtimeState: row.stepRuntimeState,
@@ -518,7 +567,7 @@ const openActionModal = (row: ApprovalTableRow) => {
     can_add_after: row.can_add_after,
     certifications: row.certifications
   }
-  selectedActionState.value = {
+  const draft: ActionModalState = {
     approvalId: row.stepId,
     assignedDiffersFromDefault: Boolean(row.egcs_cn_defaultuser || row.egcs_cn_defaultgroup) && !claimantMatchesDefault(row),
     isOnBehalf: Boolean(row.egcs_cn_defaultuser || row.egcs_cn_defaultgroup) && !claimantMatchesDefault(row),
@@ -535,7 +584,7 @@ const openActionModal = (row: ApprovalTableRow) => {
       egcs_cn_certification_fr: certification.egcs_cn_certification_fr
     }))
   }
-  isActionModalOpen.value = true
+  actionModal.openUpdate({ step, draft })
 }
 
 /**
@@ -547,9 +596,7 @@ const closeActionModal = (force = false) => {
     return
   }
 
-  isActionModalOpen.value = false
-  selectedActionStep.value = null
-  selectedActionState.value = null
+  actionModal.close()
 }
 
 /**
@@ -580,7 +627,7 @@ const openReassignModal = (row: ApprovalTableRow) => {
     return
   }
 
-  selectedReassignStep.value = {
+  const step: ApprovalStepItem = {
     id: row.stepId,
     runtimeItemId: row.stepRuntimeItemId,
     runtimeState: row.stepRuntimeState,
@@ -616,21 +663,21 @@ const openReassignModal = (row: ApprovalTableRow) => {
     can_add_after: row.can_add_after,
     certifications: row.certifications
   }
-  selectedReassignState.value = {
+  const draft: ReassignModalState = {
     approvalId: row.stepId,
     egcs_cn_assigneduser: row.egcs_cn_assigneduser ?? row.egcs_cn_defaultuser ?? '',
     egcs_cn_assignedgroup: row.egcs_cn_assignedgroup
   }
-  isReassignModalOpen.value = true
+  reassignModal.openUpdate({ step, draft })
 }
 
 /**
- *
+ * Closes the current reassignment unless its request is pending.
+ * @param force Whether a completed request or identity reset may close the session.
  */
-const closeReassignModal = () => {
-  isReassignModalOpen.value = false
-  selectedReassignStep.value = null
-  selectedReassignState.value = null
+const closeReassignModal = (force = false) => {
+  if (isSubmittingReassign.value && !force) return
+  reassignModal.close()
 }
 
 /** Opens a policy-prefilled additional approval draft at the selected anchor.
@@ -651,7 +698,7 @@ const openAddStepModal = (row: ApprovalTableRow, position: AddApprovalPosition) 
     return
   }
 
-  selectedAddStep.value = {
+  const step: ApprovalStepItem = {
     id: row.stepId,
     runtimeItemId: row.stepRuntimeItemId,
     runtimeState: row.stepRuntimeState,
@@ -681,8 +728,7 @@ const openAddStepModal = (row: ApprovalTableRow, position: AddApprovalPosition) 
     can_add_after: row.can_add_after,
     certifications: row.certifications
   }
-  selectedAddStepRoutingSlip.value = routingSlip
-  selectedAddStepState.value = {
+  const draft: AddApprovalModalState = {
     anchorApprovalId: row.stepId,
     position,
     egcs_cn_assigneduser: '',
@@ -698,7 +744,7 @@ const openAddStepModal = (row: ApprovalTableRow, position: AddApprovalPosition) 
         _key: nanoid()
       }))
   }
-  isAddStepModalOpen.value = true
+  addStepModal.openUpdate({ step, draft, routingSlip })
 }
 
 /** Clears the additional approval draft unless submission is still pending.
@@ -709,24 +755,24 @@ const closeAddStepModal = (force = false) => {
     return
   }
 
-  isAddStepModalOpen.value = false
-  selectedAddStep.value = null
-  selectedAddStepRoutingSlip.value = null
-  selectedAddStepState.value = null
+  addStepModal.close()
 }
 
 watch(entityIdentity, () => {
   entityGeneration += 1
-  isSubmittingAction.value = false
-  isSubmittingReassign.value = false
-  isSubmittingAddStep.value = false
   closeActionModal(true)
-  closeReassignModal()
+  closeReassignModal(true)
   closeAddStepModal(true)
   expandedRows.value = {}
   search.value = ''
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
+onBeforeUnmount(() => {
+  entityGeneration += 1
+  actionModal.close()
+  reassignModal.close()
+  addStepModal.close()
+})
 
 /** Adds a blank bilingual certification to the additional approval draft. */
 const addAdditionalCertification = () => {
@@ -793,6 +839,8 @@ const submitAddStep = async () => {
     return
   }
 
+  const operation = addStepContext.capture()
+  if (!operation) return
   const body = {
     entityType,
     entityId,
@@ -823,11 +871,13 @@ const submitAddStep = async () => {
       : {})
   } satisfies AddApprovalStepInput
 
+  const session = addStepModal.captureSession()
+  const submittedGeneration = entityGeneration
+  if (!addStepPending.begin(session)) return
   try {
-    const submittedGeneration = entityGeneration
-    isSubmittingAddStep.value = true
+    if (!operation.canDispatch()) return
     await saveJson('/api/approvals/add-step', 'POST', body)
-    if (submittedGeneration !== entityGeneration) return
+    if (!operation.isCurrent() || submittedGeneration !== entityGeneration || !addStepModal.isCurrentSession(session)) return
     emit('changed')
     closeAddStepModal(true)
     toast.add({
@@ -838,12 +888,12 @@ const submitAddStep = async () => {
     try {
       await refreshApprovalsPreservingExpandedRows()
     } catch (refreshError) {
-      showError(refreshError)
+      if (operation.isCurrent() && submittedGeneration === entityGeneration) showError(refreshError)
     }
   } catch (error) {
-    showError(error)
+    if (operation.isCurrent() && submittedGeneration === entityGeneration && addStepModal.isCurrentSession(session)) showError(error)
   } finally {
-    isSubmittingAddStep.value = false
+    addStepPending.end(session)
   }
 }
 
@@ -960,16 +1010,17 @@ const submitAction = async (decision: 'approve' | 'deny') => {
       }
     : basePayload
 
+  const session = actionModal.captureSession()
+  const submittedGeneration = entityGeneration
+  if (!actionPending.begin(session)) return
   try {
-    const submittedGeneration = entityGeneration
-    isSubmittingAction.value = true
     if (decision === 'approve') {
       await saveJson('/api/approvals/approve', 'POST', actionPayload satisfies ReviewApprovalApproveInput)
     } else {
       await saveJson('/api/approvals/deny', 'POST', actionPayload satisfies ReviewApprovalDenyInput)
     }
 
-    if (submittedGeneration !== entityGeneration) return
+    if (submittedGeneration !== entityGeneration || !actionModal.isCurrentSession(session)) return
     emit('changed')
     if (selectedActionState.value?.approvalId === submittedApprovalId) {
       closeActionModal(true)
@@ -982,12 +1033,12 @@ const submitAction = async (decision: 'approve' | 'deny') => {
     try {
       await refreshApprovalsPreservingExpandedRows()
     } catch (refreshError) {
-      showError(refreshError)
+      if (submittedGeneration === entityGeneration) showError(refreshError)
     }
   } catch (error) {
-    showError(error)
+    if (submittedGeneration === entityGeneration && actionModal.isCurrentSession(session)) showError(error)
   } finally {
-    isSubmittingAction.value = false
+    actionPending.end(session)
   }
 }
 
@@ -997,17 +1048,18 @@ const submitReassign = async () => {
     return
   }
 
+  const session = reassignModal.captureSession()
+  const submittedGeneration = entityGeneration
+  if (!reassignPending.begin(session)) return
   try {
-    const submittedGeneration = entityGeneration
-    isSubmittingReassign.value = true
     await saveJson('/api/approvals/reassign', 'POST', {
       approvalId: selectedReassignState.value.approvalId,
       egcs_cn_assigneduser: selectedReassignState.value.egcs_cn_assignedgroup ? null : selectedReassignState.value.egcs_cn_assigneduser,
       egcs_cn_assignedgroup: selectedReassignState.value.egcs_cn_assignedgroup ?? null
     } satisfies ReviewApprovalReassignInput)
-    if (submittedGeneration !== entityGeneration) return
+    if (submittedGeneration !== entityGeneration || !reassignModal.isCurrentSession(session)) return
     emit('changed')
-    closeReassignModal()
+    closeReassignModal(true)
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.updated_success'),
@@ -1016,12 +1068,12 @@ const submitReassign = async () => {
     try {
       await refreshApprovalsPreservingExpandedRows()
     } catch (refreshError) {
-      showError(refreshError)
+      if (submittedGeneration === entityGeneration) showError(refreshError)
     }
   } catch (error) {
-    showError(error)
+    if (submittedGeneration === entityGeneration && reassignModal.isCurrentSession(session)) showError(error)
   } finally {
-    isSubmittingReassign.value = false
+    reassignPending.end(session)
   }
 }
 </script>
@@ -1242,6 +1294,7 @@ const submitReassign = async () => {
       v-model:state="selectedAddStepState"
       :entity-type="entityType"
       :entity-id="entityId"
+      :action-context="addStepContext"
       :anchor-step="selectedAddStep"
       :routing-slip="selectedAddStepRoutingSlip"
       :is-submitting="isSubmittingAddStep"

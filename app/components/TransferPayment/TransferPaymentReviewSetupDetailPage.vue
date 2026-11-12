@@ -3,7 +3,7 @@ import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { TransferPaymentStreamReviewSetupCreateSchema } from '~~/shared/types/schemas'
 /* eslint-disable jsdoc/require-jsdoc -- page-local navigation and persistence handlers */
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
@@ -25,6 +25,9 @@ import type {
   EditorMutationToken
 } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import { useActionContext } from '~/composables/useActionContext'
 
 type ReviewSetupMember = TransferPaymentStreamReviewSetupMember & { id: string }
 type ReviewSetupDetail = Omit<TransferPaymentStreamReviewSetupItem, 'members'> & {
@@ -58,6 +61,7 @@ const endpoint = `/api/agency/${agencyId}/review-sets/${reviewSetupId}`
 const { data: agency } = await useFetch<AgencyProfileItem, FetchError, string>(`/api/agency/${agencyId}`)
 const { data: setup, error: loadError, status: loadStatus, refresh } = await useFetch<ReviewSetupDetail, FetchError, string>(endpoint)
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
+const generalForm = useTemplateRef<{ validate: () => Promise<unknown> }>('generalForm')
 const cloneSetup = (value: ReviewSetupDetail): ReviewSetupDetail => ({
   ...value,
   egcs_cn_approvaltemplate: value.egcs_cn_approvaltemplate ?? undefined,
@@ -82,6 +86,11 @@ const isEditable = computed(() => state.value?.publicationState !== 'retired')
 const canUpdate = computed(() => canManagePublication.value && isEditable.value)
 const canCreate = canUpdate
 const canDelete = canUpdate
+const publicationContext = useActionContext({
+  identity: [() => agencyId, () => reviewSetupId],
+  authority: canManagePublication,
+  eligible: () => state.value !== null && isEditable.value
+})
 const isLoadRetrying = computed(() => loadStatus.value === 'pending')
 const entityTypeItems = computed(() => TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM.map(value => ({
   label: t(`enums.entity_type.${value}`),
@@ -110,7 +119,17 @@ const getDraft = () => state.value
       egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
     }
   : null
-const mutation = useEditorMutationCoordinator({ getDraft })
+const mutation = useEditorMutationCoordinator({ getDraft, context: publicationContext })
+const formOwner = useModalSession()
+watch(state, () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = state.value !== null
+}, { immediate: true, flush: 'sync' })
+let lifetime: 'active' | 'disposed' = 'active'
+const isActive = () => lifetime === 'active'
+onScopeDispose(() => {
+  lifetime = 'disposed'
+})
 const initialSetup = setup.value
 if (initialSetup) {
   mutation.replaceSessionDraft(() => {
@@ -125,14 +144,16 @@ watch(selectedSection, sectionId => {
   if (import.meta.client) document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 })
 const retryLoad = async () => {
+  if (!isActive()) return
   await refresh()
+  if (!isActive()) return
   const refreshedSetup = setup.value
   if (refreshedSetup && !loadError.value) {
     mutation.replaceSessionDraft(() => {
       state.value = cloneSetup(refreshedSetup)
     })
     await nextTick()
-    detailContent.value?.focus()
+    if (isActive()) detailContent.value?.focus()
   }
 }
 
@@ -160,7 +181,9 @@ const mergeMemberMetadata = (value: ReviewSetupDetail) => {
   state.value.hasUnpublishedChanges = value.hasUnpublishedChanges
 }
 const refreshForMutation = async (token: EditorMutationToken) => {
+  if (!mutation.isTokenCurrent(token)) return false
   await refresh()
+  if (loadError.value || loadStatus.value !== 'success') return false
   const refreshedSetup = setup.value
   if (!refreshedSetup) return false
   return mutation.applyMutationRefresh(token, {
@@ -181,12 +204,16 @@ const persistSet = async (token: EditorMutationToken, showSuccess: boolean) => {
     egcs_cn_sequential: state.value.egcs_cn_sequential,
     egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
   }
+  if (!generalForm.value) return false
+  await generalForm.value.validate()
+  if (!mutation.canContinue(token)) return false
   const response = await fetch(getClientRequestUrl(endpoint), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   })
   if (!response.ok) await throwFetchResponseError(response)
+  mutation.acceptCommittedDraft(token, body)
   if (!await refreshForMutation(token)) {
     if (mutation.isTokenCurrent(token)) showPreservedDraft()
     return false
@@ -203,10 +230,11 @@ const saveSet = async () => {
     try {
       await persistSet(token, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: publicationContext }, submit: saveSet })
 
 const publicationAction = async (action: 'publish' | 'retire') => {
   if (mutation.isPending.value || !canManagePublication.value || state.value?.publicationState === 'retired') return
@@ -214,6 +242,7 @@ const publicationAction = async (action: 'publish' | 'retire') => {
   await mutation.run(action, async token => {
     try {
       if (action === 'publish' && mutation.isDirty.value && !await persistSet(token, false)) return
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/${action}`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
       if (!await refreshForMutation(token)) {
@@ -222,7 +251,7 @@ const publicationAction = async (action: 'publish' | 'retire') => {
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized(`review_setup.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -247,15 +276,24 @@ const editMember = (member: ReviewSetupMember) => {
 }
 const deleteMember = async (member: ReviewSetupMember) => {
   if (!canDelete.value || mutation.isPending.value || blockDirtyAction()) return
+  const targetId = member.id
   await mutation.run('delete-member', async token => {
     try {
-      deletingMemberId.value = member.id
-      const deleted = await confirmDeleteRequest(`${endpoint}/items/${member.id}`)
+      deletingMemberId.value = targetId
+      const deleted = await confirmDeleteRequest(`${endpoint}/items/${targetId}`, {
+        operation: token.operation,
+        target: {
+          id: targetId,
+          resolve: () => setup.value?.members.find(current => current.id === targetId),
+          eligible: () => canDelete.value
+        },
+        shouldProceed: () => mutation.canContinue(token) && canDelete.value
+      })
       if (deleted) await refreshForMutation(token)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     } finally {
-      deletingMemberId.value = null
+      if (mutation.isTokenCurrent(token)) deletingMemberId.value = null
     }
   })
 }
@@ -272,9 +310,26 @@ const onSchemaCreated = async (payload: { schemaId: string; reviewType: 'assessm
 }
 const runMemberMutation: EditorMutationRunner = async request => {
   if (mutation.isPending.value || blockDirtyAction()) return undefined
+  const memberDraft = associateState.value
+  const schemaDraft = schemaCreateState.value
+  const memberWasOpen = isAssociateModalOpen.value
+  const schemaWasOpen = isSchemaCreateModalOpen.value
   return await mutation.run('member', async token => {
+    if (!mutation.canContinue(token)) return undefined
     const result = await request()
-    await refreshForMutation(token)
+    if (result === undefined) return undefined
+    let readbackUnavailable = false
+    try {
+      await refreshForMutation(token)
+      readbackUnavailable = Boolean(loadError.value) || loadStatus.value !== 'success'
+    } catch (error) {
+      readbackUnavailable = true
+      if (mutation.isTokenCurrent(token)) showError(error)
+    }
+    if (readbackUnavailable && mutation.isTokenCurrent(token)) {
+      if (memberWasOpen && associateState.value === memberDraft) isAssociateModalOpen.value = false
+      if (schemaWasOpen && schemaCreateState.value === schemaDraft) isSchemaCreateModalOpen.value = false
+    }
     return result
   })
 }
@@ -315,7 +370,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
         role="region"
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
-        <CommonPublicationDetailHero icon="i-lucide-list-checks" type-label-key="review_setup.setup_type" publish-label-key="review_setup.publish" retire-label-key="review_setup.retire" :name="getBilingualValue(state, 'egcs_cn_name')" :entity-type="state.egcs_cn_entitytype" :entity-type-label-en="state.entityTypeLabelEn" :entity-type-label-fr="state.entityTypeLabelFr" :publication-state="state.publicationState" :publication-version="state.publicationVersion" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
+        <CommonPublicationDetailHero :action-context="publicationContext" icon="i-lucide-list-checks" type-label-key="review_setup.setup_type" publish-label-key="review_setup.publish" retire-label-key="review_setup.retire" :name="getBilingualValue(state, 'egcs_cn_name')" :entity-type="state.egcs_cn_entitytype" :entity-type-label-en="state.entityTypeLabelEn" :entity-type-label-fr="state.entityTypeLabelFr" :publication-state="state.publicationState" :publication-version="state.publicationVersion" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
 
         <CommonDesignTimeEditorShell>
           <template #sidebar>
@@ -337,7 +392,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
 
           <CommonDesignTimeEditorSections>
             <AssessmentSchemaPageSection section-id="review-set-general" :title="t('common.general')" role="tabpanel" :aria-label="t('common.general')">
-              <UForm :state="state" :validate="validateSet" class="space-y-5" @submit="saveSet">
+              <UForm ref="generalForm" v-bind="formSession" :state="state" :validate="validateSet" class="space-y-5">
                 <fieldset :disabled="!canUpdateFields" class="space-y-5">
                   <ReviewSetSetupFields
                     v-model:state="state"
@@ -396,7 +451,8 @@ const runMemberMutation: EditorMutationRunner = async request => {
         :agency-id="agencyId"
         :entity-type="state.egcs_cn_entitytype"
         :mutation-pending="mutation.isPending.value"
-        :run-mutation="runMemberMutation" />
+        :run-mutation="runMemberMutation"
+        :action-context="publicationContext" />
       <TransferPaymentReviewSetupSchemaCreateModal
         v-if="!loadError && schemaCreateState && canCreate"
         v-model:open="isSchemaCreateModalOpen"
@@ -405,6 +461,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
         :agency-id="agencyId"
         :mutation-pending="mutation.isPending.value"
         :run-mutation="runMemberMutation"
+        :action-context="publicationContext"
         @created="onSchemaCreated" />
     </template>
   </CommonDetailPage>

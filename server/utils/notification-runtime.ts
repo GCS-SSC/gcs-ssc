@@ -12,6 +12,29 @@ import { resolveApprovalNotificationDescriptor, resolveApprovalNotificationScope
 
 type Db = Kysely<Database> | Transaction<Database>
 type NotificationRow = Selectable<CommonNotificationTable>
+type NotificationAcceptance =
+  | { kind: 'unattempted' }
+  | { kind: 'admitted'; at: Date }
+  | { kind: 'nonacceptance_proven' }
+
+const notificationRetryEvidence = (acceptance: NotificationAcceptance): Updateable<CommonNotificationTable> => {
+  switch (acceptance.kind) {
+    case 'unattempted':
+      return { egcs_cn_status: 'pending', egcs_cn_firstsendat: null,
+        egcs_cn_lasterror: 'NOTIFICATION_CONFIGURATION_OR_DELIVERY_FAILED' }
+    case 'admitted':
+      return { egcs_cn_status: 'uncertain', egcs_cn_firstsendat: acceptance.at,
+        egcs_cn_lasterror: 'NOTIFICATION_RECOVERY_REQUIRED' }
+    case 'nonacceptance_proven':
+      return { egcs_cn_status: 'pending', egcs_cn_firstsendat: null,
+        egcs_cn_payload: {}, egcs_cn_deliverycontext: null,
+        egcs_cn_lasterror: 'NOTIFICATION_CONFIGURATION_OR_DELIVERY_FAILED' }
+    default: {
+      const exhaustive: never = acceptance
+      return exhaustive
+    }
+  }
+}
 const RECOVERY_WINDOW_MS = 7 * 86_400_000
 const DeliveryContextSchema = z.record(z.string(), z.json())
 
@@ -181,11 +204,13 @@ export const processNotificationBatch = async (
       await update({ egcs_cn_status: status, egcs_cn_completedat: finishedAt, egcs_cn_updated: finishedAt,
         egcs_cn_leaseowner: null, egcs_cn_leaseexpiry: null, egcs_cn_lasterror: null }).execute()
     }
-    let attemptedAt = job.egcs_cn_firstsendat
-    let deliveryContext: GcsExtensionJsonConfig | null = null
-    let priorNonAcceptanceProven = false
+    let acceptance: NotificationAcceptance = job.egcs_cn_firstsendat
+      ? { kind: 'admitted', at: job.egcs_cn_firstsendat }
+      : { kind: 'unattempted' }
     try {
-      deliveryContext = job.egcs_cn_deliverycontext ? DeliveryContextSchema.parse(job.egcs_cn_deliverycontext) : null
+      const deliveryContext: GcsExtensionJsonConfig | null = job.egcs_cn_deliverycontext
+        ? DeliveryContextSchema.parse(job.egcs_cn_deliverycontext)
+        : null
       if (!await eligible(db, job)) {
         await finish('cancelled')
         continue
@@ -195,14 +220,14 @@ export const processNotificationBatch = async (
         await finish('cancelled')
         continue
       }
-      if (attemptedAt) {
-        if (jobNow.getTime() - attemptedAt.getTime() >= RECOVERY_WINDOW_MS) {
+      if (acceptance.kind === 'admitted') {
+        if (jobNow.getTime() - acceptance.at.getTime() >= RECOVERY_WINDOW_MS) {
           await finish('unresolved')
           continue
         }
         const recover = provider.adapter.recover
         const originalContext = deliveryContext
-        const originalAttemptedAt = attemptedAt.toISOString()
+        const originalAttemptedAt = acceptance.at.toISOString()
         const recovery = originalContext && recover
           ? await runBoundedExtensionOperation('notification:recover', signal => recover({
               agencyId: provider.agencyId, agencyConfig: provider.agencyConfig, streamId: provider.streamId, streamConfig: provider.streamConfig, secrets: provider.secrets, signal,
@@ -214,8 +239,7 @@ export const processNotificationBatch = async (
           continue
         }
         if (recovery.kind === 'inconclusive') throw new Error('NOTIFICATION_RECOVERY_INCONCLUSIVE')
-        attemptedAt = null
-        priorNonAcceptanceProven = true
+        acceptance = { kind: 'nonacceptance_proven' }
       }
       const mapping = provider.adapter.resolveMapping({ agencyConfig: provider.agencyConfig, streamId: provider.streamId, streamConfig: provider.streamConfig, notifierId: job.egcs_cn_notifier })
       if (!mapping) throw new Error('NOTIFICATION_MAPPING_UNAVAILABLE')
@@ -273,8 +297,7 @@ export const processNotificationBatch = async (
         return admitted ? { ...freshProvider, secrets: createNotificationSecretReader(db, scope.providerKey, scope.agencyId), personalisation, admittedAt, recipientEmail: recipientEmail.data } : null
       })
       if (!admittedProvider) continue
-      attemptedAt = admittedProvider.admittedAt
-      priorNonAcceptanceProven = false
+      acceptance = { kind: 'admitted', at: admittedProvider.admittedAt }
       if (!await eligible(db, job)
         || !await resolveStreamNotificationProvider(db, scope)) {
         await finish('cancelled')
@@ -290,17 +313,13 @@ export const processNotificationBatch = async (
         continue
       }
       // A provider rejection proves no message was accepted and permits a corrected-config retry.
-      attemptedAt = null
-      priorNonAcceptanceProven = true
+      acceptance = { kind: 'nonacceptance_proven' }
       throw new Error(result.retryable ? 'NOTIFICATION_PROVIDER_RETRYABLE_REJECTION' : 'NOTIFICATION_PROVIDER_REJECTED')
     } catch {
       const attempts = job.egcs_cn_attempts + 1
-      await update({ egcs_cn_status: attemptedAt ? 'uncertain' : 'pending', egcs_cn_attempts: attempts,
-        ...(priorNonAcceptanceProven ? { egcs_cn_payload: {}, egcs_cn_deliverycontext: null } : {}),
-        egcs_cn_firstsendat: attemptedAt ?? null,
+      await update({ ...notificationRetryEvidence(acceptance), egcs_cn_attempts: attempts,
         egcs_cn_nextattempt: new Date(jobNow.getTime() + Math.min(3_600_000, 300_000 * 2 ** Math.min(attempts - 1, 4))),
-        egcs_cn_updated: jobNow, egcs_cn_leaseowner: null, egcs_cn_leaseexpiry: null,
-        egcs_cn_lasterror: attemptedAt ? 'NOTIFICATION_RECOVERY_REQUIRED' : 'NOTIFICATION_CONFIGURATION_OR_DELIVERY_FAILED'
+        egcs_cn_updated: jobNow, egcs_cn_leaseowner: null, egcs_cn_leaseexpiry: null
       }).execute()
     }
   }

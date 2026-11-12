@@ -3,6 +3,7 @@ import { isExpectedPublicationFailure } from './publication-errors'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
+import { hasWorkflowMemberApproval } from './workflow-execution-plan'
 import { readAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 import type { WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- typed workflow publication primitives */
@@ -306,11 +307,7 @@ export const buildWorkflowSetupPublication = async (
     definition.riskRatingEffect = await buildRiskRatingEffect(db, setup, members, rows)
   }
   if (definition.purpose === 'approval_submission') {
-    const hasApproval = members.some(member => member.kind === 'approval_template'
-      || Boolean(member.dataCollectionPlan?.approval)
-      || Boolean(member.recommendationPlan?.finalApproval)
-      || member.recommendationPlan?.members.some(candidate => Boolean(candidate.approval)))
-    if (!hasApproval) throw new Error('Approval submission workflow requires an approval stage')
+    if (!members.some(hasWorkflowMemberApproval)) throw new Error('Approval submission workflow requires an approval stage')
   }
   validatePublishedWorkflowStatusGraph(definition, await readLockedWorkflowStatusDefinitions(db, setup, definition))
   return {

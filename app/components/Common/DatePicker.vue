@@ -1,22 +1,36 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { DateFieldRootProps } from 'reka-ui'
 import { parseDate } from '@internationalized/date'
 import type { CalendarProps, InputDateProps } from '@nuxt/ui'
 import DateInput from './DateInput.vue'
 import { createRequiredControl } from '~/utils/required-control'
+import { formRequirementKey } from '~/utils/form-requirement-context'
 
 const LocalizedDateInput = createRequiredControl(DateInput, 'segmented')
 const { t } = useI18n()
 
 const {
-  disabled = false
+  disabled = false,
+  readonly = false
 } = defineProps<{
   disabled?: boolean
+  readonly?: boolean
 }>()
 
 const modelValue = defineModel<string | Date | null | undefined>({ required: true })
+const form = inject(formRequirementKey, undefined)
+const isInteractionDisabled = computed(() => disabled || Boolean(form?.disabled.value))
+const isEditable = computed(() => !isInteractionDisabled.value && !readonly)
+const isOpen = ref(false)
+
+/** Opens only while entry is allowed; dismissal remains available while disabled.
+ * @param open Requested popover visibility.
+ */
+const updateOpen = (open: boolean) => {
+  if (!open || isEditable.value) isOpen.value = open
+}
 
 /**
  * Converts a date-like value into a YYYY-MM-DD string when possible.
@@ -79,7 +93,12 @@ const setInputDateValue = (value: InputCalendarValue) => {
 
 const inputDateValue: Ref<InputCalendarValue> = ref(getInputDateValue()) as Ref<InputCalendarValue>
 
-watch(inputDateValue, value => {
+/** Admits calendar and segmented updates through the same owning-form gate.
+ * @param value Selected calendar date or cleared value.
+ */
+const updateInputDateValue = (value: InputCalendarValue) => {
+  if (!isEditable.value) return
+  inputDateValue.value = value
   const nextNormalized = value ? value.toString() : ''
   const currentNormalized = normalizeToIsoDate(modelValue.value)
 
@@ -88,7 +107,7 @@ watch(inputDateValue, value => {
   }
 
   setInputDateValue(value)
-})
+}
 
 watch(() => modelValue.value, () => {
   const nextValue = getInputDateValue()
@@ -105,22 +124,26 @@ watch(() => modelValue.value, () => {
 </script>
 
 <template>
-  <UPopover>
+  <UPopover :open="isOpen" @update:open="updateOpen">
     <LocalizedDateInput
       data-field-container="Composite editor; its individual field declarations own their identities."
       :model-value="inputDateValue as DateFieldRootProps['modelValue']"
-      :disabled="disabled"
+      :disabled="isInteractionDisabled"
+      :readonly="readonly"
       class="w-full"
-      @update:model-value="value => inputDateValue = value as InputCalendarValue" />
+      @update:model-value="updateInputDateValue" />
 
     <template #content>
       <UCalendar
         data-field-container="Composite editor; its individual field declarations own their identities."
+        :range="false"
+        :multiple="false"
         :calendar-label="t('common.calendar_date')"
         :model-value="inputDateValue as CalendarProps['modelValue']"
-        :disabled="disabled"
+        :disabled="isInteractionDisabled"
+        :readonly="readonly"
         class="p-2"
-        @update:model-value="value => inputDateValue = value as InputCalendarValue" />
+        @update:model-value="updateInputDateValue" />
     </template>
   </UPopover>
 </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyMonitorTypeSchema, type AgencyMonitorTypeItem } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 
@@ -17,10 +19,18 @@ const columns: TableColumnInput<AgencyMonitorTypeItem>[] = [
 const bilingualColumns: BilingualColumnConfig<AgencyMonitorTypeItem>[] = [
   { id: 'name', accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' } }
 ]
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.monitor_types')"
     icon="i-lucide-clipboard-check"
     :fetch-url="`/api/agency/${agencyId}/monitor-types`"

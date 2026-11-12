@@ -1,5 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- Page-local request and modal callbacks are covered by focused request tests. */
+import { onScopeDispose } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
 import type { ComputedRef, Ref } from 'vue'
 import type { RoleInput } from '~~/shared/types/schemas/rbac'
 import type { RoleRow } from '~~/shared/types/roles'
@@ -20,6 +22,11 @@ const { can, canAny } = useCan()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+let pageLifetime: 'active' | 'disposed' = 'active'
+onScopeDispose(() => {
+  pageLifetime = 'disposed'
+})
+const isPageActive = () => pageLifetime === 'active'
 
 const {
   search,
@@ -82,6 +89,26 @@ const roleScope = (role: Partial<RoleInput>) => {
 const findListedRole = (roleId: string): RoleRow | null =>
   items.value.find(role => role.id === roleId) ?? null
 
+const editContext = useActionContext({
+  identity: [
+    () => selectedRole.value?.id,
+    () => selectedRole.value?.id ? findListedRole(selectedRole.value.id)?.agency_id : selectedRole.value?.agency_id
+  ],
+  authority: () => {
+    const draft = selectedRole.value
+    if (!draft) return false
+    const currentRole = draft.id ? findListedRole(draft.id) : draft
+    return Boolean(currentRole && can('role', draft.id ? 'update' : 'create', roleScope(currentRole)))
+  },
+  eligible: () => Boolean(selectedRole.value && (!selectedRole.value.id
+    || (findListedRole(selectedRole.value.id) && !deletedRoleIds.value.has(selectedRole.value.id))))
+})
+const collectionContext = useActionContext({ identity: [], authority: () => canAny('role', 'read', ['global', 'agency']) })
+const deleteContext = useActionContext({
+  identity: [],
+  authority: () => canAny('role', 'delete', ['global', 'agency'])
+})
+
 const reconcileConfirmedDeletes = () => {
   if (status.value === 'success' && unreconciledDeletedRoleFilters.value.size > 0) {
     unreconciledDeletedRoleFilters.value.clear()
@@ -89,23 +116,25 @@ const reconcileConfirmedDeletes = () => {
 }
 
 watch(listError, error => {
-  if (error) {
+  if (error && isPageActive()) {
     showError(error)
   }
 })
 
 watch(status, reconcileConfirmedDeletes)
 
-const refreshRoleList = async (): Promise<boolean> => {
+const refreshRoleList = async (isCurrent: () => boolean = isPageActive): Promise<boolean> => {
+  if (!isPageActive() || !isCurrent()) return false
   try {
     await refresh()
+    if (!isPageActive() || !isCurrent()) return false
     const succeeded = status.value === 'success'
     if (succeeded) {
       reconcileConfirmedDeletes()
     }
     return succeeded
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && isCurrent()) showError(error)
     return false
   }
 }
@@ -118,7 +147,7 @@ const roleHeroStats = computed(() => [
 ])
 
 const openCreateModal = () => {
-  if (!canCreateRole.value || isMutationPending.value) return
+  if (!isPageActive() || !canCreateRole.value || isMutationPending.value) return
   selectedRole.value = { permissions: [], transfer_payment_ids: [] }
   isModalOpen.value = true
 }
@@ -127,7 +156,8 @@ const openCreateModal = () => {
 const openUpdateModal = (role: RoleRow) => {
   const listedRole = findListedRole(role.id)
   if (
-    !listedRole
+    !isPageActive()
+    || !listedRole
     || !can('role', 'update', roleScope(listedRole))
     || deletedRoleIds.value.has(listedRole.id)
     || isMutationPending.value
@@ -149,13 +179,17 @@ const openUpdateModal = (role: RoleRow) => {
 /** Persists canonical role fields after rechecking the selected scope. */
 const saveRole = async () => {
   const item = selectedRole.value
-  if (!item || isMutationPending.value) return
+  if (!isPageActive() || !item || isMutationPending.value) return
+  const collection = collectionContext.capture()
+  const operation = editContext.capture()
+  if (!operation?.canDispatch()) return
   const isUpdate = !!item.id
   const listedRole = item.id ? findListedRole(item.id) : null
   if (isUpdate && !listedRole) return
   const action = isUpdate ? 'update' : 'create'
   if (!can('role', action, roleScope(listedRole ?? item))) return
   if (item.id && deletedRoleIds.value.has(item.id)) return
+  const submittedDraft = JSON.stringify(item)
   const method = isUpdate ? 'PATCH' : 'POST'
   const requestBody = isUpdate
     ? Object.fromEntries((['name_en', 'name_fr', 'description_en', 'description_fr', 'transfer_payment_ids'] as const)
@@ -166,11 +200,14 @@ const saveRole = async () => {
   try {
     isSavingRole.value = true
     await saveJson(isUpdate ? `/api/roles/${item.id}` : '/api/roles', method, requestBody)
-    isModalOpen.value = false
-    selectedRole.value = null
-    await refreshRoleList()
+    if (!isPageActive() || !operation.isCurrent() || selectedRole.value !== item) return
+    if (JSON.stringify(item) === submittedDraft) {
+      isModalOpen.value = false
+      selectedRole.value = null
+    }
+    await refreshRoleList(() => collection?.isCurrent() === true)
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && operation.isCurrent()) showError(error)
   } finally {
     isSavingRole.value = false
   }
@@ -180,24 +217,45 @@ const saveRole = async () => {
 const deleteRole = async (role: RoleRow) => {
   const listedRole = findListedRole(role.id)
   if (
-    !listedRole
+    !isPageActive()
+    || !listedRole
     || !can('role', 'delete', roleScope(listedRole))
     || isMutationPending.value
     || deletedRoleIds.value.has(listedRole.id)
   ) return
 
+  const operation = deleteContext.capture()
+  if (!operation?.canDispatch()) return
+  const roleId = listedRole.id
+  const agencyId = listedRole.agency_id
+  const canDeleteTarget = () => {
+    const currentRole = findListedRole(roleId)
+    return Boolean(currentRole && currentRole.agency_id === agencyId
+      && can('role', 'delete', roleScope(currentRole)) && !deletedRoleIds.value.has(roleId))
+  }
   const deletedRoleFilterKey = responseFilterKey.value
   try {
-    deletingRoleId.value = listedRole.id
-    const deleted = await confirmDeleteRequest(`/api/roles/${listedRole.id}`, { description: t('agency.delete_confirm') })
-    if (!deleted) return
-    deletedRoleIds.value.add(listedRole.id)
-    unreconciledDeletedRoleFilters.value.set(listedRole.id, deletedRoleFilterKey)
-    if (selectedRole.value?.id === listedRole.id) {
+    deletingRoleId.value = roleId
+    const deleted = await confirmDeleteRequest(`/api/roles/${roleId}`, {
+      description: t('agency.delete_confirm'),
+      operation,
+      target: {
+        id: roleId,
+        resolve: () => findListedRole(roleId),
+        eligible: current => current.agency_id === agencyId
+          && can('role', 'delete', roleScope(current)) && !deletedRoleIds.value.has(current.id)
+      },
+      shouldProceed: canDeleteTarget
+    })
+    if (!deleted || !isPageActive() || !operation.isCurrent()) return
+    deletedRoleIds.value.add(roleId)
+    unreconciledDeletedRoleFilters.value.set(roleId, deletedRoleFilterKey)
+    if (selectedRole.value?.id === roleId) {
       isModalOpen.value = false
       selectedRole.value = null
     }
-    await refreshRoleList()
+    await refreshRoleList(operation.isCurrent)
+    if (!operation.isCurrent()) return
 
     const pageSize = pagination.value.pageSize
     const lastPageIndex = Math.max(Math.ceil(displayedTotalRecords.value / pageSize) - 1, 0)
@@ -205,7 +263,7 @@ const deleteRole = async (role: RoleRow) => {
       pagination.value.pageIndex = lastPageIndex
     }
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && operation.isCurrent()) showError(error)
   } finally {
     deletingRoleId.value = null
   }
@@ -248,6 +306,7 @@ const deleteRole = async (role: RoleRow) => {
         :title="selectedRole.id ? t('role.update_title') : t('role.create_title')"
         :submit-label="selectedRole.id ? t('common.update') : t('common.save')"
         :pending="isMutationPending"
+        :action-context="editContext"
         @submit="saveRole"
       />
     </template>

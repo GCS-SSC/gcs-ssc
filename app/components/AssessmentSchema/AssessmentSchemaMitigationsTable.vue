@@ -1,7 +1,7 @@
 <!-- eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Ref } from 'vue'
+import { useLocalRowEditor } from '~/composables/useLocalRowEditor'
 import { toRaw } from 'vue'
 import type { AssessmentOutcomeRow } from '~/composables/useAssessmentSchemaEditorState'
 import { createAssessmentOutcomeRow } from '~/composables/useAssessmentSchemaEditorState'
@@ -13,10 +13,8 @@ const outcomes = defineModel<AssessmentOutcomeRow[]>('outcomes', {
 
 const { t, locale } = useI18n()
 
-const isEditorOpen: Ref<boolean> = ref(false)
-const editorMode: Ref<'create' | 'edit'> = ref('create')
-const editingKey: Ref<string | null> = ref(null)
-const draftOutcome: Ref<AssessmentOutcomeRow | null> = ref(null)
+const rowEditor = useLocalRowEditor<AssessmentOutcomeRow, string>()
+const { isOpen: isEditorOpen, mode: editorMode, target: editingKey, draft: draftOutcome, close: resetEditor } = rowEditor
 
 const activeLocale = computed<'en' | 'fr'>(() => locale.value === 'fr' ? 'fr' : 'en')
 
@@ -41,18 +39,8 @@ const columns = computed<TableColumn<OutcomeRow>[]>(() => [
   { id: 'actions', header: t('common.actions') }
 ])
 
-const resetEditor = () => {
-  isEditorOpen.value = false
-  editorMode.value = 'create'
-  editingKey.value = null
-  draftOutcome.value = null
-}
-
 const openCreateEditor = () => {
-  editorMode.value = 'create'
-  editingKey.value = null
-  draftOutcome.value = structuredClone(createAssessmentOutcomeRow())
-  isEditorOpen.value = true
+  rowEditor.openCreate(structuredClone(createAssessmentOutcomeRow()))
 }
 
 const openEditEditor = (index: number) => {
@@ -61,10 +49,7 @@ const openEditEditor = (index: number) => {
     return
   }
 
-  editorMode.value = 'edit'
-  editingKey.value = currentOutcome._key
-  draftOutcome.value = structuredClone(toRaw(currentOutcome))
-  isEditorOpen.value = true
+  rowEditor.openEdit(currentOutcome._key, structuredClone(toRaw(currentOutcome)))
 }
 
 const saveDraft = () => {

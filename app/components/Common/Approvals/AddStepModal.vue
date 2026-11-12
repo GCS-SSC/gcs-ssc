@@ -2,6 +2,9 @@
 /* eslint-disable jsdoc/require-jsdoc -- Modal-local event handlers are clear from their use. */
 import { computed, ref, watch } from 'vue'
 import { useBilingualValue } from '~/composables/useBilingualValue'
+import type { ActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import { AddApprovalStepSchema } from '~~/shared/types/schemas/review-approval'
 import type {
   AddApprovalModalState,
@@ -14,12 +17,14 @@ const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<AddApprovalModalState | null>('state', { required: true })
 
 const {
+  actionContext,
   entityType,
   entityId,
   anchorStep,
   routingSlip,
   isSubmitting
 } = defineProps<{
+  actionContext: ActionContext
   entityType: string
   entityId: string
   anchorStep: ApprovalStepItem | null
@@ -44,6 +49,16 @@ const orderedCertifications = computed(() => state.value?.certifications ?? [])
 const { createValidator } = useZodI18n()
 const validate = createValidator(AddApprovalStepSchema)
 const validationState = computed(() => ({ ...state.value, entityType, entityId }))
+const modalSession = useModalSession()
+watch([open, state, () => entityType, () => entityId, () => anchorStep, () => routingSlip], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null && anchorStep !== null && routingSlip !== null
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({
+  owner: modalSession,
+  action: { kind: 'remote', context: () => actionContext },
+  submit: () => { if (!isSubmitting) emit('submit') }
+})
 const assigneeKind = ref<'user' | 'group'>('user')
 watch(() => state.value?.anchorApprovalId, () => {
   assigneeKind.value = state.value?.egcs_cn_assignedgroup ? 'group' : 'user'
@@ -73,7 +88,7 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
     :description="t('assessment.approvals.add_step_description')"
     data-field-exclude="Runtime approval steps are outside configurable field help." @update:open="value => value ? (open = true) : emit('close')">
     <template #body>
-      <UForm v-if="state && anchorStep && routingSlip" :state="validationState" :validate="validate" class="space-y-6" @submit="emit('submit')">
+      <UForm v-if="state && anchorStep && routingSlip" :state="validationState" :validate="validate" :disabled="isSubmitting" class="space-y-6" v-bind="formSession">
         <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/60">
           <p class="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
             {{ state.position === 'before' ? t('assessment.approvals.add_before') : t('assessment.approvals.add_after') }}

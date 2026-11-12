@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent Correction page callbacks have focused request and financial tests. */
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 import type { CorrectionDetail } from '~~/shared/types/correction'
@@ -24,10 +27,15 @@ const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
+const { canAny } = useAuth()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { formatDate } = useDateHelpers()
 const agreementId = computed(() => String(route.params.id))
 const correctionId = computed(() => String(route.params.correctionId))
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
 const isHeroCollapsed = getHeroCollapsed('agreement-correction-detail')
 const { data: correction, status, error: detailError, refresh } = useCorrectionDetail(agreementId, correctionId)
 
@@ -38,6 +46,28 @@ usePageResourceError({
   errors: [() => approvalOnly.value ? null : detailError.value],
   pending: () => status.value === 'pending',
   hasContent: () => Boolean(correction.value)
+})
+
+const ownsCorrection = () => !disposed && correction.value?.id === correctionId.value
+const editContext = useActionContext({
+  identity: [agreementId, correctionId],
+  authority: () => canAny('correction', 'update'),
+  eligible: () => ownsCorrection() && correction.value?.egcs_fc_canedit === true
+})
+const deleteContext = useActionContext({
+  identity: [agreementId, correctionId],
+  authority: () => canAny('correction', 'delete'),
+  eligible: () => ownsCorrection() && correction.value?.egcs_fc_candelete === true
+})
+const cancelContext = useActionContext({
+  identity: [agreementId, correctionId],
+  authority: () => canAny('correction', 'update'),
+  eligible: () => ownsCorrection() && correction.value?.egcs_fc_cancancel === true
+})
+const linkedCreateContext = useActionContext({
+  identity: [agreementId, correctionId],
+  authority: () => canAny('correction', 'create'),
+  eligible: () => ownsCorrection() && correction.value?.egcs_fc_canlink === true
 })
 
 const refreshKey: Ref<number> = ref(0)
@@ -112,6 +142,14 @@ const refreshPage = async () => {
   await refresh()
   refreshKey.value += 1
 }
+const captureCancelCommitted = useCommittedSettlement({
+  context: cancelContext,
+  settle: async () => {
+    if (!await refresh()) return { kind: 'unavailable', error: detailError.value }
+    refreshKey.value += 1
+    return { kind: 'available' }
+  }
+})
 const retryLoad = async () => {
   if (await refresh()) {
     await nextTick()
@@ -119,25 +157,39 @@ const retryLoad = async () => {
   }
 }
 const save = async () => {
-  if (!state.value || !correction.value?.egcs_fc_canedit || saving.value) return
+  if (disposed || !state.value || !correction.value?.egcs_fc_canedit || saving.value) return
+  const operation = editContext.capture()
+  if (!operation?.canDispatch()) return
   const owner = correctionId.value
   const submitted = JSON.stringify(state.value)
   saving.value = true
   try {
     await sendJson(`/api/corrections/${owner}`, 'PATCH', CorrectionEditSchema.parse(state.value))
-    if (correctionId.value !== owner) return
-    if (await refresh() && correction.value && JSON.stringify(state.value) === submitted) hydrate(correction.value)
+    if (disposed || !operation.isCurrent() || correctionId.value !== owner) return
+    const refreshed = await refresh()
+    if (disposed || !operation.isCurrent() || correctionId.value !== owner) return
+    if (refreshed && correction.value && JSON.stringify(state.value) === submitted) hydrate(correction.value)
     refreshKey.value += 1
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
-    if (correctionId.value === owner) showError(failure)
+    if (!disposed && operation.isCurrent() && correctionId.value === owner) showError(failure)
   } finally {
-    if (correctionId.value === owner) saving.value = false
+    if (!disposed && correctionId.value === owner) saving.value = false
   }
 }
 const deleteDraft = async () => {
   const owner = correctionId.value
-  if (await confirmDeleteRequest(`/api/corrections/${owner}`) && owner === correctionId.value) await navigateTo(localePath(appRouteLocations.agreementCorrectionCollection(agreementId.value)))
+  const operation = deleteContext.capture()
+  if (!operation?.canDispatch()) return
+  const deleted = await confirmDeleteRequest(`/api/corrections/${owner}`, {
+    operation,
+    target: {
+      id: owner,
+      resolve: () => correction.value?.id === owner ? correction.value : null,
+      eligible: row => row.egcs_fc_candelete
+    }
+  })
+  if (deleted && operation.isCurrent()) await navigateTo(localePath(appRouteLocations.agreementCorrectionCollection(agreementId.value)))
 }
 const heroActions = computed(() => [
   { label: t('correction.create_linked'), color: 'neutral' as const, variant: 'outline' as const, icon: 'i-lucide-file-plus-2', visible: correction.value?.egcs_fc_canlink === true, onClick: () => { linkedOpen.value = true } },
@@ -147,6 +199,15 @@ const heroActions = computed(() => [
 const linkedCreated = async (id: string) => {
   await navigateTo(localePath(appRouteLocations.agreementCorrectionDetail(agreementId.value, id)))
 }
+
+const formSession = useFormSession({
+  owner: {
+    captureSession: () => !disposed && state.value && selectedTab.value === 'lines' ? 1 : null,
+    isCurrentSession: session => session === 1 && !disposed && state.value !== null && selectedTab.value === 'lines'
+  },
+  action: { kind: 'remote', context: editContext },
+  submit: save
+})
 
 useFieldTooltipProvider(() => correction.value && String(correction.value.id) === String(route.params.correctionId) ? { entityType: 'fundingcasecorrection', entityId: correction.value.id } : null)
 </script>
@@ -167,7 +228,7 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-file-diff" :title="formatCorrectionReference(correction)" :meta-items="[`${t('correction.agreement')}: ${correction.egcs_fc_agreementnumber}`, formatDate(correction.egcs_fc_requesteddate)]" :badges="[{ statusId: correction.egcs_fc_status }]" :actions="heroActions" />
         <ULink v-if="correction.egcs_fc_linkedcorrection" :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, correction.egcs_fc_linkedcorrection))" class="mb-4 text-sm">{{ t('correction.linked_correction') }}</ULink>
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.corrections.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-correction-detail-content">
-          <UForm v-if="selectedTab === 'lines'" data-help-view="casework.corrections.lines" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8" @submit="save">
+          <UForm v-if="selectedTab === 'lines'" v-bind="formSession" data-help-view="casework.corrections.lines" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8">
             <CommonSection :show-header="false" :title="t('correction.financial_lines')" :grid-cols="1">
               <p id="correction-line-instruction" class="text-sm text-muted">
                 {{ t('correction.lines_instruction') }}
@@ -250,10 +311,10 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
           </section>
           <section v-else-if="selectedTab === 'completion'" data-help-view="casework.corrections.completion" data-help-target="casework.corrections.detail.completion" data-help-kind="section" class="space-y-6">
             <UAlert v-if="dirty" color="warning" :title="t('correction.save_before_completion')" />
-            <CommonCompletionPanel entity-type="fundingcasecorrection" :entity-id="correctionId" :can-complete="correction.egcs_fc_canedit && completionReady && !dirty && !saving && status === 'success'" :can-work-workflow="correction.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="correction.completion.title" description-key="correction.completion.description" status-complete-key="correction.completion.status_complete" status-locked-key="correction.completion.status_locked" comment-placeholder-key="correction.completion.comment_placeholder" complete-action-key="correction.completion.complete" completed-success-key="correction.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+            <CommonCompletionPanel :mutation-role-allowed="canAny('correction', 'update')" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-complete="correction.egcs_fc_canedit && completionReady && !dirty && !saving && status === 'success'" :can-work-workflow="correction.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="correction.completion.title" description-key="correction.completion.description" status-complete-key="correction.completion.status_complete" status-locked-key="correction.completion.status_locked" comment-placeholder-key="correction.completion.comment_placeholder" complete-action-key="correction.completion.complete" completed-success-key="correction.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.corrections.reviews" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-update="correction.egcs_fc_canedit" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.corrections.workflows" entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="standard" :can-edit="correction.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canAny('correction', 'update')" data-help-view="casework.corrections.workflows" entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="standard" :can-edit="correction.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
           <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.corrections.supplementary-information" data-help-target="casework.corrections.supplementary-information.content">
             <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
           </section>
@@ -262,7 +323,7 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>
-    <CorrectionCancelModal v-model:open="cancelOpen" :correction-id="correctionId" @cancelled="refreshPage" />
-    <CorrectionCreateModal v-if="correction" v-model:open="linkedOpen" :agreement-id="agreementId" :linked-correction-id="correctionId" :initial-commitment-id="correction.egcs_fc_commitment" @created="linkedCreated" />
+    <CorrectionCancelModal v-model:open="cancelOpen" :action-context="cancelContext" :correction-id="correctionId" :capture-committed="captureCancelCommitted" />
+    <CorrectionCreateModal v-if="correction" v-model:open="linkedOpen" :action-context="linkedCreateContext" :agreement-id="agreementId" :linked-correction-id="correctionId" :initial-commitment-id="correction.egcs_fc_commitment" @created="linkedCreated" />
   </div>
 </template>

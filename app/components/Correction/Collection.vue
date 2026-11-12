@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
 import type { Ref } from 'vue'
 import type { CorrectionRow } from '~~/shared/types/correction'
 import type { ListResponse } from '~~/shared/types/admin'
@@ -21,6 +22,11 @@ const createOpen: Ref<boolean> = ref(false)
 const outcome: Ref<string> = ref('all')
 const fiscalYear: Ref<string | null | undefined> = ref(undefined)
 const exporting: Ref<boolean> = ref(false)
+let disposed = false
+let exportGeneration = 0
+onBeforeUnmount(() => {
+  disposed = true
+})
 type CollectionMetadata = ListResponse<CorrectionRow> & {
   egcs_fc_cancreate?: boolean
   egcs_fc_agreementnumber?: string
@@ -36,6 +42,12 @@ const { search, pagination, items, totalRecords, status, retry, response } = use
 })
 const metadata = computed(() => response.value as CollectionMetadata | undefined)
 const canCreate = computed(() => Boolean(metadata.value?.egcs_fc_cancreate))
+const { canAny } = useCan()
+const createContext = useActionContext({
+  identity: [() => agreementId],
+  authority: () => canAny('correction', 'create'),
+  eligible: canCreate
+})
 const fiscalYears = computed(() => metadata.value?.egcs_fc_fiscalyears ?? [])
 watch(metadata, value => {
   if (value?.egcs_fc_agreementnumber) emit('context', { egcs_fc_agreementnumber: value.egcs_fc_agreementnumber, egcs_fc_agreementreadable: value.egcs_fc_agreementreadable === true })
@@ -48,6 +60,8 @@ const columns: TableColumnInput<CorrectionRow>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 watch(() => agreementId, () => {
+  exportGeneration += 1
+  exporting.value = false
   createOpen.value = false
   outcome.value = 'all'
   fiscalYear.value = undefined
@@ -64,8 +78,9 @@ const created = async (id: string) => {
 }
 /** Downloads the same scoped, filtered evidence shown in the collection. */
 const exportCorrections = async () => {
-  if (exporting.value) return
+  if (disposed || exporting.value) return
   const ownerAgreement = agreementId
+  const generation = ++exportGeneration
   exporting.value = true
   try {
     const url = getClientRequestUrl(`/api/agreements/${ownerAgreement}/corrections/export`)
@@ -75,7 +90,7 @@ const exportCorrections = async () => {
     const result = await fetch(url)
     if (!result.ok) await throwFetchResponseError(result)
     const { fields, data } = CorrectionExportSchema.parse(await result.json())
-    if (ownerAgreement !== agreementId) return
+    if (ownerAgreement !== agreementId || generation !== exportGeneration) return
     const blob = new Blob([serializeCsvExport(fields, data)], { type: 'text/csv; charset=utf-8' })
     const downloadUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -84,9 +99,9 @@ const exportCorrections = async () => {
     link.click()
     URL.revokeObjectURL(downloadUrl)
   } catch (failure) {
-    if (ownerAgreement === agreementId) showError(failure)
+    if (!disposed && ownerAgreement === agreementId && generation === exportGeneration) showError(failure)
   } finally {
-    exporting.value = false
+    if (generation === exportGeneration) exporting.value = false
   }
 }
 </script>
@@ -147,7 +162,7 @@ const exportCorrections = async () => {
         </template>
       </CommonResourceLayout>
     </section>
-    <CorrectionCreateModal v-model:open="createOpen" :agreement-id="agreementId" @created="created" />
+    <CorrectionCreateModal v-model:open="createOpen" :action-context="createContext" :agreement-id="agreementId" @created="created" />
   </div>
 </template>
 

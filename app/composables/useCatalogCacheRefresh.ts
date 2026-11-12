@@ -1,7 +1,17 @@
-import { computed, getCurrentScope, onScopeDispose, ref, toValue } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, shallowRef, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import type { CatalogCacheChange } from '~/utils/catalog-cache-client'
 import { getCatalogCacheClient, subscribeCatalogCache } from '~/utils/catalog-cache'
+import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
+
+type RefreshState =
+  | { kind: 'idle' }
+  | { kind: 'pending'; work: Promise<boolean>; failed: boolean }
+  | { kind: 'settled'; work: Promise<boolean>; failed: boolean }
+
+type VersionCheckState =
+  | { kind: 'idle' | 'success' | 'error'; latest: number }
+  | { kind: 'pending'; latest: number; count: number; failed: boolean }
 
 type CatalogRequestSource = MaybeRefOrGetter<string | URL | Array<string | URL> | null>
 
@@ -17,30 +27,50 @@ export const useCatalogCacheRefresh = (
   refresh: (change: CatalogCacheChange) => unknown,
   onError: (error: unknown) => void = () => undefined
 ) => {
-  let pendingRefresh: Promise<boolean> | undefined
+  const refreshState = shallowRef<RefreshState>({ kind: 'idle' })
+  const versionCheckState = shallowRef<VersionCheckState>({ kind: 'idle', latest: 0 })
   let lastChange: CatalogCacheChange | undefined
   let refreshGeneration = 0
-  let checkGeneration = 0
-  let disposed = false
-  const pendingChecks = ref(0)
-  const refreshing = ref(false)
-  const refreshFailed = ref(false)
-  const versionCheckFailed = ref(false)
-  const checking = computed(() => pendingChecks.value > 0 || refreshing.value)
-  const failed = computed(() => refreshFailed.value || versionCheckFailed.value)
+  let sourceEpoch = 0
+  const lifetime = shallowRef<'active' | 'disposed'>('active')
+  const isDisposed = () => lifetime.value === 'disposed'
+  const refreshFailed = () => refreshState.value.kind !== 'idle' && refreshState.value.failed
+  const versionCheckFailed = () => versionCheckState.value.kind === 'error'
+    || (versionCheckState.value.kind === 'pending' && versionCheckState.value.failed)
+  const checking = computed(() => !isDisposed()
+    && (versionCheckState.value.kind === 'pending' || refreshState.value.kind === 'pending'))
+  const failed = computed(() => refreshFailed() || versionCheckFailed())
   const urls = () => {
     const value = toValue(source)
     return value === null ? [] : Array.isArray(value) ? value : [value]
   }
+  const sourceKey = computed(() => JSON.stringify([...new Set(urls().map(url => getCatalogRequestUrl(String(url)).href))].sort()))
+  /** Abandons local feedback when the source or authenticated session changes. */
+  const resetConsumer = () => {
+    sourceEpoch += 1
+    refreshGeneration += 1
+    lastChange = undefined
+    refreshState.value = { kind: 'idle' }
+    versionCheckState.value = { kind: 'idle', latest: versionCheckState.value.latest + 1 }
+  }
+  watch(sourceKey, resetConsumer, { flush: 'sync' })
   /**
    * Tracks catalog refill failures separately from successful version checks.
    * @param change - Accepted catalog or security change.
    * @returns Whether the current memory was refreshed successfully.
    */
   const refreshMemory = (change: CatalogCacheChange) => {
+    if (isDisposed()) return Promise.resolve(false)
+    const epoch = sourceEpoch
     lastChange = change
-    const generation = ++refreshGeneration
-    refreshing.value = true
+    refreshGeneration += 1
+    let complete: (success: boolean) => void = () => undefined
+    const work = new Promise<boolean>(resolve => {
+      complete = resolve
+    })
+    refreshState.value = { kind: 'pending', work, failed: refreshFailed() }
+    const ownsRefresh = () => !isDisposed() && epoch === sourceEpoch
+      && refreshState.value.kind === 'pending' && refreshState.value.work === work
     // Invalidate synchronously so requests already in flight cannot settle into the old memory.
     let result: unknown
     try {
@@ -48,24 +78,27 @@ export const useCatalogCacheRefresh = (
     } catch (error: unknown) {
       result = Promise.reject(error)
     }
-    pendingRefresh = Promise.resolve(result).then(success => {
-      if (generation === refreshGeneration) refreshFailed.value = success === false
-      return success !== false
+    void Promise.resolve(result).then(success => {
+      if (ownsRefresh()) refreshState.value = { kind: 'settled', work, failed: success === false }
+      complete(success !== false)
     }).catch((error: unknown) => {
-      if (generation === refreshGeneration) refreshFailed.value = true
-      if (generation === refreshGeneration && !disposed) onError(error)
-      return false
-    }).finally(() => {
-      if (generation === refreshGeneration) refreshing.value = false
+      if (ownsRefresh()) {
+        refreshState.value = { kind: 'settled', work, failed: true }
+        onError(error)
+      }
+      complete(false)
     })
-    return pendingRefresh
+    return work
   }
   const unsubscribe = subscribeCatalogCache(change => {
+    if (change.securityContextChanged) resetConsumer()
     const client = getCatalogCacheClient()
     if (client && urls().some(url => client.affects(url, change))) void refreshMemory(change)
   })
   if (getCurrentScope()) onScopeDispose(() => {
-    disposed = true
+    lifetime.value = 'disposed'
+    refreshState.value = { kind: 'idle' }
+    versionCheckState.value = { kind: 'idle', latest: versionCheckState.value.latest + 1 }
     unsubscribe()
   })
 
@@ -74,23 +107,49 @@ export const useCatalogCacheRefresh = (
    * @returns Whether the version check succeeded.
    */
   const check = async (): Promise<boolean> => {
+    if (isDisposed()) return false
     const client = getCatalogCacheClient()
     if (!client || !urls().some(url => client.getRequestStamp(url))) return true
-    const generation = ++checkGeneration
+    const current = versionCheckState.value
+    const epoch = sourceEpoch
+    const ownsSource = () => !isDisposed() && epoch === sourceEpoch
+    const generation = current.latest + 1
     const refreshAtStart = refreshGeneration
-    pendingChecks.value += 1
+    versionCheckState.value = {
+      kind: 'pending', latest: generation,
+      count: current.kind === 'pending' ? current.count + 1 : 1,
+      failed: versionCheckFailed()
+    }
+    /**
+     * Updates the latest result without completing overlapping checks.
+     * @param hasFailed - Whether the owning check failed.
+     */
+    const settleCheck = (hasFailed: boolean) => {
+      if (ownsSource() && versionCheckState.value.kind === 'pending'
+        && generation === versionCheckState.value.latest) {
+        versionCheckState.value = { ...versionCheckState.value, failed: hasFailed }
+      }
+    }
     try {
       await client.checkVersions()
-      if (generation === checkGeneration) versionCheckFailed.value = false
-      if (refreshFailed.value && refreshAtStart === refreshGeneration && lastChange) await refreshMemory(lastChange)
-      await pendingRefresh
-      return !refreshFailed.value
+      if (!ownsSource()) return false
+      settleCheck(false)
+      if (refreshFailed() && refreshAtStart === refreshGeneration && lastChange) await refreshMemory(lastChange)
+      if (!ownsSource()) return false
+      const currentRefresh = refreshState.value
+      if (currentRefresh.kind !== 'idle') await currentRefresh.work
+      return ownsSource() && !refreshFailed()
     } catch (error: unknown) {
-      if (generation === checkGeneration) versionCheckFailed.value = true
-      if (generation === checkGeneration && !disposed) onError(error)
+      settleCheck(true)
+      if (ownsSource() && generation === versionCheckState.value.latest) onError(error)
       return false
     } finally {
-      pendingChecks.value -= 1
+      const pending = versionCheckState.value
+      if (ownsSource() && pending.kind === 'pending') {
+        versionCheckState.value = pending.count > 1
+          ? { ...pending, count: pending.count - 1 }
+          : { kind: pending.failed ? 'error' : 'success', latest: pending.latest }
+      }
     }
   }
   return { check, checking, failed }

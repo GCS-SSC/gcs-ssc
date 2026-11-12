@@ -1393,7 +1393,7 @@
       "mixed_provider_metadata_update_not_allowed": "Enregistrez les détails de la pièce jointe et les métadonnées gérées par le fournisseur comme des modifications distinctes.",
       "provider_unavailable": "Le fournisseur de stockage enregistré est indisponible ou mal configuré.",
       "provider_changed": "Le fournisseur de stockage de l'organisme a changé pendant le téléversement. Réessayez.",
-      "provider_in_use": "Ce fournisseur de stockage ne peut pas être désactivé tant qu'il est sélectionné ou référencé par des pièces jointes actives."
+      "provider_in_use": "Ce fournisseur de stockage ne peut pas être désactivé tant qu’il est sélectionné, référencé par des pièces jointes actives ou associé à des opérations de nettoyage du stockage non résolues."
     },
     "document_generation": {
       "condition_syntax": "Condition Word non valide « {expression} ». Utilisez des comparaisons, and/or et des parenthèses équilibrées sur une seule ligne.",

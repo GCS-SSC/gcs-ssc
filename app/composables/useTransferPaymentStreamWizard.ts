@@ -1,8 +1,10 @@
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { onBeforeUnmount, toValue, watch } from 'vue'
+import { toValue, watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
 import { useCrudModalPending } from '~/composables/useCrudModal'
-import type { MaybeRefOrGetter, Ref } from 'vue'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { MaybeRefOrGetter } from 'vue'
 import type { TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 
 type WizardRefreshHandler = () => Promise<boolean>
@@ -12,30 +14,37 @@ type WizardRefreshHandler = () => Promise<boolean>
  *
  * @param programId - Parent transfer payment profile id.
  * @param refresh - Callback that refreshes upstream data and reports whether it loaded successfully.
+ * @param ownership - Write authority and independent same-page collection ownership.
+ * @param ownership.context - Actor, Program and update-role authority for the opening.
+ * @param ownership.collectionContext - Actor and Program ownership for committed refresh.
  * @returns Wizard open state and submit handler.
  */
-export const useTransferPaymentStreamWizard = (programId: MaybeRefOrGetter<string>, refresh: WizardRefreshHandler) => {
+export const useTransferPaymentStreamWizard = (
+  programId: MaybeRefOrGetter<string>,
+  refresh: WizardRefreshHandler,
+  ownership: { context: ActionContext, collectionContext: ActionContext }
+) => {
   const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
-  const isStreamWizardOpen: Ref<boolean> = ref(false)
+  const {
+    isOpen: isStreamWizardOpen,
+    captureSession,
+    isCurrentSession,
+    isDisposed
+  } = useModalSession()
   let contextGeneration = 0
-  let nextSession = 0
-  let disposed = false
-  const session: Ref<number | null> = ref(null)
-  const pending = useCrudModalPending(() => session.value)
+  const pending = useCrudModalPending(captureSession)
   const isSavingStreamWizard = pending.isPending
-  watch(isStreamWizardOpen, open => {
-    session.value = open ? ++nextSession : null
-  }, { flush: 'sync' })
   watch(() => toValue(programId), () => {
     contextGeneration += 1
     isStreamWizardOpen.value = false
   }, { flush: 'sync' })
-  onBeforeUnmount(() => {
-    disposed = true
-    contextGeneration += 1
-  })
-  const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+  watch(ownership.context.version, () => {
+    isStreamWizardOpen.value = false
+  }, { flush: 'sync' })
+  const isCurrentContext = (generation: number) => (
+    !isDisposed() && generation === contextGeneration
+  )
 
   /**
    * Submits the wizard data to the server and refreshes the parent program data.
@@ -43,8 +52,11 @@ export const useTransferPaymentStreamWizard = (programId: MaybeRefOrGetter<strin
    * @param data - The wizard payload containing stream details and associations.
    */
   const saveStreamWizard = async (data: TransferPaymentStreamPolymorphicWizard) => {
-    if (disposed || !isStreamWizardOpen.value || session.value === null) return
-    const requestedSession = session.value
+    const operation = ownership.context.capture()
+    const collectionOperation = ownership.collectionContext.capture()
+    if (!operation || !collectionOperation) return
+    const requestedSession = captureSession()
+    if (requestedSession === null) return
     if (!pending.begin(requestedSession)) return
     const generation = contextGeneration
     const requestedProgramId = toValue(programId)
@@ -57,11 +69,11 @@ export const useTransferPaymentStreamWizard = (programId: MaybeRefOrGetter<strin
         body: JSON.stringify(data)
       })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!isCurrentContext(generation)) return
-      closedSession = session.value === requestedSession
+      if (!isCurrentContext(generation) || !collectionOperation.isCurrent()) return
+      closedSession = isCurrentSession(requestedSession) && operation.isCurrent()
       if (closedSession) isStreamWizardOpen.value = false
     } catch (error: unknown) {
-      if (isCurrentContext(generation) && session.value === requestedSession) showError(error)
+      if (isCurrentContext(generation) && operation.isCurrent() && isCurrentSession(requestedSession)) showError(error)
       return
     } finally {
       pending.end(requestedSession)
@@ -69,14 +81,14 @@ export const useTransferPaymentStreamWizard = (programId: MaybeRefOrGetter<strin
 
     try {
       const refreshed = await refresh()
-      if (!refreshed || !isCurrentContext(generation) || !closedSession || session.value !== null) return
+      if (!refreshed || !isCurrentContext(generation) || !operation.isCurrent() || !closedSession || captureSession() !== null) return
       toast.add({
         title: toast.localized('common.success'),
         description: toast.localized('common.added_success'),
         color: 'success'
       })
     } catch (error: unknown) {
-      if (isCurrentContext(generation)) showError(error)
+      if (isCurrentContext(generation) && operation.isCurrent()) showError(error)
     }
   }
 

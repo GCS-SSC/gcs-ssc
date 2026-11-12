@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed } from 'vue'
+import { computed, onScopeDispose, watch } from 'vue'
+import { useFormSession } from '~/composables/useFormSession'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { TransferPaymentBudgetSchema } from '~~/shared/types/schemas'
@@ -21,6 +23,11 @@ const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+
+const deleteContext = useActionContext({
+  identity: [() => programId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const getBudgetName = (budget: TransferPaymentBudgetRow) =>
   `${budget.fiscal_year_display || String(budget.egcs_tp_fiscalyear)} [${budget.id}]`
 
@@ -43,9 +50,21 @@ const budgetColumns: TableColumnInput<TransferPaymentBudgetRow>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
+const editingTarget = ref<string | null>(null)
 const budgetModal = useCrudModal<TransferPaymentBudgetRow, TransferPaymentBudgetForm>({
-  createState: () => ({ egcs_tp_currency: 'cad' }),
-  updateState: budget => ({ ...budget })
+  createState: () => {
+    editingTarget.value = null
+    return { egcs_tp_currency: 'cad' }
+  },
+  updateState: budget => {
+    editingTarget.value = budget.id
+    return { ...budget }
+  }
+})
+const writeContext = useActionContext({
+  identity: [() => programId, () => agencyId],
+  authority: () => canUpdateChild,
+  eligible: () => Boolean(agencyId) && (editingTarget.value === null || budgets.value.some(row => row.id === editingTarget.value))
 })
 
 const isBudgetModalOpen: Ref<boolean> = budgetModal.isOpen
@@ -72,22 +91,39 @@ const openUpdateBudget = (budget: TransferPaymentBudgetRow) => {
   budgetModal.openUpdate(budget)
 }
 
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+watch([() => programId, () => agencyId, () => canUpdateChild], () => {
+  contextGeneration += 1
+  budgetModal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  disposed = true
+  contextGeneration += 1
+  budgetModal.close()
+})
+
 /**
  * Saves the currently selected budget record.
  * Performs a PATCH if the record has an ID (update), or a POST if it doesn't (new).
  * Closes the modal, refreshes the budget data, and provides success feedback to the user.
  */
 const saveBudget = async () => {
-  if (!selectedBudget.value || !agencyId || !canUpdateChild) return
+  if (disposed || !selectedBudget.value || !agencyId || !canUpdateChild) return
+  const targetId = editingTarget.value
+  const operation = writeContext.capture()
+  if (!operation) return
   const session = budgetModal.captureSession()
   if (!budgetPending.begin(session)) return
-  const isUpdate = Boolean(selectedBudget.value.id)
+  const generation = contextGeneration
+  const isUpdate = targetId !== null
   let closedCurrentSession = false
   try {
-    const response = await fetch(getClientRequestUrl(selectedBudget.value.id
-      ? `/api/transfer-payments/${programId}/budgets/${selectedBudget.value.id}`
+    const response = await fetch(getClientRequestUrl(targetId
+      ? `/api/transfer-payments/${programId}/budgets/${targetId}`
       : `/api/transfer-payments/${programId}/budgets`), {
-      method: selectedBudget.value.id ? 'PATCH' : 'POST',
+      method: targetId ? 'PATCH' : 'POST',
       headers: {
         'content-type': 'application/json'
       },
@@ -96,9 +132,10 @@ const saveBudget = async () => {
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
+    if (!operation.isCurrent() || !isCurrentContext(generation)) return
     closedCurrentSession = budgetModal.closeSession(session)
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && budgetModal.isCurrentSession(session)) showError(error)
     return
   } finally {
     budgetPending.end(session)
@@ -114,7 +151,7 @@ const saveBudget = async () => {
   try {
     await refreshBudgets()
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && (budgetModal.isCurrentSession(session) || (closedCurrentSession && budgetModal.isLatestSession(session)))) showError(error)
   }
 }
 
@@ -126,20 +163,27 @@ const saveBudget = async () => {
  * @param {TransferPaymentBudgetRow} budget - The budget record to be deleted.
  */
 const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
+  if (disposed || !canDeleteChild) return
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const targetId = budget.id
   try {
-    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/budgets/${budget.id}`)
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/budgets/${budget.id}`, {
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => budgets.value.find(current => current.id === targetId),
+        eligible: () => canDeleteChild
+      }
+    })
+    if (!ok || !operation.isCurrent()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
-  } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
     await refreshBudgets()
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent()) showError(error)
   }
 }
+const formSession = useFormSession({ owner: budgetModal, action: { kind: 'remote', context: writeContext }, submit: saveBudget })
 </script>
 
 <template>
@@ -203,7 +247,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
       v-model:open="isBudgetModalOpen"
       :title="selectedBudget?.id ? t('common.update') : t('common.add')">
       <template #body>
-        <UForm :state="selectedBudget" :validate="validateBudget" class="space-y-4" @submit="saveBudget">
+        <UForm v-bind="formSession" :state="selectedBudget" :validate="validateBudget" class="space-y-4">
           <UFormField :label="t('transfer_payment.fiscal_year')" name="egcs_tp_fiscalyear">
             <CommonServerLookupSelect
               v-model="selectedBudget.egcs_tp_fiscalyear"

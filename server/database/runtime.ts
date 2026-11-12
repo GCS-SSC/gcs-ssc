@@ -28,15 +28,17 @@ interface DatabaseGeneration {
   leases: Set<symbol>
 }
 
-interface DatabaseRetirement {
-  generationId: symbol
-  promise: Promise<void>
+type DatabaseRegistry =
+  | { kind: 'empty' }
+  | { kind: 'active'; generation: DatabaseGeneration }
+  | { kind: 'retiring'; generationId: symbol; promise: Promise<void> }
+
+const databaseProcess = nodeProcess as NodeJS.Process & {
+  __gcsSscDatabaseRegistry?: DatabaseRegistry
 }
 
-const databaseState = nodeProcess as NodeJS.Process & {
-  __gcsSscDatabaseGeneration?: DatabaseGeneration
-  __gcsSscDatabaseRetirement?: DatabaseRetirement
-}
+/** @returns The process owner shared across module reloads. */
+const getDatabaseRegistry = (): DatabaseRegistry => databaseProcess.__gcsSscDatabaseRegistry ??= { kind: 'empty' }
 
 export interface DatabaseRuntimeConfig extends PostgresTimeoutRuntimeConfig {
   databaseUrl?: string
@@ -248,18 +250,21 @@ const createDatabaseGeneration = (dependencies: DatabaseRuntimeDependencies): Da
  * @param dependencies - Runtime configuration and request attribution boundary.
  * @returns The current Kysely database instance.
  */
-export const useDatabase = (dependencies: DatabaseRuntimeDependencies): Kysely<Database> => {
-  const currentGeneration = databaseState.__gcsSscDatabaseGeneration
-  if (currentGeneration) return currentGeneration.database
+export const useDatabase = (dependencies: DatabaseRuntimeDependencies): Kysely<Database> =>
+  getDatabaseGeneration(dependencies).database
 
-  if (databaseState.__gcsSscDatabaseRetirement) {
-    throw new Error('Database generation is shutting down')
-  }
+/**
+ * @param dependencies - Runtime configuration and request attribution boundary.
+ * @returns The current generation, creating it only while the registry is empty.
+ */
+const getDatabaseGeneration = (dependencies: DatabaseRuntimeDependencies): DatabaseGeneration => {
+  const state = getDatabaseRegistry()
+  if (state.kind === 'active') return state.generation
+  if (state.kind === 'retiring') throw new Error('Database generation is shutting down')
 
   const generation = createDatabaseGeneration(dependencies)
-  databaseState.__gcsSscDatabaseGeneration = generation
-
-  return generation.database
+  databaseProcess.__gcsSscDatabaseRegistry = { kind: 'active', generation }
+  return generation
 }
 
 export interface DatabaseLease {
@@ -272,39 +277,29 @@ export interface DatabaseLease {
 /**
  * Destroys one detached database generation without touching replacement state.
  *
- * @param generation - Detached generation to destroy.
+ * @param generation - Current generation to detach and destroy.
+ * @returns The shared retirement completion, or an already resolved promise for stale generations.
  */
-const retireDatabaseGeneration = async (generation: DatabaseGeneration): Promise<void> => {
-  const destroyPromise = Promise.resolve().then(async () => {
-    await generation.destroy()
-  })
-  const retirement: DatabaseRetirement = {
+const retireDatabaseGeneration = (generation: DatabaseGeneration): Promise<void> => {
+  const state = getDatabaseRegistry()
+  if (state.kind !== 'active' || state.generation !== generation) return Promise.resolve()
+
+  const retirement: Extract<DatabaseRegistry, { kind: 'retiring' }> = {
+    kind: 'retiring',
     generationId: generation.id,
-    promise: destroyPromise
+    promise: Promise.resolve().then(async () => {
+      try {
+        await generation.destroy()
+      } finally {
+        if (getDatabaseRegistry() === retirement) {
+          databaseProcess.__gcsSscDatabaseRegistry = { kind: 'empty' }
+        }
+      }
+    })
   }
-  databaseState.__gcsSscDatabaseRetirement = retirement
-
-  try {
-    await destroyPromise
-  } finally {
-    if (databaseState.__gcsSscDatabaseRetirement === retirement) {
-      delete databaseState.__gcsSscDatabaseRetirement
-    }
-  }
-}
-
-/**
- * Synchronously detaches one current generation and its matching migration state.
- *
- * @param generation - Generation expected to be current.
- * @returns True when the generation was detached.
- */
-const detachDatabaseGeneration = (generation: DatabaseGeneration): boolean => {
-  if (databaseState.__gcsSscDatabaseGeneration !== generation) return false
-
-  delete databaseState.__gcsSscDatabaseGeneration
+  databaseProcess.__gcsSscDatabaseRegistry = retirement
   clearMigrationStateForDatabaseGeneration(generation.id)
-  return true
+  return retirement.promise
 }
 
 /**
@@ -318,24 +313,20 @@ const detachDatabaseGeneration = (generation: DatabaseGeneration): boolean => {
  * @returns The leased generation and an idempotent asynchronous release function.
  */
 export const acquireDatabaseLease = async (dependencies: DatabaseRuntimeDependencies): Promise<DatabaseLease> => {
-  const activeRetirement = databaseState.__gcsSscDatabaseRetirement
-  if (activeRetirement) await activeRetirement.promise
+  let state = getDatabaseRegistry()
+  while (state.kind === 'retiring') {
+    await state.promise
+    state = getDatabaseRegistry()
+  }
 
-  const generation = databaseState.__gcsSscDatabaseGeneration ?? createDatabaseGeneration(dependencies)
-  databaseState.__gcsSscDatabaseGeneration = generation
+  const generation = getDatabaseGeneration(dependencies)
   const leaseId = Symbol('gcs-ssc-database-lease')
   generation.leases.add(leaseId)
 
-  let released = false
   /** Releases this lease once and retires the generation after its final lease. */
   const release = async (): Promise<void> => {
-    if (released) return
-    released = true
-
     if (!generation.leases.delete(leaseId)) return
     if (generation.leases.size > 0) return
-    if (!detachDatabaseGeneration(generation)) return
-
     await retireDatabaseGeneration(generation)
   }
 
@@ -351,12 +342,10 @@ export const acquireDatabaseLease = async (dependencies: DatabaseRuntimeDependen
  * Force-destroys the database connection and resets all lifecycle state.
  */
 export const destroyDatabase = async (): Promise<void> => {
-  const generation = databaseState.__gcsSscDatabaseGeneration
-  if (generation && detachDatabaseGeneration(generation)) {
-    await retireDatabaseGeneration(generation)
-    return
+  const state = getDatabaseRegistry()
+  if (state.kind === 'active') {
+    await retireDatabaseGeneration(state.generation)
+  } else if (state.kind === 'retiring') {
+    await state.promise
   }
-
-  const retirement = databaseState.__gcsSscDatabaseRetirement
-  if (retirement) await retirement.promise
 }

@@ -2,7 +2,10 @@
 import { appRouteLocations } from '~/utils/route-locations'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
-import { computed, ref, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import { nanoid } from 'nanoid'
@@ -25,12 +28,39 @@ const toast = useLocalizedToast()
 const { sendJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const id = String(route.params.id)
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
+const isCurrentPage = () => !disposed && String(route.params.id) === id
 const isHeroCollapsed = getHeroCollapsed('journal-voucher-detail')
 
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
 const { data: voucher, error, status, refresh } = useFetch<JournalVoucherDetail, FetchError, string>(`/api/journal-vouchers/${id}`)
 usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(voucher.value) })
+const { canAny } = useCan()
+const currentVoucher = () => isCurrentPage() && String(voucher.value?.id) === id ? voucher.value : null
+const updateContext = useActionContext({
+  identity: [() => String(route.params.id)],
+  authority: () => canAny('journal_voucher', 'update'),
+  eligible: () => currentVoucher()?.egcs_fc_canedit === true
+})
+const deleteContext = useActionContext({
+  identity: [() => String(route.params.id)],
+  authority: () => canAny('journal_voucher', 'delete'),
+  eligible: () => currentVoucher()?.egcs_fc_candelete === true
+})
+const reversalContext = useActionContext({
+  identity: [() => String(route.params.id)],
+  authority: () => canAny('journal_voucher', 'create'),
+  eligible: () => currentVoucher()?.egcs_fc_canreverse === true
+})
+const replacementContext = useActionContext({
+  identity: [() => String(route.params.id)],
+  authority: () => canAny('journal_voucher', 'create') && canAny('agreement', 'read'),
+  eligible: () => currentVoucher()?.egcs_fc_canreplace === true
+})
 type FormState = {
   egcs_fc_requesteddate: string | Date | null
   egcs_fc_narrative_en: string
@@ -142,8 +172,14 @@ const accountingColumnDefinitions: TableColumnInput<AccountingRow>[] = [
   { id: 'actions', headerKey: 'common.actions', meta: { class: { th: 'text-right', td: originalRowAccent } } }
 ]
 const accountingColumns = useTableColumns(accountingColumnDefinitions)
+/** Confirms only the accepted voucher and settles through its captured delete owner. */
 const deleteDraft = async () => {
-  if (await confirmDeleteRequest(`/api/journal-vouchers/${id}`)) await navigateTo(localePath(appRouteLocations.journalVouchers()))
+  const operation = deleteContext.capture()
+  if (await confirmDeleteRequest(`/api/journal-vouchers/${id}`, {
+    operation,
+    target: { id, resolve: currentVoucher, eligible: row => row.egcs_fc_candelete },
+    shouldProceed: isCurrentPage
+  }) && operation?.isCurrent()) await navigateTo(localePath(appRouteLocations.journalVouchers()))
 }
 const breadcrumbs = computed(() => [
   { label: t('journal_voucher.title'), to: localePath(appRouteLocations.journalVouchers()) },
@@ -158,7 +194,8 @@ const refreshPage = async () => {
  *
  */
 const save = async () => {
-  if (!state.value || !voucher.value?.egcs_fc_canedit || saving.value) return
+  const operation = updateContext.capture()
+  if (!operation?.canDispatch() || !state.value || saving.value) return
   const submitted = JSON.stringify(state.value)
   saving.value = true
   try {
@@ -166,11 +203,13 @@ const save = async () => {
       egcs_fc_commitmentline: line.egcs_fc_commitmentline, egcs_fc_chartofaccount: line.egcs_fc_chartofaccount, egcs_fc_amount: line.egcs_fc_amount
     })) }
     await sendJson(`/api/journal-vouchers/${id}`, 'PATCH', payload)
+    if (!operation.isCurrent()) return
     await refreshPage()
+    if (!operation.isCurrent()) return
     if (!error.value && voucher.value && JSON.stringify(state.value) === submitted) hydrate(voucher.value)
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
-    showError(failure)
+    if (operation.isCurrent()) showError(failure)
   } finally { saving.value = false }
 }
 /**
@@ -178,16 +217,19 @@ const save = async () => {
  * @param kind Linked correction operation.
  */
 const prepareLinked = async (kind: 'reversal' | 'replacement') => {
-  if (!voucher.value || saving.value) return
+  const operation = (kind === 'reversal' ? reversalContext : replacementContext).capture()
+  const sourceVoucher = currentVoucher()
+  if (!operation?.canDispatch() || !sourceVoucher || saving.value) return
   saving.value = true
   try {
     const header = { egcs_fc_requesteddate: new Date().toISOString().slice(0, 10), egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '' }
     const created = kind === 'reversal'
       ? await sendJson<{ id: string }>(`/api/journal-vouchers/${id}/reversal`, 'POST', header)
-      : await sendJson<{ id: string }>('/api/journal-vouchers', 'POST', { ...header, egcs_fc_payment: voucher.value.egcs_fc_payment, egcs_fc_replacementof: id })
+      : await sendJson<{ id: string }>('/api/journal-vouchers', 'POST', { ...header, egcs_fc_payment: sourceVoucher.egcs_fc_payment, egcs_fc_replacementof: id })
+    if (!operation.isCurrent()) return
     await navigateTo(localePath(appRouteLocations.journalVoucherDetail(created.id)))
   } catch (failure) {
-    showError(failure)
+    if (operation.isCurrent()) showError(failure)
   } finally { saving.value = false }
 }
 /**
@@ -195,12 +237,19 @@ const prepareLinked = async (kind: 'reversal' | 'replacement') => {
  * @param line Allocation created or edited in the modal.
  */
 const applyAllocation = (line: JournalVoucherAllocationDraft) => {
-  if (!state.value || !canEditAllocations.value) return
+  if (!isCurrentPage() || !state.value || !canEditAllocations.value) return
   const index = state.value.egcs_fc_allocations.findIndex(allocation => allocation.key === line.key)
   if (index === -1) state.value.egcs_fc_allocations.push(line)
   else state.value.egcs_fc_allocations.splice(index, 1, line)
   allocationModal.close()
 }
+
+const formOwner = useModalSession()
+watch([state, selectedTab, () => String(route.params.id)], () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = selectedTab.value === 'entry' && state.value !== null && isCurrentPage()
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: updateContext }, submit: save })
 
 useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === String(route.params.id) ? { entityType: 'journal_voucher', entityId: voucher.value.id } : null)
 </script>
@@ -221,12 +270,12 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.journal-vouchers.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="journal-voucher-detail-content">
           <UForm
             v-if="selectedTab === 'entry' && state"
+            v-bind="formSession"
             data-help-view="casework.journal-vouchers.entry"
             :state="state"
             :validate="createValidator(JournalVoucherEditSchema)"
             :validate-on="[]"
-            class="space-y-8"
-            @submit="save">
+            class="space-y-8">
             <CommonSection :show-header="false" :title="t('journal_voucher.accounting_entry')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -382,10 +431,10 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
           </UForm>
           <div v-else-if="selectedTab === 'completion'" data-help-view="casework.journal-vouchers.completion" data-help-target="casework.journal-vouchers.detail.completion" data-help-kind="section" class="space-y-4">
             <UAlert v-if="dirty" color="warning" :title="t('journal_voucher.save_before_completion')" />
-            <CommonCompletionPanel entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted && !dirty && !saving && status === 'success'" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+            <CommonCompletionPanel :mutation-role-allowed="canAny('journal_voucher', 'update')" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted && !dirty && !saving && status === 'success'" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </div>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.journal-vouchers.reviews" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.journal-vouchers.workflows" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.journal-vouchers.workflows" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :mutation-role-allowed="canAny('journal_voucher', 'update')" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
           <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.journal-vouchers.supplementary-information" data-help-target="casework.journal-vouchers.supplementary-information.content">
             <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
           </section>

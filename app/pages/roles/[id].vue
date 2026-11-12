@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- page-local handlers are clear from their names and types */
+import { onScopeDispose } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
 import type { ComputedRef, Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import RolePermissionsTab from '~/components/Role/RolePermissionsTab.vue'
@@ -31,19 +33,28 @@ const route = useRoute()
 const id = route.params.id as string
 const { can } = useCan()
 const roleUrl: string = `/api/roles/${id}`
+let pageLifetime: 'active' | 'disposed' = 'active'
+onScopeDispose(() => {
+  pageLifetime = 'disposed'
+})
+const isPageActive = () => pageLifetime === 'active'
 
 const role: Ref<RoleDetail | null> = ref(null)
 const loadError: Ref<unknown | null> = ref(null)
 const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(role.value) })
-const refresh = async () => {
+const refresh = async (isCurrent: () => boolean = isPageActive) => {
+  if (!isPageActive() || !isCurrent()) return false
   loadStatus.value = 'pending'
   loadError.value = null
   try {
-    role.value = await $fetch<RoleDetail, string>(roleUrl)
+    const detail = await $fetch<RoleDetail, string>(roleUrl)
+    if (!isPageActive() || !isCurrent()) return false
+    role.value = detail
     loadStatus.value = 'success'
     return true
   } catch (error: unknown) {
+    if (!isPageActive() || !isCurrent()) return false
     role.value = null
     loadError.value = error
     loadStatus.value = 'error'
@@ -64,16 +75,21 @@ const selectedRole: Ref<Partial<RoleInput> | null> = ref(null)
 const isSavingRole: Ref<boolean> = ref(false)
 
 const openUpdateModal = () => {
-  if (!role.value || isSavingRole.value) return
+  if (!isPageActive() || !role.value || !canUpdateRole.value || isSavingRole.value) return
   selectedRole.value = {
     ...role.value,
-    transfer_payment_ids: role.value.transfer_payment_ids ?? []
+    transfer_payment_ids: [...(role.value.transfer_payment_ids ?? [])]
   }
   isUpdateModalOpen.value = true
 }
 
 const updateRole = async () => {
-  if (!selectedRole.value || isSavingRole.value) return
+  const draft = selectedRole.value
+  if (!isPageActive() || !draft || isSavingRole.value) return
+  const operation = updateContext.capture()
+  if (!operation?.canDispatch()) return
+  const submittedDraft = JSON.stringify(draft)
+  const ownsEditor = () => isPageActive() && operation.isCurrent() && selectedRole.value === draft
 
   try {
     isSavingRole.value = true
@@ -82,8 +98,11 @@ const updateRole = async () => {
       .filter(key => JSON.stringify(selectedRole.value?.[key]) !== JSON.stringify(role.value?.[key]))
       .map(key => [key, selectedRole.value?.[key]]))
     await saveJson(roleUrl, 'PATCH', profile)
-    isUpdateModalOpen.value = false
-    if (!await refresh()) {
+    if (!ownsEditor()) return
+    if (JSON.stringify(draft) === submittedDraft) isUpdateModalOpen.value = false
+    const refreshed = await refresh(operation.isCurrent)
+    if (!ownsEditor()) return
+    if (!refreshed) {
       showError(loadError.value)
       return
     }
@@ -93,7 +112,7 @@ const updateRole = async () => {
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsEditor()) showError(error)
   } finally {
     isSavingRole.value = false
   }
@@ -101,16 +120,17 @@ const updateRole = async () => {
 
 /** Applies an allowed ability change and reloads the persisted role. */
 const updatePermission = async (subject: RoleAbilitySubject, permission: RolePermissionInput | null) => {
-  if (!role.value || isSavingRole.value || isUpdateModalOpen.value) return
+  const operation = updateContext.capture()
+  if (!isPageActive() || !role.value || !operation?.canDispatch() || isSavingRole.value || isUpdateModalOpen.value) return
 
   try {
     isSavingRole.value = true
     await saveJson(`${roleUrl}/permissions`, 'PATCH', { subject, permission })
-    if (!await refresh()) {
-      showError(loadError.value)
-    }
+    if (!isPageActive() || !operation.isCurrent()) return
+    const refreshed = await refresh(operation.isCurrent)
+    if (isPageActive() && operation.isCurrent() && !refreshed) showError(loadError.value)
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && operation.isCurrent()) showError(error)
   } finally {
     isSavingRole.value = false
   }
@@ -137,6 +157,11 @@ const roleScope = computed(() => {
 const canUpdateRole = computed(() => {
   if (!role.value) return false
   return can('role', 'update', roleScope.value)
+})
+const updateContext = useActionContext({
+  identity: [() => role.value?.id, () => role.value?.agency_id],
+  authority: canUpdateRole,
+  eligible: () => role.value !== null
 })
 
 const allowedSubjects = computed(() => {
@@ -229,6 +254,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
         :title="t('role.update_title')"
         :submit-label="t('common.update')"
         :pending="isSavingRole"
+        :action-context="updateContext"
         editing
         @submit="updateRole" />
     </template>

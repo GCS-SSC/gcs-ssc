@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
 import type { Ref } from 'vue'
+import { onScopeDispose, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import { useActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import { useApprovalTemplateTable } from '~/composables/useApprovalTemplateTable'
 import type {
   ApprovalTemplate,
@@ -32,8 +35,24 @@ const {
 const { t, locale } = useI18n()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { showError } = useApiErrorToast()
+const createContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canUpdateChild
+})
+const deleteContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canDeleteChild
+})
 
 const isDeleting: Ref<boolean> = ref(false)
+let isActive = true
+let contextGeneration = 0
+watch(() => agencyId, () => {
+  contextGeneration += 1
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  isActive = false
+})
 
 const { isOpen, selected, openCreate, captureSession, closeSession } = useCrudModal<
   ApprovalTemplateItem,
@@ -68,8 +87,18 @@ const { isOpen, selected, openCreate, captureSession, closeSession } = useCrudMo
   })
 })
 
-const { search, pagination, items, totalRecords, refresh, status } = useApprovalTemplateTable({
+const { search, pagination, items, totalRecords, refresh, status, error } = useApprovalTemplateTable({
   agencyId: () => agencyId
+})
+
+const captureCommitted = useCommittedSettlement({
+  context: createContext,
+  settle: async () => {
+    await refresh()
+    return status.value === 'success'
+      ? { kind: 'available' }
+      : { kind: 'unavailable', error: error.value }
+  }
 })
 
 const columns: TableColumnInput<ApprovalTemplateRow>[] = [
@@ -97,17 +126,29 @@ const deleteTemplate = async (templateId: string) => {
   if (!canDeleteChild || isDeleting.value) {
     return
   }
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const capturedAgencyId = agencyId
+  const generation = contextGeneration
+  const isCurrent = () => isActive && generation === contextGeneration && operation.isCurrent()
 
   try {
     isDeleting.value = true
-    const ok = await confirmDeleteRequest(`/api/agency/${agencyId}/approval-templates/${templateId}`)
+    const ok = await confirmDeleteRequest(`/api/agency/${capturedAgencyId}/approval-templates/${templateId}`, {
+      operation,
+      target: {
+        id: templateId,
+        resolve: () => items.value.find(item => String(item.id) === templateId),
+        eligible: () => canDeleteChild
+      }
+    })
     if (!ok) {
       return
     }
 
     await refresh()
   } catch (error) {
-    showError(error)
+    if (isCurrent()) showError(error)
   } finally {
     isDeleting.value = false
   }
@@ -179,8 +220,9 @@ const deleteTemplate = async (templateId: string) => {
       v-model:open="isOpen"
       v-model:state="selected"
       :agency-id="agencyId"
+      :action-context="createContext"
       :capture-session="captureSession"
       :close-session="closeSession"
-      @saved="refresh" />
+      :capture-committed="captureCommitted" />
   </div>
 </template>

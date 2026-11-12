@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 /* eslint-disable jsdoc/require-jsdoc -- Modal identity and draft recovery are covered by component regressions. */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
 import type { MoneyInput } from '~~/shared/utils/money'
 import type { Ref } from 'vue'
 import { createAccountReceivableCreateSchemaForType } from '~~/shared/types/schemas/account-receivable'
@@ -12,6 +15,7 @@ type AdjustmentSource = Pick<AccountReceivableDetail, 'id' | 'egcs_fc_applicantr
 const { agreementId, adjustment, sourceEntry } = defineProps<{ agreementId: string, adjustment?: AdjustmentSource, sourceEntry?: AccountReceivableSourceEntry }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ created: [id: string] }>()
+const { canAny } = useAuth()
 const { t, locale } = useI18n()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
@@ -35,7 +39,24 @@ type CreateState = {
   egcs_fc_sourcepayment?: string
   egcs_fc_sourceclaim?: string
 }
-const state: Ref<CreateState | null> = ref(null)
+const createDraft = (): CreateState => ({
+  ...(adjustment ? { egcs_fc_agencyfinancialid: adjustment.egcs_fc_effectiveagencyfinancialid ?? undefined } : { egcs_fc_amount: undefined }),
+  egcs_fc_applicantrecipient: adjustment?.egcs_fc_applicantrecipient ?? sourceEntry?.egcs_fc_applicantrecipient,
+  egcs_fc_agencyfiscalyear: adjustment?.egcs_fc_agencyfiscalyear ?? sourceEntry?.egcs_fc_agencyfiscalyear,
+  egcs_fc_type: adjustment?.egcs_fc_type ?? (sourceEntry?.types.length === 1 ? String(sourceEntry.types[0]!.id) : undefined),
+  egcs_fc_recoverymethod: adjustment?.egcs_fc_effectiverecoverymethod ?? undefined,
+  egcs_fc_sources: [],
+  egcs_fc_requesteddate: new Date().toISOString().slice(0, 10),
+  egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '',
+  egcs_fc_monitorfollowup: adjustment?.egcs_fc_monitorfollowup ?? undefined, egcs_fc_recipientpreference: undefined, egcs_fc_preferenceoverride_en: '', egcs_fc_preferenceoverride_fr: '',
+  ...(adjustment ? { egcs_fc_linkedreceivable: adjustment.id } : {}),
+  ...(sourceEntry ? sourceEntry.kind === 'advance' ? { egcs_fc_sourcepayment: sourceEntry.id } : { egcs_fc_sourceclaim: sourceEntry.id } : {})
+})
+const modal = useCrudModal<CreateState, CreateState>({ createState: createDraft, updateState: draft => draft })
+const state = modal.selected
+const pendingRequest = useCrudModalPending(modal.captureSession)
+const pending = pendingRequest.isPending
+onBeforeUnmount(modal.close)
 const selectedType: Ref<AdminCommonLookupResponseItem | null> = ref(null)
 const monitorRequired = computed(() => adjustment?.egcs_fc_monitorrequired ?? selectedType.value?.egcs_ay_monitorrequired === true)
 const claimRelated = computed(() => adjustment?.egcs_fc_claimrelated
@@ -68,27 +89,11 @@ const resolveFiscalYear = (items: AdminCommonLookupResponseItem[]) => {
   const selected = items.find(item => String(item.id) === state.value?.egcs_fc_agencyfiscalyear)
   currency.value = adjustment?.egcs_fc_currency ?? (typeof selected?.egcs_fc_currency === 'string' ? selected.egcs_fc_currency : null)
 }
-const pending: Ref<boolean> = ref(false)
-let session = 0
 watch([open, () => agreementId, () => adjustment?.id, () => sourceEntry], ([isOpen]) => {
-  session += 1
-  pending.value = false
   selectedType.value = null
-  state.value = isOpen
-    ? {
-        ...(adjustment ? { egcs_fc_agencyfinancialid: adjustment.egcs_fc_effectiveagencyfinancialid ?? undefined } : { egcs_fc_amount: undefined }),
-        egcs_fc_applicantrecipient: adjustment?.egcs_fc_applicantrecipient ?? sourceEntry?.egcs_fc_applicantrecipient,
-        egcs_fc_agencyfiscalyear: adjustment?.egcs_fc_agencyfiscalyear ?? sourceEntry?.egcs_fc_agencyfiscalyear,
-        egcs_fc_type: adjustment?.egcs_fc_type ?? (sourceEntry?.types.length === 1 ? String(sourceEntry.types[0]!.id) : undefined),
-        egcs_fc_recoverymethod: adjustment?.egcs_fc_effectiverecoverymethod ?? undefined,
-        egcs_fc_sources: [],
-        egcs_fc_requesteddate: new Date().toISOString().slice(0, 10),
-        egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '',
-        egcs_fc_monitorfollowup: adjustment?.egcs_fc_monitorfollowup ?? undefined, egcs_fc_recipientpreference: undefined, egcs_fc_preferenceoverride_en: '', egcs_fc_preferenceoverride_fr: '',
-        ...(adjustment ? { egcs_fc_linkedreceivable: adjustment.id } : {}),
-        ...(sourceEntry ? sourceEntry.kind === 'advance' ? { egcs_fc_sourcepayment: sourceEntry.id } : { egcs_fc_sourceclaim: sourceEntry.id } : {})
-      }
-    : null
+  if (isOpen) {
+    modal.openCreate()
+  } else modal.close()
 }, { immediate: true, flush: 'sync' })
 watch(() => state.value?.egcs_fc_type, () => {
   selectedType.value = null
@@ -106,30 +111,38 @@ watch(sourceQuery, () => {
     state.value.egcs_fc_sourceclaim = sourceEntry?.kind === 'claim' ? sourceEntry.id : undefined
   }
 }, { flush: 'sync' })
+const actionContext = useActionContext({
+  identity: [() => agreementId, () => adjustment?.id, () => sourceEntry?.id],
+  authority: () => canAny('account_receivable', 'create'),
+  eligible: () => open.value
+})
 const save = async () => {
+  const capturedAction = actionContext.capture()
+  if (!capturedAction?.canDispatch()) return
   if (!state.value || pending.value || (!adjustment && !selectedType.value)) return
-  const currentSession = session
+  const currentSession = modal.captureSession()
   const ownerAgreement = agreementId
-  pending.value = true
+  if (!pendingRequest.begin(currentSession)) return
   try {
     const result = await sendJson<{ id: string }>(adjustment
       ? `/api/account-receivables/${adjustment.id}/adjustments`
       : `/api/agreements/${ownerAgreement}/account-receivables`, 'POST', createSchema.value.parse(state.value))
-    if (currentSession !== session || ownerAgreement !== agreementId) return
+    if (!capturedAction.isCurrent() || !modal.isCurrentSession(currentSession) || ownerAgreement !== agreementId) return
     open.value = false
     emit('created', result.id)
   } catch (failure) {
-    if (currentSession === session) showError(failure)
+    if (capturedAction.isCurrent() && modal.isCurrentSession(currentSession)) showError(failure)
   } finally {
-    if (currentSession === session) pending.value = false
+    pendingRequest.end(currentSession)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
   <UModal v-model:open="open" data-help-view="casework.account-receivable.create-modal.open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }" data-field-tooltip-context="agreement" data-field-scope="account-receivable.create-modal" data-scope-label-en="Agreements > Receivables > Create or adjust" data-scope-label-fr="Ententes > Créances > Créer ou ajuster">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="createValidator(createSchema)" class="space-y-4" @submit="save">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="createValidator(createSchema)" class="space-y-4">
         <UFormField v-if="!adjustment" name="egcs_fc_amount" :label="t('account_receivable.requested_amount')" required>
           <CommonCurrencyInput v-model="state.egcs_fc_amount" :currency="currency" :disabled="pending" />
         </UFormField>

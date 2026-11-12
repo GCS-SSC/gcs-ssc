@@ -1,7 +1,8 @@
 import { defineEventHandler, getRouterParam } from 'h3'
+import { nanoid } from 'nanoid'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
-import { deleteStoredFile } from '~~/server/utils/file-storage'
+import { enqueueStorageCleanup, processStorageCleanupBatch } from '~~/server/utils/storage-cleanup-outbox'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -58,26 +59,26 @@ export default defineEventHandler(async event => {
       .where('_deleted', '=', false)
       .execute()
 
-    return { attachment, agencyId: (currentContext ?? agreementContext).agencyId, success: true }
+    if (attachment) {
+      await enqueueStorageCleanup(trx, {
+        agency_id: currentContext.agencyId, provider_key: attachment.egcs_cn_provider,
+        object_id: attachment.egcs_cn_providerobjectid, locator: attachment.egcs_cn_providerlocator,
+        purpose: 'generated-document',
+        payload: { target: { entityType: 'fundingcaseagreement', entityId: agreementId } }
+      })
+    }
+
+    return { success: true }
   }, { action: 'delete' })
 
   if (!('success' in result) || result.success !== true) return result
 
-  if ('attachment' in result && result.attachment) {
-    const [cleanup] = await Promise.allSettled([deleteStoredFile(
-      db,
-      String(result.agencyId),
-      result.attachment,
-      'generated-document',
-      { entityType: 'fundingcaseagreement', entityId: agreementId }
-    )])
-    if (cleanup?.status === 'rejected') {
-      console.error('Failed to clean up deleted agreement document attachment.', {
-        agreementId,
-        documentId,
-        category: 'storage_cleanup_failed'
-      })
-    }
+  try {
+    await processStorageCleanupBatch(db, `request:${nanoid()}`, 1)
+  } catch (error) {
+    console.error('Failed to drain durable agreement document cleanup.', {
+      agreementId, documentId, category: 'storage_cleanup_failed', error
+    })
   }
 
   return { success: true }

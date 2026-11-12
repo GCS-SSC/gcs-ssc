@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import { DataCollectionSetupCreateSchema, DataCollectionDefinitionSchema } from '~~/shared/types/schemas/data-collection'
 import type { DataCollectionDefinition } from '~~/shared/types/schemas/data-collection'
@@ -52,7 +55,7 @@ const isLoadRetrying: Ref<boolean> = ref(false)
 const selectedSection: Ref<string> = ref('data-collection-general')
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-data-collection-setup-detail')
-const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', { type: 'agency', agencyId }))
+const canManagePublication = computed(() => can('agency', 'update', { type: 'agency', agencyId }))
 const canEdit = computed(() => canManagePublication.value && state.value?.publicationState !== 'retired')
 
 const title = computed(() => getBilingualValue(state.value, 'egcs_cn_name', t('data_collection.title')))
@@ -73,17 +76,34 @@ const definitionErrors = computed(() => definitionValidation.value && !definitio
   ? [...new Set(definitionValidation.value.error.issues.map(issue => t(issue.message)))]
   : [])
 
-const getDraft = () => state.value && definition.value
-  ? {
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_description_en: state.value.egcs_cn_description_en,
-      egcs_cn_description_fr: state.value.egcs_cn_description_fr,
-      egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate,
-      egcs_cn_schema: definition.value
-    }
-  : null
-const mutation = useEditorMutationCoordinator({ getDraft })
+const getDraft = () => {
+  if (!state.value || !definition.value) return null
+  const draft = {
+    egcs_cn_name_en: state.value.egcs_cn_name_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_description_en: state.value.egcs_cn_description_en,
+    egcs_cn_description_fr: state.value.egcs_cn_description_fr,
+    egcs_cn_schema: definition.value,
+    egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
+  }
+  const parsed = DataCollectionSetupCreateSchema.safeParse(draft)
+  return parsed.success ? parsed.data : draft
+}
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
+const formOwner = useModalSession()
+watch(state, () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = state.value !== null
+}, { immediate: true, flush: 'sync' })
+const actionContext = useActionContext({
+  identity: [() => String(route.params.id), () => String(route.params.dataCollectionSetupId)],
+  authority: canManagePublication,
+  eligible: () => Boolean(agency.value) && state.value !== null && state.value.publicationState !== 'retired'
+})
+const mutation = useEditorMutationCoordinator({ getDraft, context: actionContext })
 const isSaving = computed(() => mutation.isActionPending('save'))
 const isPublishing = computed(() => mutation.isActionPending('publish'))
 const isRetiring = computed(() => mutation.isActionPending('retire'))
@@ -92,7 +112,7 @@ const applyPayload = (payload: DataCollectionPayload) => {
   state.value = structuredClone(payload)
   definition.value = structuredClone(payload.egcs_cn_schema)
 }
-const mergePublicationMetadata = (payload: DataCollectionPayload) => {
+const mergePublicationMetadata = (payload: Pick<DataCollectionPayload, 'publicationId' | 'publicationState' | 'publicationVersionId' | 'publicationVersion' | 'hasUnpublishedChanges'>) => {
   if (!state.value) return
   state.value.publicationId = payload.publicationId
   state.value.publicationState = payload.publicationState
@@ -109,24 +129,26 @@ const loadSession = async () => {
   isLoadRetrying.value = true
   try {
     const payload = await fetchPayload()
+    if (disposed) return
     mutation.replaceSessionDraft(() => applyPayload(payload))
     loadError.value = null
   } catch (error) {
+    if (disposed) return
     state.value = null
     definition.value = null
     loadError.value = error
     throw error
   } finally {
-    isLoadRetrying.value = false
+    if (!disposed) isLoadRetrying.value = false
   }
 }
 const retryLoad = async () => {
   try {
     await loadSession()
     await nextTick()
-    detailContent.value?.focus()
+    if (!disposed) detailContent.value?.focus()
   } catch (error) {
-    showError(error)
+    if (!disposed) showError(error)
   }
 }
 onMounted(retryLoad)
@@ -134,6 +156,11 @@ onMounted(retryLoad)
 const showPreservedDraft = () => toast.add({
   title: toast.localized('common.warning'),
   description: toast.localized('common.newer_changes_preserved'),
+  color: 'warning'
+})
+const showSynchronizationWarning = () => toast.add({
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.saved_refresh_failed'),
   color: 'warning'
 })
 const blockDirtyAction = () => {
@@ -146,6 +173,7 @@ const blockDirtyAction = () => {
   return true
 }
 const refreshForMutation = async (token: EditorMutationToken) => {
+  if (!mutation.isTokenCurrent(token)) return false
   const payload = await fetchPayload()
   return mutation.applyMutationRefresh(token, {
     apply: () => applyPayload(payload),
@@ -156,20 +184,24 @@ const refreshForMutation = async (token: EditorMutationToken) => {
 const persist = async (token: EditorMutationToken, showSuccess: boolean) => {
   if (!state.value || !definition.value) return false
   await formRef.value?.validate()
+  if (!mutation.canContinue(token)) return false
   const persistedDefinition = DataCollectionDefinitionSchema.parse(definition.value)
+  const body = DataCollectionSetupCreateSchema.parse({
+    egcs_cn_name_en: state.value.egcs_cn_name_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_description_en: state.value.egcs_cn_description_en,
+    egcs_cn_description_fr: state.value.egcs_cn_description_fr,
+    egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate,
+    egcs_cn_schema: persistedDefinition
+  })
+  if (!mutation.canContinue(token)) return false
   const response = await fetch(getClientRequestUrl(endpoint), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_description_en: state.value.egcs_cn_description_en,
-      egcs_cn_description_fr: state.value.egcs_cn_description_fr,
-      egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate,
-      egcs_cn_schema: persistedDefinition
-    })
+    body: JSON.stringify(body)
   })
   if (!response.ok) await throwFetchResponseError(response)
+  mutation.acceptCommittedDraft(token, body)
   if (!await refreshForMutation(token)) {
     if (mutation.isTokenCurrent(token)) showPreservedDraft()
     return false
@@ -186,7 +218,7 @@ const save = async () => {
     try {
       return await persist(token, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
       return false
     }
   }) === true
@@ -196,15 +228,24 @@ const publish = async () => {
   await mutation.run('publish', async token => {
     try {
       if (mutation.isDirty.value && !await persist(token, false)) return
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/publish`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!await refreshForMutation(token)) {
-        if (mutation.isTokenCurrent(token)) showPreservedDraft()
-        return
+      const metadata = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(metadata)
+      try {
+        if (!await refreshForMutation(token)) {
+          if (mutation.isTokenCurrent(token)) showPreservedDraft()
+          return
+        }
+      } catch {
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('data_collection.published'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -213,23 +254,34 @@ const retire = async () => {
   if (blockDirtyAction()) return
   await mutation.run('retire', async token => {
     try {
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/retire`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!await refreshForMutation(token)) return
+      const metadata = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(metadata)
+      try {
+        if (!await refreshForMutation(token)) return
+      } catch {
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
+      }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('data_collection.retired'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
 const deleteDraft = async () => {
   if (!state.value || state.value.publicationState !== 'draft' || !canManagePublication.value || mutation.isPending.value) return
-  await mutation.run('delete', async () => {
+  const targetId = state.value.id
+  await mutation.run('delete', async token => {
     try {
-      if (await confirmDeleteRequest(endpoint)) await router.push(localePath({ ...appRouteLocations.agencyDetail(agencyId), query: { section: 'dataCollections' } }))
-    } catch (error) { showError(error) }
+      if (await confirmDeleteRequest(endpoint, { operation: token.operation, target: { id: targetId, resolve: () => state.value?.id === targetId ? state.value : null, eligible: row => row.publicationState === 'draft' }, shouldProceed: () => mutation.canContinue(token) }) && mutation.isTokenCurrent(token)) await router.push(localePath({ ...appRouteLocations.agencyDetail(agencyId), query: { section: 'dataCollections' } }))
+    } catch (error) { if (mutation.isTokenCurrent(token)) showError(error) }
   })
 }
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
@@ -268,6 +320,7 @@ const deleteDraft = async () => {
         :aria-label="title"
         tabindex="-1">
         <CommonPublicationDetailHero
+          :action-context="actionContext"
           :name="title"
           :description="getBilingualValue(state, 'egcs_cn_description')"
           icon="i-lucide-clipboard-list"
@@ -303,7 +356,7 @@ const deleteDraft = async () => {
             </aside>
           </template>
 
-          <UForm ref="dataCollectionForm" :state="{ egcs_cn_name_en: state.egcs_cn_name_en, egcs_cn_name_fr: state.egcs_cn_name_fr, egcs_cn_description_en: state.egcs_cn_description_en, egcs_cn_description_fr: state.egcs_cn_description_fr, egcs_cn_approvaltemplate: state.egcs_cn_approvaltemplate, egcs_cn_schema: definition }" :validate="validate" @submit="async () => { await save() }">
+          <UForm v-bind="formSession" ref="dataCollectionForm" :state="{ egcs_cn_name_en: state.egcs_cn_name_en, egcs_cn_name_fr: state.egcs_cn_name_fr, egcs_cn_description_en: state.egcs_cn_description_en, egcs_cn_description_fr: state.egcs_cn_description_fr, egcs_cn_approvaltemplate: state.egcs_cn_approvaltemplate, egcs_cn_schema: definition }" :validate="validate">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
                 <AssessmentSchemaPageSection section-id="data-collection-general" :title="t('data_collection.general')" role="tabpanel" :aria-label="t('data_collection.general')">

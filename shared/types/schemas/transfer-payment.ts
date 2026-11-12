@@ -287,10 +287,10 @@ const addInvalidWizardSelectionIssue = (
  * @param valueFr - French value.
  * @returns Normalized bilingual duplicate key.
  */
-const getBilingualDuplicateKey = (valueEn: string, valueFr: string) => [
+const getBilingualDuplicateKey = (valueEn: string, valueFr: string) => JSON.stringify([
   normalizeBilingual(valueEn),
   normalizeBilingual(valueFr)
-].join('|')
+])
 
 /**
  * Validates wizard outcome temp ids and bilingual name uniqueness.
@@ -387,11 +387,11 @@ const validateWizardPerformanceIndicators = (
       addInvalidWizardSelectionIssue(ctx, ['performanceIndicators', index, 'tempOutcomeId'])
     }
 
-    const indicatorKey = [
+    const indicatorKey = JSON.stringify([
       String(indicator.tempOutcomeId),
       normalizeBilingual(indicator.egcs_tp_name_en),
       normalizeBilingual(indicator.egcs_tp_name_fr)
-    ].join('|')
+    ])
     if (performanceIndicatorCombos.has(indicatorKey)) {
       addInvalidWizardSelectionIssue(ctx, ['performanceIndicators', index, 'egcs_tp_name_en'])
       continue
@@ -1295,9 +1295,7 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
   validateUniqueByKey(
     data.amendmentTypes,
     item =>
-      [item.egcs_tp_amended, normalizeBilingual(item.egcs_tp_name_en), normalizeBilingual(item.egcs_tp_name_fr)].join(
-        '|'
-      ),
+      JSON.stringify([item.egcs_tp_amended, normalizeBilingual(item.egcs_tp_name_en), normalizeBilingual(item.egcs_tp_name_fr)]),
     index => ['amendmentTypes', index, 'egcs_tp_name_en'],
     ctx
   )
@@ -1312,10 +1310,10 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
   validateUniqueByKey(
     data.amendmentSubtypes,
     item =>
-      [
+      JSON.stringify([
         normalizeBilingual(item.egcs_tp_name_en),
         normalizeBilingual(item.egcs_tp_name_fr)
-      ].join('|'),
+      ]),
     index => ['amendmentSubtypes', index, 'egcs_tp_name_en'],
     ctx
   )
@@ -1339,7 +1337,7 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
 
   validateUniqueByKey(
     data.areasOfExpertise,
-    item => [normalizeBilingual(item.egcs_tp_name_en), normalizeBilingual(item.egcs_tp_name_fr)].join('|'),
+    item => JSON.stringify([normalizeBilingual(item.egcs_tp_name_en), normalizeBilingual(item.egcs_tp_name_fr)]),
     index => ['areasOfExpertise', index, 'egcs_tp_name_en'],
     ctx
   )

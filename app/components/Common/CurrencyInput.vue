@@ -13,33 +13,36 @@ const { modelValue, currency, readonly = false, disabled = false } = defineProps
 const emit = defineEmits<{ 'update:modelValue': [value: MoneyInput] }>()
 const { locale } = useI18n()
 const focused: Ref<boolean> = ref(false)
-const draft: Ref<string> = ref(isCanonicalMoney(modelValue) ? majorMoneyText(modelValue) : modelValue && 'draft' in modelValue ? modelValue.draft : '')
-const invalidDraft: Ref<boolean> = ref(Boolean(modelValue && 'draft' in modelValue))
+type CurrencyDraft =
+  | { kind: 'empty'; text: '' }
+  | { kind: 'valid'; text: string }
+  | { kind: 'invalid'; text: string }
+const draft: Ref<CurrencyDraft> = ref(isCanonicalMoney(modelValue)
+  ? { kind: 'valid', text: majorMoneyText(modelValue) }
+  : modelValue && 'draft' in modelValue
+    ? { kind: 'invalid', text: modelValue.draft }
+    : { kind: 'empty', text: '' })
 let lastEmitted: Money | null | undefined
 watch(() => modelValue, value => {
   if (value && 'draft' in value) {
-    draft.value = value.draft
-    invalidDraft.value = true
+    draft.value = { kind: 'invalid', text: value.draft }
   } else if (isCanonicalMoney(value)) {
     if (focused.value && lastEmitted?.amount === value.amount && lastEmitted.currency === value.currency) return
-    draft.value = majorMoneyText(value)
-    invalidDraft.value = false
+    draft.value = { kind: 'valid', text: majorMoneyText(value) }
   } else {
-    draft.value = ''
-    invalidDraft.value = false
+    draft.value = { kind: 'empty', text: '' }
   }
 })
 watch(() => currency, (next, previous) => {
   if (previous && next !== previous && isCanonicalMoney(modelValue) && modelValue.currency !== next?.toUpperCase()) {
-    draft.value = ''
-    invalidDraft.value = false
+    draft.value = { kind: 'empty', text: '' }
     lastEmitted = undefined
     emit('update:modelValue', null)
   }
 })
 const displayValue = computed(() => {
-  if ((focused.value && !readonly && !disabled) || invalidDraft.value || !isCanonicalMoney(modelValue)) return draft.value
-  if (!currency || modelValue.currency !== currency.toUpperCase()) return draft.value
+  if ((focused.value && !readonly && !disabled) || draft.value.kind === 'invalid' || !isCanonicalMoney(modelValue)) return draft.value.text
+  if (!currency || modelValue.currency !== currency.toUpperCase()) return draft.value.text
   return formatMoneyText(modelValue, locale.value)
 })
 /**
@@ -47,24 +50,24 @@ const displayValue = computed(() => {
  * @param value Current native input text.
  */
 const update = (value: string | number | undefined) => {
-  draft.value = value === undefined ? '' : String(value)
-  if (draft.value === '') {
-    invalidDraft.value = false
+  const text = value === undefined ? '' : String(value)
+  if (text === '') {
+    draft.value = { kind: 'empty', text: '' }
     lastEmitted = undefined
     emit('update:modelValue', null)
     return
   }
   try {
     if (!currency) throw new TypeError('A currency must be selected before entering money.')
-    const amount = parseCurrencyMoney(draft.value, currency)
+    const amount = parseCurrencyMoney(text, currency)
     if (!isPersistableMoney(amount)) throw new RangeError('Amount exceeds the persisted minor-unit range.')
-    invalidDraft.value = false
+    draft.value = { kind: 'valid', text }
     lastEmitted = amount
     emit('update:modelValue', amount)
   } catch {
-    invalidDraft.value = true
+    draft.value = { kind: 'invalid', text }
     lastEmitted = null
-    emit('update:modelValue', { draft: draft.value })
+    emit('update:modelValue', { draft: text })
   }
 }
 </script>

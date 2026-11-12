@@ -2,7 +2,9 @@
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { buildAsyncCommandPaletteLookupItems } from '~/utils/async-command-palette-lookup'
-import { onBeforeUnmount } from 'vue'
+import { computed, ref, watch } from 'vue'
+import type { Ref } from 'vue'
+import { useDebouncedRequest } from '~/composables/useDebouncedRequest'
 import type { CommandPaletteGroup } from '@nuxt/ui'
 
 type LookupItem = Record<string, unknown>
@@ -41,69 +43,41 @@ const {
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 
-const isLoading: Ref<boolean> = ref(false)
 const searchTerm: Ref<string> = ref('')
-const items: Ref<LookupItem[]> = ref([])
-const searchTimeout: Ref<ReturnType<typeof setTimeout> | null> = ref(null)
-let requestGeneration = 0
-let requestController: AbortController | null = null
-
-/**
- * Fetches lookup items for the current query and optional search term.
- *
- * @param search - Search text entered in the palette.
- */
-const fetchItems = async (search = '') => {
-  const generation = ++requestGeneration
-  requestController?.abort()
-  const controller = new AbortController()
-  requestController = controller
-  try {
-    isLoading.value = true
+const request = useDebouncedRequest<LookupItem[]>({
+  initialData: [],
+  failureEvidence: 'clear',
+  /**
+   * Fetches options for the current lookup query.
+   * @param signal - Cancellation owned by the current request.
+   * @returns The accepted option rows.
+   */
+  load: async signal => {
     const requestUrl = getClientRequestUrl(fetchUrl)
     requestUrl.searchParams.set('page', '1')
     requestUrl.searchParams.set('limit', String(limit))
     for (const [key, value] of Object.entries(query ?? {})) {
       requestUrl.searchParams.set(key, String(value))
     }
-    if (search) {
-      requestUrl.searchParams.set('search', search)
-    }
-    const fetchResponse = await fetch(requestUrl, { signal: controller.signal })
-    if (!fetchResponse.ok) {
-      await throwFetchResponseError(fetchResponse)
-    }
+    const search = searchTerm.value.trim()
+    if (search) requestUrl.searchParams.set('search', search)
+    const fetchResponse = await fetch(requestUrl, { signal })
+    if (!fetchResponse.ok) await throwFetchResponseError(fetchResponse)
     const response = await fetchResponse.json() as { items: LookupItem[] }
-
-    if (generation === requestGeneration && !controller.signal.aborted) items.value = response.items
-  } catch (error) {
-    if (generation === requestGeneration && !controller.signal.aborted) {
-      items.value = []
-      showError(error)
-    }
-  } finally {
-    if (generation === requestGeneration) isLoading.value = false
+    return response.items
   }
-}
-
-watch(() => query, async () => {
-  await fetchItems(searchTerm.value.trim())
-}, { deep: true, immediate: true })
-
-watch(searchTerm, value => {
-  if (searchTimeout.value) {
-    clearTimeout(searchTimeout.value)
-  }
-
-  searchTimeout.value = setTimeout(async () => {
-    await fetchItems(value.trim())
-  }, 200)
 })
+const isLoading = computed(() => request.state.value.kind === 'pending' || request.state.value.kind === 'debouncing')
+const items = computed(() => request.state.value.kind === 'error' ? [] : request.data.value)
 
-onBeforeUnmount(() => {
-  requestGeneration += 1
-  requestController?.abort()
-  if (searchTimeout.value) clearTimeout(searchTimeout.value)
+watch(request.state, state => {
+  if (state.kind === 'error') showError(state.error)
+})
+watch(() => query, () => {
+  void request.execute()
+}, { deep: true, immediate: true })
+watch(searchTerm, () => {
+  request.schedule()
 })
 
 const groups = computed<CommandPaletteGroup[]>(() => [

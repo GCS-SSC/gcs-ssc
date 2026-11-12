@@ -3,10 +3,10 @@
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
 import type { Ref } from 'vue'
-import { computed, ref, watch } from 'vue'
-import { getClientRequestUrl } from '~/utils/client-request-url'
-import { throwFetchResponseError } from '~/utils/fetch-error'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
+import { useActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import type {
   TransferPaymentStreamRecommendationSetupItem,
   TransferPaymentStreamRecommendationSetupMemberItem
@@ -56,6 +56,8 @@ type GroupedRow = {
 
 const SETUP_GROUP = 'setupGroup'
 const MEMBER_GROUP = 'memberGroup'
+const updateActionContext = useActionContext({ identity: [() => agencyId], authority: () => canUpdateChild })
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDeleteChild })
 const { t } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const router = useRouter()
@@ -74,15 +76,60 @@ const selectedItemParent: Ref<RecommendationSetupWithMembers | null> = ref(null)
 const isSchemaCreateModalOpen: Ref<boolean> = ref(false)
 const schemaCreateState: Ref<Record<string, unknown> | null> = ref(null)
 const schemaCreateParent: Ref<RecommendationSetupWithMembers | null> = ref(null)
+type CatalogContext = { kind: 'active'; agencyId: string } | { kind: 'disposed' }
+let context: CatalogContext = { kind: 'active', agencyId }
+let editorIntent = 0
+const isCurrentContext = (owner: CatalogContext) => owner.kind === 'active' && context === owner
 
 const { isOpen, selected, openCreate, captureSession, closeSession } = useCrudModal<RecommendationSetupWithMembers>({
   createState: () => ({ members: [] }),
   updateState: item => ({ ...item, members: item.members.map(member => ({ ...member })) })
 })
-const { search, pagination, items, totalRecords, refresh, status } = useResourceTable<RecommendationSetupWithMembers>({
-  fetchUrl: `/api/agency/${agencyId}/recommendation-sets`
+const { search, pagination, items, totalRecords, refresh, status, error } = useResourceTable<RecommendationSetupWithMembers>({
+  fetchUrl: computed(() => `/api/agency/${agencyId}/recommendation-sets`)
+})
+watch([() => agencyId, () => canUpdateChild, () => canDeleteChild], () => {
+  context = { kind: 'active', agencyId }
+  editorIntent += 1
+  isDeleting.value = false
+  deletingMemberId.value = null
+}, { flush: 'sync' })
+watch(() => agencyId, () => {
+  isOpen.value = false
+  isItemModalOpen.value = false
+  selectedItem.value = null
+  selectedItemParent.value = null
+  isSchemaCreateModalOpen.value = false
+  schemaCreateState.value = null
+  schemaCreateParent.value = null
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context = { kind: 'disposed' }
+  editorIntent += 1
+})
+const captureCommitted = useCommittedSettlement({
+  context: updateActionContext,
+  settle: async () => {
+    await refresh()
+    return status.value === 'success'
+      ? { kind: 'available' }
+      : { kind: 'unavailable', error: error.value }
+  }
 })
 const setupById = computed(() => new Map(items.value.map(item => [String(item.id), item] as const)))
+const memberActionContext = useActionContext({
+  identity: [() => agencyId, () => selectedItemParent.value?.id, () => selectedItem.value?.id],
+  authority: () => canUpdateChild,
+  eligible: () => {
+    const parent = items.value.find(item => String(item.id) === String(selectedItemParent.value?.id))
+    return Boolean(parent && (!selectedItem.value?.id || parent.members.some(member => String(member.id) === String(selectedItem.value?.id))))
+  }
+})
+const schemaCreateActionContext = useActionContext({
+  identity: [() => agencyId, () => schemaCreateParent.value?.id],
+  authority: () => canUpdateChild,
+  eligible: () => items.value.some(item => String(item.id) === String(schemaCreateParent.value?.id))
+})
 const tableRows = computed<RecommendationRow[]>(() => items.value.flatMap(setup => {
   const members = setup.members ?? []
   if (members.length === 0) {
@@ -152,26 +199,38 @@ const groupedCount = (row: GroupedRow) => row.leafRows?.filter(leaf => !leaf.ori
 const setupForRow = (row: GroupedRow) => setupById.value.get(row.original.setupId) ?? null
 
 const onAdd = () => {
-  if (!canUpdateChild) return
+  if (context.kind !== 'active' || !canUpdateChild) return
+  editorIntent += 1
   openCreate()
 }
 const onEdit = async (setup: RecommendationSetupWithMembers) => {
+  if (context.kind !== 'active') return
+  editorIntent += 1
   await router.push(localePath(appRouteLocations.agencyRecommendationSetDetail(agencyId, String(setup.id))))
 }
 const onDelete = async (setup: RecommendationSetupWithMembers) => {
-  if (isDeleting.value) return
+  const owner = context
+  if (owner.kind !== 'active' || !canDeleteChild || isDeleting.value) return
+  const id = String(setup.id)
+  const operation = deleteActionContext.capture()
+  const shouldProceed = () => isCurrentContext(owner) && canDeleteChild
   try {
     isDeleting.value = true
-    const deleted = await confirmDeleteRequest(`/api/agency/${agencyId}/recommendation-sets/${setup.id}`)
-    if (deleted) await refresh()
+    const deleted = await confirmDeleteRequest(`/api/agency/${owner.agencyId}/recommendation-sets/${id}`, {
+      operation,
+      target: { id, resolve: () => items.value.find(current => String(current.id) === id), eligible: () => canDeleteChild },
+      shouldProceed
+    })
+    if (deleted && operation?.isCurrent() && isCurrentContext(owner)) await refresh()
   } catch (error) {
-    showError(error)
+    if (operation?.isCurrent() && isCurrentContext(owner)) showError(error)
   } finally {
-    isDeleting.value = false
+    if (isCurrentContext(owner)) isDeleting.value = false
   }
 }
 const onAddMember = (setup: RecommendationSetupWithMembers) => {
-  if (!canUpdateChild) return
+  if (context.kind !== 'active' || !canUpdateChild) return
+  editorIntent += 1
   const members = setup.members ?? []
   selectedItemParent.value = setup
   selectedItem.value = {
@@ -181,7 +240,8 @@ const onAddMember = (setup: RecommendationSetupWithMembers) => {
   isItemModalOpen.value = true
 }
 const onCreateSchema = (setup: RecommendationSetupWithMembers) => {
-  if (!canUpdateChild) return
+  if (context.kind !== 'active' || !canUpdateChild) return
+  editorIntent += 1
   const members = setup.members ?? []
   schemaCreateParent.value = setup
   schemaCreateState.value = {
@@ -191,35 +251,61 @@ const onCreateSchema = (setup: RecommendationSetupWithMembers) => {
   isSchemaCreateModalOpen.value = true
 }
 const onSchemaCreated = async (payload: { schemaId: string }) => {
-  await refresh()
-  await router.push(localePath(appRouteLocations.agencyRecommendationSchemaDetail(agencyId, payload.schemaId)))
+  const owner = context
+  const operation = updateActionContext.capture()
+  const intent = editorIntent
+  const isCurrent = () => Boolean(operation?.isCurrent()) && isCurrentContext(owner) && intent === editorIntent && canUpdateChild
+  if (owner.kind !== 'active' || !isCurrent()) return
+  try {
+    if (isCurrent()) await router.push(localePath(appRouteLocations.agencyRecommendationSchemaDetail(owner.agencyId, payload.schemaId)))
+  } catch (error) {
+    if (isCurrent()) showError(error)
+  }
 }
 const onEditMember = (row: RecommendationRow) => {
+  if (context.kind !== 'active' || !canUpdateChild) return
   const setup = setupById.value.get(row.setupId)
   const member = setup?.members?.find(item => String(item.id) === row.memberId)
   if (!setup || !member) return
+  editorIntent += 1
   selectedItemParent.value = setup
   selectedItem.value = { ...member }
   isItemModalOpen.value = true
 }
 const openSchemaEditor = async (row: RecommendationRow) => {
-  if (row.isPlaceholder || row.schemaId.length === 0) return
+  if (context.kind !== 'active' || row.isPlaceholder || row.schemaId.length === 0) return
+  editorIntent += 1
   await router.push(localePath(
     appRouteLocations.agencyRecommendationSchemaDetail(agencyId, row.schemaId)
   ))
 }
 const onDeleteMember = async (row: RecommendationRow) => {
-  if (deletingMemberId.value) return
+  const owner = context
+  if (owner.kind !== 'active' || !canDeleteChild || deletingMemberId.value) return
+  const setupId = row.setupId
+  const memberId = row.memberId
+  const operation = deleteActionContext.capture()
+  const shouldProceed = () => isCurrentContext(owner) && canDeleteChild
   try {
     deletingMemberId.value = row.id
-    if (!await confirmDelete({ description: t('transfer_payment.recommendation_schema') })) return
-    const response = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/recommendation-sets/${row.setupId}/items/${row.memberId}`), { method: 'DELETE' })
-    if (!response.ok) await throwFetchResponseError(response)
-    await refresh()
+    const deleted = await confirmDeleteRequest(
+      `/api/agency/${owner.agencyId}/recommendation-sets/${setupId}/items/${memberId}`,
+      {
+        operation,
+        target: {
+          id: memberId,
+          resolve: () => items.value.find(current => String(current.id) === setupId)?.members.find(member => String(member.id) === memberId),
+          eligible: () => canDeleteChild
+        },
+        shouldProceed,
+        confirm: () => confirmDelete({ description: t('transfer_payment.recommendation_schema') })
+      }
+    )
+    if (deleted && operation?.isCurrent() && isCurrentContext(owner)) await refresh()
   } catch (error) {
-    showError(error)
+    if (operation?.isCurrent() && isCurrentContext(owner)) showError(error)
   } finally {
-    deletingMemberId.value = null
+    if (isCurrentContext(owner)) deletingMemberId.value = null
   }
 }
 </script>
@@ -292,8 +378,8 @@ const onDeleteMember = async (row: RecommendationRow) => {
         </div>
       </template>
     </CommonResourceLayout>
-    <AgencyRecommendationSetModal v-if="selected && canUpdateChild" v-model:open="isOpen" v-model:state="selected" :agency-id="agencyId" :capture-session="captureSession" :close-session="closeSession" @saved="refresh" />
-    <AgencyRecommendationSetItemModal v-if="selectedItem && selectedItemParent && canUpdateChild" v-model:open="isItemModalOpen" v-model:state="selectedItem" :recommendation-setup-id="String(selectedItemParent.id)" :agency-id="agencyId" @saved="refresh" />
-    <AgencyRecommendationSetSchemaCreateModal v-if="schemaCreateState && schemaCreateParent && canUpdateChild" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :recommendation-setup-id="String(schemaCreateParent.id)" :agency-id="agencyId" @created="onSchemaCreated" />
+    <AgencyRecommendationSetModal v-if="selected && canUpdateChild" v-model:open="isOpen" v-model:state="selected" :action-context="updateActionContext" :agency-id="agencyId" :capture-session="captureSession" :close-session="closeSession" :capture-committed="captureCommitted" />
+    <AgencyRecommendationSetItemModal v-if="selectedItem && selectedItemParent && canUpdateChild" v-model:open="isItemModalOpen" v-model:state="selectedItem" :action-context="memberActionContext" :recommendation-setup-id="String(selectedItemParent.id)" :agency-id="agencyId" :capture-committed="captureCommitted" />
+    <AgencyRecommendationSetSchemaCreateModal v-if="schemaCreateState && schemaCreateParent && canUpdateChild" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :action-context="schemaCreateActionContext" :recommendation-setup-id="String(schemaCreateParent.id)" :agency-id="agencyId" :capture-committed="captureCommitted" @created="onSchemaCreated" />
   </div>
 </template>

@@ -1,8 +1,17 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { TransferPaymentStreamCommitmentTypeItem } from '~~/shared/types/schemas/transfer-payment'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
-import { watch } from 'vue'
+import { onScopeDispose, watch } from 'vue'
 
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canCreateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canDeleteChild
+})
 const { transferPaymentId, streamId, canCreateChild, canDeleteChild } = defineProps<{
   transferPaymentId: string
   streamId: string
@@ -18,8 +27,11 @@ const modal = useCrudModal<TransferPaymentStreamCommitmentTypeItem>({
   updateState: item => ({ ...item })
 })
 const { isOpen, selected, captureSession, closeSession } = modal
+type DeleteContext = { kind: 'active' } | { kind: 'disposed' }
+let deleteContext: DeleteContext = { kind: 'active' }
+const ownsDeleteContext = (owner: DeleteContext) => owner.kind === 'active' && deleteContext === owner
 const openCreate = () => {
-  if (canCreateChild) modal.openCreate()
+  if (canCreateChild && deleteContext.kind === 'active') modal.openCreate()
 }
 const { getBilingualValue } = useBilingualValue()
 const getActionTarget = (item: TransferPaymentStreamCommitmentTypeItem) =>
@@ -41,23 +53,38 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentStreamCommitmentTyp
  * @param id - Commitment type identifier.
  */
 const onDelete = async (id: string) => {
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const owner = deleteContext
+  const shouldProceed = () => ownsDeleteContext(owner) && canDeleteChild
+  if (!shouldProceed()) return
   try {
     const deleted = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types/${id}`
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types/${id}`,
+      { operation, target: { id, resolve: () => items.value.find(current => current.id === id), eligible: current => current.id === id }, shouldProceed }
     )
-    if (!deleted) return
-  } catch (error) {
-    showError(error)
-    return
-  }
-  try {
+    if (!deleted || !operation.isCurrent() || !shouldProceed()) return
     await refresh()
-  } catch (error) {
-    showError(error)
+  } catch (error: unknown) {
+    if (operation.isCurrent() && shouldProceed()) showError(error)
   }
 }
 
-watch([() => transferPaymentId, () => streamId], () => modal.close())
+watch([() => transferPaymentId, () => streamId], () => {
+  if (deleteContext.kind !== 'active') return
+  deleteContext = { kind: 'active' }
+  modal.close()
+}, { flush: 'sync' })
+watch(() => canDeleteChild, () => {
+  if (deleteContext.kind === 'active') deleteContext = { kind: 'active' }
+}, { flush: 'sync' })
+watch(() => canCreateChild, allowed => {
+  if (!allowed) modal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  deleteContext = { kind: 'disposed' }
+  modal.close()
+})
 </script>
 
 <template>
@@ -91,9 +118,10 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
     v-if="selected && canCreateChild"
     v-model:open="isOpen"
     v-model:state="selected"
+    :action-context="writeContext"
     :transfer-payment-id="transferPaymentId"
     :stream-id="streamId"
     :capture-session="captureSession"
     :close-session="closeSession"
-    @saved="refresh" />
+    :refresh-collection="refresh" />
 </template>

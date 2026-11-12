@@ -3,7 +3,7 @@ import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ApprovalTemplateItem } from '~~/shared/types/schemas'
 import { ApprovalTemplateSchema } from '~~/shared/types/schemas'
@@ -12,6 +12,9 @@ import { createApprovalTemplateEditorTemplate } from '~/utils/approval-template-
 import { buildApprovalTemplateDetailPayload, saveApprovalTemplateDetail } from '~/utils/approval-template-detail-save'
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
+import { useActionContext } from '~/composables/useActionContext'
 
 const props = withDefaults(defineProps<{
   templateId: string
@@ -38,11 +41,22 @@ const isHeroCollapsed = computed({
   set: value => { getHeroCollapsed(props.heroCollapsedKey).value = value }
 })
 const state: Ref<ApprovalTemplateEditorTemplate | null> = ref(null)
+const formOwner = useModalSession()
+watch(state, () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = state.value !== null
+}, { immediate: true, flush: 'sync' })
 const stepsTableRef: Ref<{ openCreateEditor: () => void } | null> = ref(null)
 const template: Ref<ApprovalTemplateItem | null> = ref(null)
 const templateEndpoint = computed(() => `/api/agency/${props.agencyId}/approval-templates/${props.templateId}`)
 const canEdit = computed(() => props.canManagePublication && template.value?.publicationState !== 'retired')
+const writeContext = useActionContext({
+  identity: [() => props.agencyId, () => props.templateId],
+  authority: () => props.canManagePublication,
+  eligible: () => template.value !== null && template.value.publicationState !== 'retired'
+})
 const mutation = useEditorMutationCoordinator({
+  context: writeContext,
   getDraft: () => state.value ? buildApprovalTemplateDetailPayload(state.value) : null
 })
 const isSaving = computed(() => mutation.isActionPending('save'))
@@ -50,7 +64,7 @@ const isPublishing = computed(() => mutation.isActionPending('publish'))
 const isRetiring = computed(() => mutation.isActionPending('retire'))
 const canEditFields = computed(() => canEdit.value && !mutation.isPending.value)
 
-const fetchTemplate = async (endpoint = templateEndpoint.value) => {
+const fetchTemplate = async (endpoint: string) => {
   const response = await fetch(getClientRequestUrl(endpoint))
   if (!response.ok) {
     await throwFetchResponseError(response)
@@ -61,21 +75,23 @@ const applyTemplate = (value: ApprovalTemplateItem) => {
   template.value = value
   state.value = createApprovalTemplateEditorTemplate(value)
 }
-const refreshForMutation = async (token: EditorMutationToken) => {
-  const value = await fetchTemplate()
+const mergePublicationMetadata = (value: ApprovalTemplateItem) => {
+  if (!template.value) return
+  template.value = {
+    ...template.value,
+    publicationId: value.publicationId,
+    publicationState: value.publicationState,
+    publicationVersionId: value.publicationVersionId,
+    publicationVersion: value.publicationVersion,
+    hasUnpublishedChanges: value.hasUnpublishedChanges
+  }
+}
+const refreshForMutation = async (token: EditorMutationToken, endpoint: string) => {
+  if (!mutation.isTokenCurrent(token)) return false
+  const value = await fetchTemplate(endpoint)
   return mutation.applyMutationRefresh(token, {
     apply: () => applyTemplate(value),
-    mergeMetadata: () => {
-      if (!template.value) return
-      template.value = {
-        ...template.value,
-        publicationId: value.publicationId,
-        publicationState: value.publicationState,
-        publicationVersionId: value.publicationVersionId,
-        publicationVersion: value.publicationVersion,
-        hasUnpublishedChanges: value.hasUnpublishedChanges
-      }
-    }
+    mergeMetadata: () => mergePublicationMetadata(value)
   })
 }
 let loadGeneration = 0
@@ -93,7 +109,10 @@ watch(() => [props.agencyId, props.templateId], async () => {
   } catch (error) {
     if (generation === loadGeneration) showError(error)
   }
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
+onScopeDispose(() => {
+  loadGeneration += 1
+})
 
 const sectionTabs = computed(() => [
   { key: 'agency.tabs.general', icon: 'i-lucide-info', value: 'approval-template-general' },
@@ -120,24 +139,29 @@ const blockDirtyAction = () => {
   })
   return true
 }
-const persistTemplate = async (token: EditorMutationToken, showSuccess: boolean) => {
+const persistTemplate = async (token: EditorMutationToken, endpoint: string, showSuccess: boolean) => {
   const saved = await saveApprovalTemplateDetail({
     state: state.value,
-    requestUrl: getClientRequestUrl(templateEndpoint.value),
+    requestUrl: getClientRequestUrl(endpoint),
     validate,
     toast,
     t,
     showError,
-    showSuccess: false
+    showSuccess: false,
+    shouldProceed: () => mutation.canContinue(token),
+    canSettle: () => mutation.isTokenCurrent(token)
   })
-  if (!saved) return false
+  if (!saved || !mutation.isTokenCurrent(token)) return false
+  mutation.acceptCommittedDraft(token)
   try {
-    if (!await refreshForMutation(token)) {
-      if (mutation.isTokenCurrent(token)) showPreservedDraft()
+    if (!await refreshForMutation(token, endpoint)) {
+      if (!mutation.isTokenCurrent(token)) return false
+      showPreservedDraft()
       return true
     }
   } catch {
-    if (mutation.isTokenCurrent(token)) showSynchronizationWarning()
+    if (!mutation.isTokenCurrent(token)) return false
+    showSynchronizationWarning()
     if (showSuccess) {
       toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
     }
@@ -150,15 +174,17 @@ const persistTemplate = async (token: EditorMutationToken, showSuccess: boolean)
 }
 const saveTemplate = async () => {
   if (!canEdit.value || mutation.isPending.value) return false
+  const endpoint = templateEndpoint.value
   return await mutation.run('save', async token => {
     try {
-      return await persistTemplate(token, true)
+      return await persistTemplate(token, endpoint, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
       return false
     }
   }) === true
 }
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: writeContext }, submit: saveTemplate })
 
 const hasUnsavedChanges = () => {
   return mutation.isDirty.value
@@ -167,22 +193,28 @@ const hasUnsavedChanges = () => {
 const performPublicationAction = async (action: 'publish' | 'retire') => {
   if (mutation.isPending.value || !props.canManagePublication || template.value?.publicationState === 'retired') return
   if (action === 'retire' && blockDirtyAction()) return
+  const endpoint = templateEndpoint.value
   await mutation.run(action, async token => {
     try {
-      if (action === 'publish' && hasUnsavedChanges() && !await persistTemplate(token, false)) return
-      const response = await fetch(getClientRequestUrl(`${templateEndpoint.value}/${action}`), { method: 'POST' })
+      if (action === 'publish' && hasUnsavedChanges() && !await persistTemplate(token, endpoint, false)) return
+      if (!mutation.canContinue(token)) return
+      const response = await fetch(getClientRequestUrl(`${endpoint}/${action}`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
+      const committedTemplate: ApprovalTemplateItem = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(committedTemplate)
       try {
-        if (!await refreshForMutation(token)) {
+        if (!await refreshForMutation(token, endpoint)) {
           if (mutation.isTokenCurrent(token)) showPreservedDraft()
           return
         }
       } catch {
-        if (mutation.isTokenCurrent(token)) showSynchronizationWarning()
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized(`approval_templates.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -213,6 +245,7 @@ watch(selectedSection, value => {
           :publication-version="template.publicationVersion"
           :has-unpublished-changes="template.hasUnpublishedChanges"
           :can-manage="props.canManagePublication"
+          :action-context="writeContext"
           :is-publishing="isPublishing"
           :is-retiring="isRetiring"
           :is-mutation-pending="mutation.isPending.value"
@@ -241,9 +274,9 @@ watch(selectedSection, value => {
 
           <UForm
             v-if="state"
+            v-bind="formSession"
             :state="state"
-            :validate="validate"
-            @submit.prevent="() => { void saveTemplate() }">
+            :validate="validate">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
                 <AssessmentSchemaPageSection section-id="approval-template-general" :title="t('agency.tabs.general')" role="tabpanel" :aria-label="t('agency.tabs.general')">
@@ -289,6 +322,7 @@ watch(selectedSection, value => {
                     ref="stepsTableRef"
                     v-model:steps="state.steps"
                     :approval-template-id="props.templateId"
+                    :action-context="writeContext"
                     @save="saveTemplate" />
                 </AssessmentSchemaPageSection>
               </CommonDesignTimeEditorSections>

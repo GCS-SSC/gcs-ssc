@@ -45,7 +45,7 @@ export const applyAllocatedAccountReceivableCoding = async (trx: Transaction<Dat
           egcs_fc_accountingdimensions: sql`${JSON.stringify(retained.egcs_fc_accountingdimensions)}::jsonb`, _deleted: false }).execute()
       }
       remaining = subtractMoney(remaining, applied)
-      capacity.remaining = subtractMoney(remaining, applied)
+      capacity.remaining = subtractMoney(capacity.remaining, applied)
     }
     if (compareMoney(remaining, zeroMoney(currency)) !== 0) throw new Error('AR_SOURCE_CAPACITY')
   }

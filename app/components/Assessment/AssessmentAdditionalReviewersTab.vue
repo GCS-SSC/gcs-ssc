@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -29,8 +31,9 @@ type AdditionalReviewerModalState = AdditionalReviewerInput & {
   id?: string
 }
 
-const { reviewId, canUpdateAssessment = false, reviewersDisabled = false, runtimeLocked = false } = defineProps<{
+const { reviewId, readAuthority, canUpdateAssessment = false, reviewersDisabled = false, runtimeLocked = false } = defineProps<{
   reviewId: string
+  readAuthority: boolean
   canUpdateAssessment?: boolean
   reviewersDisabled?: boolean
   runtimeLocked?: boolean
@@ -190,6 +193,11 @@ const canSaveReviewer = computed(() => {
       ? rows.value.some(row => row.id === selected.id && row.can_update)
       : canUpdateAssessment && !reviewersDisabled))
 })
+const reviewerContext = useActionContext({
+  identity: [() => reviewId],
+  authority: () => readAuthority,
+  eligible: canSaveReviewer
+})
 const selectedUserOption: Ref<UserOptionItem | null> = ref(null)
 const lookupRowId = computed(() => isReviewerModalOpen.value && canSaveReviewer.value
   ? selectedReviewer.value?.id
@@ -315,6 +323,8 @@ const saveReviewer = async () => {
     return
   }
 
+  const operation = reviewerContext.capture()
+  if (!operation) return
   const isCreate = !selectedReviewer.value.id
   const requestedReviewGeneration = reviewGeneration
   const session = reviewerModal.captureSession()
@@ -322,6 +332,7 @@ const saveReviewer = async () => {
   if (!reviewerPending.begin(session)) return
 
   try {
+    if (!operation.canDispatch()) return
     if (isCreate) {
       await requestJson(`/api/reviews/${requestedReviewId}/additional-reviewers`, 'POST', {
         egcs_cn_user: selectedReviewer.value.egcs_cn_user,
@@ -341,20 +352,22 @@ const saveReviewer = async () => {
       })
     }
 
-    if (requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration || !reviewerModal.closeSession(session)) return
+    if (!operation.isCurrent() || requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration) return
+    const closed = reviewerModal.closeSession(session)
     await refreshRows()
-    if (requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration) return
+    if (!operation.isCurrent() || requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration || !closed || !reviewerModal.isLatestSession(session)) return
     toast.add({
       title: toast.localized('common.success'),
       description: isCreate ? toast.localized('assessment.additional_reviewers.created_success') : toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (error) {
-    if (requestedReviewId === reviewId && requestedReviewGeneration === reviewGeneration && reviewerModal.captureSession() === session) showError(error)
+    if (operation.isCurrent() && requestedReviewId === reviewId && requestedReviewGeneration === reviewGeneration && reviewerModal.captureSession() === session) showError(error)
   } finally {
     reviewerPending.end(session)
   }
 }
+const reviewerForm = useFormSession({ owner: reviewerModal, action: { kind: 'remote', context: reviewerContext }, submit: saveReviewer })
 
 /**
  * Marks an additional reviewer as complete.
@@ -544,10 +557,10 @@ const deleteRow = async (rowId: string) => {
       :title="selectedReviewer.id ? t('assessment.additional_reviewers.update_title') : t('assessment.additional_reviewers.create_title')">
       <template #body>
         <UForm
+          v-bind="reviewerForm"
           :state="selectedReviewer"
           :validate="validate"
-          class="space-y-4"
-          @submit="saveReviewer">
+          class="space-y-4">
           <UFormField :label="t('groups.assignee_type')" required data-ui-target="assessment.additional-reviewers-tab.groups.assignee_type">
             <USelect v-model="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" />
           </UFormField>

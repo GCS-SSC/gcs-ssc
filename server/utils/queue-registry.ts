@@ -19,11 +19,15 @@ export type RegisteredQueueHandler = ClusterQueueHandler | ProcessQueueHandler
 
 const registryKey = Symbol.for('gcs-ssc.queue-registry')
 
-type QueueActivation = { owner: string; status: 'pending' | 'ready' | 'failed' }
+type PendingQueueActivation = { kind: 'pending'; handlers: Map<string, ClusterQueueHandler> }
+type QueueActivation = {
+  owner: string
+  state: PendingQueueActivation | { kind: 'ready' } | { kind: 'failed' }
+}
 
 type QueueRegistry = {
   handlers: Map<string, RegisteredQueueHandler>
-  pending: Map<string, Map<string, ClusterQueueHandler>>
+  pending: Map<string, PendingQueueActivation>
   extensionKeys: Set<string>
   activationScope: AsyncLocalStorage<QueueActivation>
   registerHost: (handler: RegisteredQueueHandler) => () => void
@@ -53,7 +57,7 @@ const registryFor = (app: object): QueueRegistry => {
   const existing = Object.hasOwn(app, registryKey) ? Reflect.get(app, registryKey) as QueueRegistry : undefined
   if (existing) return existing
   const handlers = new Map<string, RegisteredQueueHandler>()
-  const pending = new Map<string, Map<string, ClusterQueueHandler>>()
+  const pending = new Map<string, PendingQueueActivation>()
   const extensionKeys = new Set<string>()
   const activationScope = new AsyncLocalStorage<QueueActivation>()
   const registry: QueueRegistry = {
@@ -92,10 +96,10 @@ const registryFor = (app: object): QueueRegistry => {
       if (activation && activation.owner !== validated.extensionKey) {
         throw new Error(`Queue handler owner does not match activating extension: ${activation.owner}`)
       }
-      if (activation?.status === 'failed') {
+      if (activation?.state.kind === 'failed') {
         throw new Error(`Queue registration belongs to a failed plugin activation: ${activation.owner}`)
       }
-      const staged = pending.get(validated.extensionKey)
+      const staged = pending.get(validated.extensionKey)?.handlers
       if (handlers.has(validated.id) || staged?.has(validated.id)) {
         throw new Error(`Duplicate queue handler: ${validated.id}`)
       }
@@ -132,16 +136,16 @@ export const activateExtensionQueueHandlers = async (
   app: object, extensionKey: string, activate: () => Promise<void>
 ): Promise<void> => {
   const registry = registryFor(app)
-  const staged = new Map<string, ClusterQueueHandler>()
   if (registry.pending.has(extensionKey)) throw new Error(`Queue activation already pending: ${extensionKey}`)
-  registry.pending.set(extensionKey, staged)
-  const activation: QueueActivation = { owner: extensionKey, status: 'pending' }
+  const pending: PendingQueueActivation = { kind: 'pending', handlers: new Map() }
+  const activation: QueueActivation = { owner: extensionKey, state: pending }
+  registry.pending.set(extensionKey, pending)
   try {
     await registry.activationScope.run(activation, activate)
-    for (const [id, handler] of staged) registry.handlers.set(id, handler)
-    activation.status = 'ready'
+    for (const [id, handler] of pending.handlers) registry.handlers.set(id, handler)
+    activation.state = { kind: 'ready' }
   } finally {
-    if (activation.status === 'pending') activation.status = 'failed'
+    if (activation.state.kind === 'pending') activation.state = { kind: 'failed' }
     registry.pending.delete(extensionKey)
   }
 }

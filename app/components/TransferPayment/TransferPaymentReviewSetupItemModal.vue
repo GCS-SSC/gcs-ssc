@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- request closure is local to the coordinated submit */
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -27,20 +33,28 @@ const {
   agencyId,
   entityType,
   mutationPending = false,
-  runMutation
+  runMutation,
+  captureCommitted,
+  actionContext
 } = defineProps<{
   reviewSetupId: string
   agencyId: string
   entityType: string
   mutationPending?: boolean
-  runMutation?: EditorMutationRunner
-}>()
+  actionContext: ActionContext
+} & ({ runMutation: EditorMutationRunner; captureCommitted?: never } | { runMutation?: never; captureCommitted: CaptureCommittedSettlement })>()
 
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 
-const isSubmitting = ref(false)
+const modalSession = useModalSession()
+watch([() => open.value, () => state.value, () => agencyId, () => reviewSetupId], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null
+}, { immediate: true, flush: 'sync' })
+const pending = useCrudModalPending(modalSession.captureSession)
+const isSubmitting = pending.isPending
 const isUpdate = computed(() => Boolean(state.value?.id))
 const validateCreate = createValidator(TransferPaymentStreamReviewSetupMemberCreateSchema)
 const validatePatch = createValidator(TransferPaymentStreamReviewSetupMemberPatchSchema)
@@ -65,10 +79,10 @@ const validate = withFormRequirements(async (
 ) => {
   const editablePayload = getEditablePayload(payload)
   if (isUpdate.value) {
-    return await validatePatch(editablePayload as z.infer<typeof TransferPaymentStreamReviewSetupMemberPatchSchema>)
+    return await validatePatch(editablePayload)
   }
 
-  return await validateCreate(editablePayload as z.infer<typeof TransferPaymentStreamReviewSetupMemberCreateSchema>)
+  return await validateCreate(editablePayload)
 }, TransferPaymentStreamReviewSetupMemberCreateSchema)
 
 const modalTitle = computed(() => (
@@ -91,43 +105,55 @@ const onSubmit = async (
     z.infer<typeof TransferPaymentStreamReviewSetupMemberPatchSchema>
   >
 ) => {
-  if (isSubmitting.value || mutationPending) {
-    return
-  }
+  const session = modalSession.captureSession()
+  const committed = captureCommitted?.()
+  if (!runMutation && !committed) return
+  const operation = actionContext.capture()
+  if (session === null || !operation || mutationPending || !pending.begin(session)) return
+  const isCurrent = () => modalSession.isCurrentSession(session) && operation.isCurrent()
 
   try {
-    isSubmitting.value = true
-    const itemId = state.value?.id ? String(state.value.id) : null
-    const body = getEditablePayload(event.data)
+    let completed: unknown
+    try {
+      const itemId = state.value?.id ? String(state.value.id) : null
+      const body = getEditablePayload(event.data)
 
-    const request = async () => {
-      const response = await fetch(getClientRequestUrl(itemId
+      const requestUrl = getClientRequestUrl(itemId
         ? `/api/agency/${agencyId}/review-sets/${reviewSetupId}/items/${itemId}`
-        : `/api/agency/${agencyId}/review-sets/${reviewSetupId}/items`), {
-        method: itemId ? 'PATCH' : 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      if (!response.ok) await throwFetchResponseError(response)
-      return true
+        : `/api/agency/${agencyId}/review-sets/${reviewSetupId}/items`)
+      const requestBody = JSON.stringify(body)
+      const request = async () => {
+        if (!isCurrent() || !operation.canDispatch() || (committed && !committed.canDispatch())) return
+        const response = await fetch(requestUrl, {
+          method: itemId ? 'PATCH' : 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: requestBody
+        })
+        if (!response.ok) await throwFetchResponseError(response)
+        return true
+      }
+      completed = runMutation ? await runMutation(request) : await request()
+    } catch (error) {
+      if (modalSession.isCurrentSession(session) && operation.isCurrent()) showError(error)
+      return
     }
-    const completed = runMutation ? await runMutation(request) : await request()
     if (completed === undefined) return
+    const readback = committed ? await committed.settle() : null
+    if (readback?.kind === 'retired' || !isCurrent()) return
 
     open.value = false
     emit('saved')
-  } catch (error) {
-    showError(error)
   } finally {
-    isSubmitting.value = false
+    pending.end(session)
   }
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="modalTitle" data-field-scope="transfer-payment.review-setup-item-modal">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="validate" @submit="onSubmit">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="validate">
         <fieldset :disabled="isSubmitting || mutationPending" class="space-y-4">
           <ReviewAssessmentSetItemFields
             v-model:state="state"

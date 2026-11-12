@@ -1,9 +1,10 @@
 import { defineEventHandler } from 'h3'
+import { unauthorized } from '~~/server/utils/api-errors'
 import { getValidatedQueryI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { executeFreshAuthorizedCurrentRecommendationWrite } from '~~/server/utils/review-runtime-access'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
-import { saveCurrentRecommendation } from '~~/server/utils/recommendation-runtime'
+import { saveRecommendationById } from '~~/server/utils/recommendation-runtime'
 import { WorkflowRecommendationSaveSchema, WorkflowRuntimeQuerySchema } from '~~/shared/types/schemas/workflow'
 import {
   authorizeExtensionLifecycleRead,
@@ -21,18 +22,18 @@ export default defineEventHandler(async event => {
     ?? await resolveCompletionRuntimeEntityFromEntity(event.context.$db, query.entityType, query.entityId)
   if (!context) return await respondCompletionRuntimeEntityNotFound(event, query.entityType)
   if (extensionRuntime) await authorizeExtensionLifecycleRead(event, extensionRuntime)
-  return await executeFreshAuthorizedCurrentRecommendationWrite(event, context, async (trx, currentContext) => {
+  return await executeFreshAuthorizedCurrentRecommendationWrite(event, context, async (trx, recommendationId) => {
     const currentUser = await resolveCurrentCommonUser(event, trx)
     if (!currentUser) return await unauthorized(event)
-    return await saveCurrentRecommendation(
+    const updated = await saveRecommendationById(
       event,
-      currentContext,
+      recommendationId,
       body.responses,
       true,
       currentUser.id,
       trx,
-      query.purpose,
       body.revision
     )
-  })
+    return updated
+  }, query.purpose)
 })

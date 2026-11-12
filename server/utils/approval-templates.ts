@@ -579,35 +579,30 @@ const syncAdditionalApprovalCertifications = async (
 
   const existing = await db
     .selectFrom('Common_Certification')
-    .select(['id', 'egcs_cn_order'])
+    .select(['id'])
     .where('egcs_cn_approvaltemplate', '=', templateId)
     .where('_deleted', '=', false)
     .execute()
   const existingIds = new Set(existing.map(item => String(item.id)))
-  const existingOrderById = new Map(existing.map(item => [String(item.id), item.egcs_cn_order]))
-  const retainedIds = new Set<string>()
+  for (const certification of certifications) {
+    if (certification.id && !existingIds.has(String(certification.id))) {
+      throw new Error('Additional approval certification is outside its parent template.')
+    }
+  }
 
+  // Release active name/order slots in the caller's transaction. Only IDs
+  // proven active in this template above can be restored; omissions stay deleted.
   if (existingIds.size > 0) {
     await db
       .updateTable('Common_Certification')
-      .set(eb => ({ egcs_cn_order: eb('egcs_cn_order', '*', -1) }))
+      .set({ _deleted: true })
       .where('egcs_cn_approvaltemplate', '=', templateId)
       .where('_deleted', '=', false)
       .execute()
   }
 
   for (const certification of certifications) {
-    if (certification.id && !existingIds.has(String(certification.id))) {
-      throw new Error('Additional approval certification is outside its parent template.')
-    }
-
     if (certification.id && certification._deleted === true) {
-      await db
-        .updateTable('Common_Certification')
-        .set({ _deleted: true })
-        .where('id', '=', certification.id)
-        .where('egcs_cn_approvaltemplate', '=', templateId)
-        .execute()
       continue
     }
 
@@ -615,7 +610,8 @@ const syncAdditionalApprovalCertifications = async (
       await db
         .updateTable('Common_Certification')
         .set({
-          egcs_cn_order: certification.egcs_cn_order ?? existingOrderById.get(String(certification.id)) ?? 0,
+          _deleted: false,
+          ...(certification.egcs_cn_order === undefined ? {} : { egcs_cn_order: certification.egcs_cn_order }),
           ...(certification.egcs_cn_description_en === undefined ? {} : { egcs_cn_description_en: certification.egcs_cn_description_en }),
           ...(certification.egcs_cn_description_fr === undefined ? {} : { egcs_cn_description_fr: certification.egcs_cn_description_fr }),
           ...(certification.egcs_cn_name_en === undefined ? {} : { egcs_cn_name_en: certification.egcs_cn_name_en }),
@@ -626,13 +622,11 @@ const syncAdditionalApprovalCertifications = async (
         })
         .where('id', '=', certification.id)
         .where('egcs_cn_approvaltemplate', '=', templateId)
-        .where('_deleted', '=', false)
         .execute()
-      retainedIds.add(certification.id)
       continue
     }
 
-    const created = await db
+    await db
       .insertInto('Common_Certification')
       .values({
         egcs_cn_order: certification.egcs_cn_order ?? 0,
@@ -646,20 +640,6 @@ const syncAdditionalApprovalCertifications = async (
         egcs_cn_approvaltemplate: templateId,
         _deleted: false
       })
-      .returning('id')
-      .executeTakeFirstOrThrow()
-    retainedIds.add(String(created.id))
-  }
-
-  const removedIds = existing
-    .map(item => String(item.id))
-    .filter(id => !retainedIds.has(id))
-  if (removedIds.length > 0) {
-    await db
-      .updateTable('Common_Certification')
-      .set({ _deleted: true })
-      .where('id', 'in', removedIds)
-      .where('egcs_cn_approvaltemplate', '=', templateId)
       .execute()
   }
 }

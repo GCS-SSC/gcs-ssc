@@ -2,7 +2,8 @@ import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- wizard callbacks use self-descriptive local signatures */
 import { nanoid } from 'nanoid'
 import type { FormError } from '#ui/types'
-import type { Ref } from 'vue'
+import { getCurrentScope, onScopeDispose, toValue } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type {
   AgencyAgreementTypeItem,
   AgencyHoldbackBasisItem,
@@ -128,7 +129,7 @@ export const createTransferPaymentStreamWizardInitialState = (): TransferPayment
 
 interface UseTransferPaymentStreamWizardModalOptions {
   open: Ref<boolean>
-  programId: string
+  programId: MaybeRefOrGetter<string>
 }
 
 type WizardListKey = {
@@ -144,6 +145,7 @@ export const useTransferPaymentStreamWizardModal = ({
   open,
   programId
 }: UseTransferPaymentStreamWizardModalOptions) => {
+  const resolvedProgramId = computed(() => toValue(programId))
   const { t, locale } = useI18n()
   const toast = useLocalizedToast()
   const { createValidator } = useZodI18n()
@@ -151,6 +153,11 @@ export const useTransferPaymentStreamWizardModal = ({
 
   const state: Ref<TransferPaymentStreamWizardForm | null> = ref(null)
   const wizardErrors: Ref<FormError[]> = ref([])
+  let disposed = false
+  if (getCurrentScope()) onScopeDispose(() => {
+    disposed = true
+    latestReferenceLoadId.value += 1
+  })
   const isReferenceDataLoading: Ref<boolean> = ref(false)
   const latestReferenceLoadId: Ref<number> = ref(0)
 
@@ -191,20 +198,20 @@ export const useTransferPaymentStreamWizardModal = ({
 
   const budgetLabels: Ref<Record<string, { programId: string, budgetId: string, label: string, currency: string }>> = ref({})
   const onBudgetResolved = (budgetTempId: string, payload: { programId: string, items: AdminCommonLookupResponseItem[] }) => {
-    if (!open.value || payload.programId !== programId) return
+    if (!open.value || payload.programId !== resolvedProgramId.value) return
     const budget = state.value?.budgets.find(item => item.tempId === budgetTempId)
     if (!budget) return
     const item = payload.items.find(item => String(item.id) === String(budget.egcs_tp_transferpaymentbudget))
     if (!item && payload.items.length > 0) return
     const next = Object.fromEntries(Object.entries(budgetLabels.value).filter(([tempId]) => tempId !== budgetTempId))
     if (item && typeof item.fiscal_year_currency_display === 'string' && typeof item.egcs_tp_currency === 'string') {
-      next[budgetTempId] = { programId, budgetId: String(item.id), label: item.fiscal_year_currency_display, currency: item.egcs_tp_currency }
+      next[budgetTempId] = { programId: resolvedProgramId.value, budgetId: String(item.id), label: item.fiscal_year_currency_display, currency: item.egcs_tp_currency }
     }
     budgetLabels.value = next
   }
   watch(() => state.value?.budgets.map(budget => ({ tempId: budget.tempId, budgetId: budget.egcs_tp_transferpaymentbudget })) ?? [], budgets => {
     budgetLabels.value = Object.fromEntries(Object.entries(budgetLabels.value).filter(([tempId, item]) =>
-      item.programId === programId && budgets.some(budget => budget.tempId === tempId && String(budget.budgetId) === item.budgetId)))
+      item.programId === resolvedProgramId.value && budgets.some(budget => budget.tempId === tempId && String(budget.budgetId) === item.budgetId)))
   }, { flush: 'sync' })
   const budgetLabelById = computed(() => new Map(Object.values(budgetLabels.value).map(item => [item.budgetId, item.label])))
   const getBudgetLabel = (budgetId: string) => budgetLabelById.value.get(String(budgetId))
@@ -216,7 +223,7 @@ export const useTransferPaymentStreamWizardModal = ({
     refresh: refreshApplicantRecipientOptions
   } =
     useAgencyReferenceData<AgencyApplicantRecipientSubtypeItem>({
-      agencyId: computed(() => (open.value ? programId : '')),
+      agencyId: computed(() => (open.value ? resolvedProgramId.value : '')),
       buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/applicant-recipient-subtypes`,
       query: { page: 1, limit: 100 }
     })
@@ -228,7 +235,7 @@ export const useTransferPaymentStreamWizardModal = ({
     refresh: refreshLineItemOptions
   } =
     useAgencyReferenceData<AgencyCostCategoryLineItemItem>({
-      agencyId: computed(() => (open.value ? programId : '')),
+      agencyId: computed(() => (open.value ? resolvedProgramId.value : '')),
       buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/line-items`,
       query: { page: 1, limit: 100 }
     })
@@ -240,7 +247,7 @@ export const useTransferPaymentStreamWizardModal = ({
     refresh: refreshAgreementTypeOptions
   } =
     useAgencyReferenceData<AgencyAgreementTypeItem>({
-      agencyId: computed(() => (open.value ? programId : '')),
+      agencyId: computed(() => (open.value ? resolvedProgramId.value : '')),
       buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/agreement-types`,
       query: { page: 1, limit: 100 }
     })
@@ -251,7 +258,7 @@ export const useTransferPaymentStreamWizardModal = ({
     error: agencyHoldbackError,
     refresh: refreshAgencyHoldbackOptions
   } = useAgencyReferenceData<AgencyHoldbackBasisItem>({
-    agencyId: computed(() => (open.value ? programId : '')),
+    agencyId: computed(() => (open.value ? resolvedProgramId.value : '')),
     buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/holdback-bases`,
     query: { page: 1, limit: 100 }
   })
@@ -457,7 +464,7 @@ export const useTransferPaymentStreamWizardModal = ({
 
   const validateWizard = withFormRequirements(async (wizardState: TransferPaymentStreamPolymorphicWizard) => {
     const result = await validateWizardSchema(wizardState)
-    wizardErrors.value = result
+    if (!disposed && open.value && state.value === wizardState) wizardErrors.value = result
     return result
   }, TransferPaymentStreamPolymorphicWizardSchema)
 
@@ -645,8 +652,8 @@ export const useTransferPaymentStreamWizardModal = ({
   }
 
   watch(
-    open,
-    isOpen => {
+    [open, resolvedProgramId],
+    ([isOpen]) => {
       if (isOpen) {
         initializeState()
         return

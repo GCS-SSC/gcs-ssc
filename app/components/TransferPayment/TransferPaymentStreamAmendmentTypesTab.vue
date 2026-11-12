@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { computed, onScopeDispose, shallowRef, watch } from 'vue'
+import type { Ref } from 'vue'
 import { TransferPaymentAmendmentTypeSchema } from '~~/shared/types/schemas/transfer-payment'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -31,7 +34,7 @@ const {
   refresh,
   status
 } = useResourceTable<TransferPaymentAmendmentTypeItem>({
-  fetchUrl: `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types`
+  fetchUrl: computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types`)
 })
 
 const columns: TableColumnInput<TransferPaymentAmendmentTypeItem>[] = [
@@ -45,10 +48,13 @@ const columns: TableColumnInput<TransferPaymentAmendmentTypeItem>[] = [
 const {
   isOpen: isModalOpen,
   selected: selectedItem,
-  openCreate,
-  openUpdate,
+  openCreate: createDraft,
+  openUpdate: updateDraft,
   captureSession,
-  closeSession
+  closeSession,
+  close,
+  isCurrentSession,
+  isLatestSession
 } = useCrudModal<TransferPaymentAmendmentTypeItem, Partial<TransferPaymentAmendmentTypeItem>>({
   createState: () => ({ egcs_tp_transferpaymentstream: streamId }),
   updateState: row => ({ ...row })
@@ -56,30 +62,78 @@ const {
 const itemPending = useCrudModalPending(captureSession)
 const isSavingItem = itemPending.isPending
 
+const editingTarget: Ref<string | null> = shallowRef(null)
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canUpdateChild,
+  eligible: () => editingTarget.value === null || items.value.some(row => String(row.id) === editingTarget.value)
+})
+const deleteContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canDeleteChild
+})
+
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const context: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const isCurrentContext = (captured: ResourceContext) => captured.kind === 'active' && context.value === captured
+watch([() => transferPaymentId, () => streamId], () => {
+  context.value = { kind: 'active' }
+  close()
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context.value = { kind: 'disposed' }
+  close()
+})
+/** Opens a new local draft under the current role and resource. */
+const openCreate = () => {
+  if (context.value.kind !== 'active' || !canUpdateChild) return
+  editingTarget.value = null
+  createDraft()
+}
+/** @param row - Accepted record whose immutable ID owns the edit. */
+const openUpdate = (row: TransferPaymentAmendmentTypeItem) => {
+  if (context.value.kind !== 'active' || !canUpdateChild) return
+  editingTarget.value = String(row.id)
+  updateDraft(row)
+}
+
 /**
  * Saves the currently selected amendment type record.
  * Performs a PATCH if the record has an ID (update), or a POST if it doesn't (new).
  * Closes the modal, refreshes the dataset, and provides success feedback.
  */
 const saveItem = async () => {
-  if (!selectedItem.value) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  const targetId = editingTarget.value
+  if (context.value.kind === 'disposed' || !selectedItem.value || !canUpdateChild) return
   const session = captureSession()
-  if (!itemPending.begin(session)) return
-  const isUpdate = !!selectedItem.value.id
+  if (session === null || !itemPending.begin(session)) return
+  const requestedContext = context.value
+  const isUpdate = targetId !== null
+  const url = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types${isUpdate ? `/${targetId}` : ''}`
+  const body = JSON.stringify(selectedItem.value)
+  let closedSession = false
+  const ownsFeedback = () => (isCurrentContext(requestedContext) && operation.isCurrent()) && (
+    isCurrentSession(session) || (closedSession && isLatestSession(session))
+  )
   try {
-    const response = await fetch(getClientRequestUrl(isUpdate
-      ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types/${selectedItem.value.id}`
-      : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types`), {
+    const response = await fetch(getClientRequestUrl(url), {
       method: isUpdate ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(selectedItem.value)
+      body
     })
     if (!response.ok) await throwFetchResponseError(response)
-    closeSession(session)
+    if (!(isCurrentContext(requestedContext) && operation.isCurrent())) return
+    closedSession = closeSession(session)
     await refresh()
-    toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
+    if (!ownsFeedback() || status.value === 'error') return
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
     itemPending.end(session)
   }
@@ -93,15 +147,30 @@ const saveItem = async () => {
  * @param {TransferPaymentAmendmentTypeItem} row - The record to be deleted.
  */
 const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
+  const targetId = String(row.id)
+  if (context.value.kind === 'disposed' || !canDeleteChild) return
+  const requestedContext = context.value
+  const operation = deleteContext.capture()
+  if (!operation) return
   try {
-    const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types/${row.id}`
+    const removed = await confirmDeleteRequest(
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/amendment-types/${targetId}`,
+      {
+        operation,
+        target: {
+          id: targetId,
+          resolve: () => items.value.find(current => String(current.id) === targetId),
+          eligible: current => String(current.id) === targetId
+        },
+        shouldProceed: () => isCurrentContext(requestedContext) && operation.canDispatch()
+      }
     )
-    if (!ok) return
+    if (!removed || !(isCurrentContext(requestedContext) && operation.isCurrent())) return
     await refresh()
+    if (!(isCurrentContext(requestedContext) && operation.isCurrent()) || status.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if ((isCurrentContext(requestedContext) && operation.isCurrent())) showError(error)
   }
 }
 </script>
@@ -116,9 +185,11 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
       :bilingual-columns="[{ id: 'name', accessorKey: { en: 'egcs_tp_name_en', fr: 'egcs_tp_name_fr' } }]"
       :total-records="totalRecords"
       :loading="status === 'pending'"
+      :request-status="status"
       :button-label="canUpdateChild ? t('common.add') : undefined"
       :show-button="canUpdateChild"
-      @add="openCreate">
+      @add="openCreate"
+      @retry="refresh">
       <template #name-cell="{ row }">
         <button
           v-if="canUpdateChild"
@@ -172,6 +243,7 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
     <CommonFormDialog
       v-if="selectedItem"
       v-model:open="isModalOpen"
+      :action-context="writeContext"
       :state="selectedItem"
       :schema="TransferPaymentAmendmentTypeSchema"
       :title="selectedItem.id ? t('transfer_payment.amendment_type_update') : t('transfer_payment.amendment_type_create')"

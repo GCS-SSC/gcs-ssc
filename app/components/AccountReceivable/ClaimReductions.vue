@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 /* eslint-disable jsdoc/require-jsdoc -- Retained Claim reconciliation follows the AR's draft and stale-request boundaries. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -15,17 +18,22 @@ import { useGroupedDisclosureIds } from '~/composables/useGroupedDisclosureIds'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 
-const { accountReceivableId, currency, declaredAmount, reductions, canEdit, canUpdate, readOnly = false } = defineProps<{
+const { accountReceivableId, currency, declaredAmount, reductions, canEdit, canUpdate, captureCommitted, pendingReceivables, resourcePending = false, readOnly = false } = defineProps<{
   accountReceivableId: string
   currency: string
   declaredAmount: Money
   reductions: AccountReceivableClaimReduction[]
   canEdit: boolean
   canUpdate: boolean
+  captureCommitted: CaptureCommittedSettlement
+  pendingReceivables: Set<string>
+  resourcePending?: boolean
   readOnly?: boolean
 }>()
 const emit = defineEmits<{ changed: [] }>()
+const { canAny } = useAuth()
 const { t, locale } = useI18n()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
@@ -34,16 +42,26 @@ const toast = useLocalizedToast()
 const { recoveryFocusTarget, focusRecoveredContent } = useLoadRecoveryFocus()
 type Choice = AccountReceivableClaimReductionChoice
 type DraftLine = { egcs_fc_claimline: string, egcs_fc_amount: MoneyInput }
-const choices: Ref<Choice[]> = ref([])
 const state: Ref<{ egcs_fc_lines: DraftLine[] } | null> = ref(null)
-const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
-const loadError: Ref<unknown | null> = ref(null)
+const choiceRequest = useResourceRequest<Choice[]>({
+  identity: () => accountReceivableId,
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl(`/api/account-receivables/${accountReceivableId}/claim-reductions`), { signal })
+    if (!response.ok) await throwFetchResponseError(response)
+    const result = await response.json() as { items: Choice[] }
+    return result.items
+  }
+})
+const choices = computed(() => choiceRequest.data.value ?? [])
+const loadStatus = choiceRequest.status
+const loadError = choiceRequest.error
 const draftSchema = z.object({ egcs_fc_claimline: z.string(), egcs_fc_amount: NonNegativeMoneySchema })
 const lineModal = useCrudModal<Choice, DraftLine>({
   updateState: choice => ({ egcs_fc_claimline: choice.id, egcs_fc_amount: state.value?.egcs_fc_lines.find(line => line.egcs_fc_claimline === choice.id)?.egcs_fc_amount ?? zeroMoney(currency) })
 })
 const selectedLine = lineModal.selected
 const isModalOpen = lineModal.isOpen
+const planPending = computed(() => pendingReceivables.has(accountReceivableId))
 const modalPending = useCrudModalPending(lineModal.captureSession)
 const pending = modalPending.isPending
 const selectedChoice = computed(() => choices.value.find(choice => choice.id === selectedLine.value?.egcs_fc_claimline) ?? null)
@@ -99,41 +117,21 @@ const rowAmount = (row: GroupedRow, field: 'reconciled' | 'reduction' | 'balance
   })
   return values.some(value => value === null) ? null : sumMoney(values.filter(value => value !== null), currency)
 }
-let generation = 0
-let disposed = false
-const load = async () => {
-  const requestGeneration = ++generation
-  const owner = accountReceivableId
-  loadStatus.value = 'pending'
-  loadError.value = null
-  try {
-    const response = await fetch(getClientRequestUrl(`/api/account-receivables/${owner}/claim-reductions`))
-    if (!response.ok) await throwFetchResponseError(response)
-    const result = await response.json() as { items: Choice[] }
-    if (disposed || requestGeneration !== generation || owner !== accountReceivableId) return
-    choices.value = result.items
-    state.value = { egcs_fc_lines: result.items.map(choice => ({ egcs_fc_claimline: choice.id,
+watch(choiceRequest.data, items => {
+  if (items) {
+    state.value = { egcs_fc_lines: items.map(choice => ({ egcs_fc_claimline: choice.id,
       egcs_fc_amount: reductions.find(row => row.egcs_fc_claimline === choice.id)?.egcs_fc_amount ?? zeroMoney(currency) })) }
     if (selectedLine.value && !selectedChoice.value) lineModal.close()
-    loadStatus.value = 'success'
-  } catch (failure) {
-    if (!disposed && requestGeneration === generation && owner === accountReceivableId) {
-      loadError.value = failure
-      loadStatus.value = 'error'
-    }
-  }
-}
+  } else state.value = null
+}, { flush: 'sync' })
+const load = choiceRequest.refresh
 const retryLoad = async () => {
-  await load()
-  if (!disposed && loadStatus.value === 'success') await focusRecoveredContent()
+  if (await load()) await focusRecoveredContent()
 }
 watch(() => accountReceivableId, () => {
-  choices.value = []
-  state.value = null
   lineModal.close()
   expandedRows.value = true
   pagination.value.pageIndex = 0
-  void load()
 }, { immediate: true, flush: 'sync' })
 watch(() => reductions, () => {
   if (state.value) void load()
@@ -143,8 +141,6 @@ watch(() => readOnly || !canUpdate || !canEdit, blocked => {
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
   lineModal.close()
-  disposed = true
-  generation += 1
 })
 const format = (amount: Money) => formatAccountReceivableAmount(amount, locale.value)
 const totalAmount = (field: 'reconciled' | 'reduction' | 'balance') => {
@@ -156,15 +152,23 @@ const formattedAmount = (row: GroupedRow, field: 'reconciled' | 'reduction' | 'b
   return amount === null ? t('common.unavailable') : format(amount)
 }
 const openEdit = (choice: Choice) => {
-  if (readOnly || !canUpdate || loadStatus.value !== 'success' || pending.value) return
+  if (readOnly || !canUpdate || resourcePending || loadStatus.value !== 'success' || pending.value) return
   if (!canEdit) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   lineModal.openUpdate(choice)
 }
+const actionContext = useActionContext({
+  identity: [() => accountReceivableId, () => currency],
+  authority: () => canAny('account_receivable', 'update') && canUpdate,
+  eligible: () => canEdit && !readOnly && !resourcePending
+})
 const save = async () => {
-  if (!state.value || !selectedLine.value || readOnly || !canUpdate || loadStatus.value !== 'success') return
+  const capturedAction = actionContext.capture()
+  const committed = captureCommitted()
+  if (!capturedAction?.canDispatch() || !committed?.canDispatch()) return
+  if (!state.value || !selectedLine.value || readOnly || !canUpdate || resourcePending || loadStatus.value !== 'success' || planPending.value) return
   if (!canEdit) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
@@ -172,20 +176,27 @@ const save = async () => {
   const session = lineModal.captureSession()
   const owner = accountReceivableId
   if (!modalPending.begin(session)) return
+  pendingReceivables.add(owner)
   try {
     const draft = draftSchema.parse(selectedLine.value)
     const lines = state.value.egcs_fc_lines.map(line => line.egcs_fc_claimline === draft.egcs_fc_claimline ? draft : line)
-    await sendJson(`/api/account-receivables/${owner}/claim-reductions`, 'PATCH', AccountReceivableClaimReductionSchema.parse({ egcs_fc_lines: lines.filter(line => compareMoney(NonNegativeMoneySchema.parse(line.egcs_fc_amount), zeroMoney(currency)) > 0) }))
-    if (!disposed && owner === accountReceivableId && lineModal.closeSession(session)) {
+    const payload = AccountReceivableClaimReductionSchema.parse({ egcs_fc_lines: lines.filter(line => compareMoney(NonNegativeMoneySchema.parse(line.egcs_fc_amount), zeroMoney(currency)) > 0) })
+    if (!capturedAction.canDispatch() || !committed.canDispatch()) return
+    await sendJson(`/api/account-receivables/${owner}/claim-reductions`, 'PATCH', payload)
+    if (capturedAction.isCurrent() && choiceRequest.state.value.kind !== 'disposed' && owner === accountReceivableId) {
       state.value = { egcs_fc_lines: lines }
+      lineModal.closeSession(session)
       emit('changed')
     }
+    await committed.settle()
   } catch (failure) {
-    if (!disposed && owner === accountReceivableId && lineModal.isCurrentSession(session)) showError(failure)
+    if (capturedAction.isCurrent() && choiceRequest.state.value.kind !== 'disposed' && owner === accountReceivableId && lineModal.isCurrentSession(session)) showError(failure)
   } finally {
+    pendingReceivables.delete(owner)
     modalPending.end(session)
   }
 }
+const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
@@ -270,7 +281,7 @@ const save = async () => {
             <UButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-retry" :label="t('common.retry')" @click="load" />
           </template>
         </UAlert>
-        <UForm :state="selectedLine" :validate="createValidator(draftSchema)" class="space-y-4" @submit="save">
+        <UForm v-bind="formSession" :state="selectedLine" :validate="createValidator(draftSchema)" class="space-y-4">
           <p class="font-semibold">
             {{ t('account_receivable.claim') }} {{ selectedChoice.egcs_fc_claim }}
           </p>
@@ -284,7 +295,7 @@ const save = async () => {
           </UFormField>
           <div class="flex justify-end gap-2">
             <UButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-cancel" type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="lineModal.close()" />
-            <CommonSaveButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-save" :label="t('common.save')" :loading="pending" :disabled="pending || loadStatus !== 'success'" />
+            <CommonSaveButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-save" :label="t('common.save')" :loading="pending" :disabled="pending || planPending || resourcePending || loadStatus !== 'success'" />
           </div>
         </UForm>
       </template>

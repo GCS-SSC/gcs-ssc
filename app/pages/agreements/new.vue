@@ -5,6 +5,8 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { Ref } from 'vue'
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
+import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useActionContext } from '~/composables/useActionContext'
 import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
 import type { FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
 
@@ -69,7 +71,14 @@ useFieldTooltipProvider(() => form.value?.egcs_fc_transferpaymentstream
   ? { entityType: 'agreement_create', entityId: form.value.egcs_fc_transferpaymentstream }
   : null)
 
-const isSaving: Ref<boolean> = ref(false)
+const { canAny } = useCan()
+const actionContext = useActionContext({
+  identity: [() => form.value?.egcs_fc_transferpaymentstream],
+  authority: () => canAny('agreement', 'create'),
+  eligible: () => Boolean(form.value?.egcs_fc_transferpaymentstream)
+})
+const mutations = useEditorMutationCoordinator({ getDraft: () => form.value, context: actionContext })
+const isSaving = mutations.isPending
 const numberMode: Ref<'manual' | 'generated' | null> = ref(null)
 const numberModeFailed: Ref<boolean> = ref(false)
 let numberModeGeneration = 0
@@ -113,42 +122,55 @@ const submit = async () => {
     return
   }
 
-  try {
-    isSaving.value = true
-    const streamId = form.value.egcs_fc_transferpaymentstream
-    const agreementNumber = form.value.egcs_fc_agreementnumber
-    if (streamId === undefined) return
-    if (numberMode.value === 'manual') {
-      if (typeof agreementNumber !== 'string') return
-      const canContinue = await requestSimilarityPreview({ streamId, agreementNumber })
-      if (!canContinue) return
-    }
+  await mutations.run('create', async token => {
+    const draft = form.value
+    let stage: 'preview' | 'create' = 'preview'
+    const proceed = () => mutations.canContinue(token)
+      && form.value === draft
+      && JSON.stringify(form.value) === token.expectedDraft
+    try {
+      const streamId = draft?.egcs_fc_transferpaymentstream
+      const agreementNumber = draft?.egcs_fc_agreementnumber
+      if (streamId === undefined) return
+      if (numberMode.value === 'manual') {
+        if (typeof agreementNumber !== 'string') return
+        const canContinue = await requestSimilarityPreview({ streamId, agreementNumber })
+        if (!proceed()) {
+          isSimilarityWarningOpen.value = false
+          cancelSimilarityWarnings()
+          return
+        }
+        if (!canContinue) return
+      }
 
-    const response = await fetch(getClientRequestUrl('/api/agreements'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        ...form.value,
-        confirmations: getSimilarityConfirmations()
+      if (!proceed()) return
+      stage = 'create'
+      const response = await fetch(getClientRequestUrl('/api/agreements'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          ...draft,
+          confirmations: getSimilarityConfirmations()
+        })
       })
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    const created = await response.json() as { id: string }
+      if (!response.ok) await throwFetchResponseError(response)
+      const created = await response.json() as { id: string }
+      if (!mutations.isTokenCurrent(token)) return
 
-    toast.add({
-      title: toast.localized('common.success'),
-      description: toast.localized('common.added_success'),
-      color: 'success'
-    })
+      toast.add({
+        title: toast.localized('common.success'),
+        description: toast.localized('common.added_success'),
+        color: 'success'
+      })
 
-    await navigateTo(localePath(appRouteLocations.agreementDetail(created.id)))
-  } catch (error: unknown) {
-    if (handleSimilarityMutationError(error)) return
-    showError(error)
-    await loadNumberMode()
-  } finally {
-    isSaving.value = false
-  }
+      await navigateTo(localePath(appRouteLocations.agreementDetail(created.id)))
+    } catch (error: unknown) {
+      if (!mutations.isTokenCurrent(token) || (stage === 'preview' && !proceed())) return
+      if (proceed() && handleSimilarityMutationError(error)) return
+      showError(error)
+      await loadNumberMode()
+    }
+  })
 }
 
 /** Confirms the visible fingerprints and retries the complete preview-and-create path. */
@@ -218,6 +240,8 @@ onMounted(() => {
           </p>
           <AgreementProfileFormPage
             v-model:model="form"
+            :action-context="actionContext"
+            :editor-session="0"
             compact
             :submit-label="t('common.add')"
             :cancel-label="t('common.cancel')"

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { computed, onUnmounted, watch } from 'vue'
 import { useAgreementChildActionPrerequisites, type AgreementChildActionTarget } from '~/composables/useAgreementChildActionPrerequisites'
 import type { FundingCaseAgreementActivityForm, FundingCaseAgreementActivityRow } from '~~/shared/types/funding-case-agreement-ui'
@@ -54,6 +56,24 @@ const beforeDelete = async (_id: string, current: () => boolean) => {
 const { formatDate } = useDateHelpers()
 const { getBilingualValue } = useBilingualValue()
 const resourceBase = computed(() => apiBase ?? `/api/agreements/${agreementId}`)
+const resourceIdentity = [
+  () => agreementId,
+  () => resourceBase.value,
+  () => actionTarget?.kind,
+  () => actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : null
+]
+const createContext = useActionContext({
+  identity: resourceIdentity, authority: () => canCreate, eligible: () => !staticMode
+})
+const updateContext = useActionContext({
+  identity: resourceIdentity, authority: () => canUpdate, eligible: () => !staticMode
+})
+const deleteContext = useActionContext({
+  identity: resourceIdentity, authority: () => canDelete, eligible: () => !staticMode
+})
+const resourceAction = computed<ResourceCrudAction>(() => staticMode
+  ? { kind: 'read-only' }
+  : { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext })
 const staticActivityItems = computed<AgreementActivityCrudRow[] | undefined>(() =>
   snapshotItems?.map(item => ({ ...item })))
 
@@ -94,6 +114,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
 <template>
   <!-- @vue-generic {AgreementActivityCrudRow} -->
   <CommonResourceCrud
+    :action="resourceAction"
     class="w-full"
     :title="t('agreement.activities.title')"
     icon="i-lucide-list-todo"

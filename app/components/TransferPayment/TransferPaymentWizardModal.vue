@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import type { ActionContext } from '~/composables/useActionContext'
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 import type { FormSubmitEvent } from '#ui/types'
 import type { TransferPaymentWizard } from '~~/shared/types/schemas'
 import { formatMoneyText, parseMoney, type MoneyInput } from '~~/shared/utils/money'
 import { useTransferPaymentWizardModal } from '~/composables/useTransferPaymentWizardModal'
 
-const { fixedAgencyId, pending = false } = defineProps<{
+const { fixedAgencyId, pending = false, actionContext } = defineProps<{
+  actionContext: ActionContext
   fixedAgencyId?: string
   pending?: boolean
 }>()
@@ -78,6 +83,12 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
   clearErrors()
   emit('submit', event.data)
 }
+const modalSession = useModalSession()
+watch([() => open.value, () => state.value, () => fixedAgencyId], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
@@ -92,10 +103,10 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
     <template #body>
       <UForm
         v-if="state"
+        v-bind="formSession"
         :state="state"
         :validate="validateWizard"
-        class="flex h-full flex-col lg:flex-row"
-        @submit="onSubmit">
+        class="flex h-full flex-col lg:flex-row">
         <CommonWizardShell
           :current-step="currentStep"
           :steps="steps"

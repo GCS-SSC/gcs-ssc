@@ -1,5 +1,5 @@
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
-import { computed, onScopeDispose, ref, toValue, watch, h } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, toValue, watch, h } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -20,6 +20,13 @@ type RecommendationSubmissionResponse = {
   canStart?: boolean
   startBlocker?: { reason: NonNullable<CompletionResponse['blocker']>, name_en?: string, name_fr?: string, purpose?: string } | null
 }
+
+type CompletionReadinessState =
+  | { kind: 'idle' }
+  | { kind: 'pending', generation: number }
+  | { kind: 'success', response: CompletionResponse }
+  | { kind: 'error', error: unknown }
+  | { kind: 'disposed' }
 
 type CompletionWorkflowStartOptions = {
   mode?: MaybeRefOrGetter<WorkflowPreActionMode>
@@ -44,17 +51,19 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
   const { t, locale } = useI18n()
   const toast = useLocalizedToast()
   const { showError, resolveDetails } = useApiErrorToast()
-  const completionResponse: Ref<CompletionResponse | null> = ref(null)
+  const readiness: Ref<CompletionReadinessState> = shallowRef({ kind: 'idle' })
+  const completionResponse = computed(() => readiness.value.kind === 'success' ? readiness.value.response : null)
   const completionError: Ref<unknown> = ref(null)
   const completionErrorDetails = computed(() => resolveDetails(completionError.value))
-  const isLoading: Ref<boolean> = ref(false)
+  const isLoading = computed(() => readiness.value.kind === 'pending')
   const isSubmitting: Ref<boolean> = ref(false)
-  const loadStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
+  const loadStatus = computed(() => readiness.value.kind === 'disposed' ? 'idle' : readiness.value.kind)
   const isActive: Ref<boolean> = ref(options.immediate !== false)
   let completionRequestGeneration = 0
   onScopeDispose(() => {
     isActive.value = false
     completionRequestGeneration += 1
+    readiness.value = { kind: 'disposed' }
   })
   const mode = computed(() => toValue(options.mode) ?? 'completion')
   const entityIdentity = computed(() => `${mode.value}:${toValue(options.entityType)}:${toValue(options.entityId)}`)
@@ -68,11 +77,10 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
 
   /** Refreshes whether the target can be completed and whether completion already exists. */
   const refreshCompletion = async () => {
+    if (readiness.value.kind === 'disposed') return
     const requestGeneration = ++completionRequestGeneration
     const requestMode = mode.value
-    completionResponse.value = null
-    loadStatus.value = 'pending'
-    isLoading.value = true
+    readiness.value = { kind: 'pending', generation: requestGeneration }
     try {
       const requestUrl = getClientRequestUrl(requestMode === 'recommendation_submission'
         ? '/api/workflows/runtime'
@@ -83,7 +91,7 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
       const response = await fetch(requestUrl)
       if (!response.ok) await throwFetchResponseError(response)
       const responsePayload = await response.json() as CompletionResponse | RecommendationSubmissionResponse
-      if (requestGeneration !== completionRequestGeneration) return
+      if (readiness.value.kind !== 'pending' || readiness.value.generation !== requestGeneration) return
       let nextCompletionResponse: CompletionResponse
       if (requestMode === 'recommendation_submission') {
         const submissionResponse = responsePayload as RecommendationSubmissionResponse
@@ -102,15 +110,11 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
       } else {
         nextCompletionResponse = responsePayload as CompletionResponse
       }
-      completionResponse.value = nextCompletionResponse
-      loadStatus.value = 'success'
+      readiness.value = { kind: 'success', response: nextCompletionResponse }
     } catch (error) {
-      if (requestGeneration !== completionRequestGeneration) return
-      completionResponse.value = null
-      loadStatus.value = 'error'
+      if (readiness.value.kind !== 'pending' || readiness.value.generation !== requestGeneration) return
+      readiness.value = { kind: 'error', error }
       showError(error)
-    } finally {
-      if (requestGeneration === completionRequestGeneration) isLoading.value = false
     }
   }
 
@@ -121,9 +125,7 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
       await refreshCompletion()
     } else {
       completionRequestGeneration += 1
-      completionResponse.value = null
-      loadStatus.value = 'idle'
-      isLoading.value = false
+      if (readiness.value.kind !== 'disposed') readiness.value = { kind: 'idle' }
     }
   }, { immediate: true })
 

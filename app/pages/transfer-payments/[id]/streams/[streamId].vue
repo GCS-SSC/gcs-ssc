@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
 import type { Ref } from 'vue'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -63,14 +65,26 @@ usePageResourceError({
   hasContent: () => Boolean(profile.value && stream.value)
 })
 
-const isUpdateModalOpen: Ref<boolean> = ref(false)
+const streamModal = useModalSession()
+const isUpdateModalOpen = streamModal.isOpen
 const isSavingStream: Ref<boolean> = ref(false)
 const selectedStream: Ref<Partial<TransferPaymentStreamItem> | null> = ref(null)
 const persistedStream: Ref<TransferPaymentStreamRow | null> = ref(null)
 
+const writeContext = useActionContext({
+  identity: [() => id, () => streamId, () => profile.value?.egcs_tp_agency],
+  authority: canUpdateChild,
+  eligible: () => profile.value?.id === id && stream.value?.id === streamId
+})
+watch(writeContext.version, () => {
+  isUpdateModalOpen.value = false
+  selectedStream.value = null
+  persistedStream.value = null
+}, { flush: 'sync' })
+
 /** Copies the current Stream into the shared edit modal. */
 const openUpdateStream = () => {
-  if (!stream.value || !canUpdateChild.value || isSavingStream.value) return
+  if (!stream.value || !canUpdateChild.value || isSavingStream.value || streamModal.isDisposed()) return
   persistedStream.value = { ...stream.value } as TransferPaymentStreamRow
   selectedStream.value = { ...stream.value }
   isUpdateModalOpen.value = true
@@ -78,26 +92,32 @@ const openUpdateStream = () => {
 
 /** Saves the edited Stream and refreshes the detail view. */
 const saveStream = async () => {
-  if (!selectedStream.value || !canUpdateChild.value || isSavingStream.value) return
+  const operation = writeContext.capture()
+  const session = streamModal.captureSession()
+  if (!operation?.canDispatch() || !selectedStream.value || !canUpdateChild.value || isSavingStream.value || session === null || streamModal.isDisposed()) return
+  const ownsSave = () => operation.isCurrent() && streamModal.isCurrentSession(session)
   const draft = selectedStream.value
+  const submittedDraft = JSON.stringify({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null })
   isSavingStream.value = true
   try {
     const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${id}/streams/${streamId}`), {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null })
+      body: submittedDraft
     })
     if (!response.ok) await throwFetchResponseError(response)
+    if (!operation.isCurrent()) return
     await refreshStream()
+    if (!ownsSave()) return
     if (streamStatus.value === 'error' || streamError.value) return
-    if (selectedStream.value === draft) {
+    if (selectedStream.value === draft && JSON.stringify({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null }) === submittedDraft) {
       isUpdateModalOpen.value = false
       selectedStream.value = null
       persistedStream.value = null
     }
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsSave()) showError(error)
   } finally {
     isSavingStream.value = false
   }
@@ -171,6 +191,7 @@ const retryLoad = async () => {
       :program-id="id"
       :persisted-stream="persistedStream ?? undefined"
       :persisted-program-id="id"
+      :action-context="writeContext"
       :pending="isSavingStream"
       @submit="saveStream" />
   </div>

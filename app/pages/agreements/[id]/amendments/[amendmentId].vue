@@ -210,8 +210,10 @@ const tabs = computed(() => [
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'general' })
 
 const refreshPage = async () => {
+  const generation = amendmentActionGeneration
+  if (!ownsAmendmentPage()) return
   await refresh()
-  approvalsRefreshKey.value += 1
+  if (generation === amendmentActionGeneration && ownsAmendmentPage()) approvalsRefreshKey.value += 1
 }
 
 type SnapshotDomain = 'budget' | 'activity'
@@ -229,6 +231,8 @@ const invalidateAmendmentActions = () => {
   requiredSubtypeIdsByType.value = {}
   scopeSubtypeRequirementFailed.value = false
   isSavingScope.value = false
+  isSavingRisk.value = false
+  isCancelling.value = false
   isCreatingBudgetSnapshot.value = false
   isCreatingActivitySnapshot.value = false
 }
@@ -309,8 +313,24 @@ const createSnapshot = async (domain: SnapshotDomain) => {
   }
 }
 
+const serializeGeneralDraft = () => JSON.stringify([
+  amendmentNameEn.value,
+  amendmentNameFr.value,
+  [...scopeTypeIds.value].sort(),
+  [...scopeSubtypeIds.value].sort(),
+  scopeIncludesDuration.value ? durationDates.value?.egcs_fc_proposedauthorizedassistancestartdate || null : null,
+  scopeIncludesDuration.value ? durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate || null : null
+])
+const serializeRiskDraft = () => JSON.stringify([changeRisk.value, proposedRiskScoreSelection.value || null])
+let hydratedAmendmentId: string | null = null
+let acceptedGeneralDraft: string | null = null
+let acceptedRiskDraft: string | null = null
+
 watch(amendment, value => {
   if (!value) {
+    hydratedAmendmentId = null
+    acceptedGeneralDraft = null
+    acceptedRiskDraft = null
     scopeTypeIds.value = []
     scopeSubtypeIds.value = []
     durationDates.value = null
@@ -318,18 +338,38 @@ watch(amendment, value => {
     proposedRiskScoreSelection.value = undefined
     return
   }
-  changeRisk.value = value.egcs_fc_changerisk
-  proposedRiskScoreSelection.value = value.egcs_fc_proposedriskscore === null || value.egcs_fc_proposedriskscore === undefined
+  const reset = hydratedAmendmentId !== value.id
+  const hydrateGeneral = reset || !value.can_edit_scope || serializeGeneralDraft() === acceptedGeneralDraft
+  const hydrateRisk = reset || !value.can_edit || value.isCompleted || value.risk_workflow_managed
+    || serializeRiskDraft() === acceptedRiskDraft
+  const nextGeneralDraft = JSON.stringify([
+    value.egcs_fc_name_en ?? '',
+    value.egcs_fc_name_fr ?? '',
+    [...(value.amendment_type_ids ?? [])].sort(),
+    [...(value.amendment_subtype_ids ?? [])].sort(),
+    value.egcs_fc_proposedauthorizedassistancestartdate ?? null,
+    value.egcs_fc_proposedauthorizedassistanceenddate ?? null
+  ])
+  const nextRiskScore = value.egcs_fc_proposedriskscore === null || value.egcs_fc_proposedriskscore === undefined
     ? undefined
     : String(value.egcs_fc_proposedriskscore)
-  scopeTypeIds.value = [...(value.amendment_type_ids ?? [])]
-  scopeSubtypeIds.value = [...(value.amendment_subtype_ids ?? [])]
-  amendmentNameEn.value = value.egcs_fc_name_en ?? ''
-  amendmentNameFr.value = value.egcs_fc_name_fr ?? ''
-  durationDates.value = {
-    egcs_fc_proposedauthorizedassistancestartdate: value.egcs_fc_proposedauthorizedassistancestartdate ?? undefined,
-    egcs_fc_proposedauthorizedassistanceenddate: value.egcs_fc_proposedauthorizedassistanceenddate ?? undefined
+  if (hydrateGeneral) {
+    scopeTypeIds.value = [...(value.amendment_type_ids ?? [])]
+    scopeSubtypeIds.value = [...(value.amendment_subtype_ids ?? [])]
+    amendmentNameEn.value = value.egcs_fc_name_en ?? ''
+    amendmentNameFr.value = value.egcs_fc_name_fr ?? ''
+    durationDates.value = {
+      egcs_fc_proposedauthorizedassistancestartdate: value.egcs_fc_proposedauthorizedassistancestartdate ?? undefined,
+      egcs_fc_proposedauthorizedassistanceenddate: value.egcs_fc_proposedauthorizedassistanceenddate ?? undefined
+    }
   }
+  if (hydrateRisk) {
+    changeRisk.value = value.egcs_fc_changerisk
+    proposedRiskScoreSelection.value = nextRiskScore
+  }
+  hydratedAmendmentId = value.id
+  acceptedGeneralDraft = nextGeneralDraft
+  acceptedRiskDraft = JSON.stringify([value.egcs_fc_changerisk, nextRiskScore ?? null])
 }, { immediate: true })
 
 const onScopeTypesChanged = async (typeIds: string[]) => {
@@ -474,7 +514,9 @@ const saveScope = async () => {
 }
 
 const saveRisk = async () => {
-  if (!canEditRisk.value || isSavingRisk.value) return
+  const generation = amendmentActionGeneration
+  const shouldProceed = () => generation === amendmentActionGeneration && ownsAmendmentPage()
+  if (!shouldProceed() || !canEditRisk.value || isSavingRisk.value) return
   try {
     isSavingRisk.value = true
     await saveJson(amendmentApiBase, 'PATCH', {
@@ -483,27 +525,33 @@ const saveRisk = async () => {
         ? null
         : Number(proposedRiskScoreSelection.value)
     })
+    if (!shouldProceed()) return
     await refreshPage()
+    if (!shouldProceed()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.amendments.risk_updated'), color: 'success' })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (shouldProceed()) showError(caughtError)
   } finally {
-    isSavingRisk.value = false
+    if (shouldProceed()) isSavingRisk.value = false
   }
 }
 
 const cancelAmendment = async () => {
-  if (!canCancelAmendment.value || isCancelling.value) return
+  const generation = amendmentActionGeneration
+  const shouldProceed = () => generation === amendmentActionGeneration && ownsAmendmentPage()
+  if (!shouldProceed() || !canCancelAmendment.value || isCancelling.value) return
   try {
     isCancelling.value = true
     await saveJson(`${amendmentApiBase}/cancel`, 'POST', {})
+    if (!shouldProceed()) return
     isCancelModalOpen.value = false
     await refresh()
+    if (!shouldProceed()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.amendments.cancelled_success'), color: 'success' })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (shouldProceed()) showError(caughtError)
   } finally {
-    isCancelling.value = false
+    if (shouldProceed()) isCancelling.value = false
   }
 }
 
@@ -763,6 +811,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 
           <section v-else-if="selectedTab === 'recommendation'" data-help-target="casework.amendments.recommendation.content" data-help-kind="section" data-help-view="casework.amendments.recommendation" class="space-y-6">
             <CommonCompletionPanel
+              :mutation-role-allowed="profile?.can_update_agreement_role === true"
               entity-type="fundingcaseamendment"
               :entity-id="amendmentId"
               :can-complete="canEditAmendment"
@@ -834,6 +883,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               </dl>
             </CommonSection>
             <CommonWorkflowSection
+              :mutation-role-allowed="profile?.can_update_agreement_role === true"
               entity-type="fundingcaseamendment"
               :entity-id="amendmentId"
               purpose="risk_rating"
@@ -851,6 +901,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 
           <CommonWorkflowSection
             v-else-if="selectedTab === 'workflows'"
+            :mutation-role-allowed="profile?.can_update_agreement_role === true"
             data-help-view="casework.amendments.workflows"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId"

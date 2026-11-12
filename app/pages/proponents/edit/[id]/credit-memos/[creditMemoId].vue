@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import type { CommittedReadbackResult, CommittedSettlementResult } from '~/composables/useCommittedSettlement'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent Proponent credit uses the financial operational-child shell. */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
@@ -42,8 +47,8 @@ usePageResourceError({
 })
 const isHeroCollapsed = getHeroCollapsed('proponent-credit-memo-detail')
 const saving: Ref<boolean> = ref(false)
-const isEditOpen: Ref<boolean> = ref(false)
-let editSession = 0
+const editModal = useModalSession()
+const isEditOpen = editModal.isOpen
 const refreshKey: Ref<number> = ref(0)
 const content: Ref<HTMLElement | null> = ref(null)
 type FormState = {
@@ -78,7 +83,6 @@ const openEdit = () => {
   isEditOpen.value = true
 }
 watch(isEditOpen, open => {
-  editSession += 1
   if (!open && creditMemo.value && !saving.value) hydrate(creditMemo.value)
 }, { flush: 'sync' })
 watch(creditMemo, record => {
@@ -95,6 +99,13 @@ watch([proponentId, creditMemoId], () => {
   saved.value = ''
   saving.value = false
 }, { flush: 'sync' })
+const { can } = useCan()
+const mutationRoleAllowed = computed(() => Boolean(creditMemo.value && can('account_receivable', 'update', { type: 'agency', agencyId: creditMemo.value.egcs_fc_agency })))
+const actionContext = useActionContext({
+  identity: [proponentId, creditMemoId, () => creditMemo.value?.egcs_fc_agency],
+  authority: mutationRoleAllowed,
+  eligible: () => creditMemo.value?.egcs_fc_canedit === true
+})
 const reference = computed(() => creditMemo.value ? creditMemo.value.id : '')
 const tabs = [
   { key: 'account_receivable.credit_memo_summary', value: 'summary', icon: 'i-lucide-receipt-text' },
@@ -117,6 +128,33 @@ const refreshPage = async () => {
   await refresh()
   refreshKey.value += 1
 }
+const readbackLines = async (): Promise<CommittedReadbackResult> => {
+  if (!await refresh()) return { kind: 'unavailable', error: detailError.value }
+  refreshKey.value += 1
+  return { kind: 'available' }
+}
+const captureLineCommitted = useCommittedSettlement({ context: actionContext, settle: readbackLines })
+const { canAny } = useAuth()
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const lineDeleteContext = useActionContext({
+  identity: [proponentId, creditMemoId, () => creditMemo.value?.egcs_fc_receivable, () => creditMemo.value?.egcs_fc_agency, () => creditMemo.value?.egcs_fc_applicantrecipient, () => creditMemo.value?.egcs_fc_currency, () => creditMemo.value?.egcs_fc_receivables.join(',')],
+  authority: () => canAny('account_receivable', 'delete'),
+  eligible: () => !disposed && creditMemo.value?.id === creditMemoId.value
+    && creditMemo.value.egcs_fc_candeletelines && status.value === 'success' && !saving.value
+})
+const captureLineDeleted = useCommittedSettlement({ context: lineDeleteContext, settle: readbackLines })
+const removeLine = async (lineId: string, shouldProceed: () => boolean): Promise<CommittedSettlementResult | null> => {
+  const operation = lineDeleteContext.capture()
+  const committed = captureLineDeleted()
+  if (!operation?.canDispatch() || !committed?.canDispatch()) return null
+  const owner = creditMemoId.value
+  if (!await confirmDeleteRequest(`/api/account-receivable-credit-memos/${owner}/lines/${lineId}`, {
+    operation,
+    target: { id: lineId, resolve: () => creditMemo.value?.egcs_fc_lines.find(line => line.id === lineId), eligible: () => creditMemo.value?.egcs_fc_candeletelines === true },
+    shouldProceed: () => committed.canDispatch() && shouldProceed()
+  })) return null
+  return committed.settle()
+}
 const retry = async () => {
   if (await refresh()) {
     await nextTick()
@@ -128,13 +166,15 @@ const save = async () => {
   const owner = creditMemoId.value
   const requestIdentity = identity.value
   const submitted = JSON.stringify(state.value)
-  const session = editSession
+  const session = editModal.captureSession()
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
   saving.value = true
   try {
     await sendJson(`/api/account-receivable-credit-memos/${owner}`, 'PATCH', AccountReceivableCreditMemoEditSchema.parse(state.value))
-    if (disposed || requestIdentity !== identity.value || session !== editSession) return
+    if (disposed || !operation.isCurrent() || requestIdentity !== identity.value || !editModal.isCurrentSession(session)) return
     const refreshed = await refresh()
-    if (disposed || requestIdentity !== identity.value || session !== editSession) return
+    if (disposed || !operation.isCurrent() || requestIdentity !== identity.value || !editModal.isCurrentSession(session)) return
     if (refreshed && creditMemo.value && submitted === JSON.stringify(state.value)) {
       hydrate(creditMemo.value)
       isEditOpen.value = false
@@ -142,11 +182,12 @@ const save = async () => {
     refreshKey.value += 1
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
-    if (!disposed && requestIdentity === identity.value && session === editSession) showError(failure)
+    if (!disposed && operation.isCurrent() && requestIdentity === identity.value && editModal.isCurrentSession(session)) showError(failure)
   } finally {
     if (!disposed && requestIdentity === identity.value) saving.value = false
   }
 }
+const formSession = useFormSession({ owner: editModal, action: { kind: 'remote', context: actionContext }, onDenied: () => toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' }), submit: save })
 </script>
 
 <template>
@@ -205,15 +246,15 @@ const save = async () => {
             </CommonSection>
           </div>
           <AccountReceivableCreditMemoLines
-            v-else-if="selectedTab === 'lines'" :credit-memo-id="creditMemoId" :receivable-id="creditMemo.egcs_fc_receivable" :receivable-ids="creditMemo.egcs_fc_receivables" :agency-id="creditMemo.egcs_fc_agency" :applicant-recipient-id="creditMemo.egcs_fc_applicantrecipient"
+            v-else-if="selectedTab === 'lines'" :capture-committed="captureLineCommitted" :remove-line="removeLine" :credit-memo-id="creditMemoId" :receivable-id="creditMemo.egcs_fc_receivable" :receivable-ids="creditMemo.egcs_fc_receivables" :agency-id="creditMemo.egcs_fc_agency" :applicant-recipient-id="creditMemo.egcs_fc_applicantrecipient"
             :lines="creditMemo.egcs_fc_lines" :currency="creditMemo.egcs_fc_currency"
             :can-edit="!creditMemo.egcs_fc_automaticcoding && creditMemo.egcs_fc_canedit && status === 'success' && !saving" :can-delete="creditMemo.egcs_fc_candeletelines && status === 'success' && !saving"
-            @changed="refreshPage" />
+          />
           <section v-else-if="selectedTab === 'completion'" data-help-target="proponent.credit-memo.completion" data-help-kind="section" class="space-y-6">
-            <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-complete="creditMemo.egcs_fc_cancomplete && !dirty && !saving && status === 'success'" :can-work-workflow="creditMemo.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.credit_memo_completion.title" description-key="account_receivable.credit_memo_completion.description" status-complete-key="account_receivable.credit_memo_completion.status_complete" status-locked-key="account_receivable.credit_memo_completion.status_locked" comment-placeholder-key="account_receivable.credit_memo_completion.comment_placeholder" complete-action-key="account_receivable.credit_memo_completion.complete" completed-success-key="account_receivable.credit_memo_completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+            <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel :mutation-role-allowed="mutationRoleAllowed" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-complete="creditMemo.egcs_fc_cancomplete && !dirty && !saving && status === 'success'" :can-work-workflow="creditMemo.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.credit_memo_completion.title" description-key="account_receivable.credit_memo_completion.description" status-complete-key="account_receivable.credit_memo_completion.status_complete" status-locked-key="account_receivable.credit_memo_completion.status_locked" comment-placeholder-key="account_receivable.credit_memo_completion.comment_placeholder" complete-action-key="account_receivable.credit_memo_completion.complete" completed-success-key="account_receivable.credit_memo_completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-update="creditMemo.egcs_fc_canwork" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" purpose="standard" :can-edit="creditMemo.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="mutationRoleAllowed" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" purpose="standard" :can-edit="creditMemo.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
@@ -229,7 +270,7 @@ const save = async () => {
       :dismissible="!saving"
       :close="{ disabled: saving }">
       <template #body>
-        <UForm :state="state" :validate="createValidator(AccountReceivableCreditMemoEditSchema)" class="space-y-4" @submit="save">
+        <UForm v-bind="formSession" :state="state" :validate="createValidator(AccountReceivableCreditMemoEditSchema)" class="space-y-4">
           <UFormField name="egcs_fc_receiveddate" :label="t('account_receivable.received_date')">
             <CommonDatePicker v-model="state.egcs_fc_receiveddate" :disabled="saving || !creditMemo.egcs_fc_canedit" />
           </UFormField>

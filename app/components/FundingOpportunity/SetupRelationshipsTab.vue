@@ -7,6 +7,10 @@ import { useTableListState } from '~/composables/useTableListState'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
+import { useModalSession } from '~/composables/useModalSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 
 type SetupKind = 'review' | 'workflow'
 type LinkedSetup = { id: string; name_en: string; name_fr: string }
@@ -18,8 +22,9 @@ const props = defineProps<{
   linkedSetups: LinkedSetup[]
   kind: SetupKind
   canEdit: boolean
+  actionContext: ActionContext
+  captureCommitted: CaptureCommittedSettlement
 }>()
-const emit = defineEmits<{ refresh: [] }>()
 const { t } = useI18n()
 const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
@@ -27,6 +32,7 @@ const LinkSchema = z.object({
   id: z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' })
 })
 const draft: Ref<{ id?: string } | null> = ref(null)
+const associationSession = useModalSession()
 const selectedSetup: Ref<SetupRow | null> = ref(null)
 const { getBilingualValue } = useBilingualValue()
 
@@ -60,6 +66,7 @@ watch(contextKey, () => {
   mutationGeneration += 1
   pendingId.value = null
   draft.value = null
+  associationSession.isOpen.value = false
   selectedSetup.value = null
   linkedSearch.value = ''
   linkedPagination.value.pageIndex = 0
@@ -83,23 +90,28 @@ const bilingualColumns = [{
 watch(() => props.canEdit, canEdit => {
   if (!canEdit) {
     draft.value = null
+    associationSession.isOpen.value = false
     selectedSetup.value = null
   }
 })
 watch(() => props.streamIds.join(','), () => {
   draft.value = null
+  associationSession.isOpen.value = false
   selectedSetup.value = null
 })
 /** Opens a fresh single-setup association form. */
 const openAssociation = () => {
   if (!props.canEdit || pendingId.value !== null || props.streamIds.length === 0) return
   draft.value = {}
+  associationSession.isOpen.value = false
+  associationSession.isOpen.value = true
   selectedSetup.value = null
 }
 /** Closes the form after any in-flight mutation has finished. */
 const closeAssociation = () => {
   if (pendingId.value !== null) return
   draft.value = null
+  associationSession.isOpen.value = false
   selectedSetup.value = null
 }
 /** Keeps the selected setup's bilingual labels for immediate table feedback.
@@ -118,6 +130,7 @@ const associate = async () => {
   const selected = selectedSetup.value
   await saveLinks(selected?.id === id ? selected : { id, label_en: id, label_fr: id }, 'associate')
 }
+const associationForm = useFormSession({ owner: associationSession, action: { kind: 'remote', context: () => props.actionContext }, submit: associate })
 const setupName = (row: SetupRow) => getBilingualValue(row, 'label', row.id)
 
 /**
@@ -126,7 +139,9 @@ const setupName = (row: SetupRow) => getBilingualValue(row, 'label', row.id)
  * @param action - Whether to add or remove its link.
  */
 const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') => {
-  if (!props.canEdit || pendingId.value !== null || disposed) return
+  const operation = props.actionContext.capture()
+  const committed = props.captureCommitted()
+  if (!operation?.canDispatch() || !committed?.canDispatch() || !props.canEdit || pendingId.value !== null || disposed) return
   const currentIds = linkedIds.value
   if ((action === 'associate') === currentIds.has(row.id)) return
   const requestedRows = action === 'associate'
@@ -137,23 +152,27 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
   const generation = mutationGeneration
   pendingId.value = row.id
   try {
-    const response = await fetch(getClientRequestUrl(`/api/funding-opportunities/${opportunityId}`), {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        [kind === 'review' ? 'egcs_fo_reviewsetups' : 'egcs_fo_workflowsetups']: requestedRows.map(link => link.id)
+    try {
+      const response = await fetch(getClientRequestUrl(`/api/funding-opportunities/${opportunityId}`), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          [kind === 'review' ? 'egcs_fo_reviewsetups' : 'egcs_fo_workflowsetups']: requestedRows.map(link => link.id)
+        })
       })
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    if (disposed || generation !== mutationGeneration || opportunityId !== props.opportunityId || kind !== props.kind) return
+      if (!response.ok) await throwFetchResponseError(response)
+    } catch (error: unknown) {
+      if (operation.isCurrent() && !disposed && generation === mutationGeneration) showError(error)
+      return
+    }
+    const readback = await committed.settle()
+    if (readback.kind === 'retired' || !operation.isCurrent() || disposed || generation !== mutationGeneration || opportunityId !== props.opportunityId || kind !== props.kind) return
     linkedRows.value = requestedRows
     if (action === 'associate') {
       draft.value = null
+      associationSession.isOpen.value = false
       selectedSetup.value = null
     }
-    emit('refresh')
-  } catch (error: unknown) {
-    if (!disposed && generation === mutationGeneration) showError(error)
   } finally {
     if (!disposed && generation === mutationGeneration) pendingId.value = null
   }
@@ -197,7 +216,7 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
     :description="t('funding_opportunity.available_setups')"
     data-field-scope="funding-opportunity.setup-relationships-tab" @update:open="value => { if (!value) closeAssociation() }">
     <template #body>
-      <UForm v-if="draft" :state="draft" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="associate">
+      <UForm v-if="draft" v-bind="associationForm" :state="draft" :validate="createValidator(LinkSchema)" class="space-y-4">
         <UFormField data-field-label-en="Review or workflow setup" data-field-label-fr="Configuration de révision ou de flux de travail" :label="t(kind === 'review' ? 'funding_opportunity.review_setups' : 'funding_opportunity.workflow_setups')" name="id" required>
           <CommonServerLookupSelect
             v-model="draft.id"

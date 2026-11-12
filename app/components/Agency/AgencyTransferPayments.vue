@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { onScopeDispose, watch } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
 import { buildTransferPaymentProfileSaveRequest, completeTransferPaymentProfileSave } from '~/utils/transfer-payment-profile-save'
 import type { TransferPaymentProfileItem } from '~~/shared/types/schemas'
 import type { TransferPaymentProfileForm } from '~~/shared/types/transfer-payment-ui'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
 
 const { agencyId } = defineProps<{
   agencyId: string
@@ -39,10 +40,22 @@ const columns: TableColumnInput<TransferPaymentProfileItem>[] = [
 const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileItem>[] = [
   { id: 'abbreviation', accessorKey: { en: 'egcs_tp_abbreviation_en', fr: 'egcs_tp_abbreviation_fr' } }
 ]
-const { isWizardOpen, isSavingWizard, saveWizard } = useTransferPaymentWizard(refresh)
 const canCreateTransferPayment = computed(() =>
   can('transfer_payment', 'create', { type: 'agency', agencyId: String(agencyId) })
 )
+const profileActionContext = useActionContext({
+  identity: [() => agencyId],
+  authority: canCreateTransferPayment
+})
+
+const collectionActionContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => can('agency', 'read', { type: 'agency', agencyId: String(agencyId) })
+})
+const { isWizardOpen, isSavingWizard, saveWizard } = useTransferPaymentWizard(refresh, {
+  context: profileActionContext,
+  collectionContext: collectionActionContext
+})
 
 const {
   isOpen: isProfileModalOpen,
@@ -69,9 +82,22 @@ const {
 })
 const profilePending = useCrudModalPending(captureProfileSession)
 const isSavingProfile = profilePending.isPending
-watch(() => agencyId, () => {
-  isProfileModalOpen.value = false
-  selectedProfile.value = null
+let latestProfileSession: ReturnType<typeof captureProfileSession> = null
+watch(captureProfileSession, session => {
+  if (session !== null) latestProfileSession = session
+}, { flush: 'sync' })
+type ProfileContext = { kind: 'active'; agencyId: string } | { kind: 'disposed' }
+let profileContext: ProfileContext = { kind: 'active', agencyId }
+watch(() => agencyId, (currentAgency, previousAgency) => {
+  if (profileContext.kind === 'disposed') return
+  profileContext = { kind: 'active', agencyId: currentAgency }
+  if (currentAgency !== previousAgency) {
+    isProfileModalOpen.value = false
+    selectedProfile.value = null
+  }
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  profileContext = { kind: 'disposed' }
 })
 
 /**
@@ -80,26 +106,41 @@ watch(() => agencyId, () => {
  * Refreshes the dataset and provides user feedback via toasts on success or error.
  */
 const saveProfile = async () => {
+  const operation = profileActionContext.capture()
+  const context = profileContext
   const payload = selectedProfile.value
-  if (!payload) return
   const session = captureProfileSession()
+  if (!operation?.canDispatch() || context.kind !== 'active' || !payload || session === null) return
   if (!profilePending.begin(session)) return
+  const ownsContext = () => profileContext === context && operation.isCurrent()
+  const ownsSession = () => ownsContext() && captureProfileSession() === session
+  let closedSession = false
+  const ownsFeedback = () => ownsContext() && latestProfileSession === session && (
+    captureProfileSession() === session || (closedSession && captureProfileSession() === null)
+  )
 
   try {
-    const request = buildTransferPaymentProfileSaveRequest(payload, agencyId)
+    const request = buildTransferPaymentProfileSaveRequest(payload, context.agencyId)
     await ($fetch as (url: string, options: Record<string, unknown>) => Promise<unknown>)(request.url, {
       method: request.method,
       body: request.body
     })
+    if (!ownsContext()) return
+    if (!ownsSession()) {
+      await refresh()
+      return
+    }
     await completeTransferPaymentProfileSave({
       isUpdate: request.isUpdate,
-      close: () => closeProfileSession(session),
+      close: () => {
+        closedSession = closeProfileSession(session)
+      },
       refresh,
       t,
       toast
     })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
     profilePending.end(session)
   }
@@ -161,6 +202,7 @@ const saveProfile = async () => {
 
     <TransferPaymentWizardModal
       v-model:open="isWizardOpen"
+      :action-context="profileActionContext"
       :fixed-agency-id="agencyId"
       :pending="isSavingWizard"
       @submit="saveWizard" />
@@ -173,6 +215,7 @@ const saveProfile = async () => {
       :submit-label="selectedProfile.id ? t('common.update') : t('common.add')"
       :fixed-agency-id="agencyId"
       :pending="isSavingProfile"
+      :action-context="profileActionContext"
       @submit="saveProfile" />
   </div>
 </template>

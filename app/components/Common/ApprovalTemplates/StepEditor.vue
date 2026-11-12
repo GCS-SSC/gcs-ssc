@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 import { z } from 'zod'
 import { ApprovalTemplateStepSchema } from '~~/shared/types/schemas/approval-template'
 import type { ApprovalTemplateEditorStep } from '~/types/approval-template-editor'
@@ -7,9 +10,10 @@ import type { ApprovalTemplateEditorStep } from '~/types/approval-template-edito
 const open = defineModel<boolean>('open', { default: false })
 const step = defineModel<ApprovalTemplateEditorStep | null>('step', { required: true })
 
-const { mode, approvalTemplateId } = defineProps<{
+const { mode, approvalTemplateId, actionContext } = defineProps<{
   mode: 'create' | 'edit'
   approvalTemplateId: string
+  actionContext: ActionContext
 }>()
 
 const emit = defineEmits<{
@@ -20,6 +24,11 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const validate = createValidator(z.object({ step: ApprovalTemplateStepSchema }))
+const modalSession = useModalSession()
+watch([() => open.value, () => step.value, () => mode, () => approvalTemplateId], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && step.value !== null
+}, { immediate: true, flush: 'sync' })
 const validationState = computed(() => ({
   step: step.value && {
     ...step.value,
@@ -39,6 +48,7 @@ const saveEditor = () => {
   open.value = false
   emit('save')
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: saveEditor })
 </script>
 
 <template>
@@ -49,7 +59,7 @@ const saveEditor = () => {
     fullscreen
     :ui="{ content: 'rounded-none shadow-none ring-0' }">
     <template #body>
-      <UForm v-if="step" :state="validationState" :validate="validate" class="flex h-full flex-col" @submit="saveEditor">
+      <UForm v-if="step" v-bind="formSession" :state="validationState" :validate="validate" class="flex h-full flex-col">
         <div class="flex-1 overflow-y-auto p-6 lg:p-8">
           <div class="mx-auto w-full max-w-6xl space-y-8 pb-12">
             <CommonApprovalTemplatesStepFields v-model:step="step" :approval-template-id="approvalTemplateId" />

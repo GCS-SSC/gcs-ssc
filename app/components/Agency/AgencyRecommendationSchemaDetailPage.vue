@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef } from 'vue'
 import type { Ref } from 'vue'
 import { RecommendationDefinitionSchema } from '~~/shared/types/schemas/recommendation/recommendation'
 import type { RecommendationDefinition } from '~~/shared/types/schemas/recommendation/recommendation'
@@ -45,7 +46,7 @@ const isLoadRetrying: Ref<boolean> = ref(false)
 const selectedSection: Ref<string> = ref('recommendation-general')
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-recommendation-schema-detail')
-const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', { type: 'agency', agencyId }))
+const canManagePublication = computed(() => can('agency', 'update', { type: 'agency', agencyId }))
 const canEdit = computed(() => canManagePublication.value && state.value?.publicationState !== 'retired')
 
 const title = computed(() => getBilingualValue(state.value, 'egcs_cn_name', t('recommendation_schema.title')))
@@ -66,14 +67,25 @@ const definitionErrors = computed(() => definitionValidation.value && !definitio
   ? [...new Set(definitionValidation.value.error.issues.map(issue => t(issue.message)))]
   : [])
 
-const getDraft = () => state.value && definition.value
-  ? {
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_recommendationschema: definition.value
-    }
-  : null
-const mutation = useEditorMutationCoordinator({ getDraft })
+const getDraft = () => {
+  if (!state.value || !definition.value) return null
+  const parsed = RecommendationDefinitionSchema.safeParse(definition.value)
+  return {
+    egcs_cn_name_en: state.value.egcs_cn_name_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_recommendationschema: parsed.success ? parsed.data : definition.value
+  }
+}
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
+const actionContext = useActionContext({
+  identity: [() => String(route.params.id), () => String(route.params.schemaId)],
+  authority: canManagePublication,
+  eligible: () => Boolean(agency.value) && state.value !== null && state.value.publicationState !== 'retired'
+})
+const mutation = useEditorMutationCoordinator({ getDraft, context: actionContext })
 const isSaving = computed(() => mutation.isActionPending('save'))
 const isPublishing = computed(() => mutation.isActionPending('publish'))
 const isRetiring = computed(() => mutation.isActionPending('retire'))
@@ -82,7 +94,7 @@ const applyPayload = (payload: RecommendationSchemaPayload) => {
   state.value = structuredClone(payload)
   definition.value = structuredClone(payload.egcs_cn_recommendationschema)
 }
-const mergePublicationMetadata = (payload: RecommendationSchemaPayload) => {
+const mergePublicationMetadata = (payload: Pick<RecommendationSchemaPayload, 'publicationId' | 'publicationState' | 'publicationVersionId' | 'publicationVersion' | 'hasUnpublishedChanges'>) => {
   if (!state.value) return
   state.value.publicationId = payload.publicationId
   state.value.publicationState = payload.publicationState
@@ -99,24 +111,26 @@ const loadSession = async () => {
   isLoadRetrying.value = true
   try {
     const payload = await fetchPayload()
+    if (disposed) return
     mutation.replaceSessionDraft(() => applyPayload(payload))
     loadError.value = null
   } catch (error) {
+    if (disposed) return
     state.value = null
     definition.value = null
     loadError.value = error
     throw error
   } finally {
-    isLoadRetrying.value = false
+    if (!disposed) isLoadRetrying.value = false
   }
 }
 const retryLoad = async () => {
   try {
     await loadSession()
     await nextTick()
-    detailContent.value?.focus()
+    if (!disposed) detailContent.value?.focus()
   } catch (error) {
-    showError(error)
+    if (!disposed) showError(error)
   }
 }
 onMounted(retryLoad)
@@ -124,6 +138,11 @@ onMounted(retryLoad)
 const showPreservedDraft = () => toast.add({
   title: toast.localized('common.warning'),
   description: toast.localized('common.newer_changes_preserved'),
+  color: 'warning'
+})
+const showSynchronizationWarning = () => toast.add({
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.saved_refresh_failed'),
   color: 'warning'
 })
 const blockDirtyAction = () => {
@@ -136,6 +155,7 @@ const blockDirtyAction = () => {
   return true
 }
 const refreshForMutation = async (token: EditorMutationToken) => {
+  if (!mutation.isTokenCurrent(token)) return false
   const payload = await fetchPayload()
   return mutation.applyMutationRefresh(token, {
     apply: () => applyPayload(payload),
@@ -146,16 +166,19 @@ const refreshForMutation = async (token: EditorMutationToken) => {
 const persist = async (token: EditorMutationToken, showSuccess: boolean) => {
   if (!state.value || !definition.value) return false
   const persistedDefinition = RecommendationDefinitionSchema.parse(definition.value)
+  const body = {
+    egcs_cn_name_en: state.value.egcs_cn_name_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_recommendationschema: persistedDefinition
+  }
+  if (!mutation.canContinue(token)) return false
   const response = await fetch(getClientRequestUrl(endpoint), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_recommendationschema: persistedDefinition
-    })
+    body: JSON.stringify(body)
   })
   if (!response.ok) await throwFetchResponseError(response)
+  mutation.acceptCommittedDraft(token, body)
   if (!await refreshForMutation(token)) {
     if (mutation.isTokenCurrent(token)) showPreservedDraft()
     return false
@@ -172,7 +195,7 @@ const save = async () => {
     try {
       return await persist(token, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
       return false
     }
   }) === true
@@ -182,15 +205,24 @@ const publish = async () => {
   await mutation.run('publish', async token => {
     try {
       if (mutation.isDirty.value && !await persist(token, false)) return
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/publish`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!await refreshForMutation(token)) {
-        if (mutation.isTokenCurrent(token)) showPreservedDraft()
-        return
+      const metadata = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(metadata)
+      try {
+        if (!await refreshForMutation(token)) {
+          if (mutation.isTokenCurrent(token)) showPreservedDraft()
+          return
+        }
+      } catch {
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('recommendation_schema.published'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -199,12 +231,21 @@ const retire = async () => {
   if (blockDirtyAction()) return
   await mutation.run('retire', async token => {
     try {
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/retire`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!await refreshForMutation(token)) return
+      const metadata = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(metadata)
+      try {
+        if (!await refreshForMutation(token)) return
+      } catch {
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
+      }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('recommendation_schema.retired'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -246,6 +287,7 @@ const retire = async () => {
         :aria-label="title"
         tabindex="-1">
         <AssessmentSchemaDetailHero
+          :action-context="actionContext"
           :name="title"
           :publication-version="state.publicationVersion"
           :publication-state="state.publicationState"

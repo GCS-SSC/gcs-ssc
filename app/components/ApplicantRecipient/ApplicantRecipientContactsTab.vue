@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { ApplicantRecipientContactForm } from '~~/shared/types/applicant-recipient-ui'
 import { ApplicantRecipientContactCreateSchema } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -9,6 +10,24 @@ const { applicantRecipientId, canCreate, canUpdate, canDelete } = defineProps<{
   canUpdate: boolean
   canDelete: boolean
 }>()
+
+const { canAny } = useCan()
+const createContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'create', ['global', 'agency']),
+  eligible: () => canCreate
+})
+const updateContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'update', ['global', 'agency']),
+  eligible: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']),
+  eligible: () => canDelete
+})
+const resourceAction = { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext } satisfies import('~/composables/useResourceCrudState').ResourceCrudAction
 
 const { t } = useI18n()
 
@@ -23,6 +42,7 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
 <template>
   <section data-help-target="proponent.contacts.content" data-help-kind="section" data-help-view="proponent.contacts" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      :action="resourceAction"
       help-search-target="proponent.contacts.search" help-save-target="proponent.contacts.save" help-add-target="proponent.contacts.add"
       class="w-full"
       :title="t('applicant_recipient.contacts.title')"

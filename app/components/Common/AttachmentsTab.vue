@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import type { ActionContext } from '~/composables/useActionContext'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- component-local handlers are self-describing */
-import { computed, ref, watch } from 'vue'
+import { computed, effectScope, onBeforeUnmount, ref, shallowReactive, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -82,7 +87,8 @@ const { createValidator } = useZodI18n()
 const validateHostMetadata = createValidator(AttachmentMetadataBaseSchema)
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { confirmDeleteRequest, isDeletePending } = useConfirmDeleteRequest()
+const deletingAttachments = ref(new Map<string, () => boolean>())
 const baseUrl = computed(() => `/api/attachments/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`)
 const selectedAgencyId: Ref<string> = ref('')
 const agencyRequired = computed(() => entityType === 'applicantrecipient')
@@ -93,7 +99,15 @@ const requestUrl = computed(() => withAgency(baseUrl.value))
 const selectedAttachment: Ref<AttachmentItem | null> = ref(null)
 const formState: Ref<AttachmentFormState | null> = ref(null)
 const isModalOpen: Ref<boolean> = ref(false)
-const isSaving: Ref<boolean> = ref(false)
+const modalSession = useModalSession()
+let modalGeneration = 0
+watch([isModalOpen, formState], () => {
+  modalGeneration += 1
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = isModalOpen.value && formState.value !== null
+}, { flush: 'sync' })
+const saving = useCrudModalPending(modalSession.captureSession)
+const isSaving = saving.isPending
 
 const {
   items,
@@ -118,6 +132,47 @@ const warnPrerequisite = () => toast.add({
   description: toast.localized('workflow.action_prerequisite_unavailable'),
   color: 'warning'
 })
+const uploadAction = useActionContext({
+  identity: [() => entityType, () => entityId, selectedAgencyId],
+  authority: () => attachmentResponse.value?.can_upload_role === true,
+  eligible: () => canUpload.value
+})
+const rowActionScope = effectScope()
+const rowActions = shallowReactive(new Map<string, { update: ActionContext, remove: ActionContext }>())
+const rowActionKey = (id: string) => `${requestUrl.value}\u0000${id}`
+watch([items, status, requestUrl], () => {
+  if (status.value !== 'success') return
+  for (const item of items.value) {
+    const key = rowActionKey(item.id)
+    if (rowActions.has(key)) continue
+    const requestedUrl = requestUrl.value
+    const updateRole = ref(item.can_update_role === true)
+    const deleteRole = ref(item.can_delete_role === true)
+    // Retain only observed role evidence when this DELETE removes its own row.
+    rowActionScope.run(() => {
+      watch(() => {
+        const accepted = items.value.find(row => row.id === item.id)
+        return accepted ? [accepted.can_update_role, accepted.can_delete_role] : null
+      }, roles => {
+        if (roles && requestUrl.value === requestedUrl) {
+          updateRole.value = roles[0] === true
+          deleteRole.value = roles[1] === true
+        }
+      }, { flush: 'sync' })
+      rowActions.set(key, {
+        update: useActionContext({ identity: [() => entityType, () => entityId, selectedAgencyId], authority: updateRole,
+          eligible: () => items.value.some(row => row.id === item.id && row.can_update_role === true && row.can_update === true) }),
+        remove: useActionContext({ identity: [() => entityType, () => entityId, selectedAgencyId], authority: deleteRole })
+      })
+    })
+  }
+}, { immediate: true, flush: 'sync' })
+const editorAction = () => selectedAttachment.value ? rowActions.get(rowActionKey(selectedAttachment.value.id))?.update ?? null : uploadAction
+const deleteUrl = (id: string) => withAgency(`${baseUrl.value}/${id}`)
+const isDeletingAttachment = (id: string) => Boolean(deletingAttachments.value.get(deleteUrl(id))?.()) || isDeletePending(deleteUrl(id), id)
+const canSave = () => selectedAttachment.value
+  ? items.value.some(item => item.id === selectedAttachment.value?.id && item.can_update_role === true && item.can_update === true)
+  : canUploadRole.value && canUpload.value
 const isEditing = computed(() => selectedAttachment.value !== null)
 const validateMetadata = withFormRequirements(async (state: AttachmentFormState) => {
   const errors = await validateHostMetadata(state)
@@ -160,12 +215,14 @@ const formatSize = (value: string | number): string => {
 }
 const formatUploadedAt = (value: string): string => formatDate(value) || t('common.not_available')
 
+const cloneJsonObject = (value: JsonObject): JsonObject => JSON.parse(JSON.stringify(value)) as JsonObject
+
 const emptyState = (): AttachmentFormState => ({
   nameEn: '',
   nameFr: '',
   descriptionEn: '',
   descriptionFr: '',
-  providerMetadata: { ...(uploadMetadataDeclaration.value?.value ?? {}) },
+  providerMetadata: cloneJsonObject(uploadMetadataDeclaration.value?.value ?? {}),
   file: null
 })
 
@@ -192,7 +249,7 @@ const openEdit = (item: AttachmentItem) => {
     nameFr: item.name_fr,
     descriptionEn: item.description_en,
     descriptionFr: item.description_fr,
-    providerMetadata: { ...(item.provider_metadata ?? {}) },
+    providerMetadata: cloneJsonObject(item.provider_metadata ?? {}),
     file: null
   }
   isModalOpen.value = true
@@ -205,6 +262,9 @@ const resetModalState = () => {
 }
 
 let identityGeneration = 0
+onBeforeUnmount(() => {
+  identityGeneration += 1
+})
 watch([() => entityType, () => entityId, selectedAgencyId], () => {
   identityGeneration += 1
   resetModalState()
@@ -225,8 +285,6 @@ const onFileChange = (event: Event) => {
   const input = event.target as HTMLInputElement
   formState.value.file = input.files?.[0] ?? null
 }
-
-const cloneJsonObject = (value: JsonObject): JsonObject => JSON.parse(JSON.stringify(value)) as JsonObject
 
 const patchAttachment = async (url: string, patchBody: AttachmentHostPatch | { providerMetadata: JsonObject }) => {
   const responseValue = await fetch(getClientRequestUrl(url), {
@@ -250,14 +308,14 @@ const rebasePartiallySavedEdit = async (
   attachment: AttachmentItem,
   hostPatch: AttachmentHostPatch,
   providerMetadataDraft: JsonObject,
-  generation: number
+  current: () => boolean
 ) => {
   try {
     await refresh()
   } catch {
     // The list publishes its own retryable error; retain a deterministic local view of the saved host fields.
   }
-  if (generation !== identityGeneration) return
+  if (!current()) return null
   const refreshedAttachment = items.value.find(item => item.id === attachment.id)
   const rebasedAttachment = applyHostPatch(refreshedAttachment ?? attachment, hostPatch)
   selectedAttachment.value = rebasedAttachment
@@ -271,13 +329,22 @@ const rebasePartiallySavedEdit = async (
     file: null
   }
   isModalOpen.value = true
+  return modalGeneration
 }
 
 const save = async () => {
-  if (!formState.value || isSaving.value) return
+  if (!formState.value || isSaving.value || !canSave()) return
+  const operation = editorAction()?.capture()
+  if (!operation) return
   if (!isEditing.value && !formState.value.file) return
 
+  const session = modalSession.captureSession()
+  if (session === null) return
   const generation = identityGeneration
+  let feedbackGeneration = modalGeneration
+  const ownsTarget = () => operation.isCurrent() && generation === identityGeneration
+  const ownsOpening = () => ownsTarget() && modalSession.isCurrentSession(session)
+  const ownsFeedback = () => ownsTarget() && feedbackGeneration === modalGeneration
   const url = requestUrl.value
   const attachmentUrl = withAgency(`${baseUrl.value}/${selectedAttachment.value?.id ?? ''}`)
   const providerMetadataDraft = cloneJsonObject(formState.value.providerMetadata)
@@ -285,8 +352,8 @@ const save = async () => {
   let failedProviderMetadataDraft: JsonObject | null = null
   let editingAttachment: AttachmentItem | null = null
   let providerMetadataSaved = false
+  if (!saving.begin(session)) return
   try {
-    isSaving.value = true
     if (selectedAttachment.value) {
       const attachment = selectedAttachment.value
       editingAttachment = attachment
@@ -311,11 +378,16 @@ const save = async () => {
         return
       }
       if (hasHostPatch) {
+        if (!operation.canDispatch() || !canSave()) return
         await patchAttachment(attachmentUrl, hostPatch)
-        if (generation !== identityGeneration) return
         savedHostPatch = hostPatch
+        if (!ownsOpening()) {
+          if (ownsTarget()) await refresh()
+          return
+        }
       }
       if (providerMetadataChanged) {
+        if (!operation.canDispatch() || !canSave()) return
         failedProviderMetadataDraft = providerMetadataDraft
         await patchAttachment(attachmentUrl, { providerMetadata: providerMetadataDraft })
         providerMetadataSaved = true
@@ -329,33 +401,40 @@ const save = async () => {
       body.set('descriptionEn', formState.value.descriptionEn)
       body.set('descriptionFr', formState.value.descriptionFr)
       body.set('providerMetadata', JSON.stringify(formState.value.providerMetadata))
+      if (!operation.canDispatch() || !canSave()) return
       const responseValue = await fetch(getClientRequestUrl(url), { method: 'POST', body })
       if (!responseValue.ok) await throwFetchResponseError(responseValue)
     }
-    if (generation !== identityGeneration) return
-    resetModalState()
-    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
+    if (!ownsTarget()) return
+    if (ownsOpening()) {
+      resetModalState()
+      feedbackGeneration = modalGeneration
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
+    }
     try {
       await refresh()
     } catch (refreshError) {
-      if (generation === identityGeneration) showError(refreshError)
+      if (ownsFeedback()) showError(refreshError)
     }
   } catch (error: unknown) {
-    if (generation !== identityGeneration) return
+    if (!ownsTarget()) return
     if (editingAttachment && savedHostPatch && failedProviderMetadataDraft && !providerMetadataSaved) {
-      await rebasePartiallySavedEdit(editingAttachment, savedHostPatch, failedProviderMetadataDraft, generation)
-      if (generation !== identityGeneration) return
+      const rebasedGeneration = await rebasePartiallySavedEdit(editingAttachment, savedHostPatch, failedProviderMetadataDraft, ownsOpening)
+      if (rebasedGeneration === null || !ownsTarget() || rebasedGeneration !== modalGeneration) return
+      feedbackGeneration = rebasedGeneration
       toast.add({
         title: toast.localized('attachments.partial_update_title'),
         description: toast.localized('attachments.partial_update_metadata_failed'),
         color: 'warning'
       })
-    }
+    } else if (!ownsOpening()) return
     showError(error)
   } finally {
-    isSaving.value = false
+    saving.end(session)
   }
 }
+
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: editorAction }, submit: save })
 
 const download = async (item: AttachmentItem) => {
   if (status.value !== 'success') return
@@ -377,19 +456,32 @@ const download = async (item: AttachmentItem) => {
 }
 
 const remove = async (item: AttachmentItem) => {
-  if (status.value !== 'success') return
-  if (item.can_delete !== true) {
+  if (status.value !== 'success' || isDeletingAttachment(item.id)) return
+  const acceptedItem = items.value.find(row => row.id === item.id)
+  if (!acceptedItem?.can_delete_role) return
+  if (acceptedItem.can_delete !== true) {
     warnPrerequisite()
     return
   }
+  const operation = rowActions.get(rowActionKey(item.id))?.remove.capture()
+  if (!operation) return
   const generation = identityGeneration
-  const deleted = await confirmDeleteRequest(withAgency(`${baseUrl.value}/${item.id}`))
-  if (!deleted || generation !== identityGeneration) return
-  toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
+  const current = () => operation.isCurrent() && generation === identityGeneration
+  const url = deleteUrl(item.id)
+  deletingAttachments.value.set(url, current)
   try {
+    const deleted = await confirmDeleteRequest(url, {
+      operation,
+      target: { id: item.id, resolve: () => items.value.find(row => row.id === item.id), eligible: row => row.can_delete_role === true && row.can_delete === true },
+      shouldProceed: () => current() && status.value === 'success'
+    })
+    if (!deleted || !current()) return
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
     await refresh()
   } catch (error) {
-    if (generation === identityGeneration) showError(error)
+    if (current()) showError(error)
+  } finally {
+    if (deletingAttachments.value.get(url) === current) deletingAttachments.value.delete(url)
   }
 }
 
@@ -469,14 +561,14 @@ const retryAttachmentList = async () => {
         <div v-if="status === 'success'" class="flex items-center justify-end gap-1">
           <CommonActionButton icon="i-lucide-download" color="neutral" variant="ghost" :aria-label="`${t('common.download')}: ${getAttachmentLabel(row.original)}`" @click="download(row.original)" />
           <CommonActionButton v-if="row.original.can_update_role" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
-          <CommonActionButton v-if="row.original.can_delete_role" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
+          <CommonActionButton v-if="row.original.can_delete_role" :loading="isDeletingAttachment(row.original.id)" :disabled="isDeletingAttachment(row.original.id)" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
         </div>
       </template>
     </CommonResourceLayout>
 
     <UModal v-if="formState" v-model:open="isModalOpen" :title="t(isEditing ? 'attachments.edit' : 'attachments.upload')" :dismissible="!isSaving" @update:open="value => value ? undefined : closeModal()">
       <template #body>
-        <UForm :state="formState" :validate="validateMetadata" class="space-y-4" @submit="save">
+        <UForm v-bind="formSession" :state="formState" :validate="validateMetadata" class="space-y-4">
           <UFormField v-if="!isEditing" :label="t('attachments.file')" name="file" required>
             <UInput type="file" class="block w-full text-sm" required @change="onFileChange" />
           </UFormField>

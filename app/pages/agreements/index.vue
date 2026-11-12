@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GuidedHelpLauncher from '~/components/GuidedHelp/Launcher.vue'
+import { useActionContext } from '~/composables/useActionContext'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -22,6 +23,12 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const confirmDelete = useDeleteConfirm()
 const actionOwner = ref<{ kind: 'agreement'; agreementId: string }>()
+const actionTarget = ref<{
+  agreementId: string
+  agencyId: string
+  programId: string
+  action: 'update' | 'delete'
+} | null>(null)
 const { check } = useAgreementChildActionPrerequisites(actionOwner)
 let actionGeneration = 0
 let actionPending = false
@@ -52,6 +59,27 @@ const {
 watch(listView, () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
+
+const acceptedActionRow = computed(() => agreements.value.find(row => String(row.id) === actionTarget.value?.agreementId))
+// Own deletion retains captured scope; a live ownership transfer retires the operation.
+const actionContext = useActionContext({
+  identity: [
+    () => actionTarget.value?.agreementId,
+    () => actionTarget.value?.agencyId,
+    () => actionTarget.value?.programId,
+    () => acceptedActionRow.value?.agency_id ?? actionTarget.value?.agencyId,
+    () => acceptedActionRow.value?.program_id ?? actionTarget.value?.programId,
+    () => actionTarget.value?.action,
+    listView,
+    search,
+    () => pagination.value.pageIndex,
+    () => pagination.value.pageSize
+  ],
+  authority: () => {
+    const target = actionTarget.value
+    return target !== null && can('agreement', target.action, { type: 'program', agencyId: target.agencyId, transferPaymentId: target.programId })
+  }
+})
 
 const openCreateAgreement = async () => {
   await navigateTo(localePath(appRouteLocations.agreementCreate()))
@@ -86,10 +114,13 @@ const runAgreementAction = async (agreement: FundingCaseAgreementProfileRow, act
   const agreementId = String(agreement.id)
   const agencyId = agreement.agency_id
   const programId = agreement.program_id
+  actionTarget.value = { agreementId, agencyId, programId, action }
+  const operation = actionContext.capture()
   actionOwner.value = { kind: 'agreement', agreementId }
-  const current = () => generation === actionGeneration && agreements.value.some(row =>
+  const current = () => operation?.canDispatch() === true && generation === actionGeneration && agreements.value.some(row =>
     String(row.id) === agreementId && row.agency_id === agencyId && row.program_id === programId
   ) && can('agreement', action, { type: 'program', agencyId, transferPaymentId: programId })
+  let confirmingDelete = false
   try {
     if (!await check(action, 'profile', current) || !current()) return
     if (action === 'update') {
@@ -97,15 +128,24 @@ const runAgreementAction = async (agreement: FundingCaseAgreementProfileRow, act
       await navigateTo(localePath(appRouteLocations.agreementDetail(agreementId)))
       return
     }
+    confirmingDelete = true
     const deleted = await confirmDeleteRequest(`/api/agreements/${agreementId}`, {
+      operation,
+      target: {
+        id: agreementId,
+        resolve: () => agreements.value.find(row => String(row.id) === agreementId),
+        eligible: row => row.agency_id === agencyId && row.program_id === programId
+          && can('agreement', 'delete', { type: 'program', agencyId: row.agency_id, transferPaymentId: row.program_id })
+      },
       shouldProceed: current,
       confirm: async () => Boolean(await confirmDelete()) && current() && await check('delete', 'profile', current)
     })
-    if (!deleted || !current()) return
+    if (!deleted || !operation?.isCurrent()) return
     await refresh()
+    if (!operation.isCurrent()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (confirmingDelete ? operation?.isCurrent() : current()) showError(error)
   } finally {
     if (generation === actionGeneration) actionPending = false
   }

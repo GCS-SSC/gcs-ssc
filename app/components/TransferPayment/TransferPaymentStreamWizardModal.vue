@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import type { ActionContext } from '~/composables/useActionContext'
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 import type { FormSubmitEvent } from '#ui/types'
 import type { TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 import { useTransferPaymentStreamWizardModal } from '~/composables/useTransferPaymentStreamWizardModal'
 
-const { programId, pending = false } = defineProps<{
+const { programId, pending = false, actionContext } = defineProps<{
+  actionContext: ActionContext
   programId: string
   pending?: boolean
 }>()
@@ -71,7 +76,7 @@ const {
   onCurrentStepUpdate
 } = useTransferPaymentStreamWizardModal({
   open,
-  programId
+  programId: () => programId
 })
 
 /**
@@ -84,6 +89,12 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
   clearErrors()
   emit('submit', event.data)
 }
+const modalSession = useModalSession()
+watch([() => open.value, () => state.value, () => programId], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
@@ -96,10 +107,10 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
     <template #body>
       <UForm
         v-if="state"
+        v-bind="formSession"
         :state="state"
         :validate="validateWizard"
-        class="flex h-full flex-col lg:flex-row"
-        @submit="onSubmit">
+        class="flex h-full flex-col lg:flex-row">
         <CommonWizardShell
           :current-step="currentStep"
           :steps="steps"

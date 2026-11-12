@@ -2,7 +2,7 @@ import { useNitroApp } from 'nitropack/runtime'
 import { captureParsedAuditRequestBody } from './audit-request'
 /* eslint-disable jsdoc/require-jsdoc -- Applicant-recipient CRUD helpers are covered by route and integration tests. */
 import { readGcsExtensionRequestBody, type GcsExtensionAgreementAccess } from '@gcs-ssc/extensions/server'
-import { runBoundedExtensionOperation } from './extension-admission'
+import { runTransactionExtensionOperation } from './extension-admission'
 import { canonicalizeAuthorizationLockIds } from '@gcs-ssc/authorization/server'
 import type { H3Event } from 'h3'
 import { getQuery } from 'h3'
@@ -452,11 +452,11 @@ const emitApplicantRecipientProfileUpdated = async (
   validatedBody: ApplicantRecipientProfilePatch,
   updatedProfile: Record<string, unknown>
 ) => {
-  await runBoundedExtensionOperation('applicantrecipient:profile:updated', async signal =>
+  await runTransactionExtensionOperation('applicantrecipient:profile:updated', db, async (signal, hookDb) =>
     await useNitroApp().hooks.callHook('applicantrecipient:profile:updated', {
       signal,
       event,
-      db,
+      db: hookDb,
       agreementAccess: {
         listVisibleOptions: async (rawDb, input) => {
           const agreementDb = rawDb as Kysely<Database>

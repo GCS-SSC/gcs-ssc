@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, useId, watch } from 'vue'
-import type { Ref } from 'vue'
+import { computed, useId } from 'vue'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import type { ExtensionAgencyRegistryItem, ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 
 definePageMeta({ i18n: { paths: {
@@ -15,56 +15,46 @@ const route = useRoute()
 const workspacePanelId = useId()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
+const { user, permissionRevision } = useAuth()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('extension-agency-workspace')
 const extensionKey = computed(() => String(route.params.id))
 const agencyId = computed(() => String(route.params.agencyId))
-type LoadStatus = 'pending' | 'success' | 'error'
-const list: Ref<{ items: ExtensionAgencyWorkspaceListItem[] } | null> = ref(null)
-const registry: Ref<{ items: ExtensionAgencyRegistryItem[] } | null> = ref(null)
-const listStatus: Ref<LoadStatus> = ref('pending')
-const registryStatus: Ref<LoadStatus> = ref('pending')
-let requestSequence = 0
-/** Reloads the accessible workspace and Agency registry for the current route. */
+const workspaceRequest = useResourceRequest<{ items: ExtensionAgencyWorkspaceListItem[] }>({
+  identity: () => JSON.stringify([extensionKey.value, agencyId.value, user.value?.id, permissionRevision.value]),
+  refreshData: 'clear',
+  failureData: 'clear',
+  /**
+   * Loads the authorized current workspace.
+   * @param signal - Owning request cancellation.
+   * @returns Current workspace evidence.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl('/api/extensions/workspaces'), { signal })
+    if (!response.ok) throw new Error('Workspace list request failed')
+    return await response.json() as { items: ExtensionAgencyWorkspaceListItem[] }
+  }
+})
+const registryRequest = useResourceRequest<{ items: ExtensionAgencyRegistryItem[] }>({
+  identity: () => JSON.stringify([extensionKey.value, agencyId.value, user.value?.id, permissionRevision.value]),
+  refreshData: 'clear',
+  failureData: 'clear',
+  /**
+   * Loads the authorized current workspace.
+   * @param signal - Owning request cancellation.
+   * @returns Current workspace evidence.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl(`/api/extensions/agency/${agencyId.value}`), { signal })
+    if (!response.ok) throw new Error('Agency extension registry request failed')
+    return await response.json() as { items: ExtensionAgencyRegistryItem[] }
+  }
+})
+const { data: list, status: listStatus } = workspaceRequest
+const { data: registry, status: registryStatus } = registryRequest
 const retry = async () => {
-  const sequence = ++requestSequence
-  list.value = null
-  registry.value = null
-  listStatus.value = 'pending'
-  registryStatus.value = 'pending'
-  const requests = await Promise.allSettled([
-    fetch(getClientRequestUrl('/api/extensions/workspaces')),
-    fetch(getClientRequestUrl(`/api/extensions/agency/${agencyId.value}`))
-  ])
-  if (sequence !== requestSequence) return
-  const [listResponse, registryResponse] = requests
-  const parsed = await Promise.allSettled([
-    listResponse?.status === 'fulfilled' && listResponse.value.ok
-      ? listResponse.value.json() as Promise<{ items: ExtensionAgencyWorkspaceListItem[] }>
-      : Promise.reject(new Error('Workspace list request failed')),
-    registryResponse?.status === 'fulfilled' && registryResponse.value.ok
-      ? registryResponse.value.json() as Promise<{ items: ExtensionAgencyRegistryItem[] }>
-      : Promise.reject(new Error('Agency extension registry request failed'))
-  ])
-  if (sequence !== requestSequence) return
-  if (parsed[0]?.status === 'fulfilled') {
-    list.value = parsed[0].value
-    listStatus.value = 'success'
-  } else {
-    list.value = null
-    listStatus.value = 'error'
-  }
-  if (parsed[1]?.status === 'fulfilled') {
-    registry.value = parsed[1].value
-    registryStatus.value = 'success'
-  } else {
-    registry.value = null
-    registryStatus.value = 'error'
-  }
+  await Promise.all([workspaceRequest.refresh(), registryRequest.refresh()])
 }
-watch([agencyId, extensionKey], () => {
-  void retry()
-}, { immediate: true })
 const workspace = computed(() => list.value?.items.find(item => item.key === extensionKey.value
   && item.agencies.some(agency => agency.id === agencyId.value)))
 const agency = computed(() => workspace.value?.agencies.find(item => item.id === agencyId.value))

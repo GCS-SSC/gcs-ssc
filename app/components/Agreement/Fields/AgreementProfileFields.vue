@@ -3,6 +3,7 @@ import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import type { Ref } from 'vue'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { GcsAgreementDescriptionsExtensionContext, GcsAgreementProfileExtensionContext } from '~~/shared/utils/extensions'
@@ -68,11 +69,7 @@ watch(() => agreementId, () => {
 
 const previousStreamId = ref<string | undefined>(undefined)
 const riskScoreSelection: Ref<string | undefined> = ref(undefined)
-const riskWorkflowManaged: Ref<boolean> = ref(false)
-const riskManagementStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
-const hasRiskManagementError: Ref<boolean> = ref(false)
-let riskManagementRequestGeneration = 0
-let subtypeRequestGeneration = 0
+const riskFeedback: Ref<'quiet' | 'failed'> = ref('quiet')
 
 type RiskManagementResponse = {
   workflow_managed: boolean
@@ -88,7 +85,8 @@ const isRiskManagementResponse = (value: unknown): value is RiskManagementRespon
   return typeof value === 'object'
     && value !== null
     && !Array.isArray(value)
-    && typeof (value as Record<string, unknown>).workflow_managed === 'boolean'
+    && 'workflow_managed' in value
+    && typeof value.workflow_managed === 'boolean'
 }
 
 const selectedStreamId = computed(() => {
@@ -184,8 +182,6 @@ const agreementDescriptionFrExtensionContext = computed(() => ({
   }
 }))
 
-const subtypeResponse: Ref<{ items: FundingCaseAgreementSubtypeLookupItem[] }> = ref({ items: [] })
-const subtypeStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 const subtypeCatalogUrl = computed(() => {
   const requestUrl = getClientRequestUrl('/api/agreements/lookups/agreement-subtypes')
   requestUrl.searchParams.set('page', '1')
@@ -195,92 +191,74 @@ const subtypeCatalogUrl = computed(() => {
   if (agreementId) requestUrl.searchParams.set('agreement_id', agreementId)
   return requestUrl
 })
-/**
- *
- */
-const refreshSubtypeOptions = async () => {
-  const requestedStreamId = selectedStreamId.value
-  const requestGeneration = ++subtypeRequestGeneration
-  if (!requestedStreamId) {
-    subtypeResponse.value = { items: [] }
-    subtypeStatus.value = 'idle'
-    return
+const lookupIdentity = () => JSON.stringify([selectedStreamId.value, agreementId, permissionAction])
+const subtypeRequest = useResourceRequest({
+  identity: lookupIdentity,
+  enabled: () => Boolean(selectedStreamId.value),
+  failureData: 'clear',
+  /**
+   * Loads the selected Stream's subtype catalog.
+   * @param signal - Cancellation owned by the current lookup.
+   * @returns The authorized subtype records.
+   */
+  load: async (signal): Promise<{ items: FundingCaseAgreementSubtypeLookupItem[] }> => {
+    const response = await fetch(subtypeCatalogUrl.value, { signal })
+    if (!response.ok) throw new Error('Agreement subtype lookup failed')
+    return await response.json()
   }
-
-  try {
-    subtypeStatus.value = 'pending'
-    const response = await fetch(subtypeCatalogUrl.value)
-    const payload = response.ok ? await response.json() as { items: FundingCaseAgreementSubtypeLookupItem[] } : { items: [] }
-    if (requestGeneration !== subtypeRequestGeneration || requestedStreamId !== selectedStreamId.value) return
-    subtypeResponse.value = payload
-    subtypeStatus.value = response.ok ? 'success' : 'error'
-  } catch {
-    if (requestGeneration !== subtypeRequestGeneration || requestedStreamId !== selectedStreamId.value) return
-    subtypeResponse.value = { items: [] }
-    subtypeStatus.value = 'error'
-  }
-}
+})
+const subtypeStatus = subtypeRequest.status
+const refreshSubtypeOptions = subtypeRequest.refresh
 useCatalogCacheRefresh(subtypeCatalogUrl, change => {
   if (change.securityContextChanged) {
-    subtypeRequestGeneration += 1
-    subtypeResponse.value = { items: [] }
-    subtypeStatus.value = 'idle'
+    subtypeRequest.reset()
     return
   }
   return refreshSubtypeOptions()
 })
 
-/** Refreshes whether the selected Stream delegates risk scoring to a published Workflow. */
-const refreshRiskManagement = async () => {
-  const requestedStreamId = selectedStreamId.value
-  const requestGeneration = ++riskManagementRequestGeneration
-  if (!requestedStreamId) {
-    riskWorkflowManaged.value = false
-    riskManagementStatus.value = 'idle'
-    hasRiskManagementError.value = false
-    return
-  }
-  riskManagementStatus.value = 'pending'
-  const requestUrl = getClientRequestUrl('/api/agreements/lookups/risk-ratings')
-  requestUrl.searchParams.set('page', '1')
-  requestUrl.searchParams.set('limit', '1')
-  requestUrl.searchParams.set('permission_action', permissionAction)
-  requestUrl.searchParams.set('stream_id', requestedStreamId)
-  if (agreementId) requestUrl.searchParams.set('agreement_id', agreementId)
-  try {
-    const response = await fetch(requestUrl)
+const riskRequest = useResourceRequest({
+  identity: lookupIdentity,
+  enabled: () => Boolean(selectedStreamId.value),
+  /**
+   * Loads the selected Stream's authoritative risk-management mode.
+   * @param signal - Cancellation owned by the current lookup.
+   * @returns The validated risk-management decision.
+   */
+  load: async signal => {
+    const requestUrl = getClientRequestUrl('/api/agreements/lookups/risk-ratings')
+    requestUrl.searchParams.set('page', '1')
+    requestUrl.searchParams.set('limit', '1')
+    requestUrl.searchParams.set('permission_action', permissionAction)
+    requestUrl.searchParams.set('stream_id', selectedStreamId.value)
+    if (agreementId) requestUrl.searchParams.set('agreement_id', agreementId)
+    const response = await fetch(requestUrl, { signal })
     if (!response.ok) throw new Error('Risk management lookup failed')
     const payload: unknown = await response.json()
     if (!isRiskManagementResponse(payload)) throw new Error('Risk management lookup returned an invalid response')
-    if (
-      requestGeneration === riskManagementRequestGeneration
-      && selectedStreamId.value === requestedStreamId
-    ) {
-      riskWorkflowManaged.value = payload.workflow_managed
-      if (payload.workflow_managed && Object.hasOwn(model.value, 'egcs_fc_riskscore')) {
-        const currentRiskScore = model.value.egcs_fc_riskscore
-        if (currentRiskScore !== undefined && currentRiskScore !== null && currentRiskScore !== '') {
-          riskScoreSelection.value = String(currentRiskScore)
-        }
-        const nextModel: FundingCaseAgreementProfileForm = { ...model.value }
-        delete nextModel.egcs_fc_riskscore
-        model.value = nextModel
-      }
-      hasRiskManagementError.value = false
-      riskManagementStatus.value = 'success'
-    }
-  } catch {
-    if (
-      requestGeneration === riskManagementRequestGeneration
-      && selectedStreamId.value === requestedStreamId
-    ) {
-      hasRiskManagementError.value = true
-      riskManagementStatus.value = 'error'
-    }
+    return payload
   }
-}
+})
+const riskWorkflowManaged = computed(() => riskRequest.data.value?.workflow_managed ?? false)
+const riskManagementStatus = riskRequest.status
+const hasRiskManagementError = computed(() => riskFeedback.value === 'failed')
+const refreshRiskManagement = riskRequest.refresh
+watch(riskManagementStatus, status => {
+  if (status === 'error') riskFeedback.value = 'failed'
+  else if (status === 'idle' || status === 'success') riskFeedback.value = 'quiet'
+}, { flush: 'sync' })
+watch(riskRequest.data, payload => {
+  if (!payload?.workflow_managed || !Object.hasOwn(model.value, 'egcs_fc_riskscore')) return
+  const currentRiskScore = model.value.egcs_fc_riskscore
+  if (currentRiskScore !== undefined && currentRiskScore !== null && currentRiskScore !== '') {
+    riskScoreSelection.value = String(currentRiskScore)
+  }
+  const nextModel: FundingCaseAgreementProfileForm = { ...model.value }
+  delete nextModel.egcs_fc_riskscore
+  model.value = nextModel
+})
 
-const subtypeItems = computed<FundingCaseAgreementSubtypeLookupItem[]>(() => subtypeResponse.value?.items ?? [])
+const subtypeItems = computed<FundingCaseAgreementSubtypeLookupItem[]>(() => subtypeRequest.data.value?.items ?? [])
 
 const selectedSubtype = computed(() => {
   const subtypeId = model.value.egcs_fc_agreementsubtype
@@ -302,11 +280,6 @@ const selectSubtype = (subtypeId: string | undefined) => {
 
 watch(selectedStreamId, value => {
   if (!value) {
-    subtypeRequestGeneration += 1
-    riskManagementRequestGeneration += 1
-    riskWorkflowManaged.value = false
-    riskManagementStatus.value = 'idle'
-    hasRiskManagementError.value = false
     riskScoreSelection.value = undefined
     model.value = {
       ...model.value,
@@ -317,15 +290,10 @@ watch(selectedStreamId, value => {
       egcs_fc_riskscore: undefined
     }
     previousStreamId.value = undefined
-    subtypeResponse.value = { items: [] }
-    subtypeStatus.value = 'idle'
     return
   }
 
   if (previousStreamId.value && previousStreamId.value !== value) {
-    riskWorkflowManaged.value = false
-    riskManagementStatus.value = 'idle'
-    hasRiskManagementError.value = false
     riskScoreSelection.value = undefined
     model.value = {
       ...model.value,
@@ -338,9 +306,6 @@ watch(selectedStreamId, value => {
   }
 
   previousStreamId.value = value
-
-  void refreshSubtypeOptions()
-  void refreshRiskManagement()
 }, { immediate: true })
 
 watch(() => model.value.egcs_fc_riskscore, value => {

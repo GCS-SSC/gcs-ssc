@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local modal actions are self-describing */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 import type { Ref } from 'vue'
 import { ChecklistQuestionSchema } from '~~/shared/types/schemas/checklist/checklist'
 import type { ChecklistEditorQuestion } from '~/types/checklist-schema-editor'
@@ -13,6 +15,11 @@ const emit = defineEmits<{ save: []; cancel: [] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const validate = createValidator(ChecklistQuestionSchema)
+const modalSession = useModalSession()
+watch([() => open.value, () => question.value, () => mode], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && question.value !== null
+}, { immediate: true, flush: 'sync' })
 const closeAction: Ref<'dismiss' | 'cancel' | 'save'> = ref('dismiss')
 const title = computed(() => mode === 'create'
   ? t('checklist_schema.question_create')
@@ -32,6 +39,7 @@ const save = () => {
   open.value = false
   emit('save')
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'local-draft', purpose: 'checklist-question' }, submit: save })
 </script>
 
 <template>
@@ -43,7 +51,7 @@ const save = () => {
     :ui="{ content: 'rounded-none shadow-none ring-0' }"
     @close="handleClose">
     <template #body>
-      <UForm v-if="question" :state="question" :validate="validate" class="flex h-full flex-col" @submit="save">
+      <UForm v-if="question" :key="formSession.key" :state="question" :validate="validate" class="flex h-full flex-col" @submit="formSession.onSubmit">
         <div class="flex-1 overflow-y-auto p-6 lg:p-8">
           <div class="mx-auto w-full max-w-6xl space-y-8 pb-12">
             <ChecklistSchemaQuestionFields v-model:question="question" />

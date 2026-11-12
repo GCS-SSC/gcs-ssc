@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
+import { useActionContext } from '~/composables/useActionContext'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AgreementGeneratedDocumentItem, TransferPaymentStreamDocumentTemplateItem } from '~~/shared/types/schemas'
@@ -11,6 +12,8 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 
 const { agreementId, closeoutId, canPersist } = defineProps<{ agreementId: string, closeoutId: string, canPersist: boolean }>()
+const previewAction = useActionContext({ identity: [() => agreementId, () => closeoutId], authority: true })
+const persistAction = useActionContext({ identity: [() => agreementId, () => closeoutId], authority: () => canPersist })
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
@@ -154,19 +157,23 @@ const checkPersistencePrerequisites = async (requestedBase: string, current: () 
 
 const generate = async (persist: boolean) => {
   if (!selectedTemplateId.value || isGenerating.value) return
+  const operation = (persist ? persistAction : previewAction).capture()
+  if (!operation) return
+  const intent = { templateId: selectedTemplateId.value, language: language.value, outputFormat: outputFormat.value }
   const generation = ownerGeneration
   const requestedBase = baseUrl.value
-  const fallbackName = `closeout-${closeoutId}.${outputFormat.value}`
-  const current = () => generation === ownerGeneration
+  const requestedCloseoutId = closeoutId
+  const fallbackName = `closeout-${requestedCloseoutId}.${intent.outputFormat}`
+  const current = () => operation.isCurrent() && generation === ownerGeneration
   try {
     isGenerating.value = true
     if (!await checkCatalogVersions() || !current()) return
     if (persist && (!canPersist || !await checkPersistencePrerequisites(requestedBase, current))) return
-    if (!current()) return
+    if (!current() || !operation.canDispatch()) return
     const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/${persist ? 'generate' : 'preview'}`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ templateId: selectedTemplateId.value, language: language.value, outputFormat: outputFormat.value })
+      body: JSON.stringify(intent)
     })
     if (!response.ok) await throwFetchResponseError(response)
     if (!current()) return
@@ -186,7 +193,7 @@ const generate = async (persist: boolean) => {
   } catch (error: unknown) {
     if (current()) showError(error)
   } finally {
-    if (current()) isGenerating.value = false
+    if (generation === ownerGeneration) isGenerating.value = false
   }
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
@@ -8,6 +9,7 @@ import { accountReceivableReference, formatAccountReceivableAmount } from '~/uti
 import { sumMoney, type Money } from '~~/shared/utils/money'
 
 const { agreementId } = defineProps<{ agreementId: string }>()
+const { canAny } = useAuth()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -42,6 +44,10 @@ watch(() => agreementId, () => {
   createOpen.value = false
   deletingId.value = null
 }, { flush: 'sync' })
+const deleteContext = useActionContext({
+  identity: [() => agreementId],
+  authority: () => canAny('account_receivable', 'delete')
+})
 /**
  * Deletes an eligible draft from its owning collection after confirmation.
  * @param row - Selected independently assigned draft record.
@@ -52,16 +58,21 @@ const deleteDraft = async (row: CollectionRow) => {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
+  const targetId = row.id
+  const capturedAction = deleteContext.capture()
+  if (!capturedAction?.canDispatch()) return
   const owner = agreementId
   deletingId.value = row.id
   try {
-    const deleted = await confirmDeleteRequest(`/api/account-receivables/${row.id}`, {
+    const deleted = await confirmDeleteRequest(`/api/account-receivables/${targetId}`, {
+      operation: capturedAction,
+      target: { id: targetId, resolve: () => items.value.find(item => item.id === targetId), eligible: item => item.egcs_fc_candeleterole && item.egcs_fc_candelete },
       shouldProceed: () => !disposed && agreementId === owner && status.value === 'success'
-        && items.value.some(item => item.id === row.id && item.egcs_fc_candeleterole && item.egcs_fc_candelete)
+        && items.value.some(item => item.id === targetId && item.egcs_fc_candeleterole && item.egcs_fc_candelete)
     })
-    if (deleted && !disposed && agreementId === owner) await refresh()
+    if (deleted && capturedAction.isCurrent() && !disposed && agreementId === owner) await refresh()
   } catch (error) {
-    if (!disposed && agreementId === owner) showError(error)
+    if (capturedAction.isCurrent() && !disposed && agreementId === owner) showError(error)
   } finally {
     if (!disposed && agreementId === owner) deletingId.value = null
   }

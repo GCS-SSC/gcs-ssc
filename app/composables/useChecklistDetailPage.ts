@@ -52,7 +52,7 @@ type ChecklistDetailResponse = {
     additional_reviewer_count?: number
     pending_additional_reviewer_count?: number
   }
-  permissions?: { can_update?: boolean }
+  permissions?: { can_read: boolean; can_update?: boolean }
 }
 
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-returns -- concise local state helpers are self-documenting */

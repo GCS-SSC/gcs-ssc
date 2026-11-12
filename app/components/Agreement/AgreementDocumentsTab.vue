@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -25,11 +28,21 @@ const validateGenerate = useZodI18n().createValidator(AgreementDocumentGenerateS
 const toast = useLocalizedToast()
 const { isRecordLocked } = useBusinessStatusState()
 const { showError } = useApiErrorToast()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { confirmDeleteRequest, isDeletePending } = useConfirmDeleteRequest()
+const deletingDocuments = ref(new Map<string, () => boolean>())
+const documentDeleteUrl = (id: string) => `${apiBase.value}/documents/${id}`
+const isDeletingDocument = (id: string) => Boolean(deletingDocuments.value.get(documentDeleteUrl(id))?.()) || isDeletePending(documentDeleteUrl(id), id)
+const createAction = useActionContext({ identity: [() => agreementId, () => amendmentId], authority: () => canCreate })
+const deleteAction = useActionContext({ identity: [() => agreementId, () => amendmentId], authority: () => canDelete })
 const isGenerateOpen: Ref<boolean> = ref(false)
 const isGenerating: Ref<boolean> = ref(false)
 const isOpeningGenerate: Ref<boolean> = ref(false)
 const generateState: Ref<{ templateId?: string, language: 'eng' | 'fra', outputFormat?: TransferPaymentDocumentTemplateOutputFormat } | null> = ref(null)
+const generateSession = useModalSession()
+watch([isGenerateOpen, generateState, () => canCreate], () => {
+  generateSession.isOpen.value = false
+  generateSession.isOpen.value = canCreate && isGenerateOpen.value && generateState.value !== null
+}, { flush: 'sync' })
 
 const {
   items,
@@ -48,6 +61,16 @@ const templatesStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 let templateGeneration = 0
 let operationGeneration = 0
 let ownerGeneration = 0
+let createCapabilityGeneration = 0
+let deleteCapabilityGeneration = 0
+watch(() => canCreate, () => {
+  createCapabilityGeneration++
+  isOpeningGenerate.value = false
+  isGenerating.value = false
+}, { flush: 'sync' })
+watch(() => canDelete, () => {
+  deleteCapabilityGeneration++
+}, { flush: 'sync' })
 onBeforeUnmount(() => {
   ownerGeneration++
   templateGeneration++
@@ -159,9 +182,13 @@ const checkDocumentPrerequisites = async (action: 'create' | 'delete', current: 
 }
 const openGenerate = async () => {
   if (!canCreate || isOpeningGenerate.value) return
+  const operation = createAction.capture()
+  if (!operation) return
   const generation = ++operationGeneration
   const requestedBase = apiBase.value
-  const current = () => generation === operationGeneration && requestedBase === apiBase.value
+  const capabilityGeneration = createCapabilityGeneration
+  const current = () => operation.canDispatch() && canCreate && capabilityGeneration === createCapabilityGeneration
+    && generation === operationGeneration && requestedBase === apiBase.value
   try {
     isOpeningGenerate.value = true
     if (!await checkCatalogVersions() || !current()) return
@@ -176,7 +203,7 @@ const openGenerate = async () => {
   } catch (error: unknown) {
     if (current()) showError(error)
   } finally {
-    if (current()) isOpeningGenerate.value = false
+    if (generation === operationGeneration && requestedBase === apiBase.value) isOpeningGenerate.value = false
   }
 }
 
@@ -218,45 +245,70 @@ const generateDocument = async () => {
     return
   }
 
+  const operation = createAction.capture()
+  if (!operation) return
   let generation = ++operationGeneration
   const requestedBase = apiBase.value
-  const draft = generateState.value
-  const current = () => generation === operationGeneration && requestedBase === apiBase.value
+  const draft = { ...generateState.value }
+  const capabilityGeneration = createCapabilityGeneration
+  const owner = ownerGeneration
+  const ownsTarget = () => operation.isCurrent() && canCreate && capabilityGeneration === createCapabilityGeneration
+    && owner === ownerGeneration && requestedBase === apiBase.value
+  const current = () => ownsTarget() && generation === operationGeneration
   try {
     isGenerating.value = true
-    if (!await checkDocumentPrerequisites('create', current) || !current()) return
+    if (!await checkDocumentPrerequisites('create', current) || !current() || !operation.canDispatch()) return
     const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/generate`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(draft)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!current()) return
-    isGenerateOpen.value = false
-    generation = operationGeneration
+    if (!ownsTarget()) return
+    if (current() && generateState.value?.templateId === draft.templateId
+      && generateState.value.language === draft.language
+      && generateState.value.outputFormat === draft.outputFormat) {
+      isGenerateOpen.value = false
+      generation = operationGeneration
+    }
     await refresh()
     if (!current()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.documents.generated_success'), color: 'success' })
   } catch (error: unknown) {
     if (current()) showError(error)
   } finally {
-    if (current()) isGenerating.value = false
+    if (owner === ownerGeneration && generation === operationGeneration) isGenerating.value = false
   }
 }
 
+const generateFormSession = useFormSession({ owner: generateSession, action: { kind: 'remote', context: createAction }, submit: generateDocument })
+
 const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem) => {
-  const generation = operationGeneration
+  if (!canDelete || isDeletingDocument(generatedDocument.id)) return
+  const operation = deleteAction.capture()
+  if (!operation) return
+  const url = documentDeleteUrl(generatedDocument.id)
+  const generation = ownerGeneration
   const requestedBase = apiBase.value
-  const current = () => generation === operationGeneration && requestedBase === apiBase.value
+  const capabilityGeneration = deleteCapabilityGeneration
+  const current = () => operation.isCurrent() && canDelete && capabilityGeneration === deleteCapabilityGeneration
+    && generation === ownerGeneration && requestedBase === apiBase.value
+  deletingDocuments.value.set(url, current)
   try {
     if (!await checkDocumentPrerequisites('delete', current) || !current()) return
-    const ok = await confirmDeleteRequest(`${requestedBase}/documents/${generatedDocument.id}`)
+    const ok = await confirmDeleteRequest(url, {
+      operation,
+      target: { id: generatedDocument.id, resolve: () => items.value.find(item => item.id === generatedDocument.id), eligible: () => canDelete },
+      shouldProceed: current
+    })
     if (!ok || !current()) return
     await refresh()
     if (!current()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (current()) showError(error)
+  } finally {
+    if (deletingDocuments.value.get(url) === current) deletingDocuments.value.delete(url)
   }
 }
 </script>
@@ -315,6 +367,8 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
             @click="downloadDocument(row.original)" />
           <CommonActionButton
             v-if="canDelete"
+            :loading="isDeletingDocument(row.original.id)"
+            :disabled="isDeletingDocument(row.original.id)"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
@@ -327,7 +381,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 
     <UModal v-if="canCreate && generateState" v-model:open="isGenerateOpen" :title="t('agreement.documents.generate')">
       <template #body>
-        <UForm :state="generateState" :validate="validateGenerate" class="space-y-4" data-help-view="agreement.documents.generate-dialog" data-help-label-en="Agreements — Generate document" data-help-label-fr="Ententes — Générer un document" @submit="generateDocument">
+        <UForm v-bind="generateFormSession" :state="generateState" :validate="validateGenerate" class="space-y-4" data-help-view="agreement.documents.generate-dialog" data-help-label-en="Agreements — Generate document" data-help-label-fr="Ententes — Générer un document">
           <UFormField :label="t('transfer_payment.document_templates.title')" name="templateId">
             <CommonBilingualSelectMenu
               v-model="generateState.templateId"

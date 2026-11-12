@@ -1,7 +1,7 @@
 <!-- eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Ref } from 'vue'
+import { useLocalRowEditor } from '~/composables/useLocalRowEditor'
 import { toRaw } from 'vue'
 import type { AssessmentImpactorRow } from '~/composables/useAssessmentSchemaEditorState'
 import { createAssessmentImpactorRow } from '~/composables/useAssessmentSchemaEditorState'
@@ -23,10 +23,8 @@ const {
 
 const { t } = useI18n()
 
-const isEditorOpen: Ref<boolean> = ref(false)
-const editorMode: Ref<'create' | 'edit'> = ref('create')
-const editingIndex: Ref<number | null> = ref(null)
-const draftImpactor: Ref<AssessmentImpactorRow | null> = ref(null)
+const rowEditor = useLocalRowEditor<AssessmentImpactorRow, number>()
+const { isOpen: isEditorOpen, mode: editorMode, target: editingIndex, draft: draftImpactor, close: resetEditor } = rowEditor
 
 type ImpactorTableRow = {
   id: string
@@ -52,18 +50,8 @@ const columns = computed<TableColumn<ImpactorTableRow>[]>(() => [
   { id: 'actions', header: t('common.actions') }
 ])
 
-const resetEditor = () => {
-  isEditorOpen.value = false
-  editorMode.value = 'create'
-  editingIndex.value = null
-  draftImpactor.value = null
-}
-
 const openCreateEditor = () => {
-  editorMode.value = 'create'
-  editingIndex.value = null
-  draftImpactor.value = structuredClone(createAssessmentImpactorRow())
-  isEditorOpen.value = true
+  rowEditor.openCreate(structuredClone(createAssessmentImpactorRow()))
 }
 
 const openEditEditor = (index: number) => {
@@ -72,10 +60,7 @@ const openEditEditor = (index: number) => {
     return
   }
 
-  editorMode.value = 'edit'
-  editingIndex.value = index
-  draftImpactor.value = structuredClone(toRaw(currentImpactor))
-  isEditorOpen.value = true
+  rowEditor.openEdit(index, structuredClone(toRaw(currentImpactor)))
 }
 
 const saveDraft = () => {

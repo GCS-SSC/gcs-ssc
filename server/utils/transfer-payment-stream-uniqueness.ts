@@ -14,11 +14,11 @@ export const buildAmendmentTypeKey = (input: {
   egcs_tp_name_en: string
   egcs_tp_name_fr: string
 }): string => {
-  return [
+  return JSON.stringify([
     input.egcs_tp_amended,
     normalizeTextKey(input.egcs_tp_name_en),
     normalizeTextKey(input.egcs_tp_name_fr)
-  ].join('|')
+  ])
 }
 
 /**

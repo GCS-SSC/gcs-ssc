@@ -21,6 +21,7 @@ const inputsRef = ref<(Element | ComponentPublicInstance | null)[]>([])
  * @param value Selected calendar date or cleared value.
  */
 const updateValue = (value: DateFieldRootProps['modelValue']) => {
+  if (disabled.value || props.readonly) return
   emit('update:modelValue', value)
   emitFormChange()
   emitFormInput()

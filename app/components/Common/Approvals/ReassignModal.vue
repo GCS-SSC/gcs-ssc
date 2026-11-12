@@ -32,6 +32,7 @@ watch(() => step?.id, () => {
   assigneeKind.value = state?.egcs_cn_assignedgroup ? 'group' : 'user'
 }, { immediate: true })
 const chooseKind = (kind: 'user' | 'group') => {
+  if (isSubmitting) return
   assigneeKind.value = kind
   if (!state) return
   state.egcs_cn_assigneduser = ''
@@ -39,7 +40,7 @@ const chooseKind = (kind: 'user' | 'group') => {
 }
 const selectedGroup = computed({
   get: () => state?.egcs_cn_assignedgroup ?? '',
-  set: (value: string) => { if (state) state.egcs_cn_assignedgroup = value }
+  set: (value: string) => { if (state && !isSubmitting) state.egcs_cn_assignedgroup = value }
 })
 const canSubmit = computed(() => Boolean(state
   && (assigneeKind.value === 'group' ? state.egcs_cn_assignedgroup : state.egcs_cn_assigneduser)))
@@ -65,7 +66,7 @@ const canSubmit = computed(() => Boolean(state
         </div>
 
         <UFormField :label="t('groups.assignee_type')" required>
-          <USelect :model-value="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" @update:model-value="value => chooseKind(value === 'group' ? 'group' : 'user')" />
+          <USelect :model-value="assigneeKind" :disabled="isSubmitting" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" @update:model-value="value => chooseKind(value === 'group' ? 'group' : 'user')" />
         </UFormField>
         <UFormField v-if="assigneeKind === 'user'" :label="t('assessment.approvals.assigned_approver')" required>
           <CommonBilingualSelectMenu
@@ -77,7 +78,7 @@ const canSubmit = computed(() => Boolean(state
             searchable />
         </UFormField>
         <UFormField v-else :label="t('groups.group')" required>
-          <CommonServerLookupSelect v-model="selectedGroup" fetch-url="/api/approvals/lookups/groups" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="{ entityType, entityId }" />
+          <CommonServerLookupSelect v-model="selectedGroup" :disabled="isSubmitting" fetch-url="/api/approvals/lookups/groups" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="{ entityType, entityId }" />
         </UFormField>
 
         <div class="flex justify-end gap-3">

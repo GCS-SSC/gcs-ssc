@@ -1,5 +1,5 @@
-import { computed, getCurrentScope, onScopeDispose, ref, toValue, watch } from 'vue'
-import type { MaybeRefOrGetter, Ref } from 'vue'
+import { computed, toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 import type { ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 import type { TabMap } from '~~/shared/types/ui'
 import ApplicantRecipientGeneralTab from '~/components/ApplicantRecipient/ApplicantRecipientGeneralTab.vue'
@@ -17,6 +17,7 @@ import ApplicantRecipientFundingHistoryTab from '~/components/ApplicantRecipient
 import ApplicantRecipientAccountReceivablesTab from '~/components/ApplicantRecipient/ApplicantRecipientAccountReceivablesTab.vue'
 import ApplicantRecipientCreditMemosTab from '~/components/ApplicantRecipient/ApplicantRecipientCreditMemosTab.vue'
 import ExtensionEntityTabPanel from '~/components/Extension/ExtensionEntityTabPanel.vue'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useRouteTabMap } from '~/composables/useRouteTabMap'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -61,50 +62,25 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
   const { canAny, permissionsReady } = useCan()
 
   const isEnabled = computed(() => options.enabled === undefined ? true : toValue(options.enabled))
-  const profile: Ref<ApplicantRecipientDetailProfile | null> = ref(null)
-  const error: Ref<unknown | null> = ref(null)
-  const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref(isEnabled.value ? 'pending' : 'idle')
-  let requestGeneration = 0
-  let initialRequestQueued = true
-  let disposed = false
-  if (getCurrentScope()) onScopeDispose(() => {
-    disposed = true
-    requestGeneration += 1
-  })
-
-  /** Fetches the profile without registering a route-blocking async dependency. */
-  const refreshProfile = async () => {
-    if (disposed || !isEnabled.value) return
-    const generation = ++requestGeneration
-    status.value = 'pending'
-    error.value = null
-    try {
-      const response = await fetch(getClientRequestUrl(`/api/applicant-recipients/${id}`))
-      if (disposed || generation !== requestGeneration || !isEnabled.value) return
+  const { data: profile, error, status, refresh } = useResourceRequest<ApplicantRecipientDetailProfile>({
+    identity: id,
+    enabled: isEnabled,
+    initial: 'deferred',
+    failureData: 'clear',
+    /**
+     * Loads the authorized current profile.
+     * @param signal - Owning request cancellation.
+     * @returns Current profile.
+     */
+    load: async signal => {
+      const response = await fetch(getClientRequestUrl(`/api/applicant-recipients/${id}`), { signal })
       if (!response.ok) await throwFetchResponseError(response)
-      const fetchedProfile = await response.json() as ApplicantRecipientDetailProfile
-      if (disposed || generation !== requestGeneration || !isEnabled.value) return
-      profile.value = fetchedProfile
-      status.value = 'success'
-    } catch (fetchError: unknown) {
-      if (disposed || generation !== requestGeneration || !isEnabled.value) return
-      profile.value = null
-      error.value = fetchError
-      status.value = 'error'
+      return await response.json() as ApplicantRecipientDetailProfile
     }
-  }
-
-  queueMicrotask(() => {
-    initialRequestQueued = false
-    void refreshProfile()
   })
-  watch(isEnabled, enabled => {
-    requestGeneration += 1
-    profile.value = null
-    error.value = null
-    status.value = enabled ? 'pending' : 'idle'
-    if (enabled && !initialRequestQueued) void refreshProfile()
-  }, { flush: 'sync' })
+  const refreshProfile = async () => {
+    await refresh()
+  }
   const { items: extensionItems, tabs: extensionTabs } = useExtensionEntityTabs({
     target: 'proponent',
     applicantRecipientId: computed(() => isEnabled.value ? id : undefined)

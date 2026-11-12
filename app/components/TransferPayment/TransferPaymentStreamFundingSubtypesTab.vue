@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -17,6 +20,14 @@ type LinkedSubtype = {
   egcs_ay_instacking: boolean
   egcs_ay_incostsharing: boolean
 }
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canCreateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const { transferPaymentId, streamId, agencyId, canCreateChild, canDeleteChild } = defineProps<{
   transferPaymentId: string
   streamId: string
@@ -34,8 +45,18 @@ const toast = useLocalizedToast()
 const baseUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/funding-subtypes`)
 const lookupUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/funding-subtypes`)
 const { data: links, refresh: refreshLinks, status: linkStatus } = await useFetch<{ items: LinkedSubtype[] }, FetchError, string>(baseUrl)
-const selected: Ref<{ egcs_tp_fundingsubtype?: string } | null> = ref(null)
-const saving: Ref<boolean> = ref(false)
+type SubtypeDraft = { egcs_tp_fundingsubtype?: string }
+const modal = useCrudModal<SubtypeDraft, SubtypeDraft>({
+  createState: () => ({}),
+  updateState: item => ({ ...item })
+})
+const { selected, isOpen } = modal
+const pending = useCrudModalPending(modal.captureSession)
+const saving = pending.isPending
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const context: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const isCurrentContext = (captured: ResourceContext) => captured.kind === 'active' && captured === context.value
+let deleteCapabilityGeneration = 0
 const removing: Ref<boolean> = ref(false)
 const validate = createValidator(StreamFundingSubtypeSchema)
 const items = computed(() => links.value?.items ?? [])
@@ -56,30 +77,59 @@ const columns: TableColumnInput<LinkedSubtype>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 watch([() => transferPaymentId, () => streamId, () => agencyId], () => {
-  selected.value = null
+  context.value = { kind: 'active' }
+  removing.value = false
+  modal.close()
 }, { flush: 'sync' })
+watch(() => canCreateChild, allowed => {
+  if (!allowed) modal.close()
+}, { flush: 'sync' })
+watch(() => canDeleteChild, () => {
+  deleteCapabilityGeneration += 1
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context.value = { kind: 'disposed' }
+  modal.close()
+})
+const openCreate = () => {
+  if (context.value.kind === 'active' && canCreateChild) modal.openCreate()
+}
 watch(search, () => {
   pagination.value.pageIndex = 0
 })
 
 /** Adds an Agency subtype to the Stream after validation. */
 const save = async () => {
-  if (!selected.value?.egcs_tp_fundingsubtype || saving.value || !canCreateChild) return
-  saving.value = true
+  const operation = writeContext.capture()
+  if (!operation) return
+  if (context.value.kind === 'disposed' || !selected.value?.egcs_tp_fundingsubtype || !canCreateChild) return
+  const session = modal.captureSession()
+  if (session === null || !pending.begin(session)) return
+  const requestedContext = context.value
+  const requestedUrl = baseUrl.value
+  const body = JSON.stringify(selected.value)
+  let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(baseUrl.value), {
+    const response = await fetch(getClientRequestUrl(requestedUrl), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(selected.value)
+      body
     })
     if (!response.ok) await throwFetchResponseError(response)
-    selected.value = null
+    if (!(operation.isCurrent() && isCurrentContext(requestedContext))) return
+    closedSession = modal.closeSession(session)
+  } catch (error: unknown) {
+    if ((operation.isCurrent() && isCurrentContext(requestedContext)) && modal.isCurrentSession(session)) showError(error)
+    return
+  } finally {
+    pending.end(session)
+  }
+  try {
     await refreshLinks()
+    if (!(operation.isCurrent() && isCurrentContext(requestedContext)) || !closedSession || !modal.isLatestSession(session) || linkStatus.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-  } finally {
-    saving.value = false
+    if ((operation.isCurrent() && isCurrentContext(requestedContext)) && closedSession && modal.isLatestSession(session)) showError(error)
   }
 }
 
@@ -88,19 +138,29 @@ const save = async () => {
  * @param row - Active association selected from the Stream table.
  */
 const remove = async (row: LinkedSubtype) => {
-  if (!canDeleteChild || removing.value) return
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const id = row.id
+  if (context.value.kind === 'disposed' || !canDeleteChild || removing.value) return
+  const requestedContext = context.value
+  const capabilityGeneration = deleteCapabilityGeneration
   removing.value = true
   try {
-    if (await confirmDeleteRequest(`${baseUrl.value}/${row.id}`)) {
-      await refreshLinks()
-      toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
-    }
+    const removed = await confirmDeleteRequest(`${baseUrl.value}/${id}`, {
+      operation, target: { id, resolve: () => items.value.find(current => current.id === id), eligible: current => current.id === id },
+      shouldProceed: () => operation.isCurrent() && isCurrentContext(requestedContext) && canDeleteChild && capabilityGeneration === deleteCapabilityGeneration
+    })
+    if (!removed || !(operation.isCurrent() && isCurrentContext(requestedContext))) return
+    await refreshLinks()
+    if (!(operation.isCurrent() && isCurrentContext(requestedContext)) || linkStatus.value === 'error') return
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && isCurrentContext(requestedContext)) showError(error)
   } finally {
-    removing.value = false
+    if (isCurrentContext(requestedContext)) removing.value = false
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: writeContext }, submit: save })
 </script>
 
 <template>
@@ -115,7 +175,7 @@ const remove = async (row: LinkedSubtype) => {
       :request-status="linkStatus"
       :show-button="canCreateChild"
       :button-label="t('agency.funding_types.add_subtype')"
-      @add="selected = {}"
+      @add="openCreate"
       @retry="refreshLinks">
       <template #name-cell="{ row }">
         <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
@@ -139,10 +199,9 @@ const remove = async (row: LinkedSubtype) => {
       </template>
     </CommonResourceLayout>
     <UModal
-      v-if="selected && canCreateChild" :open="Boolean(selected)" :title="t('agency.funding_types.add_subtype')"
-      @update:open="value => { if (!value) selected = null }">
+      v-if="selected && canCreateChild" v-model:open="isOpen" :title="t('agency.funding_types.add_subtype')">
       <template #body>
-        <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
+        <UForm v-bind="formSession" :state="selected" :validate="validate" class="space-y-4">
           <UFormField :label="t('agency.funding_types.subtypes')" name="egcs_tp_fundingsubtype" required>
             <CommonServerLookupSelect
               v-model="selected.egcs_tp_fundingsubtype" :fetch-url="lookupUrl"
@@ -150,7 +209,7 @@ const remove = async (row: LinkedSubtype) => {
               :include-deleted-query="false" />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="selected = null" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="modal.close()" />
             <CommonSaveButton :label="t('common.add')" :loading="saving" :disabled="saving" />
           </div>
         </UForm>

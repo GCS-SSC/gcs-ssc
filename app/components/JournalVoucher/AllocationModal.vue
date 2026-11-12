@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
@@ -18,6 +20,11 @@ const emit = defineEmits<{ save: [line: JournalVoucherAllocationDraft] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const resolvedCoding: Ref<AdminCommonLookupResponseItem[]> = ref([])
+const modalSession = useModalSession()
+watch([open, state, () => voucherId], ([isOpen, draft]) => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = isOpen && draft !== null
+}, { immediate: true, flush: 'sync' })
 const commitments = computed(() => [...new Map(original.map(line => [line.egcs_fc_commitmentline, line])).values()]
   .map(line => ({ id: line.egcs_fc_commitmentline, label: `${t('journal_voucher.commitment_line')} ${line.egcs_fc_commitmentlinenumber}` })))
 const dimensions = computed(() => TransferPaymentStreamChartOfAccountDimensionSchema.array().safeParse(
@@ -40,6 +47,7 @@ const apply = () => {
   emit('save', { ...state.value, ...allocation, egcs_fc_accountingdimensions: dimensions.value.data,
     egcs_fc_agreementcodingmatched: !codingNotOnAgreement.value })
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'local-draft', purpose: 'journal-voucher-allocation' }, submit: apply })
 </script>
 
 <template>
@@ -49,8 +57,8 @@ const apply = () => {
     :description="t('journal_voucher.split_description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.allocation-modal" data-scope-label-en="Agreements > Journal Vouchers > Allocation" data-scope-label-fr="Ententes > Pièces de journal > Répartition">
     <template #body>
       <UForm
-        v-if="state" :state="state" :validate="createValidator(JournalVoucherAllocationSchema)"
-        :validate-on="[]" class="space-y-6" @submit="apply">
+        v-if="state" v-bind="formSession" :state="state" :validate="createValidator(JournalVoucherAllocationSchema)"
+        :validate-on="[]" class="space-y-6">
         <div class="grid gap-6 sm:grid-cols-2">
           <UFormField name="egcs_fc_commitmentline" :label="t('journal_voucher.commitment_line')">
             <CommonBilingualSelectMenu v-model="state.egcs_fc_commitmentline" :items="commitments" label-key="label" />

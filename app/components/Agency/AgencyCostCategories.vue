@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, @stylistic/comma-dangle -- local helpers are self-documenting; generic Vue arrows need parser-disambiguating commas */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
 import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
 import { useTableListState } from '~/composables/useTableListState'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import {
@@ -61,14 +64,53 @@ const { search, pagination } = useTableListState()
 const categories: Ref<AgencyCostCategoryItem[]> = ref([])
 const lineItems: Ref<AgencyCostCategoryLineItemRow[]> = ref([])
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
-const selectedCategory: Ref<Partial<AgencyCostCategoryItem> | null> = ref(null)
-const selectedLineItem: Ref<Partial<AgencyCostCategoryLineItemItem> | null> = ref(null)
+const categoryModal = useCrudModal<AgencyCostCategoryItem>({
+  createState: () => ({ egcs_ay_active: true }),
+  updateState: item => ({ ...item })
+})
+const lineItemModal = useCrudModal<AgencyCostCategoryLineItemRow>({
+  createState: () => ({
+    egcs_ay_active: true,
+    egcs_ay_calculationmode: 'manual',
+    egcs_ay_sourcecategory: null,
+    egcs_ay_percentage: null,
+    egcs_ay_allowpercentageoverride: false
+  }),
+  updateState: item => ({ ...item })
+})
+const { selected: selectedCategory, isOpen: isCategoryModalOpen } = categoryModal
+const { selected: selectedLineItem, isOpen: isLineItemModalOpen } = lineItemModal
+const categoryPending = useCrudModalPending(categoryModal.captureSession)
+const lineItemPending = useCrudModalPending(lineItemModal.captureSession)
+const isSavingCategory = categoryPending.isPending
+const isSavingLineItem = lineItemPending.isPending
 const selectedLineItemCategoryId: Ref<string | null> = ref(null)
-const isCategoryModalOpen: Ref<boolean> = ref(false)
-const isLineItemModalOpen: Ref<boolean> = ref(false)
-const isSavingCategory: Ref<boolean> = ref(false)
-const isSavingLineItem: Ref<boolean> = ref(false)
+type PageContext = { kind: 'active'; agencyId: string } | { kind: 'disposed' }
+const pageContext: Ref<PageContext> = shallowRef({ kind: 'active', agencyId })
+const ownsContext = (context: PageContext) => context.kind === 'active' && pageContext.value === context
 let refreshGeneration = 0
+const categoryCreateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canCreate
+})
+const categoryUpdateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canUpdate,
+  eligible: () => categories.value.some(row => row.id === selectedCategory.value?.id)
+})
+const categoryActionContext = () => selectedCategory.value?.id ? categoryUpdateContext : categoryCreateContext
+const lineItemCreateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canCreate,
+  eligible: () => Boolean(selectedLineItemCategoryId.value) && categories.value.some(row => row.id === selectedLineItemCategoryId.value)
+})
+const lineItemUpdateContext = useActionContext({
+  identity: [() => agencyId],
+  authority: () => canUpdate,
+  eligible: () => lineItems.value.some(row => row.id === selectedLineItem.value?.id) && categories.value.some(row => row.id === selectedLineItemCategoryId.value)
+})
+const lineItemActionContext = () => selectedLineItem.value?.id ? lineItemUpdateContext : lineItemCreateContext
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDelete })
 const validateCategory = createValidator(AgencyCostCategorySchema)
 const validateLineItem = createValidator(AgencyCostCategoryLineItemSchema)
 const selectedLineItemCategoryName = computed(() => {
@@ -130,7 +172,9 @@ const saveJson = async (url: string, method: 'POST' | 'PATCH', body: unknown) =>
   }
 }
 
-const refresh = async () => {
+const refreshForOwner = async (shouldReportError: () => boolean) => {
+  const context = pageContext.value
+  if (!ownsContext(context)) return
   const generation = ++refreshGeneration
   const requestedAgencyId = agencyId
 
@@ -141,16 +185,17 @@ const refresh = async () => {
       getAllPages<AgencyCostCategoryLineItemRow>(`/api/agency/${requestedAgencyId}/line-items`)
     ])
 
-    if (generation !== refreshGeneration || requestedAgencyId !== agencyId) return
+    if (!ownsContext(context) || generation !== refreshGeneration || requestedAgencyId !== agencyId) return
     categories.value = categoryItems
     lineItems.value = lineItemItems
     status.value = 'success'
   } catch (error: unknown) {
-    if (generation !== refreshGeneration || requestedAgencyId !== agencyId) return
+    if (!ownsContext(context) || generation !== refreshGeneration || requestedAgencyId !== agencyId) return
     status.value = 'error'
-    showError(error)
+    if (shouldReportError()) showError(error)
   }
 }
+const refresh = () => refreshForOwner(() => true)
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
 
@@ -251,120 +296,134 @@ const {
 const isCostCategoryGroupRow = (row: GroupedCostCategoryRow) => isGroupRow(row, COST_CATEGORY_GROUP_COLUMN_ID)
 
 const openCreateCategory = () => {
-  selectedCategory.value = { egcs_ay_active: true }
-  isCategoryModalOpen.value = true
+  categoryModal.openCreate()
 }
 
 const openEditCategory = (categoryId: string) => {
   const category = categories.value.find(item => item.id === categoryId)
   if (!canUpdate || !category) return
-  selectedCategory.value = { ...category }
-  isCategoryModalOpen.value = true
+  categoryModal.openUpdate(category)
 }
 
 const openEditLineItem = (lineItemId: string) => {
   const lineItem = lineItems.value.find(item => item.id === lineItemId)
   if (!canUpdate || !lineItem) return
-  selectedLineItem.value = { ...lineItem }
+  lineItemModal.openUpdate(lineItem)
   selectedLineItemCategoryId.value = lineItem.egcs_ay_organizationcostcategory
-  isLineItemModalOpen.value = true
 }
 
 const openCreateLineItem = (categoryId: string) => {
-  selectedLineItem.value = {
-    egcs_ay_active: true,
-    egcs_ay_calculationmode: 'manual',
-    egcs_ay_sourcecategory: null,
-    egcs_ay_percentage: null,
-    egcs_ay_allowpercentageoverride: false
-  }
+  lineItemModal.openCreate()
   selectedLineItemCategoryId.value = categoryId
-  isLineItemModalOpen.value = true
 }
 
 const closeCategoryModal = () => {
-  isCategoryModalOpen.value = false
-  selectedCategory.value = null
+  categoryModal.close()
 }
 
 const closeLineItemModal = () => {
-  isLineItemModalOpen.value = false
-  selectedLineItem.value = null
+  lineItemModal.close()
   selectedLineItemCategoryId.value = null
 }
 
 watch(() => agencyId, () => {
+  pageContext.value = { kind: 'active', agencyId }
   refreshGeneration += 1
   categories.value = []
   lineItems.value = []
   closeCategoryModal()
   closeLineItemModal()
   void refresh().catch(() => undefined)
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
+onScopeDispose(() => {
+  pageContext.value = { kind: 'disposed' }
+  refreshGeneration += 1
+  closeCategoryModal()
+  closeLineItemModal()
+})
 
 const saveCategory = async () => {
-  if (!selectedCategory.value || isSavingCategory.value) {
-    return
-  }
-
-  let committed = false
-  const updating = Boolean(selectedCategory.value.id)
-  if (updating ? !canUpdate : !canCreate) return
-  const requestedGeneration = refreshGeneration
+  const operation = categoryActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const context = pageContext.value
+  const session = categoryModal.captureSession()
   const requestedState = selectedCategory.value
+  if (context.kind !== 'active' || !ownsContext(context) || session === null || !requestedState) return
+  const updating = Boolean(requestedState.id)
+  if ((updating ? !canUpdate : !canCreate) || !categoryPending.begin(session)) return
+  let committed = false
+  let closed = false
+  const ownsFeedback = () => operation.isCurrent() && ownsContext(context) && (
+    categoryModal.isCurrentSession(session) || (closed && categoryModal.isLatestSession(session))
+  )
   try {
-    isSavingCategory.value = true
     await saveJson(
-      updating ? `/api/agency/cost-categories/${requestedState.id}` : `/api/agency/${agencyId}/cost-categories`,
+      updating ? `/api/agency/cost-categories/${requestedState.id}` : `/api/agency/${context.agencyId}/cost-categories`,
       updating ? 'PATCH' : 'POST',
       requestedState
     )
     committed = true
-    if (requestedGeneration !== refreshGeneration) return
-    if (selectedCategory.value === requestedState) closeCategoryModal()
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
-    await refresh()
+    if (!operation.isCurrent() || !ownsContext(context)) return
+    closed = categoryModal.closeSession(session)
+    if (ownsFeedback()) {
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    }
+    await refreshForOwner(ownsFeedback)
   } catch (error: unknown) {
-    if (!committed) showError(error)
+    if (!committed && ownsFeedback()) showError(error)
   } finally {
-    isSavingCategory.value = false
+    categoryPending.end(session)
   }
 }
 
 const saveLineItem = async () => {
-  if (!selectedLineItem.value || !selectedLineItemCategoryId.value || isSavingLineItem.value) {
-    return
-  }
-
-  let committed = false
-  const updating = Boolean(selectedLineItem.value.id)
-  if (updating ? !canUpdate : !canCreate) return
-  const requestedGeneration = refreshGeneration
+  const operation = lineItemActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const context = pageContext.value
+  const session = lineItemModal.captureSession()
   const requestedState = selectedLineItem.value
+  const requestedCategoryId = selectedLineItemCategoryId.value
+  if (!ownsContext(context) || session === null || !requestedState || !requestedCategoryId) return
+  const updating = Boolean(requestedState.id)
+  if ((updating ? !canUpdate : !canCreate) || !lineItemPending.begin(session)) return
+  let committed = false
+  let closed = false
+  const ownsFeedback = () => operation.isCurrent() && ownsContext(context) && (
+    lineItemModal.isCurrentSession(session) || (closed && lineItemModal.isLatestSession(session))
+  )
   try {
-    isSavingLineItem.value = true
     await saveJson(
-      updating ? `/api/agency/line-items/${requestedState.id}` : `/api/agency/cost-categories/${selectedLineItemCategoryId.value}/line-items`,
+      updating ? `/api/agency/line-items/${requestedState.id}` : `/api/agency/cost-categories/${requestedCategoryId}/line-items`,
       updating ? 'PATCH' : 'POST',
       requestedState
     )
     committed = true
-    if (requestedGeneration !== refreshGeneration) return
-    if (selectedLineItem.value === requestedState) closeLineItemModal()
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
-    await refresh()
+    if (!operation.isCurrent() || !ownsContext(context)) return
+    closed = lineItemModal.closeSession(session)
+    if (closed) selectedLineItemCategoryId.value = null
+    if (ownsFeedback()) {
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    }
+    await refreshForOwner(ownsFeedback)
   } catch (error: unknown) {
-    if (!committed) showError(error)
+    if (!committed && ownsFeedback()) showError(error)
   } finally {
-    isSavingLineItem.value = false
+    lineItemPending.end(session)
   }
 }
+
+const categoryFormSession = useFormSession({ owner: categoryModal, action: { kind: 'remote', context: categoryActionContext }, submit: saveCategory })
+const lineItemFormSession = useFormSession({ owner: lineItemModal, action: { kind: 'remote', context: lineItemActionContext }, submit: saveLineItem })
 
 const { confirmDeleteWithToast } = useDeleteRequestToast()
 
 const deleteCategory = async (categoryId: string) => {
+  const context = pageContext.value
   await confirmDeleteWithToast(`/api/agency/cost-categories/${categoryId}`, {
+    operation: deleteActionContext.capture(),
+    target: { id: categoryId, resolve: () => categories.value.find(row => row.id === categoryId), eligible: () => canDelete },
     refresh,
+    shouldProceed: () => ownsContext(context) && canDelete,
     confirmOptions: {
       description: t('agency.delete_confirm')
     }
@@ -372,8 +431,12 @@ const deleteCategory = async (categoryId: string) => {
 }
 
 const deleteLineItem = async (lineItemId: string) => {
+  const context = pageContext.value
   await confirmDeleteWithToast(`/api/agency/line-items/${lineItemId}`, {
+    operation: deleteActionContext.capture(),
+    target: { id: lineItemId, resolve: () => lineItems.value.find(row => row.id === lineItemId), eligible: () => canDelete },
     refresh,
+    shouldProceed: () => ownsContext(context) && canDelete,
     confirmOptions: {
       description: t('agency.delete_confirm')
     }
@@ -526,7 +589,7 @@ const deleteLineItem = async (lineItemId: string) => {
 
     <UModal v-if="selectedCategory" v-model:open="isCategoryModalOpen" :title="t('agency.tabs.cost_categories')">
       <template #body>
-        <UForm data-field-scope="agency.cost-category" :state="selectedCategory" :validate="validateCategory" :validate-on="[]" class="space-y-4" @submit="saveCategory">
+        <UForm v-bind="categoryFormSession" data-field-scope="agency.cost-category" :state="selectedCategory" :validate="validateCategory" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
             <UInput v-model="selectedCategory.egcs_ay_name_en" />
           </UFormField>
@@ -548,7 +611,7 @@ const deleteLineItem = async (lineItemId: string) => {
 
     <UModal v-if="selectedLineItem" v-model:open="isLineItemModalOpen" :title="lineItemModalTitle">
       <template #body>
-        <UForm data-field-scope="agency.cost-line-item" :state="selectedLineItem" :validate="validateLineItem" :validate-on="[]" class="space-y-4" @submit="saveLineItem">
+        <UForm v-bind="lineItemFormSession" data-field-scope="agency.cost-line-item" :state="selectedLineItem" :validate="validateLineItem" :validate-on="[]" class="space-y-4">
           <p v-if="selectedLineItemCategoryName" class="text-sm text-muted">
             {{ t('agency.budget_category_context', { name: selectedLineItemCategoryName }) }}
           </p>

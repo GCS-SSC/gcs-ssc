@@ -1,6 +1,22 @@
 /* eslint-disable jsdoc/require-jsdoc -- Execution selects saved decisions, never live Agreement values. */
-import type { PublishedWorkflowConfiguration } from './workflow-setup-versioning'
+import type { PublishedWorkflowConfiguration, PublishedWorkflowMember } from './workflow-setup-versioning'
 import { WorkflowRouteValidationError, type WorkflowRoutingDecisions, type WorkflowRoutingEvidence } from './workflow-routing-contract'
+
+export const hasWorkflowMemberApproval = (member: PublishedWorkflowMember): boolean => {
+  const kind = member.kind
+  switch (kind) {
+    case 'approval_template': return true
+    case 'data_collection': return Boolean(member.dataCollectionPlan?.approval)
+    case 'recommendation_set': return Boolean(member.recommendationPlan?.finalApproval
+      || member.recommendationPlan?.members.some(candidate => candidate.approval))
+    case 'review_set': return Boolean(member.reviewPlan?.finalApproval
+      || member.reviewPlan?.members.some(candidate => candidate.approval))
+    default: {
+      const exhaustive: never = kind
+      return exhaustive
+    }
+  }
+}
 
 export const selectWorkflowRoute = (
   definition: PublishedWorkflowConfiguration, decisions: WorkflowRoutingDecisions
@@ -11,9 +27,7 @@ export const selectWorkflowRoute = (
 
 export const assertWorkflowRouteRequirements = (route: PublishedWorkflowConfiguration): void => {
   if (!route.members.length) throw new WorkflowRouteValidationError('Workflow route is empty')
-  if (route.purpose === 'approval_submission' && !route.members.some(member => member.kind === 'approval_template'
-    || member.dataCollectionPlan?.approval
-    || member.recommendationPlan?.finalApproval || member.recommendationPlan?.members.some(candidate => candidate.approval))) {
+  if (route.purpose === 'approval_submission' && !route.members.some(hasWorkflowMemberApproval)) {
     throw new WorkflowRouteValidationError('Workflow route requires approval')
   }
   if (route.riskRatingEffect && !route.members.some(member => member.memberId === route.riskRatingEffect!.workflowMemberId)) {

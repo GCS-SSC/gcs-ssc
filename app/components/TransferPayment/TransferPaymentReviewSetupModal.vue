@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
 import { computed } from 'vue'
 import {
   useTransferPaymentReviewSetupModal,
@@ -11,7 +13,9 @@ const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<ReviewSetupFormState | null>('state', { required: true })
 
-const { agencyId, captureSession, closeSession } = defineProps<{
+const { agencyId, captureSession, closeSession, actionContext, captureCommitted } = defineProps<{
+  actionContext: ActionContext
+  captureCommitted: CaptureCommittedSettlement
   agencyId: string
 } & CrudModalSessionLifecycle>()
 
@@ -24,16 +28,18 @@ const sessionLifecycle = captureSession
   ? { captureSession, closeSession }
   : { captureSession: undefined, closeSession: undefined }
 const {
+  formSession,
   validate,
   isSubmitting,
   modalTitle,
   submitLabel,
-  transferPaymentEntityTypeItems,
-  onSubmit
+  transferPaymentEntityTypeItems
 } = useTransferPaymentReviewSetupModal({
   open,
   state,
-  agencyId,
+  agencyId: () => agencyId,
+  actionContext: () => actionContext,
+  captureCommitted,
   emitSaved: () => emit('saved'),
   ...sessionLifecycle
 })
@@ -42,7 +48,7 @@ const {
 <template>
   <UModal v-model:open="open" :title="modalTitle">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="validate" :disabled="isSubmitting" class="space-y-4">
         <ReviewSetSetupFields
           v-model:state="state"
           :agency-id="agencyId"

@@ -218,6 +218,7 @@ const handleApprovalChanged = async () => {
               <AssessmentAdditionalReviewersTab
                 :review-id="String(checklist.id)"
                 :can-update-assessment="canUpdate"
+                :read-authority="String(checklist.id) === String(route.params.reviewId) && checklist.permissions?.can_read === true"
                 :reviewers-disabled="checklist.egcs_cn_disablereviewers === true"
                 :runtime-locked="checklist.reviewRuntime?.is_locked === true"
                 @progress-change="setAdditionalReviewerProgress" />

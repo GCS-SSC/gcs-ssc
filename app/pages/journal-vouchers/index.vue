@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { appRouteLocations } from '~/utils/route-locations'
+import { useActionContext } from '~/composables/useActionContext'
 import type { JournalVoucherRow } from '~~/shared/types/journal-voucher'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -7,6 +8,10 @@ definePageMeta({ i18n: { paths: { en: '/journal-vouchers', fr: '/pieces-de-journ
 const { t } = useI18n()
 const localePath = useLocalePath()
 const { canAny } = useCan()
+const createContext = useActionContext({
+  identity: [],
+  authority: () => canAny('journal_voucher', 'create') && canAny('agreement', 'read')
+})
 const { formatDate } = useDateHelpers()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('journal-vouchers')
@@ -43,7 +48,7 @@ const created = async (id: string) => await navigateTo(localePath(appRouteLocati
           </template>
         </CommonResourceLayout>
       </section>
-      <JournalVoucherCreateModal v-model:open="open" @created="created" />
+      <JournalVoucherCreateModal v-model:open="open" :action-context="createContext" @created="created" />
     </template>
   </CommonDetailPage>
 </template>

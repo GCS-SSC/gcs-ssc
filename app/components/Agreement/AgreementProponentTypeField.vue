@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 
 const { proponentId, streamId, agreementId, permissionAction = 'create', name = 'egcs_fc_applicantrecipientsubtype', label } = defineProps<{
   proponentId?: string
@@ -13,10 +14,7 @@ const { proponentId, streamId, agreementId, permissionAction = 'create', name = 
 const model = defineModel<string | null>()
 const { t } = useI18n()
 const { showError } = useApiErrorToast()
-const fixed: Ref<string | null> = ref(null)
-const loading: Ref<boolean> = ref(false)
 const savedType: Ref<string | null> = ref(model.value ?? null)
-const eligibleIds: Ref<string[]> = ref([])
 const excludedTypes = computed(() => fixed.value
   ? eligibleIds.value.filter(id => id !== fixed.value && id !== savedType.value)
   : [])
@@ -25,32 +23,28 @@ const query = computed(() => ({
   ...(agreementId ? { agreement_id: agreementId } : { stream_id: streamId ?? '' }),
   permission_action: permissionAction
 }))
-watch(() => [proponentId, streamId, agreementId], async (_value, previous, onCleanup) => {
-  const controller = new AbortController()
-  onCleanup(() => controller.abort())
-  if (previous?.length) {
-    model.value = undefined
-    savedType.value = null
-  }
-  eligibleIds.value = []
-  fixed.value = null
-  loading.value = false
-  if (!proponentId || (!streamId && !agreementId)) return
-  loading.value = true
-  try {
-    const result = await $fetch<{ suggested: string | null; fixed: string | null; items: Array<{ id: string }> }, string>('/api/agreements/lookups/proponent-types', {
-      query: query.value, signal: controller.signal
-    })
-    if (controller.signal.aborted) return
-    fixed.value = result.fixed
-    eligibleIds.value = result.items.map(item => item.id)
-    if (!model.value) model.value = result.suggested
-  } catch (error) {
-    if (!controller.signal.aborted) showError(error)
-  } finally {
-    if (!controller.signal.aborted) loading.value = false
-  }
-}, { immediate: true })
+watch(() => [proponentId, streamId, agreementId], () => {
+  model.value = undefined
+  savedType.value = null
+}, { flush: 'sync' })
+const request = useResourceRequest({
+  identity: () => JSON.stringify([proponentId, streamId, agreementId, permissionAction]),
+  enabled: () => Boolean(proponentId && (streamId || agreementId)),
+  refreshData: 'clear',
+  failureData: 'clear',
+  load: signal => $fetch<{ suggested: string | null; fixed: string | null; items: Array<{ id: string }> }, string>('/api/agreements/lookups/proponent-types', {
+    query: query.value, signal
+  })
+})
+const fixed = computed(() => request.data.value?.fixed ?? null)
+const eligibleIds = computed(() => request.data.value?.items.map(item => item.id) ?? [])
+const loading = computed(() => request.status.value === 'pending')
+watch(request.data, result => {
+  if (result && !model.value) model.value = result.suggested
+})
+watch(request.error, error => {
+  if (error) showError(error)
+})
 </script>
 
 <template>

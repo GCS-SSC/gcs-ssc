@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 /* eslint-disable jsdoc/require-jsdoc -- local callbacks are clear from their names and types */
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -21,7 +24,8 @@ const {
   hideUser = false,
   submitDisabled = false,
   pending = false,
-  roleAssignmentAccess
+  roleAssignmentAccess,
+  actionContext
 } = defineProps<{
   title: string
   submitLabel: string
@@ -29,6 +33,7 @@ const {
   submitDisabled?: boolean
   pending?: boolean
   roleAssignmentAccess: UserRoleAssignmentAccess
+  actionContext: ActionContext
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -258,12 +263,19 @@ const onSubmit = () => {
 
   emit('submit', role)
 }
+
+const modalSession = useModalSession()
+watch([open, state, () => state.value.user_id], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="title" data-field-scope="role.assignment-modal" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
-      <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm :disabled="pending" :state="state" :validate="validate" class="space-y-4" v-bind="formSession">
         <UFormField v-if="!hideUser" :label="t('role.assignment.user')" name="user_id">
           <CommonBilingualSelectMenu
             v-model="state.user_id"

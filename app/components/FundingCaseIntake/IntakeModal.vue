@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { z } from 'zod'
 import { AttachmentMetadataBaseSchema, FundingCaseIntakeCreateSchema } from '~~/shared/types/schemas'
@@ -28,7 +32,7 @@ export interface IntakeForm {
   attachments: IntakeAttachmentDraft[]
 }
 
-const { pending = false, lockOpportunity = false } = defineProps<{ pending?: boolean; lockOpportunity?: boolean }>()
+const { pending = false, lockOpportunity = false, actionContext } = defineProps<{ pending?: boolean; lockOpportunity?: boolean; actionContext: ActionContext }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<IntakeForm>('state', { required: true })
 useFieldTooltipProvider(() => open.value && state.value.egcs_fi_fundingopportunity
@@ -118,12 +122,21 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
     if (!controller.signal.aborted) inlineUploadState.value = 'error'
   }
 }, { immediate: true })
+
+const modalSession = useModalSession()
+watch([open, state], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: () => {
+  if (!pending) emit('submit')
+} })
 </script>
 
 <template>
   <UModal v-model:open="open" data-help-view="intake.create" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :close="pending ? false : undefined" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="intake" data-field-scope="funding-case-intake.intake-modal" data-scope-label-en="Intakes > General" data-scope-label-fr="Dossiers de demande > Général">
     <template #body>
-      <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
+      <UForm v-if="open" :disabled="pending" :state="state" :validate="validate" class="space-y-5" v-bind="formSession">
         <CommonSection :title="t('funding_case_intake.details')" :grid-cols="1">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('funding_case_intake.opportunity')" name="egcs_fi_fundingopportunity" required>

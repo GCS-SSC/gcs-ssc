@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { watch } from 'vue'
+import { onScopeDispose, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { TransferPaymentCostCategoryLineItemItem } from '~~/shared/types/schemas'
@@ -18,6 +20,7 @@ interface TransferPaymentCostCategoryLineRow extends TransferPaymentCostCategory
 const {
   transferPaymentId,
   streamId,
+  agencyId,
   canUpdateChild,
   canDeleteChild
 } = defineProps<{
@@ -28,6 +31,14 @@ const {
   agencyId?: string | null
 }>()
 
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const { t, n } = useI18n()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
@@ -74,7 +85,24 @@ const { getBilingualValue } = useBilingualValue()
 const getCostLineActionTarget = (row: TransferPaymentCostCategoryLineRow) =>
   `${getBilingualValue(row, 'line_item_name', String(row.id))} [${row.id}]`
 
-watch([() => transferPaymentId, () => streamId], () => costCategoryModal.close())
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const context: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const isCurrentContext = (captured: ResourceContext) => captured.kind === 'active' && captured === context.value
+let deleteCapabilityGeneration = 0
+watch([() => transferPaymentId, () => streamId], () => {
+  context.value = { kind: 'active' }
+  costCategoryModal.close()
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) costCategoryModal.close()
+}, { flush: 'sync' })
+watch(() => canDeleteChild, () => {
+  deleteCapabilityGeneration += 1
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context.value = { kind: 'disposed' }
+  costCategoryModal.close()
+})
 
 /**
  * Saves the currently selected cost category line item record.
@@ -82,9 +110,13 @@ watch([() => transferPaymentId, () => streamId], () => costCategoryModal.close()
  * Closes the modal, refreshes the dataset, and provides success feedback.
  */
 const saveCostCategoryLine = async () => {
-  if (!selectedCostCategoryLine.value || !canUpdateChild) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  if (context.value.kind === 'disposed' || !selectedCostCategoryLine.value || !canUpdateChild) return
   const session = costCategoryModal.captureSession()
-  if (!costCategoryPending.begin(session)) return
+  if (session === null || !costCategoryPending.begin(session)) return
+  const requestedContext = context.value
+  let closedSession = false
   const isUpdate = Boolean(selectedCostCategoryLine.value.id)
   try {
     const response = await fetch(getClientRequestUrl(selectedCostCategoryLine.value.id
@@ -95,23 +127,25 @@ const saveCostCategoryLine = async () => {
       body: JSON.stringify(selectedCostCategoryLine.value)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!costCategoryModal.closeSession(session)) return
+    if (!(operation.isCurrent() && isCurrentContext(requestedContext))) return
+    closedSession = costCategoryModal.closeSession(session)
   } catch (error: unknown) {
-    if (costCategoryModal.captureSession() === session) showError(error)
+    if ((operation.isCurrent() && isCurrentContext(requestedContext)) && costCategoryModal.isCurrentSession(session)) showError(error)
     return
   } finally {
     costCategoryPending.end(session)
   }
 
-  toast.add({
-    title: toast.localized('common.success'),
-    description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
-    color: 'success'
-  })
   try {
     await refreshCostLines()
+    if (!(operation.isCurrent() && isCurrentContext(requestedContext)) || !closedSession || !costCategoryModal.isLatestSession(session) || costLineStatusState.value === 'error') return
+    toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      color: 'success'
+    })
   } catch (error: unknown) {
-    showError(error)
+    if ((operation.isCurrent() && isCurrentContext(requestedContext)) && closedSession && costCategoryModal.isLatestSession(session)) showError(error)
   }
 }
 
@@ -123,22 +157,27 @@ const saveCostCategoryLine = async () => {
  * @param {TransferPaymentCostCategoryLineRow} row - The record to be deleted.
  */
 const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) => {
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const id = row.id
+  if (context.value.kind === 'disposed' || !canDeleteChild) return
+  const requestedContext = context.value
+  const capabilityGeneration = deleteCapabilityGeneration
   try {
     const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/cost-category-line-items/${row.id}`
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/cost-category-line-items/${id}`,
+      { operation, target: { id, resolve: () => costLines.value.find(current => current.id === id), eligible: current => current.id === id }, shouldProceed: () => operation.isCurrent() && isCurrentContext(requestedContext) && canDeleteChild && capabilityGeneration === deleteCapabilityGeneration }
     )
-    if (!ok) return
+    if (!ok || !(operation.isCurrent() && isCurrentContext(requestedContext))) return
+    await refreshCostLines()
+    if (!(operation.isCurrent() && isCurrentContext(requestedContext)) || costLineStatusState.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
-    await refreshCostLines()
-  } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && isCurrentContext(requestedContext)) showError(error)
   }
 }
+
+const formSession = useFormSession({ owner: costCategoryModal, action: { kind: 'remote', context: writeContext }, submit: saveCostCategoryLine })
 </script>
 
 <template>
@@ -214,10 +253,10 @@ const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) =
     :title="selectedCostCategoryLine?.id ? t('common.update') : t('common.add')" data-field-scope="transfer-payment.stream-cost-line-items-tab">
     <template #body>
       <UForm
+        v-bind="formSession"
         :state="selectedCostCategoryLine"
         :validate="validateCostCategoryLine"
-        class="space-y-4"
-        @submit="saveCostCategoryLine">
+        class="space-y-4">
         <UFormField :label="t('transfer_payment.cost_category_line_items')" name="egcs_tp_organizationcostcategory">
           <CommonServerLookupSelect
             v-model="selectedCostCategoryLine.egcs_tp_organizationcostcategory"

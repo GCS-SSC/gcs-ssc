@@ -17,19 +17,21 @@ const value = ref('')
 const destination = ref('__end')
 const errorKey = ref('')
 const error = computed(() => errorKey.value ? t(errorKey.value) : '')
-const editing = ref<number | null>(null)
-const branches = ref<NonNullable<GuideDraft['steps'][number]['flow']>['branches']>([])
+type Branch = NonNullable<GuideDraft['steps'][number]['flow']>['branches'][number]
+type BranchEditor = { kind: 'creating' } | { kind: 'editing'; branch: Branch }
+const editor = ref<BranchEditor>({ kind: 'creating' })
+const branches = ref<Branch[]>([])
 const fallback = ref('__end')
 const choices = computed(() => field.value?.kind === 'checkbox' ? [{ value: 'true', label: t('common.yes') }, { value: 'false', label: t('common.no') }] : (field.value?.choices ?? []).map(choice => ({ value: choice.value, label: label(choice.label) })))
 const destinations = computed(() => [{ value: '__end', label: t('guided_help.end_guide') }, ...document.value.steps.slice(document.value.steps.findIndex(step => step.id === stepId) + 1).map(step => ({ value: step.id, label: label(step.title) || t('guided_help.untitled_step') }))])
 watch(target, () => {
   value.value = choices.value[0]?.value ?? ''
-})
+}, { flush: 'sync' })
 watch(open, opened => {
   if (!opened) return
   branches.value = JSON.parse(JSON.stringify(source.value?.flow?.branches ?? []))
   fallback.value = source.value?.flow ? source.value.flow.next ?? '__end' : destinations.value[1]?.value ?? '__end'
-  editing.value = null
+  editor.value = { kind: 'creating' }
   target.value = fields.value[0]?.key ?? ''
   value.value = choices.value[0]?.value ?? ''
   destination.value = destinations.value[1]?.value ?? '__end'
@@ -38,25 +40,29 @@ watch(open, opened => {
 const edit = (index: number) => {
   const branch = branches.value[index]
   if (!branch) return
-  editing.value = index
+  editor.value = { kind: 'editing', branch }
   target.value = branch.target
-  queueMicrotask(() => {
-    value.value = String(branch.equals)
-  })
+  value.value = String(branch.equals)
   destination.value = branch.next ?? '__end'
 }
 const add = () => {
   if (disabled || !field.value || !choices.value.some(choice => choice.value === value.value)) return
   const equals = field.value.kind === 'checkbox' ? value.value === 'true' : value.value
-  if (branches.value.some((branch, index) => index !== editing.value && branch.target === target.value && branch.equals === equals)) {
+  const edited = editor.value.kind === 'editing' ? editor.value.branch : null
+  if (branches.value.some(branch => branch !== edited && branch.target === target.value && branch.equals === equals)) {
     errorKey.value = 'guided_help.duplicate_branch'
     return
   }
   const branch = { target: target.value, equals, next: destination.value === '__end' ? null : destination.value }
-  if (editing.value === null) branches.value.push(branch)
-  else branches.value[editing.value] = branch
-  editing.value = null
+  if (edited === null) branches.value.push(branch)
+  else branches.value.splice(branches.value.indexOf(edited), 1, branch)
+  editor.value = { kind: 'creating' }
   errorKey.value = ''
+}
+const remove = (index: number) => {
+  if (disabled) return
+  if (editor.value.kind === 'editing' && editor.value.branch === branches.value[index]) editor.value = { kind: 'creating' }
+  branches.value.splice(index, 1)
 }
 const save = () => {
   if (!disabled && source.value) source.value.flow = { next: fallback.value === '__end' ? null : fallback.value, branches: JSON.parse(JSON.stringify(branches.value)) }
@@ -80,13 +86,13 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
             <span>{{ branchLabel(branch) }} {{ t('guided_help.routes_to') }} {{ destinations.find(item => item.value === (branch.next ?? '__end'))?.label }}</span>
             <div v-if="!disabled" class="flex gap-1">
               <CommonActionButton icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit')" @click="edit(index)" />
-              <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('guided_help.remove_branch')" @click="branches.splice(index, 1)" />
+              <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('guided_help.remove_branch')" @click="remove(index)" />
             </div>
           </div>
         </section>
         <div v-if="fields.length && !disabled" class="space-y-5">
           <h3 class="font-semibold">
-            {{ t(editing === null ? 'guided_help.add_branch' : 'guided_help.edit_branch') }}
+            {{ t(editor.kind === 'creating' ? 'guided_help.add_branch' : 'guided_help.edit_branch') }}
           </h3>
           <UFormField :label="t('guided_help.branch_field')" required data-ui-target="guided-help.publisher-branches.guided_help.branch_field">
             <USelect v-model="target" :items="fields.map(item => ({ value: item.key, label: label(item.label) }))" class="w-full" />
@@ -97,7 +103,7 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
           <UFormField :label="t('guided_help.branch_destination')" required data-ui-target="guided-help.publisher-branches.guided_help.branch_destination">
             <USelect v-model="destination" :items="destinations" class="w-full" />
           </UFormField>
-          <UButton :label="t(editing === null ? 'guided_help.add_branch' : 'common.update')" icon="i-lucide-git-branch" color="neutral" variant="outline" @click="add" />
+          <UButton :label="t(editor.kind === 'creating' ? 'guided_help.add_branch' : 'common.update')" icon="i-lucide-git-branch" color="neutral" variant="outline" @click="add" />
         </div>
         <p v-else-if="!fields.length" class="text-muted">
           {{ t('guided_help.no_branch_fields') }}

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { computed } from 'vue'
 import { AgencyAccountReceivableTypeSchema, type AgencyAccountReceivableTypeItem } from '~~/shared/types/schemas/agency'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -35,10 +37,18 @@ const selectSource = (state: Partial<AgencyAccountReceivableTypeItem>, value: st
   state.egcs_ay_advancepaymentrelated = value === 'advance'
   state.egcs_ay_claimrelated = value === 'claim'
 }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.account_receivable_types')" icon="i-lucide-tags"
     :fetch-url="`/api/agency/${agencyId}/account-receivable-types`"
     :post-url="canCreate ? `/api/agency/${agencyId}/account-receivable-types` : undefined"

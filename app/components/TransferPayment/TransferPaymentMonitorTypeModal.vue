@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ActionContext } from '~/composables/useActionContext'
+import { watch } from 'vue'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { z } from 'zod'
@@ -7,6 +9,8 @@ import type { TransferPaymentMonitorTypeItem } from '~~/shared/types/schemas/tra
 import { TransferPaymentMonitorTypeSchema } from '~~/shared/types/schemas/transfer-payment'
 import type { CrudModalSessionLifecycle } from '~/composables/useCrudModal'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
@@ -16,7 +20,9 @@ const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<Partial<TransferPaymentMonitorTypeItem>>('state', { required: true })
 
-const { transferPaymentId, streamId, captureSession, closeSession } = defineProps<{
+const { transferPaymentId, streamId, captureSession, closeSession, actionContext, refreshCollection } = defineProps<{
+  actionContext: ActionContext
+  refreshCollection?: () => Promise<void>
   transferPaymentId: string
   streamId: string
   agencyId: string
@@ -28,7 +34,18 @@ if (Boolean(captureSession) !== Boolean(closeSession)) {
 
 const schema = TransferPaymentMonitorTypeSchema.strip()
 const validate = createValidator(schema)
-const pending = useCrudModalPending(() => captureSession ? captureSession() : null)
+const modalSession = useModalSession()
+watch([
+  () => open.value,
+  () => transferPaymentId,
+  () => streamId,
+  () => state.value,
+  () => captureSession ? captureSession() : null
+], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value
+}, { immediate: true, flush: 'sync' })
+const pending = useCrudModalPending(() => captureSession ? captureSession() : modalSession.captureSession())
 const isSaving = pending.isPending
 
 /**
@@ -39,11 +56,18 @@ const isSaving = pending.isPending
  */
 const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
   const body = event.data
-  const session = captureSession ? captureSession() : null
-  if (!pending.begin(session)) return
+  const operation = actionContext.capture()
+  const refreshCommittedCollection = refreshCollection
+  if (!operation) return
+  const session = captureSession ? captureSession() : modalSession.captureSession()
+  const localSession = modalSession.captureSession()
+  const ownsSession = () => operation.isCurrent() && modalSession.isCurrentSession(localSession)
+    && (!captureSession || captureSession() === session)
+  if (modalSession.isDisposed() || !pending.begin(session)) return
   try {
     const url = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/monitor-types`
 
+    if (!operation.canDispatch()) return
     const response = await fetch(getClientRequestUrl(url), {
       method: 'POST',
       headers: {
@@ -55,21 +79,25 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
       await throwFetchResponseError(response)
     }
 
-    if (closeSession && !closeSession(session)) return
-    if (!closeSession) open.value = false
-    emit('saved')
+    if (!operation.isCurrent()) return
+    if (ownsSession() && (!closeSession || closeSession(session))) {
+      if (!closeSession) open.value = false
+      emit('saved')
+    }
+    if (operation.isCurrent()) await refreshCommittedCollection?.()
   } catch (error) {
-    showError(error)
+    if (ownsSession()) showError(error)
   } finally {
     pending.end(session)
   }
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="t('transfer_payment.monitor_type_create')" data-field-scope="transfer-payment.monitor-type-modal">
     <template #body>
-      <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm v-bind="formSession" :state="state" :validate="validate" class="space-y-4">
         <UFormField :label="t('transfer_payment.monitor_types')" name="egcs_tp_agencymonitortype" required>
           <CommonServerLookupSelect
             v-model="state.egcs_tp_agencymonitortype"

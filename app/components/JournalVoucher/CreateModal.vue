@@ -1,44 +1,64 @@
 <script setup lang="ts">
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
-import { ref } from 'vue'
-import type { Ref } from 'vue'
+import { onScopeDispose, watch } from 'vue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 import { JournalVoucherCreateSchema } from '~~/shared/types/schemas/journal-voucher'
 
+const { actionContext } = defineProps<{ actionContext: ActionContext }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ created: [id: string] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
-const state: Ref<{ egcs_fc_payment: string; egcs_fc_requesteddate: string; egcs_fc_narrative_en: string; egcs_fc_narrative_fr: string } | null> = ref(null)
-const pending: Ref<boolean> = ref(false)
+type CreateState = {
+  egcs_fc_payment: string
+  egcs_fc_requesteddate: string
+  egcs_fc_narrative_en: string
+  egcs_fc_narrative_fr: string
+}
+const modal = useCrudModal<CreateState, CreateState>({
+  createState: () => ({ egcs_fc_payment: '', egcs_fc_requesteddate: new Date().toISOString().slice(0, 10), egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '' }),
+  updateState: draft => ({ ...draft })
+})
+const state = modal.selected
+const pendingRequest = useCrudModalPending(modal.captureSession)
+const pending = pendingRequest.isPending
+onScopeDispose(modal.close)
 useFieldTooltipProvider(() => open.value && state.value?.egcs_fc_payment
   ? { entityType: 'fundingcasepayment', entityId: state.value.egcs_fc_payment }
   : null)
 
 watch(open, value => {
-  state.value = value ? { egcs_fc_payment: '', egcs_fc_requesteddate: new Date().toISOString().slice(0, 10), egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '' } : null
-})
+  if (value) modal.openCreate()
+  else modal.close()
+}, { immediate: true, flush: 'sync' })
 /**
  *
  */
 const save = async () => {
-  if (!state.value || pending.value) return
-  pending.value = true
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
+  const currentSession = modal.captureSession()
+  if (!state.value || currentSession === null || !pendingRequest.begin(currentSession)) return
   try {
     const result = await sendJson<{ id: string }>('/api/journal-vouchers', 'POST', state.value)
+    if (!operation.isCurrent() || !modal.isCurrentSession(currentSession)) return
     open.value = false
     emit('created', result.id)
   } catch (error) {
-    showError(error)
-  } finally { pending.value = false }
+    if (operation.isCurrent() && modal.isCurrentSession(currentSession)) showError(error)
+  } finally { pendingRequest.end(currentSession) }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: () => actionContext }, submit: save })
 </script>
 
 <template>
   <UModal v-model:open="open" data-help-view="casework.journal-voucher.create-modal.open" :title="t('journal_voucher.create')" :description="t('journal_voucher.description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.create-modal" data-scope-label-en="Agreements > Journal Vouchers > Create" data-scope-label-fr="Ententes > Pièces de journal > Créer">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="createValidator(JournalVoucherCreateSchema)" class="space-y-4" @submit="save">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="createValidator(JournalVoucherCreateSchema)" class="space-y-4">
         <UFormField name="egcs_fc_payment" :label="t('journal_voucher.source_payment')">
           <CommonServerLookupSelect v-model="state.egcs_fc_payment" fetch-url="/api/journal-vouchers/lookups/payments" value-key="id" label-en-key="label_en" label-fr-key="label_fr" close-on-select :show-value-in-label="false" />
         </UFormField>

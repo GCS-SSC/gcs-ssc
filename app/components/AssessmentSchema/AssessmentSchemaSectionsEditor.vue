@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import lucideIcons from '@iconify-json/lucide/icons.json'
 import { nanoid } from 'nanoid'
+import { watch } from 'vue'
 import type { AssessmentDefinitionEditorState } from '~/composables/useAssessmentSchemaEditorState'
 import {
   createAssessmentSectionRow,
@@ -281,6 +282,26 @@ const getSortedSubSectionEntries = (section: SectionRow, sectionKey: string): Su
     sortOrder: getSubSectionOrderValue(subSection, sourceIndex)
   }))
   .sort((a, b) => a.sortOrder - b.sortOrder || a.sourceIndex - b.sourceIndex)
+
+// Subsection order is persisted by array position; number is only an editor draft.
+watch(
+  () => state.value.sections.map(section => ({
+    section,
+    orders: new Map(section.subSections.map(subSection => [subSection, subSection.number]))
+  })),
+  (sections, previousSections) => {
+    for (const { section, orders } of sections) {
+      const previous = previousSections.find(entry => entry.section === section)
+      if (!previous || !Array.from(orders).some(([subSection, number]) =>
+        previous.orders.has(subSection) && previous.orders.get(subSection) !== number)) {
+        continue
+      }
+
+      section.subSections = getSortedSubSectionEntries(section, section._key).map(entry => entry.subSection)
+    }
+  },
+  { flush: 'sync' }
+)
 </script>
 
 <template>

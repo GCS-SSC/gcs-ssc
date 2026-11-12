@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
+import { useActionContext } from '~/composables/useActionContext'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- Monitor table callbacks are exercised by focused component tests. */
 import { computed, onBeforeUnmount, ref, shallowReactive, watch } from 'vue'
@@ -43,18 +47,22 @@ onBeforeUnmount(() => {
   actionGeneration += 1
 })
 
+const monitorTarget: Ref<string | null> = ref(null)
 const monitorModal = useCrudModal<FundingCaseAgreementMonitorRow, FundingCaseAgreementMonitorForm>({
-  createState: () => ({
-    egcs_fc_onsite: false,
-    egcs_fc_tentativequarter: 1
-  }),
-  updateState: monitor => ({
-    id: monitor.id,
-    egcs_fc_type: monitor.egcs_fc_type,
-    egcs_fc_onsite: monitor.egcs_fc_onsite,
-    egcs_fc_tentativefiscalyear: monitor.egcs_fc_tentativefiscalyear,
-    egcs_fc_tentativequarter: monitor.egcs_fc_tentativequarter
-  })
+  createState: () => {
+    monitorTarget.value = null
+    return { egcs_fc_onsite: false, egcs_fc_tentativequarter: 1 }
+  },
+  updateState: monitor => {
+    monitorTarget.value = monitor.id
+    return {
+      id: monitor.id,
+      egcs_fc_type: monitor.egcs_fc_type,
+      egcs_fc_onsite: monitor.egcs_fc_onsite,
+      egcs_fc_tentativefiscalyear: monitor.egcs_fc_tentativefiscalyear,
+      egcs_fc_tentativequarter: monitor.egcs_fc_tentativequarter
+    }
+  }
 })
 const monitorPending = useCrudModalPending(monitorModal.captureSession)
 const isSavingMonitor = monitorPending.isPending
@@ -73,11 +81,39 @@ const savedMonitorTypeOptions = computed(() => {
 })
 const isMonitorModalOpen = monitorModal.isOpen
 const validateMonitor = createValidator(FundingCaseAgreementMonitorCreateSchema)
+const createContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canCreate
+})
+const updateContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canDelete
+})
 const {
   overview,
   overviewStatus,
   refreshOverview
 } = useAgreementOverview<{ monitors: FundingCaseAgreementMonitorRow[] }>(computed(() => `/api/agreements/${agreementId}/monitors-overview`))
+
+const committedReadback = async (): Promise<CommittedReadbackResult> => await refreshOverview()
+  ? { kind: 'available' }
+  : { kind: 'unavailable', error: new Error(t('common.resource_table_load_failed')) }
+const captureCreateCommitted = useCommittedSettlement({ context: createContext, settle: committedReadback })
+const captureUpdateCommitted = useCommittedSettlement({ context: updateContext, settle: committedReadback })
+
+const editContext = useActionContext({
+  identity: [agreementIdRef, monitorTarget],
+  authority: () => canUpdate,
+  eligible: () => {
+    const id = monitorTarget.value
+    const accepted = overview.value?.monitors.find(row => row.id === id)
+    return Boolean(accepted && !isRecordLocked(accepted))
+  }
+})
 
 const columns: TableColumnInput<FundingCaseAgreementMonitorRow>[] = [
   { id: 'type', accessorKey: 'monitor_type_name_en', headerKey: 'agreement.monitors.type' },
@@ -129,6 +165,8 @@ const checkPrerequisites = async (action: 'create' | 'update' | 'delete', monito
   return false
 }
 const openMonitor = async (monitor?: FundingCaseAgreementMonitorRow) => {
+  const operation = (monitor ? updateContext : createContext).capture()
+  if (!operation) return
   const key = monitor ? String(monitor.id) : 'create'
   if (pendingMonitorActions.has(key) || pendingMonitorDeletes.has(key)) return
   const session = monitorModal.captureSession()
@@ -137,8 +175,8 @@ const openMonitor = async (monitor?: FundingCaseAgreementMonitorRow) => {
   pendingMonitorActions.add(key)
   try {
     const ready = await checkPrerequisites(monitor ? 'update' : 'create', monitor ? String(monitor.id) : undefined,
-      () => intent === modalIntent && monitorModal.captureSession() === session)
-    if (!ready) return
+      () => operation.canDispatch() && intent === modalIntent && monitorModal.captureSession() === session)
+    if (!ready || !operation.canDispatch()) return
     editingMonitor.value = monitor && typeof ready === 'object' ? ready : null
     if (editingMonitor.value) monitorModal.openUpdate(editingMonitor.value)
     else monitorModal.openCreate()
@@ -152,48 +190,80 @@ const saveMonitor = async () => {
   const monitorState = selectedMonitor.value
   const owner = agreementId
   const generation = actionGeneration
-  const isUpdate = Boolean(monitorState.id)
+  const targetId = monitorTarget.value
+  const isUpdate = targetId !== null
+  const operation = (isUpdate ? editContext : createContext).capture()
+  const committed = (isUpdate ? captureUpdateCommitted : captureCreateCommitted)()
+  if (!operation || !committed) return
   const session = monitorModal.captureSession()
   if (!monitorPending.begin(session)) return
 
   try {
-    if (!await checkPrerequisites(isUpdate ? 'update' : 'create', isUpdate ? String(monitorState.id) : undefined,
-      () => monitorModal.captureSession() === session)) return
-    await saveJson(
-      isUpdate
-        ? `/api/agreements/${owner}/monitors/${monitorState.id}`
-        : `/api/agreements/${owner}/monitors`,
-      isUpdate ? 'PATCH' : 'POST',
-      monitorState
-    )
-    if (!monitorModal.closeSession(session)) return
-    if (!await refreshOverview() || disposed || owner !== agreementId || generation !== actionGeneration) return
+    try {
+      if (!await checkPrerequisites(isUpdate ? 'update' : 'create', targetId ?? undefined,
+        () => operation.canDispatch() && monitorModal.captureSession() === session)) return
+      if (!operation.canDispatch() || !committed.canDispatch() || !monitorModal.isCurrentSession(session)) return
+      await saveJson(
+        isUpdate
+          ? `/api/agreements/${owner}/monitors/${targetId}`
+          : `/api/agreements/${owner}/monitors`,
+        isUpdate ? 'PATCH' : 'POST',
+        monitorState
+      )
+    } catch (error: unknown) {
+      if (operation.isCurrent() && !disposed && owner === agreementId && generation === actionGeneration && monitorModal.isCurrentSession(session)) showError(error)
+      return
+    }
+    const closed = operation.isCurrent() && monitorModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!closed || settlement.kind !== 'refreshed' || !monitorModal.isLatestSession(session)) return
     toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
-  } catch (error: unknown) {
-    if (!disposed && owner === agreementId && generation === actionGeneration && monitorModal.captureSession() === session) showError(error)
   } finally {
     monitorPending.end(session)
   }
 }
+const formSession = useFormSession({
+  owner: monitorModal,
+  action: { kind: 'remote', context: () => monitorTarget.value !== null ? editContext : createContext },
+  onDenied: () => {
+    if (monitorTarget.value !== null && canUpdate) toast.add({
+      title: toast.localized('common.warning'),
+      description: toast.localized('agreement.child_records.work_prerequisite'),
+      color: 'warning'
+    })
+  },
+  submit: saveMonitor
+})
 
 const deleteMonitor = async (monitorId: string) => {
+  const operation = deleteContext.capture()
+  if (!operation) return
   if (pendingMonitorDeletes.has(monitorId) || pendingMonitorActions.has(monitorId)) return
   pendingMonitorDeletes.add(monitorId)
   const owner = agreementId
   const generation = actionGeneration
-  const current = () => !disposed && owner === agreementId && generation === actionGeneration
+  const current = () => operation.canDispatch() && !disposed && owner === agreementId && generation === actionGeneration
+  const ownsSettlement = () => operation.isCurrent() && !disposed && owner === agreementId && generation === actionGeneration
   try {
-    if (!await checkPrerequisites('delete', monitorId, current)) return
     const ok = await confirmDeleteRequest(`/api/agreements/${owner}/monitors/${monitorId}`, {
+      operation,
+      target: {
+        id: monitorId,
+        resolve: () => overview.value?.monitors.find(row => String(row.id) === monitorId),
+        eligible: row => !isRecordLocked(row)
+      },
       shouldProceed: current,
-      confirm: async () => Boolean(await confirmDelete()) && current() && Boolean(await checkPrerequisites('delete', monitorId, current))
+      confirm: async () => {
+        if (!await checkPrerequisites('delete', monitorId, current) || !current()) return false
+        return Boolean(await confirmDelete()) && current() && Boolean(await checkPrerequisites('delete', monitorId, current))
+      }
     })
-    if (!ok || !current()) return
+    if (!ok || !ownsSettlement()) return
     await refreshOverview()
-    if (!current()) return
+    if (!ownsSettlement()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (ownsSettlement()) showError(error)
   } finally {
     pendingMonitorDeletes.delete(monitorId)
   }
@@ -270,7 +340,7 @@ const deleteMonitor = async (monitorId: string) => {
       v-model:open="isMonitorModalOpen" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors > Create or update Monitor" data-scope-label-fr="Ententes > Surveillances > Créer ou mettre à jour la surveillance"
       :title="selectedMonitor.id ? t('agreement.monitors.edit') : t('agreement.monitors.add')">
       <template #body>
-        <UForm :state="selectedMonitor" :validate="validateMonitor" :validate-on="[]" class="space-y-4" data-help-view="agreement.monitors.monitor-dialog" data-help-label-en="Agreements — Monitor editor" data-help-label-fr="Ententes — Éditeur de surveillance" @submit="saveMonitor">
+        <UForm v-bind="formSession" :state="selectedMonitor" :validate="validateMonitor" :validate-on="[]" class="space-y-4" data-help-view="agreement.monitors.monitor-dialog" data-help-label-en="Agreements — Monitor editor" data-help-label-fr="Ententes — Éditeur de surveillance">
           <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
             <CommonServerLookupSelect
               v-model="selectedMonitor.egcs_fc_type"

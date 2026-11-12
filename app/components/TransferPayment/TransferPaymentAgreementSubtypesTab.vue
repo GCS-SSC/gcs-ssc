@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -38,6 +40,11 @@ const getAgreementSubtypeActionTarget = (subtype: AgreementSubtypeRow) =>
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+
+const deleteContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const { createValidator } = useZodI18n()
 
 const {
@@ -61,9 +68,21 @@ const bilingualColumns: BilingualColumnConfig<AgreementSubtypeRow>[] = [
   { id: 'agreement', accessorKey: { en: 'agreement_name_en', fr: 'agreement_name_fr' } }
 ]
 
+const editingTarget = ref<string | null>(null)
 const modal = useCrudModal<AgreementSubtypeRow, Partial<TransferPaymentAgreementSubtypeItem>>({
-  createState: () => ({ egcs_tp_transferpaymentstream: streamId }),
-  updateState: row => ({ ...row })
+  createState: () => {
+    editingTarget.value = null
+    return { egcs_tp_transferpaymentstream: streamId }
+  },
+  updateState: row => {
+    editingTarget.value = row.id
+    return { ...row }
+  }
+})
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild,
+  eligible: () => (editingTarget.value === null || items.value.some(row => row.id === editingTarget.value))
 })
 
 const isOpen: Ref<boolean> = modal.isOpen
@@ -74,18 +93,24 @@ const validateAgreementSubtype = createValidator(TransferPaymentAgreementSubtype
 const modalPending = useCrudModalPending(modal.captureSession)
 const isSaving = modalPending.isPending
 
-const isDeleting: Ref<boolean> = ref(false)
+const deletePending = useCrudModalPending(() => deleteContext.version.value)
+const isDeleting = deletePending.isPending
+const isRetryingAgreementTypes: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 watch([() => transferPaymentId, () => streamId], () => {
   contextGeneration += 1
-  isDeleting.value = false
+  isRetryingAgreementTypes.value = false
   modal.close()
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) modal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
   disposed = true
   contextGeneration += 1
+  modal.close()
 })
 
 /**
@@ -93,15 +118,18 @@ onBeforeUnmount(() => {
  */
 const save = async () => {
   if (disposed || !selected.value || !canUpdateChild) return
+  const targetId = editingTarget.value
+  const operation = writeContext.capture()
+  if (!operation) return
   const session = modal.captureSession()
   if (!modalPending.begin(session)) return
   const generation = contextGeneration
-  const isUpdate = Boolean(selected.value.id)
+  const isUpdate = targetId !== null
   let closedSession = false
 
   try {
     const response = await fetch(getClientRequestUrl(isUpdate
-      ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes/${selected.value.id}`
+      ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes/${targetId}`
       : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes`), {
       method: isUpdate ? 'PATCH' : 'POST',
       headers: {
@@ -112,10 +140,10 @@ const save = async () => {
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
-    if (!isCurrentContext(generation)) return
+    if (!operation.isCurrent() || !isCurrentContext(generation)) return
     closedSession = modal.closeSession(session)
   } catch (error: unknown) {
-    if (isCurrentContext(generation) && modal.captureSession() === session) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && modal.captureSession() === session) showError(error)
     return
   } finally {
     modalPending.end(session)
@@ -123,14 +151,14 @@ const save = async () => {
 
   try {
     await refresh()
-    if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value === 'error') return
+    if (!operation.isCurrent() || !isCurrentContext(generation) || !closedSession || !modal.isLatestSession(session) || status.value === 'error') return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && closedSession && modal.isLatestSession(session)) showError(error)
   }
 }
 
@@ -141,21 +169,31 @@ const save = async () => {
  */
 const remove = async (row: AgreementSubtypeRow) => {
   if (disposed || !canDeleteChild || isDeleting.value) return
-  const generation = contextGeneration
-  isDeleting.value = true
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const targetId = row.id
+  const deleteSession = deleteContext.version.value
+  if (!deletePending.begin(deleteSession)) return
   try {
     const ok = await confirmDeleteRequest(
       `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes/${row.id}`,
-      { shouldProceed: () => isCurrentContext(generation) && canDeleteChild }
+      {
+        operation,
+        target: {
+          id: targetId,
+          resolve: () => items.value.find(current => current.id === targetId),
+          eligible: () => canDeleteChild
+        }
+      }
     )
-    if (!ok || !isCurrentContext(generation)) return
+    if (!ok || !operation.isCurrent()) return
     await refresh()
-    if (!isCurrentContext(generation) || status.value !== 'success') return
+    if (!operation.isCurrent() || status.value !== 'success') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent()) showError(error)
   } finally {
-    if (isCurrentContext(generation)) isDeleting.value = false
+    deletePending.end(deleteSession)
   }
 }
 
@@ -164,20 +202,21 @@ const { data: agreementTypeResponse, error: agreementTypeError, refresh: refresh
   buildUrl: () => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/agreement-types`,
   query: { page: 1, limit: 100 }
 })
-const isRetryingAgreementTypes: Ref<boolean> = ref(false)
 
 /** Retries the failed reference request without changing the selected subtype. */
 const retryAgreementTypes = async () => {
-  if (isRetryingAgreementTypes.value) return
+  if (disposed || isRetryingAgreementTypes.value) return
+  const generation = contextGeneration
   isRetryingAgreementTypes.value = true
   try {
     await refreshAgreementTypes()
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   } finally {
-    isRetryingAgreementTypes.value = false
+    if (isCurrentContext(generation)) isRetryingAgreementTypes.value = false
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: writeContext }, submit: save })
 </script>
 
 <template>
@@ -228,7 +267,7 @@ const retryAgreementTypes = async () => {
 
   <UModal v-if="selected && canUpdateChild" v-model:open="isOpen" :title="selected.id ? t('common.update') : t('common.add')">
     <template #body>
-      <UForm :state="selected" :validate="validateAgreementSubtype" class="space-y-4" @submit="save">
+      <UForm v-bind="formSession" :state="selected" :validate="validateAgreementSubtype" class="space-y-4">
         <div v-if="agreementTypeError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
           <span>{{ t('common.lookup_load_failed') }}</span>
           <UButton

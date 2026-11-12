@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Request lifecycle helpers are local to the palette. */
-import { computed, onBeforeUnmount, ref, toValue, watch } from 'vue'
-import type { MaybeRefOrGetter, Ref } from 'vue'
+import { computed, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { useDebouncedRequest } from '~/composables/useDebouncedRequest'
 import type { SearchResponse } from '~~/shared/types/search'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 
@@ -16,58 +17,34 @@ export const usePaletteSearch = (
   search: MaybeRefOrGetter<string>,
   locale: MaybeRefOrGetter<string>
 ) => {
-  const response: Ref<SearchResponse | null> = ref(null)
-  const loading: Ref<boolean> = ref(false)
-  const failed: Ref<boolean> = ref(false)
   const searchText = computed(() => toValue(search).trim())
-  let generation = 0
-  let controller: AbortController | null = null
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  const invalidate = () => {
-    generation += 1
-    controller?.abort()
-    controller = null
-    if (timeout !== null) clearTimeout(timeout)
-    timeout = null
-  }
-  const fetchResults = async () => {
-    if (!toValue(open)) return
-    invalidate()
-    const requestGeneration = generation
-    const requestController = new AbortController()
-    controller = requestController
-    loading.value = true
-    failed.value = false
-    try {
+  const request = useDebouncedRequest<SearchResponse | null>({
+    initialData: null,
+    failureEvidence: 'retain',
+    load: async signal => {
       const url = getClientRequestUrl('/api/search')
       if (searchText.value) url.searchParams.set('search', searchText.value)
       const result = await fetch(url, {
-        signal: requestController.signal,
+        signal,
         headers: { 'Accept-Language': toValue(locale) }
       })
       if (!result.ok) throw new Error('Search request failed')
-      const payload = await result.json() as SearchResponse
-      if (generation === requestGeneration && !requestController.signal.aborted) response.value = payload
-    } catch {
-      if (generation === requestGeneration && !requestController.signal.aborted) failed.value = true
-    } finally {
-      if (generation === requestGeneration) loading.value = false
+      return await result.json() as SearchResponse
     }
+  })
+  const loading = computed(() => request.state.value.kind === 'pending' || request.state.value.kind === 'debouncing')
+  const failed = computed(() => request.state.value.kind === 'error')
+  const fetchResults = async () => {
+    if (toValue(open)) await request.execute()
   }
   watch([() => toValue(open), searchText, () => toValue(locale)], ([isOpen], previous) => {
-    invalidate()
-    response.value = null
-    failed.value = false
-    loading.value = isOpen
+    request.clear()
     if (!isOpen) return
     if (!previous || !previous[0] || searchText.value === '') {
       void fetchResults()
       return
     }
-    timeout = setTimeout(() => {
-      void fetchResults()
-    }, 200)
+    request.schedule()
   }, { immediate: true, flush: 'sync' })
-  onBeforeUnmount(invalidate)
-  return { response, loading, failed, retry: fetchResults }
+  return { response: request.data, loading, failed, retry: fetchResults }
 }

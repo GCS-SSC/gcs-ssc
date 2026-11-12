@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Modal session behavior is covered by component regressions. */
-import { ref, watch } from 'vue'
-import type { Ref } from 'vue'
+import { onScopeDispose, watch } from 'vue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 import { CorrectionCreateSchema } from '~~/shared/types/schemas/correction'
 
-const { agreementId, linkedCorrectionId, initialCommitmentId } = defineProps<{
+const { agreementId, linkedCorrectionId, initialCommitmentId, actionContext } = defineProps<{
   agreementId: string
+  actionContext: ActionContext
   linkedCorrectionId?: string
   initialCommitmentId?: string
 }>()
@@ -23,47 +26,51 @@ type CreateState = {
   egcs_fc_narrative_fr: string
   egcs_fc_linkedcorrection?: string
 }
-const state: Ref<CreateState | null> = ref(null)
-const pending: Ref<boolean> = ref(false)
-let session = 0
+const modal = useCrudModal<CreateState, CreateState>({
+  createState: () => ({
+    egcs_fc_commitment: initialCommitmentId,
+    egcs_fc_payments: [],
+    egcs_fc_requesteddate: new Date().toISOString().slice(0, 10),
+    egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '',
+    ...(linkedCorrectionId ? { egcs_fc_linkedcorrection: linkedCorrectionId } : {})
+  }),
+  updateState: draft => ({ ...draft })
+})
+const state = modal.selected
+const pendingRequest = useCrudModalPending(modal.captureSession)
+const pending = pendingRequest.isPending
+onScopeDispose(modal.close)
 watch([open, () => agreementId, () => linkedCorrectionId], ([isOpen]) => {
-  session += 1
-  pending.value = false
-  state.value = isOpen
-    ? {
-        egcs_fc_commitment: initialCommitmentId,
-        egcs_fc_payments: [],
-        egcs_fc_requesteddate: new Date().toISOString().slice(0, 10),
-        egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '',
-        ...(linkedCorrectionId ? { egcs_fc_linkedcorrection: linkedCorrectionId } : {})
-      }
-    : null
+  if (isOpen) modal.openCreate()
+  else modal.close()
 }, { immediate: true, flush: 'sync' })
 watch(() => state.value?.egcs_fc_commitment, (commitment, previousCommitment) => {
   if (state.value && commitment !== previousCommitment) state.value.egcs_fc_payments = []
 }, { flush: 'sync' })
 const save = async () => {
-  if (!state.value || pending.value) return
-  const currentSession = session
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
+  const currentSession = modal.captureSession()
+  if (!state.value || currentSession === null || !pendingRequest.begin(currentSession)) return
   const ownerAgreement = agreementId
-  pending.value = true
   try {
     const result = await sendJson<{ id: string }>(`/api/agreements/${ownerAgreement}/corrections`, 'POST', CorrectionCreateSchema.parse(state.value))
-    if (currentSession !== session || ownerAgreement !== agreementId) return
+    if (!operation.isCurrent() || !modal.isCurrentSession(currentSession) || ownerAgreement !== agreementId) return
     open.value = false
     emit('created', result.id)
   } catch (error) {
-    if (currentSession === session) showError(error)
+    if (operation.isCurrent() && modal.isCurrentSession(currentSession)) showError(error)
   } finally {
-    if (currentSession === session) pending.value = false
+    pendingRequest.end(currentSession)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: () => actionContext }, submit: save })
 </script>
 
 <template>
   <UModal v-model:open="open" data-help-view="casework.correction.create-modal.open" :title="t(linkedCorrectionId ? 'correction.create_linked' : 'correction.create')" :description="t('correction.description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="agreement" data-field-scope="correction.create-modal" data-scope-label-en="Agreements > Corrections > Create" data-scope-label-fr="Ententes > Corrections > Créer">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="createValidator(CorrectionCreateSchema)" class="space-y-4" @submit="save">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="createValidator(CorrectionCreateSchema)" class="space-y-4">
         <UFormField name="egcs_fc_commitment" :label="t('correction.commitment')">
           <CommonServerLookupSelect v-model="state.egcs_fc_commitment" :fetch-url="`/api/agreements/${agreementId}/corrections/lookups/commitments`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" close-on-select />
         </UFormField>

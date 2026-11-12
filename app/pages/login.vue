@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onScopeDispose } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { resolveAuthReturnTarget } from '~/utils/auth-return-target'
 import { resolveLoginError } from '~/utils/login-error'
@@ -20,10 +21,18 @@ const toast = useLocalizedToast()
 
 const email = ref('')
 const password = ref('')
-const loading = ref(false)
-const loginErrorMessage = ref('')
-const hasLoginError = ref(false)
-const loginError = computed(() => hasLoginError.value ? loginErrorMessage.value || t('login.error_description') : '')
+type LoginState =
+  | { kind: 'ready' }
+  | { kind: 'submitting' }
+  | { kind: 'navigating' }
+  | { kind: 'error'; message: string }
+  | { kind: 'disposed' }
+const loginState = ref<LoginState>({ kind: 'ready' })
+onScopeDispose(() => {
+  loginState.value = { kind: 'disposed' }
+})
+const loading = computed(() => loginState.value.kind === 'submitting' || loginState.value.kind === 'navigating')
+const loginError = computed(() => loginState.value.kind === 'error' ? loginState.value.message || t('login.error_description') : '')
 const isDemoBuild = import.meta.env.VITE_GCS_DEMO === 'true'
 
 /**
@@ -31,8 +40,8 @@ const isDemoBuild = import.meta.env.VITE_GCS_DEMO === 'true'
  * @param error - Authentication response or transport failure.
  */
 const showLoginError = (error: unknown) => {
-  loginErrorMessage.value = resolveLoginError(error, '')
-  hasLoginError.value = true
+  if (loginState.value.kind === 'disposed') return
+  loginState.value = { kind: 'error', message: resolveLoginError(error, '') }
   toast.add({
     title: toast.localized('login.error_title'),
     description: resolveLoginError(error, '') || toast.localized('login.error_description'),
@@ -50,15 +59,15 @@ if (import.meta.dev || isDemoBuild) {
  * Updates the loading state and provides user feedback on success or failure.
  */
 const onLogin = async () => {
-  if (loading.value) return
-  loading.value = true
-  hasLoginError.value = false
-  loginErrorMessage.value = ''
+  if (loading.value || loginState.value.kind === 'disposed') return
+  loginState.value = { kind: 'submitting' }
+  const request = loginState.value
   try {
     const { error } = await authClient.signIn.email({
       email: email.value,
       password: password.value
     })
+    if (loginState.value !== request) return
 
     if (error) {
       showLoginError(error)
@@ -69,12 +78,13 @@ const onLogin = async () => {
         homePath,
         ['/login', '/connexion', localePath(appRouteLocations.login())]
       )
+      loginState.value = { kind: 'navigating' }
       await navigateTo(target)
     }
   } catch (error) {
     showLoginError(error)
   } finally {
-    loading.value = false
+    if (loading.value) loginState.value = { kind: 'ready' }
   }
 }
 </script>

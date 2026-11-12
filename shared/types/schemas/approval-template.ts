@@ -86,6 +86,7 @@ export const ApprovalTemplateStepPatchSchema = ApprovalTemplateStepBaseSchema
   .partial()
   .extend({
     id: RequiredId().optional(),
+    egcs_cn_requiregroupdetails: z.boolean().optional(),
     certifications: z.array(ApprovalTemplateCertificationPatchSchema).optional(),
     _deleted: z.boolean().optional()
   })

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ActionContext } from '~/composables/useActionContext'
 import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 
 const {
+  actionContext,
   name = '',
   entityType,
   publicationVersion = null,
@@ -16,6 +18,7 @@ const {
   canImport = false,
   reviewType = 'assessment'
 } = defineProps<{
+  actionContext: ActionContext
   name?: string
   entityType?: string
   publicationVersion?: number | null
@@ -43,6 +46,7 @@ const typeLabelKey = computed(() => reviewType === 'checklist'
 
 <template>
   <CommonPublicationDetailHero
+    :action-context="actionContext"
     :is-collapsed="isCollapsed"
     :icon="reviewType === 'checklist' ? 'i-lucide-list-checks' : reviewType === 'recommendation' ? 'i-lucide-message-square-quote' : 'i-lucide-clipboard-check'"
     :name="name"

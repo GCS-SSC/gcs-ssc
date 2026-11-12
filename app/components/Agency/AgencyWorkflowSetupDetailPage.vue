@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc -- page-local navigation and save handlers */
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import { z } from 'zod'
@@ -99,6 +102,16 @@ const validateConditions = createValidator(z.object({ conditions: WorkflowMember
 watch(isConditionsOpen, open => {
   if (!open) selectedConditions.value = null
 })
+const memberOwner = useModalSession()
+watch([isMemberOpen, selectedMember], () => {
+  memberOwner.isOpen.value = false
+  memberOwner.isOpen.value = isMemberOpen.value && selectedMember.value !== null
+}, { immediate: true, flush: 'sync' })
+const conditionsOwner = useModalSession()
+watch([isConditionsOpen, selectedConditions], () => {
+  conditionsOwner.isOpen.value = false
+  conditionsOwner.isOpen.value = isConditionsOpen.value && selectedConditions.value !== null
+}, { immediate: true, flush: 'sync' })
 const groupOwnerModes: Ref<Record<string, boolean>> = ref({})
 const setGroupOwnerMode = (nestedId: string, index: number, enabled: boolean) => {
   groupOwnerModes.value[nestedId] = enabled
@@ -131,9 +144,9 @@ onMounted(async () => {
 })
 const isHeroCollapsed = getHeroCollapsed('agency-workflow-setup-detail')
 const agencyScope: Scope = { type: 'agency', agencyId }
-const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', agencyScope))
+const canManagePublication = computed(() => can('agency', 'update', agencyScope))
 const canUpdate = computed(() => canManagePublication.value && state.value?.publicationState !== 'retired')
-const canDelete = computed(() => Boolean(agency.value) && can('agency', 'update', agencyScope))
+const canDelete = computed(() => can('agency', 'update', agencyScope))
 const isLoadRetrying = computed(() => loadStatus.value === 'pending')
 const validate = createValidator(CommonWorkflowSetupCreateSchema)
 const validateMemberBase = createValidator(CommonWorkflowSetupMemberCreateSchema)
@@ -207,7 +220,21 @@ const buildSetupPayload = () => state.value
       egcs_cn_riskratingrequired: state.value.egcs_cn_riskratingrequired ?? false
     }
   : null
-const mutation = useEditorMutationCoordinator({ getDraft: buildSetupPayload })
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
+const formOwner = useModalSession()
+watch(state, () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = state.value !== null
+}, { immediate: true, flush: 'sync' })
+const actionContext = useActionContext({
+  identity: [() => String(route.params.id), () => String(route.params.workflowSetupId)],
+  authority: canManagePublication,
+  eligible: () => Boolean(agency.value) && state.value !== null && state.value.publicationState !== 'retired'
+})
+const mutation = useEditorMutationCoordinator({ getDraft: buildSetupPayload, context: actionContext })
 const initialSetup = setup.value
 if (initialSetup) {
   mutation.replaceSessionDraft(() => {
@@ -222,6 +249,9 @@ const isNestedMembersLoading = ref(false)
 const nestedMembersError = ref<unknown>(null)
 let nestedMembersGeneration = 0
 let previousNestedMember: WorkflowMemberForm | null = null
+onScopeDispose(() => {
+  nestedMembersGeneration += 1
+})
 const canEditFields = computed(() => canUpdate.value && !mutation.isPending.value)
 watch(selectedSection, async (sectionId, previous) => {
   if ((sectionId === 'workflow-flow') !== flowOnly) {
@@ -241,13 +271,14 @@ watch(selectedSection, async (sectionId, previous) => {
 })
 const retryLoad = async () => {
   await refresh()
+  if (disposed) return
   const refreshedSetup = setup.value
   if (refreshedSetup && !loadError.value) {
     mutation.replaceSessionDraft(() => {
       state.value = cloneSetup(refreshedSetup)
     })
     await nextTick()
-    detailContent.value?.focus()
+    if (!disposed) detailContent.value?.focus()
   }
 }
 
@@ -275,6 +306,7 @@ const mergeMemberMetadata = (value: WorkflowSetupDetail) => {
   state.value.hasUnpublishedChanges = value.hasUnpublishedChanges
 }
 const refreshForMutation = async (token: EditorMutationToken) => {
+  if (!mutation.isTokenCurrent(token)) return false
   await refresh()
   const refreshedSetup = setup.value
   if (!refreshedSetup) return false
@@ -286,12 +318,14 @@ const refreshForMutation = async (token: EditorMutationToken) => {
 const persistSetup = async (token: EditorMutationToken, showSuccess: boolean) => {
   const body = buildSetupPayload()
   if (!body) return false
+  if (!mutation.canContinue(token)) return false
   const response = await fetch(getClientRequestUrl(endpoint), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   })
   if (!response.ok) await throwFetchResponseError(response)
+  mutation.acceptCommittedDraft(token)
   if (!await refreshForMutation(token)) {
     if (mutation.isTokenCurrent(token)) showPreservedDraft()
     return false
@@ -308,7 +342,7 @@ const save = async () => {
     try {
       await persistSetup(token, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -319,6 +353,7 @@ const performPublicationAction = async (action: 'publish' | 'retire') => {
   await mutation.run(action, async token => {
     try {
       if (action === 'publish' && mutation.isDirty.value && !await persistSetup(token, false)) return
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/${action}`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
       if (!await refreshForMutation(token)) {
@@ -327,7 +362,7 @@ const performPublicationAction = async (action: 'publish' | 'retire') => {
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized(`workflow.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -374,6 +409,8 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
   if (!referenceId) {
     return
   }
+  const operation = actionContext.capture()
+  if (!operation) return
   isNestedMembersLoading.value = true
   try {
     const requestedKind = member.egcs_cn_kind
@@ -389,14 +426,14 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
       },
       () => {
         const current = selectedMember.value
-        if (!current || current.egcs_cn_kind === 'approval_template') return null
+        if (!operation.isCurrent() || !current || current.egcs_cn_kind === 'approval_template') return null
         const currentReferenceId = current.egcs_cn_kind === 'review_set'
           ? current.egcs_cn_reviewset
           : current.egcs_cn_kind === 'data_collection' ? current.egcs_cn_datacollection : current.egcs_cn_recommendationset
         return { kind: current.egcs_cn_kind, referenceId: String(currentReferenceId) }
       },
       response => {
-        if (generation !== nestedMembersGeneration) return
+        if (!operation.isCurrent() || disposed || generation !== nestedMembersGeneration) return
         const current = selectedMember.value!
         nestedMembers.value = response.members
         riskAssessmentMembers.value = response.riskAssessmentMembers ?? []
@@ -414,29 +451,32 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
       }
     )
   } catch (error) {
-    if (generation === nestedMembersGeneration) {
+    if (operation.isCurrent() && !disposed && generation === nestedMembersGeneration) {
       nestedMembersError.value = error
       showError(error)
     }
   } finally {
-    if (generation === nestedMembersGeneration) isNestedMembersLoading.value = false
+    if (!disposed && generation === nestedMembersGeneration) isNestedMembersLoading.value = false
   }
 })
 const saveMember = async () => {
   if (!selectedMember.value || !canUpdate.value || mutation.isPending.value || isNestedMembersLoading.value || nestedMembersError.value || blockDirtyAction()) return
+  const session = memberOwner.captureSession()
+  if (session === null) return
   await mutation.run('save-member', async token => {
     try {
       const member = selectedMember.value
       if (!member) return
       const url = `${endpoint}/members${member.id ? `/${member.id}` : ''}`
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(url), {
         method: member.id ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(member)
       })
       if (!response.ok) await throwFetchResponseError(response)
       if (!await refreshForMutation(token)) return
-      isMemberOpen.value = false
+      if (memberOwner.isCurrentSession(session)) isMemberOpen.value = false
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token) && memberOwner.isCurrentSession(session)) showError(error)
     }
   })
 }
@@ -452,8 +492,11 @@ const openConditions = (member: WorkflowMember) => {
 const saveConditions = async () => {
   const draft = selectedConditions.value
   if (!draft || !canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
+  const session = conditionsOwner.captureSession()
+  if (session === null) return
   await mutation.run('save-conditions', async token => {
     try {
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/members/${draft.id}`), {
         method: 'PATCH', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ conditions: draft.conditions })
@@ -461,7 +504,9 @@ const saveConditions = async () => {
       if (!response.ok) await throwFetchResponseError(response)
       if (!await refreshForMutation(token)) return
       if (selectedConditions.value === draft) isConditionsOpen.value = false
-    } catch (error) { showError(error) }
+    } catch (error) {
+      if (mutation.isTokenCurrent(token) && conditionsOwner.isCurrentSession(session)) showError(error)
+    }
   })
 }
 const moveMember = async (member: WorkflowMember, sequence: number) => {
@@ -469,24 +514,29 @@ const moveMember = async (member: WorkflowMember, sequence: number) => {
   if (sequence < 1 || sequence > (state.value?.members.length ?? 0)) return
   await mutation.run('move-member', async token => {
     try {
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/members/${member.id}`), {
         method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ egcs_cn_sequence: sequence })
       })
       if (!response.ok) await throwFetchResponseError(response)
       await refreshForMutation(token)
-    } catch (error) { showError(error) }
+    } catch (error) { if (mutation.isTokenCurrent(token)) showError(error) }
   })
 }
 const deleteMember = async (member: WorkflowMember) => {
   if (!canUpdate.value || !canDelete.value || mutation.isPending.value || blockDirtyAction()) return
   await mutation.run('delete-member', async token => {
     try {
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/members/${member.id}`), { method: 'DELETE' })
       if (!response.ok) await throwFetchResponseError(response)
       await refreshForMutation(token)
-    } catch (error) { showError(error) }
+    } catch (error) { if (mutation.isTokenCurrent(token)) showError(error) }
   })
 }
+const memberFormSession = useFormSession({ owner: memberOwner, action: { kind: 'remote', context: actionContext }, submit: saveMember })
+const conditionsFormSession = useFormSession({ owner: conditionsOwner, action: { kind: 'remote', context: actionContext }, submit: saveConditions })
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
@@ -525,6 +575,7 @@ const deleteMember = async (member: WorkflowMember) => {
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
         <CommonPublicationDetailHero
+          :action-context="actionContext"
           icon="i-lucide-git-branch"
           type-label-key="workflow.setup_type"
           publish-label-key="workflow.publish"
@@ -544,7 +595,7 @@ const deleteMember = async (member: WorkflowMember) => {
           @publish="publish"
           @retire="retire" />
 
-        <UForm :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col" @submit="save">
+        <UForm v-bind="formSession" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col">
           <CommonDesignTimeEditorShell>
             <template #sidebar>
               <AssessmentSchemaDetailSidebar
@@ -693,7 +744,7 @@ const deleteMember = async (member: WorkflowMember) => {
     :title="selectedMember?.id ? t('workflow.edit_member') : t('workflow.add_member')"
     :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="agency.workflow-setup-detail-page">
     <template #body>
-      <UForm v-if="selectedMember" :state="selectedMember" :validate="validateMember" @submit="saveMember">
+      <UForm v-if="selectedMember" v-bind="memberFormSession" :state="selectedMember" :validate="validateMember">
         <fieldset :disabled="mutation.isPending.value || isNestedMembersLoading" class="space-y-4">
           <UFormField :label="t('workflow.member_kind')" name="egcs_cn_kind">
             <CommonEnumSelect v-model="selectedMember.egcs_cn_kind" name="workflow_member_kind" :items="memberKinds" :disabled="Boolean(selectedMember.id)" class="w-full" />
@@ -788,7 +839,7 @@ const deleteMember = async (member: WorkflowMember) => {
     :title="t('workflow.conditions.edit_member', { sequence: selectedConditions?.sequence ?? '' })"
     :ui="{ content: 'sm:max-w-2xl' }" data-field-scope="agency.workflow-setup-detail-page">
     <template #body>
-      <UForm v-if="selectedConditions" :state="selectedConditions" :validate="validateConditions" @submit="saveConditions">
+      <UForm v-if="selectedConditions" v-bind="conditionsFormSession" :state="selectedConditions" :validate="validateConditions">
         <fieldset :disabled="mutation.isPending.value" class="space-y-4">
           <TransferPaymentWorkflowConditions
             v-model="selectedConditions.conditions"

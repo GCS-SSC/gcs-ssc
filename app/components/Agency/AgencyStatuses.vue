@@ -1,6 +1,10 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Local UI event handlers are described by their names and focused tests. */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 import type { Ref } from 'vue'
 import { StatusDefinitionCreateSchema, type StatusDefinitionInput } from '~~/shared/types/schemas'
 import type { StatusDefinition } from '~~/shared/types/status'
@@ -10,8 +14,9 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 
 type StatusLifecycle = 'normal' | 'readOnly' | 'terminal'
+type ReconciliationSaveState = { kind: 'idle' } | { kind: 'saving', request: symbol } | { kind: 'disposed' }
 
-const { agencyId, canCreate, canUpdate, canDelete, showHeader = true } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean, showHeader?: boolean }>()
+const { agencyId, canCreate, canUpdate, canDelete, showHeader = true, reconciliationPendingRequests } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean, showHeader?: boolean, reconciliationPendingRequests: Map<string, symbol> }>()
 const { locale, t } = useI18n()
 const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
@@ -20,14 +25,25 @@ const catalog = useStatusCatalog()
 const canEdit = computed(() => canUpdate)
 const canManageFlags = computed(() => canDelete)
 const definitions = computed(() => catalog.getForAgency(agencyId, true))
-const isOpen: Ref<boolean> = ref(false)
+const modal = useModalSession()
+const isOpen = modal.isOpen
 const selectedId: Ref<string | null> = ref(null)
-const modalSession: Ref<number> = ref(0)
-const pendingSession: Ref<number | null> = ref(null)
-const pending = computed(() => pendingSession.value === modalSession.value)
+const createActionContext = useActionContext({ identity: [() => agencyId], authority: () => canCreate })
+const updateActionContext = useActionContext({
+  identity: [() => agencyId], authority: () => canUpdate,
+  eligible: () => definitions.value.some(row => row.id === selectedId.value && !row.isDraft)
+})
+const formActionContext = () => selectedId.value ? updateActionContext : createActionContext
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+const reconciliationActionContext = useActionContext({ identity: [() => agencyId], authority: () => canUpdate })
+const modalPending = useCrudModalPending(modal.captureSession)
+const pending = modalPending.isPending
 const pendingActionId: Ref<string | null> = ref(null)
 const reconciliationStatuses: Ref<AgencyClaimReconciliationStatusConfiguration> = ref({ startStatusId: null, finalStatusId: null })
-const reconciliationStatusesPending: Ref<boolean> = ref(false)
+const acceptedReconciliationStatuses: Ref<{ agencyId: string, value: AgencyClaimReconciliationStatusConfiguration } | null> = ref(null)
+const reconciliationSaveState: Ref<ReconciliationSaveState> = ref({ kind: 'idle' })
+const reconciliationReadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
+const reconciliationStatusesPending = computed(() => reconciliationPendingRequests.has(agencyId))
 const state: Ref<StatusDefinitionInput> = ref({ nameEn: '', nameFr: '', color: '#64748b', icon: 'i-lucide-circle', readOnly: false, terminal: false })
 const lifecycle: Ref<StatusLifecycle> = ref('normal')
 const terminalLocked: Ref<boolean> = ref(false)
@@ -40,52 +56,116 @@ const lifecycleOptions = computed(() => [
 ])
 const previewLabel = computed(() => locale.value === 'fr' ? state.value.nameFr : state.value.nameEn)
 let agencyRefreshGeneration = 0
+let disposed = false
+let reconciliationGeneration = 0
+let reconciliationDraftVersion = 0
+let reconciliationRead: symbol | null = null
+const isCurrentContext = (generation: number) => !disposed && generation === agencyRefreshGeneration
+watch([
+  () => reconciliationStatuses.value.startStatusId,
+  () => reconciliationStatuses.value.finalStatusId
+], () => {
+  reconciliationDraftVersion += 1
+}, { flush: 'sync' })
+watch([() => canCreate, () => canUpdate, () => canDelete], () => {
+  isOpen.value = false
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  disposed = true
+  agencyRefreshGeneration += 1
+  reconciliationRead = null
+  reconciliationSaveState.value = { kind: 'disposed' }
+})
 
 const refreshReconciliationStatuses = async (requestedAgencyId: string, generation: number) => {
-  const response = await fetch(getClientRequestUrl(`/api/agency/${requestedAgencyId}/claim-reconciliation-statuses`))
-  if (!response.ok) await throwFetchResponseError(response)
-  const nextStatuses = await response.json() as AgencyClaimReconciliationStatusConfiguration
-  if (generation !== agencyRefreshGeneration || requestedAgencyId !== agencyId) return
-  reconciliationStatuses.value = nextStatuses
+  const request = Symbol('reconciliation-read')
+  reconciliationRead = request
+  reconciliationReadStatus.value = 'pending'
+  const draftVersion = reconciliationDraftVersion
+  const isCurrent = () => !disposed && generation === reconciliationGeneration && reconciliationRead === request
+  try {
+    const response = await fetch(getClientRequestUrl(`/api/agency/${requestedAgencyId}/claim-reconciliation-statuses`))
+    if (!response.ok) await throwFetchResponseError(response)
+    const nextStatuses = await response.json() as AgencyClaimReconciliationStatusConfiguration
+    if (!isCurrent()) return
+    reconciliationReadStatus.value = 'success'
+    acceptedReconciliationStatuses.value = { agencyId: requestedAgencyId, value: { ...nextStatuses } }
+    if (draftVersion === reconciliationDraftVersion) reconciliationStatuses.value = nextStatuses
+  } catch (error: unknown) {
+    if (isCurrent()) {
+      reconciliationReadStatus.value = 'error'
+      showError(error)
+    }
+  } finally {
+    if (reconciliationRead === request) reconciliationRead = null
+  }
+}
+const retryReconciliationStatuses = () => {
+  if (disposed || reconciliationRead !== null) return
+  return refreshReconciliationStatuses(agencyId, reconciliationGeneration)
 }
 
 watch(() => agencyId, requestedAgencyId => {
   const generation = ++agencyRefreshGeneration
-  reconciliationStatuses.value = { startStatusId: null, finalStatusId: null }
-  reconciliationStatusesPending.value = false
   pendingActionId.value = null
   isOpen.value = false
   selectedId.value = null
 
   void catalog.refreshAgency(requestedAgencyId).catch(error => {
-    if (generation === agencyRefreshGeneration && requestedAgencyId === agencyId) showError(error)
+    if (isCurrentContext(generation) && requestedAgencyId === agencyId) showError(error)
   })
-  void refreshReconciliationStatuses(requestedAgencyId, generation).catch(error => {
-    if (generation === agencyRefreshGeneration && requestedAgencyId === agencyId) showError(error)
-  })
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
+
+watch(reconciliationActionContext.version, () => {
+  const requestedAgencyId = agencyId
+  const generation = ++reconciliationGeneration
+  acceptedReconciliationStatuses.value = null
+  reconciliationStatuses.value = { startStatusId: null, finalStatusId: null }
+  reconciliationSaveState.value = { kind: 'idle' }
+  void refreshReconciliationStatuses(requestedAgencyId, generation)
+}, { immediate: true, flush: 'sync' })
 
 const saveReconciliationStatuses = async () => {
-  if (reconciliationStatusesPending.value) return
+  const operation = reconciliationActionContext.capture()
+  if (!operation?.canDispatch()) return
+  if (disposed || !canUpdate || reconciliationStatusesPending.value) return
+  if (acceptedReconciliationStatuses.value?.agencyId !== agencyId) {
+    toast.add({
+      title: toast.localized('common.unavailable'),
+      description: toast.localized(reconciliationReadStatus.value === 'pending' ? 'common.loading' : 'common.configuration_load_failed_description'),
+      color: 'warning'
+    })
+    return
+  }
   const requestedAgencyId = agencyId
-  const generation = agencyRefreshGeneration
-  const isCurrent = () => generation === agencyRefreshGeneration && requestedAgencyId === agencyId
+  const generation = reconciliationGeneration
+  const request = Symbol('reconciliation-save')
+  const draftVersion = reconciliationDraftVersion
+  const draft = { ...reconciliationStatuses.value }
+  const isCurrent = () => operation.isCurrent() && !disposed && generation === reconciliationGeneration
+    && reconciliationSaveState.value.kind === 'saving' && reconciliationSaveState.value.request === request
+  reconciliationRead = null
+  reconciliationPendingRequests.set(requestedAgencyId, request)
+  reconciliationSaveState.value = { kind: 'saving', request }
   try {
-    reconciliationStatusesPending.value = true
     const response = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/claim-reconciliation-statuses`), {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(reconciliationStatuses.value)
+      body: JSON.stringify(draft)
     })
     if (!response.ok) await throwFetchResponseError(response)
     const savedStatuses = await response.json() as AgencyClaimReconciliationStatusConfiguration
     if (!isCurrent()) return
-    reconciliationStatuses.value = savedStatuses
+    acceptedReconciliationStatuses.value = { agencyId: requestedAgencyId, value: { ...savedStatuses } }
+    if (draftVersion === reconciliationDraftVersion) reconciliationStatuses.value = savedStatuses
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agency.statuses.reconciliation_saved'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrent()) showError(error)
   } finally {
-    if (isCurrent()) reconciliationStatusesPending.value = false
+    if (reconciliationPendingRequests.get(requestedAgencyId) === request) reconciliationPendingRequests.delete(requestedAgencyId)
+    if (reconciliationSaveState.value.kind === 'saving' && reconciliationSaveState.value.request === request) {
+      reconciliationSaveState.value = { kind: 'idle' }
+    }
   }
 }
 
@@ -94,7 +174,8 @@ const getLifecycle = (definition: StatusDefinition): StatusLifecycle => definiti
   : definition.readOnly ? 'readOnly' : 'normal'
 
 const openCreate = () => {
-  modalSession.value += 1
+  if (disposed || !canCreate) return
+  isOpen.value = false
   selectedId.value = null
   state.value = { nameEn: '', nameFr: '', color: '#64748b', icon: 'i-lucide-circle', readOnly: false, terminal: false }
   lifecycle.value = 'normal'
@@ -102,8 +183,8 @@ const openCreate = () => {
   isOpen.value = true
 }
 const openEdit = (definition: StatusDefinition) => {
-  if (definition.isDraft) return
-  modalSession.value += 1
+  if (disposed || !canUpdate || definition.isDraft) return
+  isOpen.value = false
   selectedId.value = definition.id
   state.value = { nameEn: definition.nameEn, nameFr: definition.nameFr, color: definition.color, icon: definition.icon, readOnly: definition.readOnly, terminal: definition.terminal }
   lifecycle.value = getLifecycle(definition)
@@ -111,12 +192,19 @@ const openEdit = (definition: StatusDefinition) => {
   isOpen.value = true
 }
 const save = async () => {
-  const requestSession = modalSession.value
+  const operation = formActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const requestSession = modal.captureSession()
+  const generation = agencyRefreshGeneration
+  const requestedAgencyId = agencyId
   const updating = selectedId.value !== null
+  if (disposed || requestSession === null || (updating ? !canUpdate : !canCreate) || !modalPending.begin(requestSession)) return
   const statusId = selectedId.value
-  pendingSession.value = requestSession
+  const ownsEditor = () => operation.isCurrent() && isCurrentContext(generation) && modal.isCurrentSession(requestSession)
+  let closed = false
+  const ownsFeedback = () => operation.isCurrent() && isCurrentContext(generation) && (modal.isCurrentSession(requestSession) || (closed && modal.isLatestSession(requestSession)))
   try {
-    const url = updating ? `/api/agency/statuses/${statusId}` : `/api/agency/${agencyId}/statuses`
+    const url = updating ? `/api/agency/statuses/${statusId}` : `/api/agency/${requestedAgencyId}/statuses`
     const presentation = {
       nameEn: state.value.nameEn,
       nameFr: state.value.nameFr,
@@ -130,43 +218,60 @@ const save = async () => {
           terminal: lifecycle.value === 'terminal'
         }
       : presentation
-    const response = await fetch(url, { method: updating ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    const response = await fetch(getClientRequestUrl(url), { method: updating ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     if (!response.ok) await throwFetchResponseError(response)
-    if (modalSession.value === requestSession) isOpen.value = false
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.created_success'), color: 'success' })
+    if (!operation.isCurrent() || !isCurrentContext(generation)) return
+    if (ownsEditor()) {
+      isOpen.value = false
+      closed = true
+    }
+    if (ownsFeedback()) toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.created_success'), color: 'success' })
     try {
-      await catalog.refreshAgency(agencyId)
+      await catalog.refreshAgency(requestedAgencyId)
     } catch (refreshError) {
-      showError(refreshError)
+      if (ownsFeedback()) showError(refreshError)
     }
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
-    if (pendingSession.value === requestSession) pendingSession.value = null
+    modalPending.end(requestSession)
   }
 }
-watch(isOpen, open => {
-  if (!open) modalSession.value += 1
-})
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: formActionContext }, submit: save })
 const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
+  if (disposed || !canDelete || definition.isDraft || pendingActionId.value !== null) return
+  const operation = deleteActionContext.capture()
+  if (!operation?.canDispatch()) return
+  const generation = agencyRefreshGeneration
+  const requestedAgencyId = agencyId
+  const isCurrent = () => operation.isCurrent() && isCurrentContext(generation)
+  const id = definition.id
+  let eligible = true
+  const stopTarget = watch(() => definitions.value.some(row => row.id === id && !row.isDraft && row.deleted !== deleted), value => {
+    if (!value) eligible = false
+  }, { immediate: true, flush: 'sync' })
+  const canDispatch = () => eligible && operation.canDispatch() && isCurrentContext(generation)
   const localizedName = locale.value === 'fr'
     ? definition.nameFr
     : definition.nameEn
-  if (deleted && !await confirmDelete({ description: t('agency.statuses.delete_confirmation', { name: localizedName }) })) return
-  pendingActionId.value = definition.id
+  pendingActionId.value = id
   try {
-    const response = await fetch(`/api/agency/statuses/${definition.id}/${deleted ? 'delete' : 'restore'}`, { method: 'POST' })
+    if (deleted && !await confirmDelete({ description: t('agency.statuses.delete_confirmation', { name: localizedName }) })) return
+    if (!canDispatch()) return
+    const response = await fetch(getClientRequestUrl(`/api/agency/statuses/${id}/${deleted ? 'delete' : 'restore'}`), { method: 'POST' })
     if (!response.ok) await throwFetchResponseError(response)
+    if (!isCurrent()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized(deleted ? 'agency.statuses.deleted_success' : 'agency.statuses.restored_success'), color: 'success' })
     try {
-      await catalog.refreshAgency(agencyId)
+      await catalog.refreshAgency(requestedAgencyId)
     } catch (refreshError) {
-      showError(refreshError)
+      if (isCurrent()) showError(refreshError)
     }
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrent()) showError(error)
   } finally {
-    pendingActionId.value = null
+    stopTarget()
+    if (isCurrentContext(generation) && pendingActionId.value === id) pendingActionId.value = null
   }
 }
 </script>
@@ -230,6 +335,17 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
           {{ t('agency.statuses.reconciliation_description') }}
         </p>
       </div>
+      <UAlert
+        v-if="reconciliationReadStatus === 'error'"
+        role="alert"
+        color="error"
+        variant="subtle"
+        :title="t('common.configuration_load_failed')"
+        :description="t('common.configuration_load_failed_description')">
+        <template #actions>
+          <UButton :label="t('common.retry')" color="neutral" variant="outline" @click="retryReconciliationStatuses" />
+        </template>
+      </UAlert>
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UFormField :label="t('agency.statuses.reconciliation_start_status')" data-ui-target="agency.statuses.agency.statuses.reconciliation_start_status">
           <CommonStatusSelect v-model="reconciliationStatuses.startStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
@@ -249,7 +365,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
       :description="t('agency.statuses.form_description')"
       :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm :state="state" :validate="validate" class="space-y-6" @submit="save">
+        <UForm v-bind="formSession" :state="state" :validate="validate" class="space-y-6">
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <UFormField :label="t('agency.name_en')" name="nameEn">
               <UInput v-model="state.nameEn" class="w-full" />

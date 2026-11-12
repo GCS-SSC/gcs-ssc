@@ -49,6 +49,19 @@ const booleanValueItems = computed(() => [
 const dependencyRules = ref<DependencyRuleUi[]>([])
 const isSyncingDependencyRules = ref(false)
 
+const syncClauseValueType = (clause: DependencyRuleUi['clauses'][number]) => {
+  if (clause.onType !== 'helpers') {
+    return
+  }
+
+  const helperDefinition = helperDefinitions.value.find(definition => definition.field === clause.field)
+  if (!helperDefinition) {
+    return
+  }
+
+  clause.valueType = getAssessmentHelperComparableValueType(helperDefinition)
+}
+
 watch(
   () => depends.value,
   value => {
@@ -136,19 +149,6 @@ const removeDependencyClause = (ruleId: string, clauseId: string) => {
   if (rule.clauses.length === 0) {
     removeDependencyRule(ruleId)
   }
-}
-
-const syncClauseValueType = (clause: DependencyRuleUi['clauses'][number]) => {
-  if (clause.onType !== 'helpers') {
-    return
-  }
-
-  const helperDefinition = helperDefinitions.value.find(definition => definition.field === clause.field)
-  if (!helperDefinition) {
-    return
-  }
-
-  clause.valueType = getAssessmentHelperComparableValueType(helperDefinition)
 }
 
 const updateClauseOnType = (clause: DependencyRuleUi['clauses'][number], value: string | number) => {

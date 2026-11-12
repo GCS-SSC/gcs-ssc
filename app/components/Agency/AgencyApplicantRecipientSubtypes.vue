@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyApplicantRecipientSubtypeSchema, type AgencyApplicantRecipientSubtypeItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -11,10 +13,18 @@ const columns: TableColumnInput<AgencyApplicantRecipientSubtypeItem>[] = [
   { accessorKey: 'egcs_ay_applicantrecipienttype', headerKey: 'agency.tabs.applicant_recipient_subtypes' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.applicant_recipient_subtypes')"
     icon="i-lucide-users"
     :fetch-url="`/api/agency/${agencyId}/applicant-recipient-subtypes`"

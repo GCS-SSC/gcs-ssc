@@ -9,8 +9,13 @@ import type { HelpVersion } from '~/utils/guided-help-client'
 const { versions } = defineProps<{ versions: HelpVersion[] }>()
 const emit = defineEmits<{ preview: [document: GuideDraft] }>()
 const { t, locale } = useI18n()
-const selected: Ref<HelpVersion | null> = ref(null)
-const open = ref(false)
+type HistoryState = { kind: 'closed' } | { kind: 'inspecting'; version: HelpVersion }
+const history: Ref<HistoryState> = ref({ kind: 'closed' })
+const selected = computed(() => history.value.kind === 'inspecting' ? history.value.version : null)
+const open = computed({
+  get: () => history.value.kind === 'inspecting',
+  set: (value: boolean) => { if (!value) history.value = { kind: 'closed' } }
+})
 const columns = computed<TableColumn<HelpVersion>[]>(() => [
   { accessorKey: 'version', header: t('guided_help.source_version'), meta: { class: { th: 'w-[14%]' } } },
   { id: 'title', header: t('common.name'), meta: { class: { th: 'w-[36%]' } } },
@@ -25,8 +30,7 @@ const publishedAt = (value?: string) => value ? new Date(value).toLocaleString(l
  * @param version Captured publication to inspect.
  */
 const inspect = (version: HelpVersion) => {
-  selected.value = version
-  open.value = true
+  history.value = { kind: 'inspecting', version }
 }
 </script>
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
+import { onScopeDispose, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useExtensionConfigurationState } from '~/composables/useExtensionConfigurationState'
 import type { ExtensionStreamRegistryItem } from '~~/shared/types/schemas/extensions'
@@ -19,6 +20,7 @@ const { t, locale } = useI18n()
 const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
+const { user, permissionRevision } = useAuth()
 const canConfigure = (item: ExtensionStreamRegistryItem) => canUpdateChild && item.canConfigure
 const {
   isModalOpen,
@@ -28,9 +30,14 @@ const {
   fallbackConfigText,
   fallbackConfigError,
   isSavingConfiguration,
+  savingExtensionKeys,
   isRowBusy,
   setRowBusy,
   openConfigure,
+  captureSession,
+  captureDraftSave,
+  acceptCommittedDraft,
+  setSessionSaving,
   resetConfigureState,
   closeConfigure,
   cancelDiscardChanges,
@@ -40,11 +47,28 @@ const {
 } = useExtensionConfigurationState<ExtensionStreamTableRow>()
 
 const { search, pagination, items, totalRecords, refresh, status } = useResourceTable<ExtensionStreamTableRow>({
-  fetchUrl: computed(() => `/api/extensions/streams/${streamId}`)
+  fetchUrl: computed(() => `/api/extensions/streams/${streamId}`),
+  contextKey: computed(() => JSON.stringify([user.value?.id, permissionRevision.value]))
 })
 const isLoading = computed(() => status.value === 'pending')
-
-watch(() => streamId, resetConfigureState, { flush: 'sync' })
+let lifetime: 'active' | 'disposed' = 'active'
+const isActive = () => lifetime === 'active'
+let contextVersion = 0
+watch(() => [streamId, transferPaymentId, agencyId, canUpdateChild, user.value?.id, permissionRevision.value], () => {
+  contextVersion++
+  savingExtensionKeys.value = new Set()
+  resetConfigureState()
+}, { flush: 'sync' })
+watch(() => selectedItem.value ? items.value.find(row => row.extension.key === selectedItem.value?.extension.key)?.canConfigure : undefined,
+  (capability, previous) => {
+    if (!selectedItem.value || capability === previous || previous === undefined) return
+    contextVersion++
+    savingExtensionKeys.value = new Set()
+    if (capability !== true || isSavingConfiguration.value) resetConfigureState()
+  }, { flush: 'sync' })
+onScopeDispose(() => {
+  lifetime = 'disposed'
+})
 
 const columns: TableColumnInput<ExtensionStreamTableRow>[] = [
   { id: 'name', headerKey: 'agency.name_en' },
@@ -98,14 +122,22 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
     return
   }
 
-  if (!canConfigure(item) || isRowBusy(item)) {
+  if (!isActive() || !canConfigure(item) || isRowBusy(item)) {
     return
   }
+
+  const configurationSession = isSelectedItem ? captureSession() : null
+  const draftSave = isSelectedItem ? captureDraftSave() : null
+  const requestedContext = contextVersion
+  const ownsContext = () => isActive() && contextVersion === requestedContext
+  let closedSession = false
+  const ownsFeedback = () => ownsContext() && (!isSelectedItem || captureSession() === configurationSession
+    || (closedSession && captureSession() === null))
 
   try {
     setRowBusy(extensionKey, true)
     if (isSelectedItem) {
-      isSavingConfiguration.value = true
+      setSessionSaving(configurationSession, true)
     }
 
     await postJson(`/api/extensions/streams/${streamId}`, 'PATCH', {
@@ -114,25 +146,27 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
       config: isSelectedItem ? draftConfig.value : item.config
     })
 
+    if (!ownsContext()) return
     if (isSelectedItem) {
-      resetConfigureState()
+      closedSession = acceptCommittedDraft(draftSave)
     }
 
-    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
+    if (ownsFeedback()) toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
     return
   } finally {
-    setRowBusy(extensionKey, false)
+    if (ownsContext()) setRowBusy(extensionKey, false)
     if (isSelectedItem) {
-      isSavingConfiguration.value = false
+      setSessionSaving(configurationSession, false)
     }
   }
 
+  if (!ownsContext()) return
   try {
     await refresh()
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   }
 }
 </script>

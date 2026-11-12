@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowReactive, useId, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, shallowReactive, shallowRef, useId, watch } from 'vue'
 import type { Ref } from 'vue'
+import { formRequirementKey } from '~/utils/form-requirement-context'
 import type { FundingCaseAgreementApplicantRecipientLookupItem } from '~~/shared/types/funding-case-agreement-ui'
 
 type ApplicantRecipientLookupResponse = {
@@ -18,16 +19,17 @@ type VisibleSearchOutcome = 'success' | 'error' | 'cancelled'
 
 type VisibleSearchAttempt = {
   controller: AbortController
-  generation: number
   startedSequence: number
-  settledSequence: number | null
+  settlement: { kind: 'pending' } | { kind: 'settled'; sequence: number; outcome: VisibleSearchOutcome }
   promise: Promise<VisibleSearchOutcome>
   resolve: (outcome: VisibleSearchOutcome) => void
 }
 
+type HydrationLifetime = { kind: 'active' } | { kind: 'disposed' }
+
 type SelectedHydrationRequest = {
   controller: AbortController
-  lifecycleGeneration: number
+  lifetime: Extract<HydrationLifetime, { kind: 'active' }>
   startedSequence: number
   ids: Set<string>
 }
@@ -50,22 +52,47 @@ const { t, locale } = useI18n()
 const pickerId = useId()
 const pickerDialogContent = { id: `${pickerId}-dialog`, disableOutsidePointerEvents: true }
 const { showError } = useApiErrorToast()
+const form = inject(formRequirementKey, undefined)
+const isInteractionDisabled = computed(() => Boolean(form?.disabled.value))
 
-const isOpen: Ref<boolean> = ref(false)
-const isLoading: Ref<boolean> = ref(false)
+type PickerSession = { kind: 'closed' } | { kind: 'open'; draft: string[] }
+const pickerSession = ref<PickerSession>({ kind: 'closed' })
+const isOpen = computed({
+  get: () => pickerSession.value.kind === 'open',
+  /**
+   * Opens the picker only while its owning Form permits edits.
+   * @param open - Requested picker visibility.
+   */
+  set: (open: boolean) => {
+    if (open && isInteractionDisabled.value) return
+    if (open === (pickerSession.value.kind === 'open')) return
+    pickerSession.value = open ? { kind: 'open', draft: [...selectedIds.value] } : { kind: 'closed' }
+  }
+})
+type VisibleSearchState =
+  | { kind: 'idle' | 'disposed' }
+  | { kind: 'debouncing'; attempt: VisibleSearchAttempt; timer: ReturnType<typeof setTimeout> }
+  | { kind: 'pending' | 'settled'; attempt: VisibleSearchAttempt }
+const visibleSearch = shallowRef<VisibleSearchState>({ kind: 'idle' })
+const isLoading = computed(() => visibleSearch.value.kind === 'debouncing' || visibleSearch.value.kind === 'pending')
 const searchTerm: Ref<string> = ref('')
 const lookupItems: Ref<FundingCaseAgreementApplicantRecipientLookupItem[]> = ref([])
 const selectedIds: Ref<string[]> = ref([])
-const draftSelectedIds: Ref<string[]> = ref([])
+const draftSelectedIds = computed({
+  get: () => pickerSession.value.kind === 'open' ? pickerSession.value.draft : selectedIds.value,
+  set: (draft: string[]) => {
+    if (isInteractionDisabled.value) return
+    if (pickerSession.value.kind === 'open') pickerSession.value.draft = draft
+  }
+})
 const invalidSelectedIds: Ref<string[]> = ref([])
 const cachedItemsById: Ref<Record<string, FundingCaseAgreementApplicantRecipientLookupItem>> = ref({})
-const searchTimeout: Ref<ReturnType<typeof setTimeout> | null> = ref(null)
 const cachedItemSequenceById = new Map<string, number>()
-let visibleSearchGeneration = 0
-let hydrationLifecycleGeneration = 0
+const hydrationLifetime = shallowRef<HydrationLifetime>({ kind: 'active' })
 let lookupOperationSequence = 0
 let lastReportedLookupErrorSequence: number | null = null
-let currentVisibleSearchAttempt: VisibleSearchAttempt | null = null
+const currentVisibleSearchAttempt = () => 'attempt' in visibleSearch.value ? visibleSearch.value.attempt : null
+const ownsVisibleSearch = (attempt: VisibleSearchAttempt) => currentVisibleSearchAttempt() === attempt
 const pendingHydrationById: Map<string, SelectedHydrationRequest> = shallowReactive(new Map())
 
 /**
@@ -110,32 +137,16 @@ const mergeCachedItems = (
   cachedItemsById.value = nextItems
 }
 
-/**
- * Clears a queued lookup search.
- */
-const clearSearchTimeout = () => {
-  if (searchTimeout.value === null) {
-    return
-  }
-
-  clearTimeout(searchTimeout.value)
-  searchTimeout.value = null
-}
-
-/**
- * Invalidates queued and in-flight visible search work and clears its options.
- */
+/** Invalidates visible work while keeping selected-label hydration independent. */
 const invalidateVisibleSearch = () => {
-  clearSearchTimeout()
-  visibleSearchGeneration += 1
-  if (currentVisibleSearchAttempt?.settledSequence === null) {
-    currentVisibleSearchAttempt.controller.abort()
-    currentVisibleSearchAttempt.settledSequence = ++lookupOperationSequence
-    currentVisibleSearchAttempt.resolve('cancelled')
+  if (visibleSearch.value.kind === 'debouncing') clearTimeout(visibleSearch.value.timer)
+  const attempt = currentVisibleSearchAttempt()
+  if (attempt?.settlement.kind === 'pending') {
+    attempt.controller.abort()
+    settleVisibleSearchAttempt(attempt, 'cancelled')
   }
-  currentVisibleSearchAttempt = null
+  visibleSearch.value = { kind: 'idle' }
   lookupItems.value = []
-  isLoading.value = false
 }
 
 /**
@@ -149,13 +160,12 @@ const settleVisibleSearchAttempt = (
   attempt: VisibleSearchAttempt,
   outcome: VisibleSearchOutcome
 ): number => {
-  if (attempt.settledSequence !== null) {
-    return attempt.settledSequence
-  }
-
-  attempt.settledSequence = ++lookupOperationSequence
+  if (attempt.settlement.kind === 'settled') return attempt.settlement.sequence
+  const sequence = ++lookupOperationSequence
+  attempt.settlement = { kind: 'settled', sequence, outcome }
+  if (ownsVisibleSearch(attempt)) visibleSearch.value = { kind: 'settled', attempt }
   attempt.resolve(outcome)
-  return attempt.settledSequence
+  return sequence
 }
 
 /** Reports only the newest lookup failure to avoid duplicate stale toasts.
@@ -194,14 +204,13 @@ const createVisibleSearchAttempt = (): VisibleSearchAttempt => {
   })
   const attempt: VisibleSearchAttempt = {
     controller: new AbortController(),
-    generation: visibleSearchGeneration,
     startedSequence: ++lookupOperationSequence,
-    settledSequence: null,
+    settlement: { kind: 'pending' },
     promise,
     resolve: resolveAttempt
   }
 
-  currentVisibleSearchAttempt = attempt
+  visibleSearch.value = { kind: 'pending', attempt }
   return attempt
 }
 
@@ -212,13 +221,13 @@ const createVisibleSearchAttempt = (): VisibleSearchAttempt => {
  * @param attempt - Search attempt captured when the request was scheduled.
  */
 const fetchVisibleItems = async (search: string, attempt: VisibleSearchAttempt) => {
-  if (attempt.generation !== visibleSearchGeneration) {
+  if (!ownsVisibleSearch(attempt)) {
     settleVisibleSearchAttempt(attempt, 'cancelled')
     return
   }
 
   try {
-    isLoading.value = true
+    visibleSearch.value = { kind: 'pending', attempt }
     const query: ApplicantRecipientLookupQuery = {
       page: 1,
       limit: 25,
@@ -232,7 +241,7 @@ const fetchVisibleItems = async (search: string, attempt: VisibleSearchAttempt) 
       signal: attempt.controller.signal
     })
 
-    if (attempt.generation !== visibleSearchGeneration) {
+    if (!ownsVisibleSearch(attempt)) {
       settleVisibleSearchAttempt(attempt, 'cancelled')
       return
     }
@@ -242,15 +251,11 @@ const fetchVisibleItems = async (search: string, attempt: VisibleSearchAttempt) 
     abortUnneededHydrationRequests(activeSelectedIds())
     settleVisibleSearchAttempt(attempt, 'success')
   } catch (error: unknown) {
-    if (attempt.generation === visibleSearchGeneration) {
+    if (ownsVisibleSearch(attempt)) {
       const errorSequence = settleVisibleSearchAttempt(attempt, 'error')
       reportLookupError(error, attempt.startedSequence, errorSequence)
     } else {
       settleVisibleSearchAttempt(attempt, 'cancelled')
-    }
-  } finally {
-    if (attempt.generation === visibleSearchGeneration) {
-      isLoading.value = false
     }
   }
 }
@@ -264,12 +269,12 @@ const fetchVisibleItems = async (search: string, attempt: VisibleSearchAttempt) 
 const waitForCurrentVisibleSearch = async (
   hydrationStartedSequence: number
 ): Promise<boolean> => {
-  let attempt = currentVisibleSearchAttempt
+  let attempt = currentVisibleSearchAttempt()
   if (
     !attempt
     || (
-      attempt.settledSequence !== null
-      && attempt.settledSequence < hydrationStartedSequence
+      attempt.settlement.kind === 'settled'
+      && attempt.settlement.sequence < hydrationStartedSequence
     )
   ) {
     return false
@@ -281,11 +286,11 @@ const waitForCurrentVisibleSearch = async (
       return true
     }
 
-    if (currentVisibleSearchAttempt === attempt) {
+    if (currentVisibleSearchAttempt() === attempt) {
       return false
     }
 
-    attempt = currentVisibleSearchAttempt
+    attempt = currentVisibleSearchAttempt()
   }
 
   return false
@@ -356,7 +361,7 @@ const removeInvalidSelectedIds = (ids: string[]) => {
  */
 const teardownLookupRequests = () => {
   invalidateVisibleSearch()
-  hydrationLifecycleGeneration += 1
+  hydrationLifetime.value = { kind: 'disposed' }
   abortPendingHydrationRequests()
 }
 
@@ -366,17 +371,16 @@ const teardownLookupRequests = () => {
  * @param missingIds - Uncached selected ids, capped to the endpoint limit.
  */
 const hydrateSelectedItemsChunk = async (missingIds: string[]) => {
+  if (hydrationLifetime.value.kind === 'disposed') return
   const request: SelectedHydrationRequest = {
     controller: new AbortController(),
-    lifecycleGeneration: hydrationLifecycleGeneration,
+    lifetime: hydrationLifetime.value,
     startedSequence: ++lookupOperationSequence,
     ids: new Set(missingIds)
   }
 
   missingIds.forEach(id => pendingHydrationById.set(id, request))
-  let requestError: unknown
-  let requestFailed = false
-  let invalidIds: string[] = []
+  let outcome: { kind: 'accepted'; invalidIds: string[] } | { kind: 'failed'; error: unknown }
 
   try {
     const query: ApplicantRecipientLookupQuery = {
@@ -393,7 +397,7 @@ const hydrateSelectedItemsChunk = async (missingIds: string[]) => {
     })
 
     if (
-      request.lifecycleGeneration !== hydrationLifecycleGeneration
+      request.lifetime !== hydrationLifetime.value
       || request.controller.signal.aborted
     ) {
       return
@@ -407,10 +411,9 @@ const hydrateSelectedItemsChunk = async (missingIds: string[]) => {
     })
     const resolvedIds = new Set(resolvedItems.map(item => String(item.id)))
     mergeCachedItems(resolvedItems, request.startedSequence)
-    invalidIds = missingIds.filter(id => currentSelectedIds.has(id) && !resolvedIds.has(id))
+    outcome = { kind: 'accepted', invalidIds: missingIds.filter(id => currentSelectedIds.has(id) && !resolvedIds.has(id)) }
   } catch (error: unknown) {
-    requestError = error
-    requestFailed = true
+    outcome = { kind: 'failed', error }
   } finally {
     missingIds.forEach(id => {
       if (pendingHydrationById.get(id) === request) {
@@ -420,21 +423,21 @@ const hydrateSelectedItemsChunk = async (missingIds: string[]) => {
   }
 
   if (
-    request.lifecycleGeneration !== hydrationLifecycleGeneration
+    request.lifetime !== hydrationLifetime.value
     || request.controller.signal.aborted
   ) {
     return
   }
 
-  if (!requestFailed) {
-    removeInvalidSelectedIds(invalidIds)
+  if (outcome.kind === 'accepted') {
+    removeInvalidSelectedIds(outcome.invalidIds)
     return
   }
 
   const visibleSearchReportedError = await waitForCurrentVisibleSearch(request.startedSequence)
   if (
     visibleSearchReportedError
-    || request.lifecycleGeneration !== hydrationLifecycleGeneration
+    || request.lifetime !== hydrationLifetime.value
   ) {
     return
   }
@@ -446,7 +449,7 @@ const hydrateSelectedItemsChunk = async (missingIds: string[]) => {
   )
 
   if (unresolvedIds.length > 0) {
-    reportLookupError(requestError, request.startedSequence)
+    reportLookupError(outcome.error, request.startedSequence)
   }
 }
 
@@ -508,7 +511,9 @@ watch(draftSelectedIds, value => {
   if (isOpen.value) void hydrateSelectedItems(value)
 })
 
+/** Commits the picker draft only while its owning Form permits edits. */
 const saveSelection = () => {
+  if (isInteractionDisabled.value) return
   selectedIds.value = [...draftSelectedIds.value]
   isOpen.value = false
 }
@@ -520,16 +525,15 @@ watch(searchTerm, value => {
 
   invalidateVisibleSearch()
   const attempt = createVisibleSearchAttempt()
-  isLoading.value = true
-
-  searchTimeout.value = setTimeout(() => {
-    searchTimeout.value = null
+  const timer = setTimeout(() => {
     void fetchVisibleItems(value.trim(), attempt)
   }, 200)
+  visibleSearch.value = { kind: 'debouncing', attempt, timer }
 })
 
 onBeforeUnmount(() => {
   teardownLookupRequests()
+  visibleSearch.value = { kind: 'disposed' }
 })
 
 const groups = computed(() => [
@@ -578,6 +582,7 @@ const getSelectedLabel = (item: FundingCaseAgreementApplicantRecipientLookupItem
  * @param id - Applicant-recipient id to remove.
  */
 const removeSelectedId = (id: string) => {
+  if (isInteractionDisabled.value) return
   selectedIds.value = selectedIds.value.filter(value => value !== id)
 }
 </script>
@@ -596,6 +601,7 @@ const removeSelectedId = (id: string) => {
               type="button"
               class="cursor-default text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
               :aria-label="`${t('common.remove')}: ${getSelectedLabel(item)}`"
+              :disabled="isInteractionDisabled"
               @click="removeSelectedId(String(item.id))">
               <UIcon name="i-lucide-x" class="size-4" />
             </button>
@@ -622,8 +628,9 @@ const removeSelectedId = (id: string) => {
           class="cursor-default"
           role="combobox"
           aria-haspopup="dialog"
-          aria-required="true"
+          :aria-required="!isInteractionDisabled || undefined"
           :aria-expanded="isOpen"
+          :disabled="isInteractionDisabled"
           :aria-controls="`${pickerId}-dialog`"
           :aria-label="t('agreement.applicant_recipients.title')"
           :aria-invalid="Boolean(fieldState?.error)"
@@ -667,6 +674,7 @@ const removeSelectedId = (id: string) => {
         selected-icon="i-lucide-circle-check"
         :groups="groups"
         :loading="isLoading"
+        :disabled="isInteractionDisabled"
         :placeholder="t('agreement.applicant_recipients.search')"
         class="h-96">
         <template #empty>
@@ -686,6 +694,7 @@ const removeSelectedId = (id: string) => {
           color="primary"
           class="cursor-default"
           :label="t('common.save')"
+          :disabled="isInteractionDisabled"
           @click="saveSelection" />
       </div>
     </template>

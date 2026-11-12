@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyApprovalBehalfTypeSchema, AgencyApprovalBehalfTypeInitial, type AgencyApprovalBehalfTypeItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -13,10 +15,18 @@ const columns: TableColumnInput<AgencyApprovalBehalfTypeItem>[] = [
 ]
 
 const initialNewItem = { ...AgencyApprovalBehalfTypeInitial }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.approval_behalf')"
     icon="i-lucide-check-square"
     :fetch-url="`/api/agency/${agencyId}/approval-behalf-types`"

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyAgreementTypeSchema, AgencyAgreementTypeInitial, type AgencyAgreementTypeItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -13,11 +15,19 @@ const columns: TableColumnInput<AgencyAgreementTypeItem>[] = [
 ]
 
 const initialNewItem = { ...AgencyAgreementTypeInitial }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <section data-help-view="agency.agreement-types" data-field-scope="agency.agreement-types">
     <CommonResourceCrud
+      :action="action"
       help-add-target="agency.agreement-types.add"
       help-save-target="agency.agreement-types.save"
       :title="t('agency.tabs.agreement_types')"

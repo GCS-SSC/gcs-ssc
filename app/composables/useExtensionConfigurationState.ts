@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc */
+import { computed, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -11,6 +12,19 @@ interface ExtensionConfigurationRow {
   config?: GcsExtensionJsonConfig
 }
 
+type ConfigurationSession<TRow> = {
+  id: number
+  item: Ref<TRow | null>
+  acceptedSnapshot: string
+  editedVersion: number
+}
+
+type ConfigurationSave = { session: number; version: number; snapshot: string }
+
+type ConfigurationDialogState<TRow> =
+  | { kind: 'closed' }
+  | { kind: 'editing' | 'confirming-discard' | 'saving'; session: ConfigurationSession<TRow> }
+
 /**
  * Shared modal and JSON editor state used by extension configuration tabs.
  *
@@ -18,18 +32,39 @@ interface ExtensionConfigurationRow {
  */
 export const useExtensionConfigurationState = <TRow extends ExtensionConfigurationRow>() => {
   const { t } = useI18n()
-  const isModalOpen: Ref<boolean> = ref(false)
-  const isDiscardConfirmOpen: Ref<boolean> = ref(false)
-  const selectedItem: Ref<TRow | null> = ref(null)
+  const dialog: Ref<ConfigurationDialogState<TRow>> = shallowRef({ kind: 'closed' })
+  let nextSession = 0
+  const isModalOpen = computed({
+    get: () => dialog.value.kind !== 'closed',
+    set: (open: boolean) => { if (!open) closeConfigure() }
+  })
+  const isDiscardConfirmOpen = computed({
+    get: () => dialog.value.kind === 'confirming-discard',
+    set: (open: boolean) => {
+      if (dialog.value.kind === 'closed' || dialog.value.kind === 'saving') return
+      dialog.value = { kind: open ? 'confirming-discard' : 'editing', session: dialog.value.session }
+    }
+  })
+  const selectedItem = computed(() => dialog.value.kind === 'closed' ? null : dialog.value.session.item.value)
   const draftConfig: Ref<GcsExtensionJsonConfig> = ref({})
-  const initialConfigSnapshot: Ref<string> = ref('{}')
   const fallbackConfigText: Ref<string> = ref('{}')
   const fallbackConfigErrorKey: Ref<string> = ref('')
   const fallbackConfigError = computed(() => fallbackConfigErrorKey.value ? t(fallbackConfigErrorKey.value) : '')
-  const isSavingConfiguration: Ref<boolean> = ref(false)
+  const isSavingConfiguration = computed({
+    get: () => dialog.value.kind === 'saving',
+    set: (saving: boolean) => {
+      if (dialog.value.kind === 'closed') return
+      dialog.value = { kind: saving ? 'saving' : 'editing', session: dialog.value.session }
+    }
+  })
   const savingExtensionKeys: Ref<Set<string>> = ref(new Set())
 
-  const isDirty = computed(() => JSON.stringify(draftConfig.value) !== initialConfigSnapshot.value)
+  const isDirty = computed(() => fallbackConfigErrorKey.value !== '' || JSON.stringify(draftConfig.value) !== (dialog.value.kind === 'closed' ? '{}' : dialog.value.session.acceptedSnapshot))
+
+  watch([draftConfig, fallbackConfigText], () => {
+    if (dialog.value.kind === 'closed') return
+    dialog.value.session.editedVersion++
+  }, { deep: true, flush: 'sync' })
 
   const isRowBusy = (item: ExtensionConfigurationRow): boolean =>
     typeof item.extension?.key === 'string' && savingExtensionKeys.value.has(item.extension.key)
@@ -49,23 +84,55 @@ export const useExtensionConfigurationState = <TRow extends ExtensionConfigurati
       return
     }
 
-    selectedItem.value = item
+    const selected: Ref<TRow | null> = ref(null)
+    selected.value = item
     draftConfig.value = JSON.parse(JSON.stringify(item.config ?? {})) as GcsExtensionJsonConfig
-    initialConfigSnapshot.value = JSON.stringify(draftConfig.value)
     fallbackConfigText.value = JSON.stringify(draftConfig.value, null, 2)
     fallbackConfigErrorKey.value = ''
-    isModalOpen.value = true
+    dialog.value = { kind: 'editing', session: { id: ++nextSession, item: selected, acceptedSnapshot: JSON.stringify(draftConfig.value), editedVersion: 0 } }
   }
 
   const resetConfigureState = (): void => {
-    isModalOpen.value = false
-    isDiscardConfirmOpen.value = false
-    selectedItem.value = null
-    initialConfigSnapshot.value = '{}'
+    dialog.value = { kind: 'closed' }
     fallbackConfigErrorKey.value = ''
   }
 
+  const captureSession = (): number | null => dialog.value.kind === 'closed' ? null : dialog.value.session.id
+
+  const captureDraftSave = (): ConfigurationSave | null => {
+    if (dialog.value.kind === 'closed') return null
+    return {
+      session: dialog.value.session.id,
+      version: dialog.value.session.editedVersion,
+      snapshot: JSON.stringify(draftConfig.value)
+    }
+  }
+
+  const acceptCommittedDraft = (save: ConfigurationSave | null): boolean => {
+    if (!save || dialog.value.kind === 'closed' || dialog.value.session.id !== save.session) return false
+    const session = dialog.value.session
+    if (session.editedVersion === save.version) {
+      resetConfigureState()
+      return true
+    }
+    dialog.value = { kind: 'editing', session: { ...session, acceptedSnapshot: save.snapshot } }
+    return false
+  }
+
+  const closeSession = (session: number | null): boolean => {
+    if (session === null || captureSession() !== session) return false
+    resetConfigureState()
+    return true
+  }
+
+  const setSessionSaving = (session: number | null, saving: boolean): boolean => {
+    if (session === null || captureSession() !== session) return false
+    isSavingConfiguration.value = saving
+    return true
+  }
+
   const closeConfigure = (): void => {
+    if (dialog.value.kind === 'closed') return
     if (isSavingConfiguration.value) {
       return
     }
@@ -129,6 +196,11 @@ export const useExtensionConfigurationState = <TRow extends ExtensionConfigurati
     isRowBusy,
     setRowBusy,
     openConfigure,
+    captureSession,
+    captureDraftSave,
+    acceptCommittedDraft,
+    closeSession,
+    setSessionSaving,
     resetConfigureState,
     closeConfigure,
     cancelDiscardChanges,

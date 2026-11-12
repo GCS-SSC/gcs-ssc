@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -- page-local callbacks use self-descriptive signatures */
 import type { FetchError } from 'ofetch'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
-import { computed, ref, shallowReactive, watch, watchEffect } from 'vue'
+import { computed, onScopeDispose, ref, shallowReactive, watch, watchEffect } from 'vue'
 import type { Ref } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 import { useExtensionEntityTabs } from '~/composables/useExtensionEntityTabs'
@@ -69,6 +72,11 @@ const statusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const monitorId = route.params.monitorId as string
+let pageState: 'active' | 'disposed' = 'active'
+const isCurrentPage = () => pageState === 'active' && route.params.id === agreementId && route.params.monitorId === monitorId
+onScopeDispose(() => {
+  pageState = 'disposed'
+})
 const { isAssigned, status: assignmentStatus } = useEntityAssignmentRoster('fundingcasemonitor', monitorId)
 const isHeroCollapsed = getHeroCollapsed('agreement-monitor-detail')
 const itemSearch: Ref<string> = ref('')
@@ -128,56 +136,100 @@ const retryLoad = async () => {
   await Promise.all([refreshProfile(), refreshMonitor()])
 }
 
+const resourceTargets = {
+  planning: ref<string | null>(null),
+  item: ref<string | null>(null),
+  finding: ref<string | null>(null),
+  followup: ref<string | null>(null),
+  update: ref<string | null>(null),
+  practice: ref<string | null>(null)
+}
 const planningModal = useCrudModal<FundingCaseAgreementMonitorPlanningRow, FundingCaseAgreementMonitorPlanningForm>({
-  createState: () => ({ egcs_fc_fundingagreementmonitor: monitorId }),
-  updateState: item => ({ id: item.id, egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor, egcs_fc_objective: item.egcs_fc_objective })
+  createState: () => {
+    resourceTargets.planning.value = null
+    return ({ egcs_fc_fundingagreementmonitor: monitorId })
+  },
+  updateState: item => {
+    resourceTargets.planning.value = String(item.id)
+    return ({ id: item.id, egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor, egcs_fc_objective: item.egcs_fc_objective })
+  }
 })
 const itemModal = useCrudModal<FundingCaseAgreementMonitorItemsRow, FundingCaseAgreementMonitorItemsForm>({
-  createState: () => ({ egcs_fc_fundingagreementmonitor: monitorId, egcs_fc_monitored: false }),
+  createState: () => {
+    resourceTargets.item.value = null
+    return ({ egcs_fc_fundingagreementmonitor: monitorId, egcs_fc_monitored: false })
+  },
   /**
    *
    * @param item
    */
-  updateState: item => ({
-    id: item.id,
-    egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor,
-    egcs_fc_item: item.egcs_fc_item,
-    egcs_fc_monitorplanning: item.egcs_fc_monitorplanning,
-    egcs_fc_plannedstart: toDateInput(item.egcs_fc_plannedstart),
-    egcs_fc_plannedend: toDateInput(item.egcs_fc_plannedend),
-    egcs_fc_detail: item.egcs_fc_detail,
-    egcs_fc_monitored: item.egcs_fc_monitored,
-    egcs_fc_actualstart: item.egcs_fc_actualstart ? toDateInput(item.egcs_fc_actualstart) : null,
-    egcs_fc_actualend: item.egcs_fc_actualend ? toDateInput(item.egcs_fc_actualend) : null
-  })
+  updateState: item => {
+    resourceTargets.item.value = String(item.id)
+    return ({
+      id: item.id,
+      egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor,
+      egcs_fc_item: item.egcs_fc_item,
+      egcs_fc_monitorplanning: item.egcs_fc_monitorplanning,
+      egcs_fc_plannedstart: toDateInput(item.egcs_fc_plannedstart),
+      egcs_fc_plannedend: toDateInput(item.egcs_fc_plannedend),
+      egcs_fc_detail: item.egcs_fc_detail,
+      egcs_fc_monitored: item.egcs_fc_monitored,
+      egcs_fc_actualstart: item.egcs_fc_actualstart ? toDateInput(item.egcs_fc_actualstart) : null,
+      egcs_fc_actualend: item.egcs_fc_actualend ? toDateInput(item.egcs_fc_actualend) : null
+    })
+  }
 })
 const findingModal = useCrudModal<FundingCaseAgreementMonitorFindingRow, FundingCaseAgreementMonitorFindingForm>({
-  createState: () => ({ egcs_fc_fundingagreementmonitor: monitorId }),
-  updateState: item => ({ ...item })
+  createState: () => {
+    resourceTargets.finding.value = null
+    return ({ egcs_fc_fundingagreementmonitor: monitorId })
+  },
+  updateState: item => {
+    resourceTargets.finding.value = String(item.id)
+    return ({ ...item })
+  }
 })
 const followupModal = useCrudModal<FundingCaseAgreementMonitorFollowupRow, FundingCaseAgreementMonitorFollowupForm>({
-  createState: () => ({ egcs_fc_fundingagreementmonitor: monitorId }),
+  createState: () => {
+    resourceTargets.followup.value = null
+    return ({ egcs_fc_fundingagreementmonitor: monitorId })
+  },
   /**
    *
    * @param item
    */
-  updateState: item => ({
-    id: item.id,
-    egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor,
-    egcs_fc_followupname: item.egcs_fc_followupname,
-    egcs_fc_monitorfinding: item.egcs_fc_monitorfinding,
-    egcs_fc_responsibleparty: item.egcs_fc_responsibleparty,
-    egcs_fc_duedate: toDateInput(item.egcs_fc_duedate),
-    egcs_fc_requiresreceivable: item.egcs_fc_requiresreceivable
-  })
+  updateState: item => {
+    resourceTargets.followup.value = String(item.id)
+    return ({
+      id: item.id,
+      egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor,
+      egcs_fc_followupname: item.egcs_fc_followupname,
+      egcs_fc_monitorfinding: item.egcs_fc_monitorfinding,
+      egcs_fc_responsibleparty: item.egcs_fc_responsibleparty,
+      egcs_fc_duedate: toDateInput(item.egcs_fc_duedate),
+      egcs_fc_requiresreceivable: item.egcs_fc_requiresreceivable
+    })
+  }
 })
 const updateModal = useCrudModal<FundingCaseAgreementMonitorFollowupUpdateRow, FundingCaseAgreementMonitorFollowupUpdateForm>({
-  createState: () => ({ egcs_fc_status: 'open', egcs_fc_updatedate: toDateInput(new Date().toISOString()) }),
-  updateState: item => ({ ...item, egcs_fc_updatedate: toDateInput(item.egcs_fc_updatedate) })
+  createState: () => {
+    resourceTargets.update.value = null
+    return ({ egcs_fc_status: 'open', egcs_fc_updatedate: toDateInput(new Date().toISOString()) })
+  },
+  updateState: item => {
+    resourceTargets.update.value = String(item.id)
+    return ({ ...item, egcs_fc_updatedate: toDateInput(item.egcs_fc_updatedate) })
+  }
 })
 const practiceModal = useCrudModal<FundingCaseAgreementMonitorPromisingPracticeRow, FundingCaseAgreementMonitorPromisingPracticeForm>({
-  createState: () => ({ egcs_fc_fundingagreementmonitor: monitorId }),
-  updateState: item => ({ ...item })
+  createState: () => {
+    resourceTargets.practice.value = null
+    return ({ egcs_fc_fundingagreementmonitor: monitorId })
+  },
+  updateState: item => {
+    resourceTargets.practice.value = String(item.id)
+    return ({ ...item })
+  }
 })
 
 const selectedPlanning = planningModal.selected
@@ -240,6 +292,44 @@ const findingRows = computed<FundingCaseAgreementMonitorFindingRow[]>(() => moni
 const followupRows = computed<FundingCaseAgreementMonitorFollowupRow[]>(() => monitor.value?.followups ?? [])
 const practiceRows = computed<FundingCaseAgreementMonitorPromisingPracticeRow[]>(() => monitor.value?.promisingPractices ?? [])
 const followupUpdateRows = computed<FundingCaseAgreementMonitorFollowupUpdateRow[]>(() => monitor.value?.followupUpdates ?? [])
+const ownsMonitorAdmission = () => isCurrentPage() && monitor.value?.id === monitorId
+  && !hasLoadError.value && isAssigned.value && !isMonitorLocked.value
+const createResourceContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.monitorId],
+  authority: canCreateMonitorResource,
+  eligible: ownsMonitorAdmission
+})
+const updateResourceContext = (target: Ref<string | null>, rows: () => readonly { id: string | number }[]) => useActionContext({
+  identity: [() => route.params.id, () => route.params.monitorId, target],
+  authority: canUpdateMonitorRole,
+  eligible: () => ownsMonitorAdmission() && rows().some(row => String(row.id) === target.value)
+})
+const resourceUpdateContexts = {
+  planning: updateResourceContext(resourceTargets.planning, () => planningRows.value),
+  item: updateResourceContext(resourceTargets.item, () => itemRows.value),
+  finding: updateResourceContext(resourceTargets.finding, () => findingRows.value),
+  followup: updateResourceContext(resourceTargets.followup, () => followupRows.value),
+  update: updateResourceContext(resourceTargets.update, () => followupUpdateRows.value),
+  practice: updateResourceContext(resourceTargets.practice, () => practiceRows.value)
+}
+const metadataContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.monitorId],
+  authority: canUpdateMonitorRole,
+  eligible: ownsMonitorAdmission
+})
+const committedReadback = async () => {
+  await refreshMonitor()
+  return monitorStatus.value === 'success' && !monitorError.value
+    ? { kind: 'available' as const }
+    : { kind: 'unavailable' as const, error: monitorError.value }
+}
+const captureCreateCommitted = useCommittedSettlement({ context: createResourceContext, settle: committedReadback })
+const captureUpdateCommitted = useCommittedSettlement({ context: metadataContext, settle: committedReadback })
+const deleteResourceContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.monitorId],
+  authority: canDeleteMonitorResource,
+  eligible: ownsMonitorAdmission
+})
 const planningOptions = computed(() => planningRows.value.map(row => ({ id: String(row.id), label_en: row.egcs_fc_objective, label_fr: row.egcs_fc_objective })))
 const itemOptions = computed(() => itemRows.value.map(row => ({ id: String(row.id), label_en: row.egcs_fc_item, label_fr: row.egcs_fc_item })))
 const findingOptions = computed(() => findingRows.value.map(row => ({ id: String(row.id), label_en: row.egcs_fc_findingname, label_fr: row.egcs_fc_findingname })))
@@ -345,35 +435,43 @@ const openMetadataEditor = () => {
 }
 
 const saveResource = async <T extends { id?: string | number }>(
-  key: string,
+  key: keyof typeof resourceUpdateContexts,
   path: AgreementMonitorResourcePath,
   selected: Ref<T | null>,
   modal: {
     captureSession: () => CrudModalSession | null
     closeSession: (session: CrudModalSession | null) => boolean
+    isLatestSession: (session: CrudModalSession | null) => boolean
   }
 ) => {
-  if (!selected.value) return
+  if (!isCurrentPage() || !selected.value) return
   const resourceState = selected.value
-  const isUpdate = Boolean(resourceState.id)
+  const resourceId = resourceTargets[key].value
+  const isUpdate = resourceId !== null
   if (!guardMonitorAction(isUpdate ? 'update' : 'create')) return
+  const operation = (isUpdate ? resourceUpdateContexts[key] : createResourceContext).capture()
+  const committed = (isUpdate ? captureUpdateCommitted : captureCreateCommitted)()
+  if (!operation?.canDispatch() || !committed?.canDispatch()) return
   const session = modal.captureSession()
   const pendingKey = `${key}:${session}`
   if (pendingResourceSessions.has(pendingKey)) return
   pendingResourceSessions.add(pendingKey)
   try {
-    const request = buildAgreementMonitorResourceSaveRequest(agreementId, path, resourceState.id)
-    await saveJson(
-      request.url,
-      request.method,
-      resourceState
-    )
-    if (modal.captureSession() !== session) return
-    await refreshMonitor()
-    if (!modal.closeSession(session)) return
+    try {
+      const request = buildAgreementMonitorResourceSaveRequest(agreementId, path, resourceId ?? undefined)
+      await saveJson(
+        request.url,
+        request.method,
+        resourceState
+      )
+    } catch (error: unknown) {
+      if (isCurrentPage() && operation.isCurrent() && modal.captureSession() === session) showError(error)
+      return
+    }
+    const closesInitiatingSession = operation.isCurrent() && isCurrentPage() && modal.closeSession(session)
+    const settlement = await committed.settle()
+    if (settlement.kind !== 'refreshed' || !modal.isLatestSession(session) || !closesInitiatingSession) return
     toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
-  } catch (error: unknown) {
-    if (modal.captureSession() === session) showError(error)
   } finally {
     pendingResourceSessions.delete(pendingKey)
   }
@@ -389,26 +487,39 @@ const saveFinding = async () => await saveResource('finding', 'monitor-findings'
 const saveFollowup = async () => await saveResource('followup', 'monitor-followups', selectedFollowup, followupModal)
 const saveUpdate = async () => await saveResource('update', 'monitor-followup-updates', selectedUpdate, updateModal)
 const savePractice = async () => await saveResource('practice', 'monitor-promising-practices', selectedPractice, practiceModal)
+const planningFormSession = useFormSession({ owner: planningModal, action: { kind: 'remote', context: () => resourceTargets.planning.value !== null ? resourceUpdateContexts.planning : createResourceContext }, submit: savePlanning, onDenied: () => guardMonitorAction(resourceTargets.planning.value !== null ? 'update' : 'create') })
+const itemFormSession = useFormSession({ owner: itemModal, action: { kind: 'remote', context: () => resourceTargets.item.value !== null ? resourceUpdateContexts.item : createResourceContext }, submit: saveItem, onDenied: () => guardMonitorAction(resourceTargets.item.value !== null ? 'update' : 'create') })
+const findingFormSession = useFormSession({ owner: findingModal, action: { kind: 'remote', context: () => resourceTargets.finding.value !== null ? resourceUpdateContexts.finding : createResourceContext }, submit: saveFinding, onDenied: () => guardMonitorAction(resourceTargets.finding.value !== null ? 'update' : 'create') })
+const followupFormSession = useFormSession({ owner: followupModal, action: { kind: 'remote', context: () => resourceTargets.followup.value !== null ? resourceUpdateContexts.followup : createResourceContext }, submit: saveFollowup, onDenied: () => guardMonitorAction(resourceTargets.followup.value !== null ? 'update' : 'create') })
+const updateFormSession = useFormSession({ owner: updateModal, action: { kind: 'remote', context: () => resourceTargets.update.value !== null ? resourceUpdateContexts.update : createResourceContext }, submit: saveUpdate, onDenied: () => guardMonitorAction(resourceTargets.update.value !== null ? 'update' : 'create') })
+const practiceFormSession = useFormSession({ owner: practiceModal, action: { kind: 'remote', context: () => resourceTargets.practice.value !== null ? resourceUpdateContexts.practice : createResourceContext }, submit: savePractice, onDenied: () => guardMonitorAction(resourceTargets.practice.value !== null ? 'update' : 'create') })
 
 /**
  *
  */
 const saveMonitorMetadata = async () => {
-  if (!monitorMetadata.value || isSavingMonitorMetadata.value || !guardMonitorAction('update')) {
+  if (!isCurrentPage() || !isMetadataModalOpen.value || !monitorMetadata.value || isSavingMonitorMetadata.value || !guardMonitorAction('update')) {
     return
   }
 
+  const operation = metadataContext.capture()
+  const committed = captureUpdateCommitted()
+  if (!operation?.canDispatch() || !committed?.canDispatch()) return
   const session = metadataSession.value
   pendingMetadataSessions.add(session)
   try {
-    await saveJson(`/api/agreements/${agreementId}/monitors/${monitorId}`, 'PATCH', monitorMetadata.value)
-    if (metadataSession.value !== session) return
-    await refreshMonitor()
-    if (metadataSession.value !== session) return
-    isMetadataModalOpen.value = false
+    try {
+      await saveJson(`/api/agreements/${agreementId}/monitors/${monitorId}`, 'PATCH', monitorMetadata.value)
+    } catch (error: unknown) {
+      if (isCurrentPage() && operation.isCurrent() && metadataSession.value === session) showError(error)
+      return
+    }
+    const closesInitiatingSession = isCurrentPage() && operation.isCurrent() && metadataSession.value === session
+    if (closesInitiatingSession) isMetadataModalOpen.value = false
+    const feedbackSession = metadataSession.value
+    const settlement = await committed.settle()
+    if (settlement.kind !== 'refreshed' || !closesInitiatingSession || metadataSession.value !== feedbackSession) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
-  } catch (error: unknown) {
-    if (metadataSession.value === session) showError(error)
   } finally {
     pendingMetadataSessions.delete(session)
   }
@@ -419,21 +530,49 @@ const saveMonitorMetadata = async () => {
  * @param path
  * @param id
  */
+const resolveResource = (path: AgreementMonitorResourcePath, id: string) => {
+  switch (path) {
+    case 'monitor-planning': return planningRows.value.find(row => String(row.id) === id)
+    case 'monitor-items': return itemRows.value.find(row => String(row.id) === id)
+    case 'monitor-findings': return findingRows.value.find(row => String(row.id) === id)
+    case 'monitor-followups': return followupRows.value.find(row => String(row.id) === id)
+    case 'monitor-followup-updates': return followupUpdateRows.value.find(row => String(row.id) === id)
+    case 'monitor-promising-practices': return practiceRows.value.find(row => String(row.id) === id)
+  }
+}
+
 const deleteResource = async (path: AgreementMonitorResourcePath, id: string) => {
   const pendingKey = `${path}:${id}`
-  if (pendingResourceDeletes.has(pendingKey) || !guardMonitorAction('delete')) return
+  if (!isCurrentPage() || pendingResourceDeletes.has(pendingKey) || !guardMonitorAction('delete')) return
+  const operation = deleteResourceContext.capture()
+  if (!operation?.canDispatch()) return
   pendingResourceDeletes.add(pendingKey)
   try {
-    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/${path}/${id}`, { shouldProceed: () => guardMonitorAction('delete') })
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/${path}/${id}`, {
+      operation,
+      target: { id, resolve: () => resolveResource(path, id), eligible: ownsMonitorAdmission },
+      shouldProceed: () => isCurrentPage() && guardMonitorAction('delete')
+    })
+    if (!ok || !isCurrentPage() || !operation.isCurrent()) return
     await refreshMonitor()
+    if (!isCurrentPage() || !operation.isCurrent()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentPage() && operation.isCurrent()) showError(error)
   } finally {
     pendingResourceDeletes.delete(pendingKey)
   }
 }
+
+const metadataFormSession = useFormSession({
+  action: { kind: 'remote', context: metadataContext },
+  owner: {
+    captureSession: () => isMetadataModalOpen.value ? metadataSession.value : null,
+    isCurrentSession: session => isCurrentPage() && isMetadataModalOpen.value && session === metadataSession.value
+  },
+  submit: saveMonitorMetadata,
+  onDenied: () => guardMonitorAction('update')
+})
 
 const isResourceDeleting = (path: AgreementMonitorResourcePath, id: string | number) => (
   pendingResourceDeletes.has(`${path}:${id}`)
@@ -704,6 +843,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
             <section v-else-if="selectedMonitorTab === 'workflow'" data-help-view="casework.monitors.workflow" data-help-target="casework.monitors.detail.workflow" data-help-kind="section" class="w-full min-w-0 space-y-6">
               <CommonCompletionPanel
+                :mutation-role-allowed="canUpdateMonitorRole"
                 entity-type="fundingcasemonitor"
                 :entity-id="monitorId"
                 :can-complete="canUpdateMonitor"
@@ -734,6 +874,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
             <CommonWorkflowSection
               v-else-if="selectedMonitorTab === 'workflows'"
+              :mutation-role-allowed="canUpdateMonitorRole"
               data-help-view="casework.monitors.workflows"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId"
@@ -777,11 +918,11 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
       <template #body>
         <UForm
           v-if="monitorMetadata"
+          v-bind="metadataFormSession"
           :state="monitorMetadata"
           :validate="validateMonitorMetadata"
           :validate-on="[]"
-          class="space-y-4"
-          @submit="saveMonitorMetadata">
+          class="space-y-4">
           <div class="space-y-4">
             <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
               <CommonServerLookupSelect
@@ -844,7 +985,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
     <UModal v-if="selectedPlanning" v-model:open="isPlanningModalOpen" data-help-view="casework.monitors.detail.is-planning-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Planning" data-scope-label-fr="Ententes > Surveillances > Planification" :title="selectedPlanning.id ? t('agreement.monitors.planning.edit') : t('agreement.monitors.planning.add')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedPlanning" :validate="validatePlanning" :validate-on="[]" class="space-y-4" @submit="savePlanning">
+        <UForm v-bind="planningFormSession" :state="selectedPlanning" :validate="validatePlanning" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.monitors.planning.objective')" name="egcs_fc_objective">
             <UTextarea v-model="selectedPlanning.egcs_fc_objective" class="w-full" />
           </UFormField>
@@ -857,7 +998,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
     <UModal v-if="selectedItem" v-model:open="isItemModalOpen" data-help-view="casework.monitors.detail.is-item-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Monitor items" data-scope-label-fr="Ententes > Surveillances > Éléments de surveillance" :title="selectedItem.id ? t('agreement.monitors.items.edit') : t('agreement.monitors.items.add')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedItem" :validate="validateItem" :validate-on="[]" class="space-y-4" @submit="saveItem">
+        <UForm v-bind="itemFormSession" :state="selectedItem" :validate="validateItem" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.monitors.items.item')" name="egcs_fc_item">
             <UInput v-model="selectedItem.egcs_fc_item" class="w-full" />
           </UFormField>
@@ -893,7 +1034,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
     <UModal v-if="selectedFinding" v-model:open="isFindingModalOpen" data-help-view="casework.monitors.detail.is-finding-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Findings" data-scope-label-fr="Ententes > Surveillances > Constatations" :title="selectedFinding.id ? t('agreement.monitors.findings.edit') : t('agreement.monitors.findings.add')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedFinding" :validate="validateFinding" :validate-on="[]" class="space-y-4" @submit="saveFinding">
+        <UForm v-bind="findingFormSession" :state="selectedFinding" :validate="validateFinding" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.monitors.findings.item_link')" name="egcs_fc_monitoritem">
             <CommonBilingualSelectMenu v-model="selectedFinding.egcs_fc_monitoritem" :items="itemOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
           </UFormField>
@@ -918,7 +1059,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
     <UModal v-if="selectedFollowup" v-model:open="isFollowupModalOpen" data-help-view="casework.monitors.detail.is-followup-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-ups" data-scope-label-fr="Ententes > Surveillances > Suivis" :title="selectedFollowup.id ? t('agreement.monitors.followups.edit') : t('agreement.monitors.followups.add')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedFollowup" :validate="validateFollowup" :validate-on="[]" class="space-y-4" @submit="saveFollowup">
+        <UForm v-bind="followupFormSession" :state="selectedFollowup" :validate="validateFollowup" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.monitors.followups.finding_link')" name="egcs_fc_monitorfinding">
             <CommonBilingualSelectMenu v-model="selectedFollowup.egcs_fc_monitorfinding" :items="findingOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
           </UFormField>
@@ -943,7 +1084,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
     <UModal v-if="selectedUpdate" v-model:open="isUpdateModalOpen" data-help-view="casework.monitors.detail.is-update-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-up updates" data-scope-label-fr="Ententes > Surveillances > Mises à jour des suivis" :title="selectedUpdate.id ? t('agreement.monitors.followups.edit_update') : t('agreement.monitors.followups.add_update')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedUpdate" :validate="validateUpdate" :validate-on="[]" class="space-y-4" @submit="saveUpdate">
+        <UForm v-bind="updateFormSession" :state="selectedUpdate" :validate="validateUpdate" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.monitors.followups.update')" name="egcs_fc_update">
             <UTextarea v-model="selectedUpdate.egcs_fc_update" />
           </UFormField>
@@ -998,7 +1139,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
     <UModal v-if="selectedPractice" v-model:open="isPracticeModalOpen" data-help-view="casework.monitors.detail.is-practice-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Promising practices" data-scope-label-fr="Ententes > Surveillances > Pratiques prometteuses" :title="selectedPractice.id ? t('agreement.monitors.promising_practices.edit') : t('agreement.monitors.promising_practices.add')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedPractice" :validate="validatePractice" :validate-on="[]" class="space-y-4" @submit="savePractice">
+        <UForm v-bind="practiceFormSession" :state="selectedPractice" :validate="validatePractice" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.monitors.promising_practices.practice')" name="egcs_fc_practice">
             <UTextarea v-model="selectedPractice.egcs_fc_practice" />
           </UFormField>

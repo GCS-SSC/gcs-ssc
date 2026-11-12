@@ -3,7 +3,7 @@ import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { nanoid } from 'nanoid'
 import type { MoneyInput } from '~~/shared/utils/money'
 import type { FormError } from '#ui/types'
-import { toValue } from 'vue'
+import { getCurrentScope, onScopeDispose, toValue } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import {
   TransferPaymentWizardSchema,
@@ -99,6 +99,10 @@ export const useTransferPaymentWizardModal = ({
 
   const state: Ref<TransferPaymentWizardForm | null> = ref(null)
   const wizardErrors: Ref<FormError[]> = ref([])
+  let disposed = false
+  if (getCurrentScope()) onScopeDispose(() => {
+    disposed = true
+  })
 
   const steps = computed<WizardStepItem<TransferPaymentWizardStepValue>[]>(() => [
     {
@@ -282,9 +286,10 @@ export const useTransferPaymentWizardModal = ({
   const validateWizardSchema = createValidator(TransferPaymentWizardSchema)
 
   const validateWizard = withFormRequirements(async (wizardState: TransferPaymentWizardForm) => {
+    const requestedAgencyId = resolvedDefaultAgencyId.value
     clearErrors()
     const result = await validateWizardSchema(wizardState)
-    wizardErrors.value = result
+    if (!disposed && open.value && state.value === wizardState && resolvedDefaultAgencyId.value === requestedAgencyId) wizardErrors.value = result
     return result
   }, TransferPaymentWizardSchema)
 
@@ -322,13 +327,17 @@ export const useTransferPaymentWizardModal = ({
 
   watch(
     resolvedDefaultAgencyId,
-    agencyId => {
+    (agencyId, previousAgencyId) => {
       if (!open.value || !state.value || !agencyId) return
+      if (previousAgencyId && agencyId !== previousAgencyId) {
+        initializeState()
+        return
+      }
       if (!state.value.profile.egcs_tp_agency) {
         state.value.profile.egcs_tp_agency = agencyId
       }
     },
-    { immediate: true }
+    { immediate: true, flush: 'sync' }
   )
 
   const getOutcomeLabel = (outcome: TransferPaymentWizard['outcomes'][number]) => {

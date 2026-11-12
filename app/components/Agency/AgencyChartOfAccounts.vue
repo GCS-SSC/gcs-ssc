@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyChartOfAccountSchema, type AgencyChartOfAccountItem } from '~~/shared/types/schemas/transfer-payment'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -29,10 +31,18 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
   state.egcs_ay_accountingdimensions ??= []
   state.egcs_ay_accountingdimensions.push({ label_en: '', label_fr: '', value: '' })
 }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.chart_of_accounts')"
     icon="i-lucide-table-properties"
     :fetch-url="`/api/agency/${agencyId}/chart-of-accounts`"

@@ -1,11 +1,18 @@
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- generic CRUD helpers are documented by their option and return types */
 import type { z } from 'zod'
-import { computed, onBeforeUnmount, ref, watch, toValue } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch, toValue, toRaw } from 'vue'
 import type { ComputedRef, MaybeRef, MaybeRefOrGetter, Ref } from 'vue'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import type { ActionContext } from '~/composables/useActionContext'
 import type { ResourceTableStatus } from '~~/shared/types/resource-table'
 
+export type ResourceCrudAction =
+  | { kind: 'read-only' }
+  | { kind: 'remote'; create: ActionContext; update: ActionContext; delete: ActionContext }
+
 interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, unknown>> {
+  action: MaybeRefOrGetter<ResourceCrudAction>
+  deleteEligible?: (row: T) => boolean
   title: MaybeRefOrGetter<string>
   fetchUrl: MaybeRef<string>
   staticItems?: MaybeRefOrGetter<T[] | undefined>
@@ -15,7 +22,7 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
   deleteUrlBase?: MaybeRefOrGetter<string | undefined>
   updateMethod?: 'PATCH' | 'PUT'
   schema: z.ZodTypeAny
-  initialNewItem?: Partial<T> | null
+  initialNewItem?: MaybeRefOrGetter<Partial<T> | null>
   beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
@@ -31,6 +38,8 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
 
 /** Centralizes list, modal, save, and confirmed-delete state for generic resources. */
 export const useResourceCrudState = <T extends { id: string } & Record<string, unknown>>({
+  action,
+  deleteEligible = () => true,
   title,
   fetchUrl,
   staticItems,
@@ -61,6 +70,10 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   const { confirmDeleteRequest } = useConfirmDeleteRequest()
   const { saveJson } = useJsonRequest()
 
+  const actionContext = (kind: 'create' | 'update' | 'delete') => {
+    const policy = toValue(action)
+    return policy.kind === 'remote' ? policy[kind] : null
+  }
   const isStaticResource = staticItems !== undefined
   const resolvedStaticItems: T[] = toValue(staticItems) ?? []
   const liveResource = !isStaticResource
@@ -72,7 +85,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   const staticSearch: Ref<string> = ref('')
   const staticStatusFilter: Ref<string> = ref('all')
   const staticPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({ pageIndex: 0, pageSize: Math.max(resolvedStaticItems.length, 1) })
-  const staticRows = ref(resolvedStaticItems) as Ref<T[]>
+  const staticRows: Ref<T[]> = shallowRef(resolvedStaticItems)
   const staticTotal: Ref<number> = ref(resolvedStaticItems.length)
   const staticStatus: Ref<ResourceTableStatus> = ref('success')
   const staticRefresh = async () => undefined
@@ -127,14 +140,20 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     statusFilter.value = value
   })
 
-  const isEditing: Ref<boolean> = ref(false)
-  let originalItem: T | null = null
-  const isDeleting: Ref<boolean> = ref(false)
+  type FormMode = { kind: 'create' } | { kind: 'update'; original: T }
+  const formMode: Ref<FormMode> = shallowRef({ kind: 'create' })
+  const isEditing = computed(() => formMode.value.kind === 'update')
+  const deletion: Ref<{ kind: 'idle' } | { kind: 'pending'; token: object }> = shallowRef({ kind: 'idle' })
+  const isDeleting = computed(() => deletion.value.kind === 'pending')
 
-  const createInitialFormState = () => (initialNewItem ? { ...initialNewItem } : {})
+  const clone = <Value>(value: Value): Value => structuredClone(toRaw(value))
+  const createInitialFormState = () => {
+    const defaults = toValue(initialNewItem)
+    return defaults ? clone(defaults) : {}
+  }
   const modal = useCrudModal<T, Partial<T>>({
     createState: createInitialFormState,
-    updateState: item => ({ ...item })
+    updateState: item => clone(item)
   })
   const {
     isOpen: isModalOpen,
@@ -147,23 +166,22 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   const savePending = useCrudModalPending(captureSession)
   const isSaving = savePending.isPending
 
-  let generation = 0
-  let disposed = false
+  type ResourceContext = { kind: 'active'; token: object } | { kind: 'disposed' }
+  const context: Ref<ResourceContext> = shallowRef({ kind: 'active', token: {} })
   watch(() => toValue(fetchUrl), () => {
-    generation++
-    originalItem = null
+    if (context.value.kind !== 'disposed') context.value = { kind: 'active', token: {} }
     closeModal()
-    isDeleting.value = false
+    deletion.value = { kind: 'idle' }
   }, { flush: 'sync' })
   onBeforeUnmount(() => {
-    disposed = true
-    generation++
+    context.value = { kind: 'disposed' }
   })
-  const canSave = computed(() => !disposed && !isStaticResource && (isEditing.value
+  const formActionContext = computed(() => actionContext(isEditing.value ? 'update' : 'create'))
+  const canSave = computed(() => toValue(action).kind === 'remote' && context.value.kind === 'active' && !isStaticResource && (isEditing.value
     ? Boolean(toValue(updateUrlBase))
     : toValue(createAllowed)))
 
-  const canUpdate: ComputedRef<boolean> = computed(() => Boolean(toValue(updateUrlBase)))
+  const canUpdate: ComputedRef<boolean> = computed(() => toValue(action).kind === 'remote' && Boolean(toValue(updateUrlBase)))
   const resolvedModalTitle: ComputedRef<string> = computed(() => {
     if (isEditing.value) {
       return toValue(updateTitle) || t('common.update')
@@ -179,24 +197,24 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     return toValue(buttonLabel) || t('common.add')
   })
 
-  let opening: object | null = null
+  let opening: { kind: 'idle' } | { kind: 'checking'; token: object } = { kind: 'idle' }
   let modalRevision = 0
   watch(captureSession, () => {
     modalRevision++
-    opening = null
+    opening = { kind: 'idle' }
   }, { flush: 'sync' })
   watch(() => toValue(fetchUrl), () => {
-    opening = null
+    opening = { kind: 'idle' }
   }, { flush: 'sync' })
 
   const open = (action: 'create' | 'update', item: T | null) => {
-    const allowed = () => !disposed && !isStaticResource && (action === 'create'
+    const operation = actionContext(action)?.capture()
+    const allowed = () => Boolean(operation?.canDispatch()) && context.value.kind === 'active' && !isStaticResource && (action === 'create'
       ? toValue(createAllowed)
       : Boolean(toValue(updateUrlBase)))
-    if (!allowed() || opening) return
+    if (!allowed() || opening.kind === 'checking') return
     const apply = () => {
-      isEditing.value = action === 'update'
-      originalItem = item ? { ...item } : null
+      formMode.value = item ? { kind: 'update', original: clone(item) } : { kind: 'create' }
       if (item) modal.openUpdate(item)
       else modal.openCreate()
     }
@@ -206,11 +224,11 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
       return
     }
     const token = {}
-    opening = token
-    const requestedGeneration = generation
+    opening = { kind: 'checking', token }
+    const requestedContext = context.value
     const requestedModalRevision = modalRevision
-    const shouldProceed = () => opening === token
-      && generation === requestedGeneration
+    const shouldProceed = () => opening.kind === 'checking' && opening.token === token
+      && context.value === requestedContext
       && modalRevision === requestedModalRevision
       && allowed()
     return (async () => {
@@ -219,7 +237,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
       } catch (error: unknown) {
         if (shouldProceed()) showError(error)
       } finally {
-        if (opening === token) opening = null
+        if (opening.kind === 'checking' && opening.token === token) opening = { kind: 'idle' }
       }
     })()
   }
@@ -228,16 +246,20 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   const openUpdate = (item: T) => open('update', item)
 
   /** Creates or updates the modal item, emits the matching event, and refreshes the list. */
-  const saveItem = async () => {
+  const saveItem = async ({ onSaved }: { onSaved?: () => void } = {}) => {
     const currentState = formState.value
-    if (disposed || !currentState || !canSave.value) {
+    if (context.value.kind === 'disposed' || !currentState || !canSave.value) {
       return
     }
+    const operation = formActionContext.value?.capture()
+    if (!operation) return
     const session = captureSession()
     if (!isCurrentSession(session) || !savePending.begin(session)) return
     const editing = isEditing.value
-    const requestedGeneration = generation
-    const isCurrentTarget = () => !disposed && requestedGeneration === generation
+    const requestedContext = context.value
+    const originalItem = formMode.value.kind === 'update' ? formMode.value.original : null
+    const isCurrentTarget = () => context.value.kind === 'active' && context.value === requestedContext
+      && operation.isCurrent()
     const refreshCurrentTarget = async () => {
       if (!isCurrentTarget()) return
       try {
@@ -248,10 +270,10 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     }
 
     try {
-      if (beforeSave && !await beforeSave(currentState, originalItem, () => isCurrentTarget() && isCurrentSession(session) && canSave.value)) return
-      if (!isCurrentTarget() || !isCurrentSession(session) || !canSave.value) return
+      if (beforeSave && !await beforeSave(currentState, originalItem, () => isCurrentTarget() && operation.canDispatch() && isCurrentSession(session) && canSave.value)) return
+      if (!isCurrentTarget() || !operation.canDispatch() || !isCurrentSession(session) || !canSave.value) return
       if (editing) {
-        const updateId = currentState.id
+        const updateId = originalItem?.id
         const resolvedUpdateUrlBase = toValue(updateUrlBase)
         if (!updateId || !resolvedUpdateUrlBase) {
           const message = 'Unable to save: missing id or endpoint'
@@ -275,6 +297,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
         await refreshCurrentTarget()
         return
       }
+      onSaved?.()
     } catch (error: unknown) {
       if (isCurrentTarget() && isCurrentSession(session)) {
         showError(error)
@@ -305,17 +328,21 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
 
   /** Confirms deletion, scopes settlement to the resource identity, and refreshes after success. */
   const deleteItem = async (id: string) => {
-    const requestedGeneration = generation
-    const isCurrentTarget = () => !disposed && requestedGeneration === generation
+    const operation = actionContext('delete')?.capture()
+    if (!operation) return
+    const requestedContext = context.value
+    const isCurrentTarget = () => context.value.kind === 'active' && context.value === requestedContext && operation.isCurrent()
     const resolvedDeleteUrlBase = toValue(deleteUrlBase)
-    if (disposed || !resolvedDeleteUrlBase || isDeleting.value) {
+    if (context.value.kind === 'disposed' || !resolvedDeleteUrlBase || isDeleting.value) {
       return
     }
 
+    const token = {}
+    deletion.value = { kind: 'pending', token }
     try {
-      isDeleting.value = true
-
       const deleted = await confirmDeleteRequest(`${resolvedDeleteUrlBase}/${id}`, {
+        operation,
+        target: { id, resolve: () => items.value.find(row => String(row.id) === id), eligible: deleteEligible },
         description: t(toValue(deleteConfirmKey)),
         ...(beforeDelete ? { confirm: () => beforeDelete(id, () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase) } : {}),
         shouldProceed: () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase
@@ -334,7 +361,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
       if (isCurrentTarget()) showError(error)
       return
     } finally {
-      if (isCurrentTarget()) isDeleting.value = false
+      if (deletion.value.kind === 'pending' && deletion.value.token === token) deletion.value = { kind: 'idle' }
     }
 
     try {
@@ -345,6 +372,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   }
 
   return {
+    formActionContext,
     validate,
     search,
     tableStatusFilter,

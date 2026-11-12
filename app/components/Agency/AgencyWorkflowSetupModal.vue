@@ -1,6 +1,11 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
-import { ref, watch } from 'vue'
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 import type { Ref } from 'vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -25,12 +30,18 @@ type WorkflowSetupItem = {
 const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 const state: Ref<WorkflowSetupItem | null> = defineModel<WorkflowSetupItem | null>('state', { default: null })
-const { agencyId } = defineProps<{ agencyId: string }>()
+const { agencyId, actionContext, captureCommitted } = defineProps<{ agencyId: string, actionContext: ActionContext, captureCommitted: CaptureCommittedSettlement }>()
 const { t } = useI18n()
 const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
 const validate = createValidator(CommonWorkflowSetupCreateSchema)
-const isSubmitting: Ref<boolean> = ref(false)
+const modalSession = useModalSession()
+watch([open, state, () => agencyId], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null
+}, { immediate: true, flush: 'sync' })
+const pending = useCrudModalPending(modalSession.captureSession)
+const isSubmitting = pending.isPending
 const { entityTypes, purposeOptions, error: entityTypesError, status: entityTypesStatus, refresh: refreshEntityTypes } = useAgencyWorkflowEntityTypes(
   () => agencyId,
   () => state.value?.egcs_cn_entitytype
@@ -46,49 +57,53 @@ watch(() => state.value?.egcs_cn_purpose, purpose => {
 })
 
 const save = async () => {
-  if (!state.value || isSubmitting.value) return
-  const requestState = state.value
-  const requestAgencyId = agencyId
-  const isCurrentRequest = () => open.value
-    && state.value === requestState
-    && agencyId === requestAgencyId
+  const session = modalSession.captureSession()
+  const committed = captureCommitted()
+  const operation = actionContext.capture()
+  if (!state.value || !committed || !operation || session === null || !pending.begin(session)) return
+  const isCurrentRequest = () => operation.isCurrent() && modalSession.isCurrentSession(session)
   try {
-    isSubmitting.value = true
-    const url = `/api/agency/${agencyId}/workflows`
-    const body = {
-      egcs_cn_entitytype: state.value.egcs_cn_entitytype,
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_description_en: state.value.egcs_cn_description_en,
-      egcs_cn_description_fr: state.value.egcs_cn_description_fr,
-      egcs_cn_purpose: state.value.egcs_cn_purpose,
-      egcs_cn_allowedstartstatuses: state.value.egcs_cn_allowedstartstatuses,
-      egcs_cn_cancellationstatus: state.value.egcs_cn_cancellationstatus,
-      egcs_cn_executionfailurestatus: state.value.egcs_cn_executionfailurestatus,
-      egcs_cn_allowretry: state.value.egcs_cn_allowretry,
-      egcs_cn_riskratingrequired: state.value.egcs_cn_riskratingrequired ?? false
+    try {
+      const url = `/api/agency/${agencyId}/workflows`
+      const body = {
+        egcs_cn_entitytype: state.value.egcs_cn_entitytype,
+        egcs_cn_name_en: state.value.egcs_cn_name_en,
+        egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+        egcs_cn_description_en: state.value.egcs_cn_description_en,
+        egcs_cn_description_fr: state.value.egcs_cn_description_fr,
+        egcs_cn_purpose: state.value.egcs_cn_purpose,
+        egcs_cn_allowedstartstatuses: state.value.egcs_cn_allowedstartstatuses,
+        egcs_cn_cancellationstatus: state.value.egcs_cn_cancellationstatus,
+        egcs_cn_executionfailurestatus: state.value.egcs_cn_executionfailurestatus,
+        egcs_cn_allowretry: state.value.egcs_cn_allowretry,
+        egcs_cn_riskratingrequired: state.value.egcs_cn_riskratingrequired ?? false
+      }
+      if (!committed.canDispatch() || !operation.canDispatch()) return
+      const response = await fetch(getClientRequestUrl(url), {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
+      })
+      if (!response.ok) await throwFetchResponseError(response)
+    } catch (error) {
+      if (isCurrentRequest()) showError(error)
+      return
     }
-    const response = await fetch(getClientRequestUrl(url), {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    if (isCurrentRequest()) {
+    const readback = await committed.settle()
+    if (readback.kind !== 'retired' && isCurrentRequest()) {
       open.value = false
       state.value = null
       emit('saved')
     }
-  } catch (error) {
-    if (isCurrentRequest()) showError(error)
   } finally {
-    isSubmitting.value = false
+    pending.end(session)
   }
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: save })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="state?.id ? t('workflow.edit_setup') : t('workflow.add_setup')" data-field-scope="agency.workflow-setup-modal">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="validate" :validate-on="[]" class="space-y-5" @submit="save">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="validate" :validate-on="[]" class="space-y-5">
         <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype">
           <CommonBilingualSelectMenu
             v-model="state.egcs_cn_entitytype" :items="entityTypes" value-key="entityType"

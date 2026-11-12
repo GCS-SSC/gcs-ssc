@@ -1,18 +1,16 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local table editor actions are self-describing */
 import type { TableColumn } from '@nuxt/ui'
+import { useLocalRowEditor } from '~/composables/useLocalRowEditor'
 import { nanoid } from 'nanoid'
-import { computed, ref, toRaw } from 'vue'
-import type { Ref } from 'vue'
+import { computed, toRaw } from 'vue'
 import type { ChecklistEditorQuestion } from '~/types/checklist-schema-editor'
 import { DEFAULT_CHECKLIST_OPTIONS } from '~~/shared/types/schemas/checklist/checklist'
 
 const questions = defineModel<ChecklistEditorQuestion[]>('questions', { default: () => [] })
 const { t, locale } = useI18n()
-const isEditorOpen: Ref<boolean> = ref(false)
-const editorMode: Ref<'create' | 'edit'> = ref('create')
-const editingKey: Ref<string | null> = ref(null)
-const draftQuestion: Ref<ChecklistEditorQuestion | null> = ref(null)
+const rowEditor = useLocalRowEditor<ChecklistEditorQuestion, string>()
+const { isOpen: isEditorOpen, mode: editorMode, target: editingKey, draft: draftQuestion, close: resetEditor } = rowEditor
 
 type ChecklistQuestionTableRow = {
   id: string
@@ -40,17 +38,10 @@ const columns = computed<TableColumn<ChecklistQuestionTableRow>[]>(() => [
   { accessorKey: 'helpCount', header: t('transfer_payment.help_text') },
   { id: 'actions', header: t('common.actions') }
 ])
-const resetEditor = () => {
-  isEditorOpen.value = false
-  editorMode.value = 'create'
-  editingKey.value = null
-  draftQuestion.value = null
-}
+
 const openCreateEditor = () => {
   const number = questions.value.length + 1
-  editorMode.value = 'create'
-  editingKey.value = null
-  draftQuestion.value = {
+  rowEditor.openCreate({
     _key: nanoid(),
     key: `question-${number}-${nanoid(6)}`,
     question: { en: '', fr: '' },
@@ -58,16 +49,12 @@ const openCreateEditor = () => {
     options: DEFAULT_CHECKLIST_OPTIONS.map(option => ({ value: option.value, description: { ...option.description } })),
     required: true,
     commentPolicy: 'optional'
-  }
-  isEditorOpen.value = true
+  })
 }
 const openEditEditor = (index: number) => {
   const currentQuestion = questions.value[index]
   if (!currentQuestion) return
-  editorMode.value = 'edit'
-  editingKey.value = currentQuestion._key
-  draftQuestion.value = structuredClone(toRaw(currentQuestion))
-  isEditorOpen.value = true
+  rowEditor.openEdit(currentQuestion._key, structuredClone(toRaw(currentQuestion)))
 }
 const saveDraft = () => {
   if (!draftQuestion.value) return

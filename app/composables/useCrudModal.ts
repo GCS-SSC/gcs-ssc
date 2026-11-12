@@ -1,4 +1,4 @@
-import { computed, ref, shallowReactive, watch } from 'vue'
+import { computed, ref, shallowReactive, shallowRef } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
 type CrudModalOptions<T, U> =
@@ -12,6 +12,11 @@ type CrudModalOptions<T, U> =
   }
 
 export type CrudModalSession = number
+
+type CrudModalState<U> =
+  | { kind: 'closed' }
+  | { kind: 'create' | 'update'; session: CrudModalSession; draft: Ref<U | null> }
+
 export type CrudModalSessionLifecycle =
   | {
     captureSession: () => CrudModalSession | null
@@ -49,7 +54,7 @@ export const useCrudModalPending = (captureSession: () => CrudModalSession | nul
 }
 
 /**
- * Manages open/close and selected state for create/update modals.
+ * Owns closed/create/update sessions; open through the mappers and close through v-model.
  *
  * @param options - Explicit state mappers for the supported create/update operations.
  * @returns Reactive modal state and control handlers.
@@ -64,14 +69,30 @@ export const useCrudModalPending = (captureSession: () => CrudModalSession | nul
  * ```
  */
 export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>) => {
-  const isOpen: Ref<boolean> = ref(false)
-  const selected: Ref<U | null> = ref(null)
+  const modalState: Ref<CrudModalState<U>> = shallowRef({ kind: 'closed' })
   let nextSession: CrudModalSession = 0
-  const activeSession: Ref<CrudModalSession | null> = ref(null)
 
-  const beginSession = () => {
-    nextSession += 1
-    activeSession.value = nextSession
+  const isOpen = computed({
+    get: () => modalState.value.kind !== 'closed',
+    set: (open: boolean) => {
+      if (!open) close()
+    }
+  })
+  const selected = computed({
+    get: () => modalState.value.kind === 'closed' ? null : modalState.value.draft.value,
+    set: (draft: U | null) => {
+      if (modalState.value.kind !== 'closed') modalState.value.draft.value = draft
+    }
+  })
+
+  /**
+   * @param kind - Mapped editing operation.
+   * @param value - Initial editable draft.
+   */
+  const beginSession = (kind: 'create' | 'update', value: U) => {
+    const draft: Ref<U | null> = ref(null)
+    draft.value = value
+    modalState.value = { kind, session: ++nextSession, draft }
   }
 
   /** Opens the modal with state produced by the configured create mapper. */
@@ -80,9 +101,7 @@ export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>)
       throw new Error('useCrudModal requires createState to open create mode')
     }
 
-    selected.value = options.createState()
-    beginSession()
-    isOpen.value = true
+    beginSession('create', options.createState())
   }
 
   /**
@@ -91,16 +110,12 @@ export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>)
    * @param item - Item to map into editable state.
    */
   const openUpdate = (item: T) => {
-    selected.value = options.updateState(item)
-    beginSession()
-    isOpen.value = true
+    beginSession('update', options.updateState(item))
   }
 
   /** Closes the active modal and clears its form state. */
   const close = () => {
-    activeSession.value = null
-    selected.value = null
-    isOpen.value = false
+    modalState.value = { kind: 'closed' }
   }
 
   /**
@@ -108,7 +123,7 @@ export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>)
    *
    * @returns Active modal session or null when closed.
    */
-  const captureSession = () => activeSession.value
+  const captureSession = () => modalState.value.kind === 'closed' ? null : modalState.value.session
 
   /**
    * Checks whether a captured session still owns the open modal.
@@ -118,9 +133,17 @@ export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>)
    */
   const isCurrentSession = (session: CrudModalSession | null) => (
     session !== null
-    && isOpen.value
-    && activeSession.value === session
+    && modalState.value.kind !== 'closed'
+    && modalState.value.session === session
   )
+
+  /**
+   * Checks the latest opening even after it closes, until another opening replaces it.
+   *
+   * @param session - Session captured before asynchronous work began.
+   * @returns Whether no later modal opening has occurred.
+   */
+  const isLatestSession = (session: CrudModalSession | null) => session !== null && session === nextSession
 
   /**
    * Closes the modal only when the captured session still owns it.
@@ -137,13 +160,6 @@ export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>)
     return true
   }
 
-  watch(isOpen, (open) => {
-    if (!open) {
-      activeSession.value = null
-      selected.value = null
-    }
-  }, { flush: 'sync' })
-
   return {
     isOpen,
     selected,
@@ -152,6 +168,7 @@ export const useCrudModal = <T, U = Partial<T>>(options: CrudModalOptions<T, U>)
     close,
     captureSession,
     isCurrentSession,
+    isLatestSession,
     closeSession
   }
 }

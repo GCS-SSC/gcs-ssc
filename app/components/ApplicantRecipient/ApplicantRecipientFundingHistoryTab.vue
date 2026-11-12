@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 /* eslint-disable jsdoc/require-jsdoc -- local table presentation helpers are self-documenting */
 import { getPaginationRowModel } from '@tanstack/table-core'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -11,6 +12,7 @@ import { formatMoneyText, type Money } from '~~/shared/utils/money'
 const {
   applicantRecipientId,
   applicantRecipientLabel,
+  canCreate = false,
   canCreateRole = false
 } = defineProps<{
   applicantRecipientId: string
@@ -60,6 +62,12 @@ watch(listView, () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
 
+const deletingHistoryId: Ref<string | null> = ref(null)
+const deleteContext = useActionContext({
+  identity: [() => applicantRecipientId, deletingHistoryId],
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']),
+  eligible: () => items.value.some(row => !row.restricted && row.historyId === deletingHistoryId.value && row.canDeleteRole === true && row.canDelete === true)
+})
 const isWizardOpen: Ref<boolean> = ref(false)
 const selectedHistory: Ref<VisibleFundingHistoryRow | null> = ref(null)
 
@@ -80,6 +88,7 @@ const columns: TableColumnInput<FundingHistoryRow>[] = [
 ]
 
 const isVisible = (row: FundingHistoryRow): row is VisibleFundingHistoryRow => !row.restricted
+const selectedAcceptedHistory = computed(() => items.value.filter(isVisible).find(row => row.historyId === selectedHistory.value?.historyId))
 const hasSummary = (row: FundingHistoryRow): boolean => typeof row.agreementNumber === 'string'
 const localized = (english?: string | null, french?: string | null): string => {
   const primary = locale.value === 'fr' ? french : english
@@ -154,20 +163,32 @@ const openSystemAgreement = async (history: VisibleFundingHistoryRow) => {
 
 const unlink = async (history: VisibleFundingHistoryRow) => {
   const ownerId = applicantRecipientId
-  const current = () => !disposed && ownerId === applicantRecipientId
-  if (!history.historyId || !await checkPrerequisite('delete', history) || !current()) return
+  const historyId = history.historyId
+  if (!historyId || deletingHistoryId.value) return
+  deletingHistoryId.value = historyId
+  const operation = deleteContext.capture()
+  const current = () => !disposed && ownerId === applicantRecipientId && Boolean(operation?.canDispatch())
   try {
+    if (!operation) {
+      warnPrerequisite()
+      return
+    }
+    if (!await checkPrerequisite('delete', history) || !current()) return
     const deleted = await confirmDeleteRequest(
-      `/api/applicant-recipients/${ownerId}/funding-history/${history.historyId}`,
+      `/api/applicant-recipients/${ownerId}/funding-history/${historyId}`,
       {
+        operation,
+        target: { id: historyId, resolve: () => items.value.find(row => !row.restricted && row.historyId === historyId), eligible: row => !row.restricted && row.canDeleteRole === true && row.canDelete === true },
         title: t('applicant_recipient.funding_history.unlink.title'),
         description: t('applicant_recipient.funding_history.unlink.description'),
         shouldProceed: current
       }
     )
-    if (deleted && current()) await refresh()
+    if (deleted && operation.isCurrent()) await refresh()
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (operation?.isCurrent()) showError(error)
+  } finally {
+    deletingHistoryId.value = null
   }
 }
 
@@ -307,6 +328,10 @@ const visibleRows = computed(() => items.value)
       :applicant-recipient-id="applicantRecipientId"
       :applicant-recipient-label="applicantRecipientLabel"
       :history="selectedHistory"
+      :can-create="canCreate"
+      :can-create-role="canCreateRole"
+      :can-update="selectedAcceptedHistory?.canUpdate === true"
+      :can-update-role="selectedAcceptedHistory?.canUpdateRole === true"
       @saved="refresh" />
   </div>
 </template>

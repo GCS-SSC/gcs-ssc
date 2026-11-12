@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import type { Ref } from 'vue'
 import type { WorkflowSupplementaryInformationResponse } from '~~/shared/types/workflow-supplementary-information'
 
@@ -12,36 +13,22 @@ const { entityType, entityId, showHeader = true, showDescription = true } = defi
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers({ formatterOptions: { dateStyle: 'medium', timeStyle: 'short' } })
-const information: Ref<WorkflowSupplementaryInformationResponse | null> = ref(null)
-const isLoading: Ref<boolean> = ref(false)
-const hasLoadError: Ref<boolean> = ref(false)
+const request = useResourceRequest<WorkflowSupplementaryInformationResponse>({
+  identity: () => `${entityType}:${entityId}`,
+  trigger: 'refresh',
+  refreshData: 'clear',
+  failureData: 'clear',
+  load: signal => fetchInformation('/api/workflows/supplementary-information', {
+    query: { entityType, entityId }, signal
+  })
+})
+const information = request.data
+const isLoading = computed(() => request.status.value === 'pending')
+const hasLoadError = computed(() => request.status.value === 'error')
 const content: Ref<HTMLElement | null> = ref(null)
-let requestController: AbortController | null = null
-
-/**
- * Loads the exact entity's successful workflow evidence and rejects stale responses.
- * @returns Completion of the current read request.
- */
+/** Refreshes the current target using the shared request owner. */
 const loadInformation = async (): Promise<void> => {
-  requestController?.abort()
-  const controller = new AbortController()
-  requestController = controller
-  information.value = null
-  hasLoadError.value = false
-  isLoading.value = true
-  try {
-    const response = await fetchInformation('/api/workflows/supplementary-information', {
-      query: { entityType, entityId },
-      signal: controller.signal
-    })
-    if (requestController !== controller) return
-    information.value = response
-  } catch {
-    if (requestController !== controller || controller.signal.aborted) return
-    hasLoadError.value = true
-  } finally {
-    if (requestController === controller) isLoading.value = false
-  }
+  await request.refresh()
 }
 
 /**
@@ -58,10 +45,6 @@ const retry = async (): Promise<void> => {
 watch(() => [entityType, entityId], () => {
   void loadInformation()
 }, { immediate: true })
-onBeforeUnmount(() => {
-  requestController?.abort()
-  requestController = null
-})
 </script>
 
 <template>

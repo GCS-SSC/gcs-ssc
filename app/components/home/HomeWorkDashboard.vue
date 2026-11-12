@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Page-local queue actions are named for their behavior. */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AssignedWorkItem, GroupWorkItem } from '~~/shared/types/assigned-work'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -35,12 +35,18 @@ const loadedAssigned: Ref<AssignedItem[]> = ref([])
 const assignedTotal: Ref<number> = ref(0)
 const nextAssignedBatch: Ref<number> = ref(2)
 const loadingAssignedBatch: Ref<boolean> = ref(false)
+let assignedGeneration: object | null = {}
+onScopeDispose(() => {
+  assignedGeneration = null
+})
 const { items, totalRecords, status, error, refresh } = useResourceTable<AssignedItem>({
   fetchUrl: '/api/assigned-work',
   initialPageSize: assignedBatchSize
 })
 watch([items, status, totalRecords], ([nextItems, nextStatus, nextTotal]) => {
   if (nextStatus !== 'success') return
+  assignedGeneration = {}
+  loadingAssignedBatch.value = false
   loadedAssigned.value = [...nextItems]
   assignedTotal.value = nextTotal
   nextAssignedBatch.value = 2
@@ -93,29 +99,36 @@ const visibleItems = (section: Section) => sectionItems(section).slice((sectionP
 const hasNext = (section: Section) => sectionItems(section).length > sectionPages.value[section] * sectionPageSize
   || (nextAssignedBatch.value - 1) * assignedBatchSize < assignedTotal.value
 const loadNextAssignedBatch = async () => {
-  if (loadingAssignedBatch.value || (nextAssignedBatch.value - 1) * assignedBatchSize >= assignedTotal.value) return
+  if (assignedGeneration === null || loadingAssignedBatch.value || (nextAssignedBatch.value - 1) * assignedBatchSize >= assignedTotal.value) return
+  const generation = assignedGeneration
+  const batchPage = nextAssignedBatch.value
   loadingAssignedBatch.value = true
   try {
     const url = getClientRequestUrl('/api/assigned-work')
-    url.searchParams.set('page', String(nextAssignedBatch.value))
+    url.searchParams.set('page', String(batchPage))
     url.searchParams.set('limit', String(assignedBatchSize))
     const response = await fetch(url)
     if (!response.ok) await throwFetchResponseError(response)
     const batch = await response.json() as { items: AssignedItem[], total: number }
+    if (assignedGeneration !== generation) return
     loadedAssigned.value = [...loadedAssigned.value, ...batch.items]
     assignedTotal.value = batch.total
-    nextAssignedBatch.value += 1
+    nextAssignedBatch.value = batchPage + 1
   } catch (loadError) {
-    showError(loadError)
+    if (assignedGeneration === generation) showError(loadError)
   } finally {
-    loadingAssignedBatch.value = false
+    if (assignedGeneration === generation) loadingAssignedBatch.value = false
   }
 }
 const nextSectionPage = async (section: Section) => {
+  const generation = assignedGeneration
+  const sectionPage = sectionPages.value[section]
+  if (generation === null) return
   while (sectionItems(section).length <= sectionPages.value[section] * sectionPageSize
     && (nextAssignedBatch.value - 1) * assignedBatchSize < assignedTotal.value) {
     const previousBatch = nextAssignedBatch.value
     await loadNextAssignedBatch()
+    if (assignedGeneration !== generation || sectionPages.value[section] !== sectionPage) return
     if (nextAssignedBatch.value === previousBatch) return
   }
   if (sectionItems(section).length > sectionPages.value[section] * sectionPageSize) sectionPages.value[section] += 1

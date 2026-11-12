@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { TransferPaymentOutcomeSchema } from '~~/shared/types/schemas'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed } from 'vue'
+import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { TransferPaymentOutcomeItem } from '~~/shared/types/schemas'
@@ -56,16 +57,46 @@ const outcomeModal = useCrudModal<TransferPaymentOutcomeRow, Partial<TransferPay
 
 const isOutcomeModalOpen: Ref<boolean> = outcomeModal.isOpen
 const selectedOutcome: Ref<Partial<TransferPaymentOutcomeItem> | null> = outcomeModal.selected
+/** Opens a new local draft under the current role and resource. */
 const openCreateOutcome = () => {
-  if (!canUpdateChild) return
+  if (resourceContext.value.kind === 'disposed' || !canUpdateChild) return
+  editingTarget.value = null
   outcomeModal.openCreate()
 }
+/** @param outcome - Accepted record whose immutable ID owns the edit. */
 const openUpdateOutcome = (outcome: TransferPaymentOutcomeRow) => {
-  if (!canUpdateChild) return
+  if (resourceContext.value.kind === 'disposed' || !canUpdateChild) return
+  editingTarget.value = String(outcome.id)
   outcomeModal.openUpdate(outcome)
 }
 const outcomePending = useCrudModalPending(outcomeModal.captureSession)
 const isSavingOutcome = outcomePending.isPending
+
+const editingTarget: Ref<string | null> = shallowRef(null)
+const writeContext = useActionContext({
+  identity: [() => programId],
+  authority: () => canUpdateChild,
+  eligible: () => editingTarget.value === null || outcomes.value.some(row => String(row.id) === editingTarget.value)
+})
+const deleteContext = useActionContext({
+  identity: [() => programId],
+  authority: () => canDeleteChild
+})
+
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const resourceContext: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const ownsContext = (captured: ResourceContext) => captured.kind === 'active' && captured === resourceContext.value
+watch(() => programId, () => {
+  resourceContext.value = { kind: 'active' }
+  outcomeModal.close()
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) outcomeModal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  resourceContext.value = { kind: 'disposed' }
+  outcomeModal.close()
+})
 
 /**
  * Saves the currently selected outcome record.
@@ -73,37 +104,45 @@ const isSavingOutcome = outcomePending.isPending
  * Closes the modal, refreshes outcome data, emits an update event, and provides success feedback.
  */
 const saveOutcome = async () => {
-  if (!selectedOutcome.value || !canUpdateChild) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  const targetId = editingTarget.value
+  const context = resourceContext.value
+  if (!(ownsContext(context) && operation.isCurrent()) || !selectedOutcome.value || !canUpdateChild) return
   const session = outcomeModal.captureSession()
-  if (!outcomePending.begin(session)) return
-  const isUpdate = Boolean(selectedOutcome.value.id)
+  if (session === null || !outcomePending.begin(session)) return
+  const item = selectedOutcome.value
+  const isUpdate = targetId !== null
+  let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(selectedOutcome.value.id
-      ? `/api/transfer-payments/${programId}/outcomes/${selectedOutcome.value.id}`
+    const response = await fetch(getClientRequestUrl(targetId !== null
+      ? `/api/transfer-payments/${programId}/outcomes/${targetId}`
       : `/api/transfer-payments/${programId}/outcomes`), {
-      method: selectedOutcome.value.id ? 'PATCH' : 'POST',
+      method: targetId !== null ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(selectedOutcome.value)
+      body: JSON.stringify(item)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!outcomeModal.closeSession(session)) return
+    if (!(ownsContext(context) && operation.isCurrent())) return
+    closedSession = outcomeModal.closeSession(session)
   } catch (error: unknown) {
-    showError(error)
+    if ((ownsContext(context) && operation.isCurrent()) && outcomeModal.isCurrentSession(session)) showError(error)
     return
   } finally {
     outcomePending.end(session)
   }
 
-  toast.add({
-    title: toast.localized('common.success'),
-    description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
-    color: 'success'
-  })
   emit('outcomesUpdated')
   try {
     await refreshOutcomes()
+    if (!(ownsContext(context) && operation.isCurrent()) || !closedSession || !outcomeModal.isLatestSession(session) || outcomeStatusState.value === 'error') return
+    toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      color: 'success'
+    })
   } catch (error: unknown) {
-    showError(error)
+    if ((ownsContext(context) && operation.isCurrent()) && closedSession && outcomeModal.isLatestSession(session)) showError(error)
   }
 }
 
@@ -112,22 +151,32 @@ const saveOutcome = async () => {
  * Displays a confirmation dialog before calling the deletion API.
  * Refreshes outcome data, emits an update event, and providing feedback on successful deletion.
  *
- * @param {TransferPaymentOutcomeRow} outcome - The outcome record to be deleted.
+ * @param {TransferPaymentOutcomeRow} item - The outcome record to be deleted.
  */
-const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
+const deleteOutcome = async (item: TransferPaymentOutcomeRow) => {
+  const targetId = String(item.id)
+  const context = resourceContext.value
+  if (!ownsContext(context) || !canDeleteChild) return
+  const operation = deleteContext.capture()
+  if (!operation) return
   try {
-    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcome.id}`)
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${targetId}`, {
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => outcomes.value.find(current => String(current.id) === targetId),
+        eligible: current => String(current.id) === targetId
+      },
+      shouldProceed: () => (ownsContext(context) && operation.isCurrent()) && canDeleteChild
+    })
+    if (!ok || !(ownsContext(context) && operation.isCurrent())) return
+    await refreshOutcomes()
+    if (!(ownsContext(context) && operation.isCurrent())) return
+    emit('outcomesUpdated')
+    if (outcomeStatusState.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  emit('outcomesUpdated')
-  try {
-    await refreshOutcomes()
-  } catch (error: unknown) {
-    showError(error)
+    if ((ownsContext(context) && operation.isCurrent())) showError(error)
   }
 }
 </script>
@@ -184,6 +233,7 @@ const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
     <CommonFormDialog
       v-if="selectedOutcome && canUpdateChild"
       v-model:open="isOutcomeModalOpen"
+      :action-context="writeContext"
       :state="selectedOutcome"
       :schema="TransferPaymentOutcomeSchema"
       :title="selectedOutcome.id ? t('common.update') : t('common.add')"

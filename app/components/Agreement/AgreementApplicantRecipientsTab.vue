@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { onUnmounted, watch } from 'vue'
 import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import AgreementProponentLookupField from './AgreementProponentLookupField.vue'
@@ -29,6 +31,12 @@ watch(() => [agreementId, canCreate, canUpdate, canDelete], () => {
 onUnmounted(() => {
   actionGeneration += 1
 })
+const createContext = useActionContext({ identity: [() => agreementId], authority: () => canCreate })
+const updateContext = useActionContext({ identity: [() => agreementId], authority: () => canUpdate })
+const deleteContext = useActionContext({ identity: [() => agreementId], authority: () => canDelete })
+const resourceAction: ResourceCrudAction = {
+  kind: 'remote', create: createContext, update: updateContext, delete: deleteContext
+}
 const permitted = (action: 'create' | 'update' | 'delete') => action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete
 /**
  * Checks current action prerequisites before opening the editor.
@@ -119,6 +127,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
 
 <template>
   <CommonResourceCrud
+    :action="resourceAction"
     class="w-full"
     :title="t('agreement.applicant_recipients.title')"
     icon="i-lucide-users-round"
@@ -129,6 +138,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"
+    :delete-eligible="row => row.can_delete === true"
     :before-open="beforeOpen"
     :before-save="beforeSave"
     :before-delete="beforeDelete"

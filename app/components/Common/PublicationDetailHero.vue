@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ActionContext } from '~/composables/useActionContext'
 import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 
 const {
-  name, description, icon, entityType, entityTypeLabelEn, entityTypeLabelFr, typeLabelKey, publicationState, publicationVersion = null,
+  actionContext, name, description, icon, entityType, entityTypeLabelEn, entityTypeLabelFr, typeLabelKey, publicationState, publicationVersion = null,
   hasUnpublishedChanges = false, isCollapsed = false, isPublishing = false, isRetiring = false,
   isMutationPending = false, canManage = false, canRetire = undefined, canImport = false, versionLabelKey = 'transfer_payment.schema_version', publishLabelKey, retireLabelKey
 } = defineProps<{
+  actionContext: ActionContext
   name: string
   description?: string
   icon: string
@@ -33,12 +35,14 @@ const { locale, t } = useI18n()
 const confirmRetire = useDeleteConfirm()
 /** Confirms the irreversible lifecycle action before notifying the resource adapter. */
 const requestRetirement = async () => {
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
   const confirmed = await confirmRetire({
     title: t('common.retire_confirm_title'),
     description: t('common.retire_confirm_description'),
     confirmLabel: t('common.retire')
   })
-  if (confirmed) emit('retire')
+  if (confirmed && operation.canDispatch()) emit('retire')
 }
 const badges = computed(() => [
   ...(entityType

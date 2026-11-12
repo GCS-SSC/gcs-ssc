@@ -1,5 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- page-local handlers are clear from their names and types */
+import { onScopeDispose, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import UserAssignmentsTab from '~/components/User/UserAssignmentsTab.vue'
@@ -26,14 +28,26 @@ const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { canAny } = useCan()
 const localePath = useLocalePath()
 const route = useRoute()
 const id = route.params.id as string
 const userUrl: string = `/api/users/${id}`
+let pageLifetime: 'active' | 'disposed' = 'active'
+onScopeDispose(() => {
+  pageLifetime = 'disposed'
+})
+const isPageActive = () => pageLifetime === 'active'
 
 const user: Ref<UserDetail | null> = ref(null)
-const refresh = async () => {
-  user.value = await $fetch<UserDetail, string>(userUrl)
+let assignmentEligibilityGeneration = 0
+watch(() => JSON.stringify(user.value?.assignments.map(item => [item.id, item.can_delete])), () => {
+  assignmentEligibilityGeneration += 1
+}, { flush: 'sync' })
+const refresh = async (isCurrent: () => boolean = isPageActive) => {
+  if (!isPageActive() || !isCurrent()) return
+  const detail = await $fetch<UserDetail, string>(userUrl)
+  if (isPageActive() && isCurrent()) user.value = detail
 }
 await refresh()
 
@@ -50,8 +64,28 @@ const isMutationPending = computed(() =>
   || isSavingAssignment.value
   || deletingAssignmentId.value !== null
 )
+const updateContext = useActionContext({
+  identity: [() => user.value?.id],
+  authority: () => canAny('user', 'update', ['global', 'agency']),
+  eligible: () => user.value?.can_update === true
+})
+const assignmentContext = useActionContext({
+  identity: [
+    () => user.value?.id,
+    () => selectedAssignment.value?.user_id,
+    () => selectedAssignment.value?.role_id,
+    () => JSON.stringify(user.value?.role_assignment_access)
+  ],
+  authority: () => canAny('user', 'update', ['global', 'agency']),
+  eligible: () => user.value?.role_assignment_access.has_global_access === true
+    || Boolean(user.value?.role_assignment_access.agency_ids.length)
+})
+const assignmentDeleteContext = useActionContext({
+  identity: [() => user.value?.id],
+  authority: () => canAny('user', 'update', ['global', 'agency'])
+})
 const openUpdateModal = () => {
-  if (!user.value?.can_update || isMutationPending.value) return
+  if (!isPageActive() || !user.value?.can_update || isMutationPending.value) return
   selectedUser.value = { ...user.value }
   isUpdateModalOpen.value = true
 }
@@ -59,7 +93,8 @@ const openUpdateModal = () => {
 const openAssignmentModal = () => {
   const access = user.value?.role_assignment_access
   if (
-    !access
+    !isPageActive()
+    || !access
     || isMutationPending.value
     || (!access.has_global_access && access.agency_ids.length === 0)
   ) return
@@ -68,7 +103,11 @@ const openAssignmentModal = () => {
 }
 
 const updateUser = async () => {
-  if (!selectedUser.value || !user.value?.can_update || isMutationPending.value) return
+  const draft = selectedUser.value
+  if (!isPageActive() || !draft || !user.value?.can_update || isMutationPending.value) return
+  const operation = updateContext.capture()
+  if (!operation?.canDispatch()) return
+  const ownsEditor = () => isPageActive() && operation.isCurrent() && selectedUser.value === draft
   const profilePatch = Object.fromEntries(
     (['name', 'email', 'image'] as const)
       .filter(key => selectedUser.value && key in selectedUser.value && selectedUser.value[key] !== user.value?.[key])
@@ -81,15 +120,17 @@ const updateUser = async () => {
   try {
     isSavingUser.value = true
     await saveJson(userUrl, 'PATCH', profilePatch)
+    if (!ownsEditor()) return
     isUpdateModalOpen.value = false
-    await refresh()
+    await refresh(operation.isCurrent)
+    if (!ownsEditor()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsEditor()) showError(error)
   } finally {
     isSavingUser.value = false
   }
@@ -103,7 +144,10 @@ const canAssignRole = (role: RoleOptionItem): boolean => {
 /** Adds an authorized role assignment and refreshes the user detail. */
 const addAssignment = async (role: RoleOptionItem) => {
   const assignment = selectedAssignment.value
-  if (!assignment || !canAssignRole(role) || isMutationPending.value) return
+  if (!isPageActive() || !assignment || !canAssignRole(role) || isMutationPending.value) return
+  const operation = assignmentContext.capture()
+  if (!operation?.canDispatch()) return
+  const ownsEditor = () => isPageActive() && operation.isCurrent() && selectedAssignment.value === assignment
   if (!assignment.role_id) {
     toast.add({
       title: toast.localized('common.error'),
@@ -120,15 +164,17 @@ const addAssignment = async (role: RoleOptionItem) => {
       user_id: id,
       role_id: role.id
     })
+    if (!ownsEditor()) return
     isAssignmentModalOpen.value = false
-    await refresh()
+    await refresh(operation.isCurrent)
+    if (!ownsEditor()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsEditor()) showError(error)
   } finally {
     isSavingAssignment.value = false
   }
@@ -137,25 +183,39 @@ const addAssignment = async (role: RoleOptionItem) => {
 /** Deletes an authorized role assignment while preventing duplicate requests. */
 const deleteAssignment = async (assignmentId: string) => {
   const assignment = user.value?.assignments.find(item => item.id === assignmentId)
-  if (!assignment?.can_delete || isMutationPending.value) return
+  if (!isPageActive() || !assignment?.can_delete || isMutationPending.value) return
+  const operation = assignmentDeleteContext.capture()
+  if (!operation?.canDispatch()) return
+  const generation = assignmentEligibilityGeneration
+  const canDeleteAssignment = () => isPageActive()
+    && generation === assignmentEligibilityGeneration
+    && user.value?.assignments.some(item => item.id === assignmentId && item.can_delete) === true
 
   try {
     deletingAssignmentId.value = assignmentId
     const deleted = await confirmDeleteRequest(`/api/users/${id}/assignments/${assignmentId}`, {
-      description: t('agency.delete_confirm')
+      description: t('agency.delete_confirm'),
+      operation,
+      target: {
+        id: assignmentId,
+        resolve: () => user.value?.assignments.find(item => item.id === assignmentId),
+        eligible: current => current.can_delete
+      },
+      shouldProceed: canDeleteAssignment
     })
-    if (!deleted) {
+    if (!deleted || !isPageActive() || !operation.isCurrent()) {
       return
     }
 
-    await refresh()
+    await refresh(operation.isCurrent)
+    if (!isPageActive() || !operation.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && operation.isCurrent()) showError(error)
   } finally {
     deletingAssignmentId.value = null
   }
@@ -250,6 +310,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
         :title="t('user.update_title')"
         :submit-label="t('common.update')"
         :pending="isMutationPending"
+        :action-context="updateContext"
         @submit="updateUser" />
 
       <RoleAssignmentModal
@@ -259,6 +320,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
         :title="t('role.assignment.new')"
         :submit-label="t('common.add')"
         :pending="isMutationPending"
+        :action-context="assignmentContext"
         :role-assignment-access="user.role_assignment_access"
         hide-user
         @submit="addAssignment" />

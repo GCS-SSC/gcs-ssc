@@ -2,6 +2,9 @@
 import type { GcsExtensionJsonConfig, GcsExtensionSlot, GcsExtensionSlotContext } from '~~/shared/utils/extensions'
 import type { ExtensionRuntimeResponse } from '~~/shared/types/schemas/extensions'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
+import { useResourceRequest } from '~/composables/useResourceRequest'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+import { throwFetchResponseError } from '~/utils/fetch-error'
 
 const {
   slotName,
@@ -48,16 +51,7 @@ const agreementId = computed(() => {
   return undefined
 })
 
-/**
- * Builds the empty runtime payload used before the slot fetch resolves.
- *
- * @returns Empty runtime slot response.
- */
-const defaultResponse = (): ExtensionRuntimeResponse => ({
-  slot: slotName,
-  streamId,
-  items: []
-})
+const { user, permissionRevision } = useAuth()
 
 const runtimeQuery = computed(() => ({
   slot: slotName,
@@ -69,15 +63,27 @@ const runtimeQuery = computed(() => ({
   ...(paymentId.value ? { paymentId: paymentId.value } : {}),
   permissionAction
 }))
-const { data, status, error, refresh } = useFetch<ExtensionRuntimeResponse, Error, '/api/extensions/runtime'>('/api/extensions/runtime', {
-  key: computed(() => `extension-slot:${JSON.stringify(runtimeQuery.value)}`),
-  query: runtimeQuery,
-  default: defaultResponse,
-  server: false,
-  watch: [() => subject, () => slotName, () => streamId, () => agencyId, () => permissionAction, applicantRecipientId, agreementId, paymentId]
+const { data, status, error, refresh } = useResourceRequest<ExtensionRuntimeResponse>({
+  identity: () => JSON.stringify([runtimeQuery.value, user.value?.id, permissionRevision.value]),
+  refreshData: 'clear',
+  failureData: 'clear',
+  /**
+   * Loads contributions for the current authorized slot subject.
+   * @param signal - Cancellation owned by the current request.
+   * @returns Current slot discovery evidence.
+   */
+  load: async signal => {
+    const requestUrl = getClientRequestUrl('/api/extensions/runtime')
+    for (const [key, value] of Object.entries(runtimeQuery.value)) {
+      requestUrl.searchParams.set(key, value)
+    }
+    const response = await fetch(requestUrl, { signal })
+    if (!response.ok) await throwFetchResponseError(response)
+    return response.json()
+  }
 })
 
-const items = computed(() => slotName === 'payment.evidence' && status.value !== 'success' ? [] : data.value?.items ?? [])
+const items = computed(() => data.value?.items ?? [])
 
 /**
  * Resolves the registered client component for a runtime extension slot item.

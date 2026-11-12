@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -20,6 +23,7 @@ const { getHeroCollapsed } = useDashboard()
 const { search, pagination, items, totalRecords, refresh, retry, status } = useResourceTable<Row>({ fetchUrl: '/api/funding-opportunities' })
 const isHeroCollapsed = getHeroCollapsed('funding-opportunities')
 const canCreate = computed(() => canAny('transfer_payment', 'create'))
+const actionContext = useActionContext({ identity: [], authority: canCreate })
 const columns: TableColumnInput<Row>[] = [
   { accessorKey: 'egcs_fo_name_en', headerKey: 'funding_opportunity.name_en' },
   { id: 'streams', headerKey: 'funding_opportunity.streams' },
@@ -28,8 +32,10 @@ const columns: TableColumnInput<Row>[] = [
   { accessorKey: 'egcs_fo_status', headerKey: 'funding_opportunity.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const modalOpen = ref(false)
-const pending = ref(false)
+const modalSession = useModalSession()
+const { isOpen: modalOpen } = modalSession
+const mutation = useCrudModalPending(modalSession.captureSession)
+const pending = mutation.isPending
 /**
  * Builds a complete, empty create form so every controlled text field has an initial value.
  *
@@ -44,7 +50,10 @@ const emptyForm = (): OpportunityForm => ({
   egcs_fo_applicationschema: null
 })
 const form = ref<OpportunityForm>(emptyForm())
+/** Opens a fresh Opportunity create session. */
 const openCreate = () => {
+  if (modalSession.isDisposed() || !canCreate.value) return
+  modalOpen.value = false
   form.value = emptyForm()
   modalOpen.value = true
 }
@@ -52,21 +61,30 @@ const openCreate = () => {
  *
  */
 const submit = async () => {
-  if (pending.value) return
-  pending.value = true
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
+  const session = modalSession.captureSession()
+  const draft = form.value
+  if (session === null || !canCreate.value || !mutation.begin(session)) return
+  const ownsOpening = () => operation.isCurrent() && modalSession.isCurrentSession(session) && form.value === draft && canCreate.value
+  const ownsCompletion = () => operation.isCurrent() && !modalSession.isDisposed() && modalSession.captureSession() === null && form.value === draft && canCreate.value
+  let completed = false
   try {
     const response = await fetch(getClientRequestUrl('/api/funding-opportunities'), {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(form.value)
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(draft)
     })
     if (!response.ok) await throwFetchResponseError(response)
     const created = await response.json() as { id: string }
+    if (!ownsOpening()) return
     modalOpen.value = false
+    completed = true
     await refresh()
+    if (!ownsCompletion()) return
     await navigateTo(localePath(appRouteLocations.fundingOpportunityDetail(String(created.id))))
   } catch (error: unknown) {
-    showError(error)
+    if (completed ? ownsCompletion() : ownsOpening()) showError(error)
   } finally {
-    pending.value = false
+    mutation.end(session)
   }
 }
 </script>
@@ -97,7 +115,7 @@ const submit = async () => {
           </div>
         </template>
       </CommonResourceLayout>
-      <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :action-context="actionContext" :pending="pending" @submit="submit" />
     </template>
   </CommonDetailPage>
 </template>

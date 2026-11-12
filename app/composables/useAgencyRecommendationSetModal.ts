@@ -4,10 +4,14 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { FormSubmitEvent } from '#ui/types'
 import type { z } from 'zod'
-import { computed } from 'vue'
-import type { Ref } from 'vue'
+import { computed, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { CrudModalSessionLifecycle } from '~/composables/useCrudModal'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useModalSession } from '~/composables/useModalSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import type { TransferPaymentStreamRecommendationSetupItem } from '~~/shared/types/schemas/transfer-payment'
 import {
   TransferPaymentStreamRecommendationSetupCreateSchema,
@@ -17,7 +21,9 @@ import {
 type UseAgencyRecommendationSetModalOptions = CrudModalSessionLifecycle & {
   open: Ref<boolean>
   state: Ref<Partial<TransferPaymentStreamRecommendationSetupItem> | null>
-  agencyId: string
+  agencyId: MaybeRefOrGetter<string>
+  actionContext: MaybeRefOrGetter<ActionContext>
+  captureCommitted: CaptureCommittedSettlement
   emitSaved: () => void
 }
 
@@ -25,6 +31,8 @@ export const useAgencyRecommendationSetModal = ({
   open,
   state,
   agencyId,
+  actionContext,
+  captureCommitted,
   emitSaved,
   captureSession,
   closeSession
@@ -32,7 +40,12 @@ export const useAgencyRecommendationSetModal = ({
   const { t } = useI18n()
   const { createValidator } = useZodI18n()
   const { showError } = useApiErrorToast()
-  const pending = useCrudModalPending(() => captureSession ? captureSession() : null)
+  const modalSession = useModalSession()
+  watch([open, state, () => toValue(agencyId), () => captureSession?.()], () => {
+    modalSession.isOpen.value = false
+    modalSession.isOpen.value = open.value && state.value !== null
+  }, { immediate: true, flush: 'sync' })
+  const pending = useCrudModalPending(modalSession.captureSession)
   const isSubmitting = pending.isPending
 
   const isUpdate = computed(() => Boolean(state.value?.id))
@@ -59,39 +72,54 @@ export const useAgencyRecommendationSetModal = ({
       z.infer<typeof TransferPaymentStreamRecommendationSetupPatchSchema>
     >
   ) => {
-    const session = captureSession ? captureSession() : null
-    if (!pending.begin(session)) return
+    const committed = captureCommitted()
+    const operation = toValue(actionContext).capture()
+    if (!committed || !operation?.canDispatch()) return
+    const session = modalSession.captureSession()
+    const parentSession = captureSession?.() ?? null
+    if (session === null || (captureSession && parentSession === null) || !pending.begin(session)) return
+    const isCurrent = () => operation.isCurrent() && modalSession.isCurrentSession(session)
+      && (!captureSession || captureSession() === parentSession)
 
     try {
-      const currentState = state.value
-      const recommendationSetupId = isUpdate.value && currentState?.id ? String(currentState.id) : null
-      const url = recommendationSetupId
-        ? `/api/agency/${agencyId}/recommendation-sets/${recommendationSetupId}`
-        : `/api/agency/${agencyId}/recommendation-sets`
-      const method = recommendationSetupId ? 'PATCH' : 'POST'
+      try {
+        const currentState = state.value
+        const recommendationSetupId = isUpdate.value && currentState?.id ? String(currentState.id) : null
+        const url = recommendationSetupId
+          ? `/api/agency/${toValue(agencyId)}/recommendation-sets/${recommendationSetupId}`
+          : `/api/agency/${toValue(agencyId)}/recommendation-sets`
+        const method = recommendationSetupId ? 'PATCH' : 'POST'
 
-      const response = await fetch(getClientRequestUrl(url), {
-        method,
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify(event.data)
-      })
-      if (!response.ok) {
-        await throwFetchResponseError(response)
+        if (!committed.canDispatch() || !operation.canDispatch()) return
+        const response = await fetch(getClientRequestUrl(url), {
+          method,
+          headers: {
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify(event.data)
+        })
+        if (!response.ok) {
+          await throwFetchResponseError(response)
+        }
+      } catch (error) {
+        if (isCurrent()) showError(error)
+        return
       }
-
-      if (closeSession) closeSession(session)
-      else open.value = false
+      const readback = await committed.settle()
+      if (readback.kind === 'retired' || !isCurrent()) return
+      if (closeSession) {
+        if (!closeSession(parentSession)) return
+      } else open.value = false
       emitSaved()
-    } catch (error) {
-      showError(error)
     } finally {
       pending.end(session)
     }
   }
 
+  const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: actionContext }, submit: onSubmit })
+
   return {
+    formSession,
     validate,
     isSubmitting,
     isUpdate,

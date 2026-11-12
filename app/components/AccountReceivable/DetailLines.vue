@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement, CommittedSettlementResult } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import { moneyMatchesSearch } from '~/utils/money-search'
 /* eslint-disable jsdoc/require-jsdoc -- Receivable line modal follows the established Commitment authoring pattern. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -13,7 +16,7 @@ import { formatAccountingDimensions, getAccountingDimensionSearchValues } from '
 import { compareMoney, parseMoney, zeroMoney, sumMoney, type MoneyInput } from '~~/shared/utils/money'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 
-const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdit, canDelete, canUpdate } = defineProps<{
+const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdit, canDelete, canUpdate, resourcePending = false, captureCommitted, removeLine } = defineProps<{
   accountReceivableId: string
   fiscalYearId: string
   isAdjustment: boolean
@@ -21,14 +24,16 @@ const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdi
   currency: string
   canEdit: boolean
   canDelete: boolean
+  captureCommitted: CaptureCommittedSettlement
+  removeLine: (lineId: string, shouldProceed: () => boolean) => Promise<CommittedSettlementResult | null>
   canUpdate: boolean
+  resourcePending?: boolean
 }>()
-const emit = defineEmits<{ changed: [] }>()
+const { canAny } = useAuth()
 const { t, locale } = useI18n()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const toast = useLocalizedToast()
 const { search, pagination } = useTableListState()
 type LineForm = {
@@ -52,8 +57,10 @@ const modal = useCrudModal<AccountReceivableLine, LineForm>({
   })
 })
 const { selected, isOpen } = modal
-const selectedLineId: Ref<string | null> = ref(null)
-const recodeMode: Ref<boolean> = ref(false)
+type LineOperation = { kind: 'create' } | { kind: 'edit' | 'recode'; lineId: string }
+const operation: Ref<LineOperation> = ref({ kind: 'create' })
+const selectedLineId = computed(() => operation.value.kind === 'create' ? null : operation.value.lineId)
+const recodeMode = computed(() => operation.value.kind === 'recode')
 const lineValidator = computed(() => createValidator(recodeMode.value ? AccountReceivableRecodeSchema.passthrough() : AccountReceivableLineCreateSchema))
 const pending = useCrudModalPending(modal.captureSession)
 const { isPending } = pending
@@ -102,25 +109,22 @@ const columns: TableColumnInput<AccountReceivableLine>[] = [
 ]
 const lineNumber = (line: AccountReceivableLine) => lines.findIndex(item => item.id === line.id) + 1
 const openCreate = () => {
-  if (!canEdit) return
-  selectedLineId.value = null
-  recodeMode.value = false
+  if (!canEdit || resourcePending) return
+  operation.value = { kind: 'create' }
   modal.openCreate()
 }
 const openEdit = (line: AccountReceivableLine) => {
-  if (!canEdit) return
-  selectedLineId.value = line.id
-  recodeMode.value = false
+  if (!canEdit || resourcePending) return
+  operation.value = { kind: 'edit', lineId: line.id }
   modal.openUpdate(line)
 }
 const openRecode = (line: AccountReceivableLine) => {
-  if (!canUpdate || !isAdjustment || !line.egcs_fc_accountreceivablechartofaccount) return
+  if (!canUpdate || !isAdjustment || !line.egcs_fc_accountreceivablechartofaccount || resourcePending) return
   if (!canEdit) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
-  selectedLineId.value = line.id
-  recodeMode.value = true
+  operation.value = { kind: 'recode', lineId: line.id }
   modal.openUpdate(line)
   selected.value!.egcs_fc_accountreceivablechartofaccount = undefined
 }
@@ -130,8 +134,16 @@ const resolveSource = (items: AdminCommonLookupResponseItem[]) => {
   selected.value.egcs_fc_sourcekey = typeof source?.egcs_fc_sourcekey === 'string' ? source.egcs_fc_sourcekey : undefined
   selected.value.egcs_fc_accountreceivablechartofaccount = typeof source?.egcs_fc_accountreceivablechartofaccount === 'string' ? source.egcs_fc_accountreceivablechartofaccount : undefined
 }
+const actionContext = useActionContext({
+  identity: [() => accountReceivableId, () => fiscalYearId, () => currency, () => isAdjustment],
+  authority: () => canAny('account_receivable', 'update'),
+  eligible: () => canEdit && canUpdate
+})
 const save = async () => {
-  if (!selected.value || !canEdit || disposed) return
+  const capturedAction = actionContext.capture()
+  const committed = captureCommitted()
+  if (!capturedAction?.canDispatch() || !committed?.canDispatch()) return
+  if (!selected.value || !canEdit || disposed || resourcePending) return
   const session = modal.captureSession()
   if (!pending.begin(session)) return
   const owner = accountReceivableId
@@ -140,54 +152,66 @@ const save = async () => {
   const updating = lineId !== null
   const recoding = recodeMode.value
   try {
-    const payload = recoding
-      ? AccountReceivableRecodeSchema.parse({ egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount })
-      : (updating ? AccountReceivableLinePatchSchema : AccountReceivableLineCreateSchema).parse({
-          ...(updating ? {} : { egcs_fc_sourcekey: line.egcs_fc_sourcekey, ...(isAdjustment ? { egcs_fc_originalline: line.egcs_fc_originalline } : {}) }),
-          egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ?? undefined,
-          egcs_fc_amount: line.egcs_fc_amount
-        })
-    await sendJson(`/api/account-receivables/${owner}/lines${lineId ? `/${lineId}` : ''}${recoding ? '/recode' : ''}`, recoding || !updating ? 'POST' : 'PATCH', payload)
-    if (disposed || owner !== accountReceivableId || !modal.closeSession(session)) return
-    emit('changed')
+    try {
+      const payload = recoding
+        ? AccountReceivableRecodeSchema.parse({ egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount })
+        : (updating ? AccountReceivableLinePatchSchema : AccountReceivableLineCreateSchema).parse({
+            ...(updating ? {} : { egcs_fc_sourcekey: line.egcs_fc_sourcekey, ...(isAdjustment ? { egcs_fc_originalline: line.egcs_fc_originalline } : {}) }),
+            egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ?? undefined,
+            egcs_fc_amount: line.egcs_fc_amount
+          })
+      if (!capturedAction.canDispatch() || !committed.canDispatch()) return
+      await sendJson(`/api/account-receivables/${owner}/lines${lineId ? `/${lineId}` : ''}${recoding ? '/recode' : ''}`, recoding || !updating ? 'POST' : 'PATCH', payload)
+    } catch (failure) {
+      if (capturedAction.isCurrent() && !disposed && modal.isCurrentSession(session)) showError(failure)
+      return
+    }
+    const closed = capturedAction.isCurrent() && !disposed && modal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!closed || settlement.kind !== 'refreshed' || !capturedAction.isCurrent() || disposed || !modal.isLatestSession(session)) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
-  } catch (failure) {
-    if (!disposed && owner === accountReceivableId && modal.isCurrentSession(session)) showError(failure)
   } finally {
     pending.end(session)
   }
 }
 const removeCoding = async (line: AccountReceivableLine) => {
-  if (!canUpdate || !isAdjustment || disposed) return
+  if (!canUpdate || !isAdjustment || disposed || resourcePending) return
   if (!canEdit) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
+  const capturedAction = actionContext.capture()
+  const committed = captureCommitted()
+  if (!capturedAction?.canDispatch() || !committed?.canDispatch()) return
   const owner = accountReceivableId
   const requestKey = removeKey(line)
   if (removePending.value.has(requestKey)) return
   removePending.value.add(requestKey)
   try {
-    await sendJson(`/api/account-receivables/${owner}/lines/${line.id}/remove-coding`, 'POST', {})
-    if (!disposed && owner === accountReceivableId) emit('changed')
-  } catch (failure) {
-    if (!disposed && owner === accountReceivableId) showError(failure)
+    try {
+      if (!capturedAction.canDispatch() || !committed.canDispatch()) return
+      await sendJson(`/api/account-receivables/${owner}/lines/${line.id}/remove-coding`, 'POST', {})
+    } catch (failure) {
+      if (capturedAction.isCurrent() && !disposed && owner === accountReceivableId) showError(failure)
+      return
+    }
+    await committed.settle()
   } finally {
     removePending.value.delete(requestKey)
   }
 }
 const deleteLine = async (line: AccountReceivableLine) => {
-  if (!canDelete || disposed) return
+  if (!canDelete || disposed || resourcePending) return
   const owner = accountReceivableId
   try {
-    if (!await confirmDeleteRequest(`/api/account-receivables/${owner}/lines/${line.id}`)) return
-    if (disposed || owner !== accountReceivableId) return
-    emit('changed')
+    const settlement = await removeLine(line.id, () => !disposed && owner === accountReceivableId && !resourcePending)
+    if (settlement?.kind !== 'refreshed' || disposed || owner !== accountReceivableId) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && owner === accountReceivableId) showError(failure)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
@@ -225,7 +249,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
     </dl>
     <UModal v-model:open="isOpen" data-help-view="casework.account-receivable.detail-lines.is-open" :title="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'account_receivable.edit_line' : 'account_receivable.add_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="selected" :state="selected" :validate="lineValidator" class="space-y-4" @submit="save">
+        <UForm v-if="selected" v-bind="formSession" :state="selected" :validate="lineValidator" :disabled="resourcePending || isPending" class="space-y-4">
           <p v-if="recodeMode" class="text-sm text-muted">
             {{ t('account_receivable.move_coding_instruction') }}
           </p>

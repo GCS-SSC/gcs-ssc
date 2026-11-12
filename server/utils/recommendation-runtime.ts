@@ -7,8 +7,7 @@ import type {
   CommonScopeEntityType,
   Database,
   Entity_Type,
-  JsonValue,
-  Workflow_Purpose
+  JsonValue
 } from '~~/shared/types/database'
 import {
   deriveRecommendationOutcome,
@@ -31,7 +30,6 @@ import {
   reduceRuntimeState,
   transitionRuntimeItem
 } from './system-runtime'
-import type { ReviewRuntimeEntityContext } from './review-runtime-access'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 type DbClient = Kysely<Database> | Transaction<Database>
@@ -738,10 +736,13 @@ export const saveRecommendationById = async (
       persist: async (db, recommendation, suppliedResponses, nextRevision, isSubmit) => {
         const definition = RecommendationDefinitionSchema.parse(readPublishedRecommendationSchema(recommendation.schemaDefinition).definition)
         const derived = isSubmit ? deriveRecommendationOutcome(definition, suppliedResponses) : null
-        return await db.updateTable('Common_Recommendation').set({
+        await db.updateTable('Common_Recommendation').set({
           egcs_cn_response: { responses: suppliedResponses }, egcs_cn_revision: nextRevision,
           ...(derived ? { egcs_cn_resultoptionkey: derived.optionKey, egcs_cn_outcome: derived.outcome } : {})
         }).where('id', '=', recommendationId).returningAll().executeTakeFirstOrThrow()
+        const updated = await fetchRuntimeRecommendation(db, recommendationId)
+        if (!updated) return await notFound(event, 'WORKFLOW_RECOMMENDATION_NOT_FOUND', 'apiErrors.admin_common.not_found')
+        return updated
       },
       submit: async (db, recommendation, updated) => {
         const publishedSchema = readPublishedRecommendationSchema(recommendation.schemaDefinition)
@@ -790,52 +791,6 @@ export const saveRecommendationById = async (
       }
     }
   })
-  return existingTrx
-    ? await executeSave(existingTrx)
-    : await event.context.$db.transaction().execute(executeSave)
-}
-
-export const saveCurrentRecommendation = async (
-  event: H3Event,
-  context: ReviewRuntimeEntityContext,
-  responses: RecommendationResponse[],
-  submit: boolean,
-  userId: string,
-  existingTrx?: Transaction<Database>,
-  purpose: Workflow_Purpose = 'standard',
-  expectedRevision?: number
-) => {
-  const executeSave = async (trx: Transaction<Database>) => {
-    const recommendation = await trx.selectFrom('Common_Recommendation')
-      .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
-      .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Common_Runtime_Item.egcs_cn_runtime')
-      .select('Common_Recommendation.id')
-      .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
-      .where('Common_Runtime.egcs_cn_entitytype', '=', context.entityType)
-      .where('Common_Runtime.egcs_cn_entityid', '=', context.entityId)
-      .where('Common_Runtime.egcs_cn_purpose', '=', purpose)
-      .where('Common_Runtime.egcs_cn_state', '=', 'active')
-      .where('Common_Runtime._deleted', '=', false)
-      .where('Common_Runtime_Item.egcs_cn_state', '=', 'active')
-      .where('Common_Runtime_Item.egcs_cn_kind', '=', 'recommendation')
-      .where('Common_Runtime_Item._deleted', '=', false)
-      .where('Common_Recommendation._deleted', '=', false)
-      .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
-      .forUpdate('Common_Recommendation')
-      .executeTakeFirst()
-    if (!recommendation) {
-      return await notFound(event, 'WORKFLOW_RECOMMENDATION_NOT_FOUND', 'apiErrors.admin_common.not_found')
-    }
-    return await saveRecommendationById(
-      event,
-      String(recommendation.id),
-      responses,
-      submit,
-      userId,
-      trx,
-      expectedRevision
-    )
-  }
   return existingTrx
     ? await executeSave(existingTrx)
     : await event.context.$db.transaction().execute(executeSave)

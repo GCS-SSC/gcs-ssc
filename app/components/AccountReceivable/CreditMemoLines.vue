@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement, CommittedSettlementResult } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import { moneyMatchesSearch } from '~/utils/money-search'
 /* eslint-disable jsdoc/require-jsdoc -- Credit Memo line modal follows the established Commitment authoring pattern. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -13,7 +16,7 @@ import { sumMoney, type MoneyInput } from '~~/shared/utils/money'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { appRouteLocations } from '~/utils/route-locations'
 
-const { creditMemoId, receivableId, receivableIds, agencyId, applicantRecipientId, lines, currency, canEdit, canDelete } = defineProps<{
+const { creditMemoId, receivableId, receivableIds, agencyId, applicantRecipientId, lines, currency, canEdit, canDelete, captureCommitted, removeLine } = defineProps<{
   creditMemoId: string
   receivableId: string
   receivableIds: string[]
@@ -23,14 +26,15 @@ const { creditMemoId, receivableId, receivableIds, agencyId, applicantRecipientI
   currency: string
   canEdit: boolean
   canDelete: boolean
+  captureCommitted: CaptureCommittedSettlement
+  removeLine: (lineId: string, shouldProceed: () => boolean) => Promise<CommittedSettlementResult | null>
 }>()
-const emit = defineEmits<{ changed: [] }>()
+const { canAny } = useAuth()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const toast = useLocalizedToast()
 const { search, pagination } = useTableListState()
 type LineForm = {
@@ -105,7 +109,15 @@ const openEdit = (line: AccountReceivableCreditMemoLine) => {
   selectedLineId.value = line.id
   modal.openUpdate(line)
 }
+const actionContext = useActionContext({
+  identity: [() => creditMemoId, () => receivableId, () => agencyId, () => applicantRecipientId, () => currency, () => receivableIds.join(',')],
+  authority: () => canAny('account_receivable', 'update'),
+  eligible: () => canEdit
+})
 const save = async () => {
+  const capturedAction = actionContext.capture()
+  const committed = captureCommitted()
+  if (!capturedAction?.canDispatch() || !committed?.canDispatch()) return
   if (!selected.value || !canEdit || disposed) return
   const session = modal.captureSession()
   if (!pending.begin(session)) return
@@ -114,18 +126,23 @@ const save = async () => {
   const lineId = selectedLineId.value
   const updating = lineId !== null
   try {
-    const payload = AccountReceivableCreditMemoLineCreateSchema.parse({
-      egcs_fc_receivable: line.egcs_fc_receivable,
-      egcs_fc_linenumber: line.egcs_fc_linenumber,
-      egcs_fc_creditmemochartofaccount: line.egcs_fc_creditmemochartofaccount,
-      egcs_fc_amount: line.egcs_fc_amount
-    })
-    await sendJson(`/api/account-receivable-credit-memos/${owner}/lines${lineId ? `/${lineId}` : ''}`, updating ? 'PATCH' : 'POST', payload)
-    if (disposed || owner !== creditMemoId || !modal.closeSession(session)) return
-    emit('changed')
+    try {
+      const payload = AccountReceivableCreditMemoLineCreateSchema.parse({
+        egcs_fc_receivable: line.egcs_fc_receivable,
+        egcs_fc_linenumber: line.egcs_fc_linenumber,
+        egcs_fc_creditmemochartofaccount: line.egcs_fc_creditmemochartofaccount,
+        egcs_fc_amount: line.egcs_fc_amount
+      })
+      if (!capturedAction.canDispatch() || !committed.canDispatch()) return
+      await sendJson(`/api/account-receivable-credit-memos/${owner}/lines${lineId ? `/${lineId}` : ''}`, updating ? 'PATCH' : 'POST', payload)
+    } catch (failure) {
+      if (capturedAction.isCurrent() && !disposed && modal.isCurrentSession(session)) showError(failure)
+      return
+    }
+    const closed = capturedAction.isCurrent() && !disposed && modal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!closed || settlement.kind !== 'refreshed' || !capturedAction.isCurrent() || disposed || !modal.isLatestSession(session)) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
-  } catch (failure) {
-    if (!disposed && owner === creditMemoId && modal.isCurrentSession(session)) showError(failure)
   } finally {
     pending.end(session)
   }
@@ -134,14 +151,14 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
   if (!canDelete || disposed) return
   const owner = creditMemoId
   try {
-    if (!await confirmDeleteRequest(`/api/account-receivable-credit-memos/${owner}/lines/${line.id}`)) return
-    if (disposed || owner !== creditMemoId) return
-    emit('changed')
+    const settlement = await removeLine(line.id, () => !disposed && owner === creditMemoId)
+    if (settlement?.kind !== 'refreshed' || disposed || owner !== creditMemoId) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && owner === creditMemoId) showError(failure)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
@@ -178,7 +195,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
     </dl>
     <UModal v-model:open="isOpen" data-help-view="casework.account-receivable.credit-memo-lines.is-open" :title="t(selectedLineId ? 'account_receivable.credit_memo_edit_line' : 'account_receivable.credit_memo_add_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="selected" :state="selected" :validate="createValidator(AccountReceivableCreditMemoLineCreateSchema)" class="space-y-4" @submit="save">
+        <UForm v-if="selected" v-bind="formSession" :state="selected" :validate="createValidator(AccountReceivableCreditMemoLineCreateSchema)" class="space-y-4">
           <UFormField name="egcs_fc_receivable" :label="t('account_receivable.credit_memo_receivable')">
             <CommonServerLookupSelect
               v-model="selected.egcs_fc_receivable"

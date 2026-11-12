@@ -2053,7 +2053,7 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Review._deleted', '=', false)
     .orderBy('Review_Item.egcs_cn_order', 'asc')
     .execute()
-  const sourceApprovalStage = await db.selectFrom('Common_Routing_Slip')
+  const directApprovalStages = await db.selectFrom('Common_Routing_Slip')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
     .select([
       'Common_Routing_Slip.id as routingSlipId',
@@ -2065,7 +2065,8 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Runtime_Item.egcs_cn_parentruntimeitem', 'is', null)
     .where('Common_Routing_Slip._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'desc')
-    .executeTakeFirst().then(row => row ? { ...row, order: parseSafeDecimal(String(row.order)) } : undefined)
+    .execute().then(rows => rows.map(row => ({ ...row, order: parseSafeDecimal(String(row.order)) })))
+  const sourceApprovalStage = directApprovalStages[0]
   const nestedApprovalStages = await db.selectFrom('Common_Routing_Slip')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
     .select([
@@ -2122,7 +2123,9 @@ const getWorkflowRuntimeInSnapshot = async (
       ...member,
       runtimeItem: runtimeItem ? runtimeItemSummary(runtimeItem) : null,
       approvalStage: runtimeItem
-        ? nestedApprovalStages.find(stage => stage.parentRuntimeItemId === runtimeItem.id) ?? null
+        ? member.kind === 'approval_template'
+          ? directApprovalStages.find(stage => stage.runtimeItemId === runtimeItem.id) ?? null
+          : nestedApprovalStages.find(stage => stage.parentRuntimeItemId === runtimeItem.id) ?? null
         : null
     }
   })

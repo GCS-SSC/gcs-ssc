@@ -7,6 +7,10 @@ import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common
 import { z } from 'zod'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
+import { useModalSession } from '~/composables/useModalSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 
 interface OpportunityAttachmentType {
   id: string
@@ -28,16 +32,21 @@ interface AttachmentTypeLookupItem {
 
 const {
   opportunityId,
+  actionContext,
+  captureCommitted,
+  mutationLane,
   attachmentTypes,
   canEdit,
   loading = false
 } = defineProps<{
   opportunityId: string
+  actionContext: ActionContext
+  captureCommitted: CaptureCommittedSettlement
+  mutationLane: { pending: Readonly<Ref<boolean>>; acquire: () => (() => void) | null }
   attachmentTypes: OpportunityAttachmentType[]
   canEdit: boolean
   loading?: boolean
 }>()
-const emit = defineEmits<{ updated: [] }>()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
@@ -49,8 +58,10 @@ const LinkSchema = z.object({
 })
 const rows: Ref<OpportunityAttachmentType[]> = ref([...attachmentTypes])
 const draft: Ref<AttachmentTypeDraft | null> = ref(null)
+const associationSession = useModalSession()
 const selectedType: Ref<AttachmentTypeLookupItem | null> = ref(null)
-const pending: Ref<boolean> = ref(false)
+const localPending: Ref<boolean> = ref(false)
+const pending = computed(() => localPending.value || mutationLane.pending.value)
 const mutationError: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
@@ -91,8 +102,9 @@ watch(() => opportunityId, () => {
   pagination.value.pageIndex = 0
   rows.value = [...attachmentTypes]
   draft.value = null
+  associationSession.isOpen.value = false
   selectedType.value = null
-  pending.value = false
+  localPending.value = false
   mutationError.value = false
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -104,12 +116,15 @@ onBeforeUnmount(() => {
 const openAdd = () => {
   if (!canEdit || pending.value) return
   draft.value = { id: undefined, egcs_fo_isinternal: false }
+  associationSession.isOpen.value = false
+  associationSession.isOpen.value = true
   selectedType.value = null
 }
 /** Closes the association form unless its save is in flight. */
 const closeAdd = () => {
   if (pending.value) return
   draft.value = null
+  associationSession.isOpen.value = false
   selectedType.value = null
 }
 
@@ -129,30 +144,42 @@ const onResolvedType = (items: AdminCommonLookupResponseItem[]) => {
  * @param nextRows - Complete next set of linked types.
  */
 const save = async (nextRows: OpportunityAttachmentType[]): Promise<void> => {
-  if (!canEdit || pending.value || disposed) return
+  const operation = actionContext.capture()
+  const committed = captureCommitted()
+  if (!operation?.canDispatch() || !committed?.canDispatch() || pending.value || disposed) return
+  const release = mutationLane.acquire()
+  if (!release) return
   const generation = contextGeneration
-  pending.value = true
+  const submittedDraft = draft.value
+  localPending.value = true
   mutationError.value = false
   try {
-    const response = await fetch(getClientRequestUrl(`/api/funding-opportunities/${opportunityId}`), {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        egcs_fo_attachmenttypes: nextRows.map(row => ({ id: row.id, egcs_fo_isinternal: row.egcs_fo_isinternal }))
+    try {
+      const response = await fetch(getClientRequestUrl(`/api/funding-opportunities/${opportunityId}`), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          egcs_fo_attachmenttypes: nextRows.map(row => ({ id: row.id, egcs_fo_isinternal: row.egcs_fo_isinternal }))
+        })
       })
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    if (disposed || generation !== contextGeneration) return
+      if (!response.ok) await throwFetchResponseError(response)
+    } catch (error: unknown) {
+      if (disposed || generation !== contextGeneration || !operation.isCurrent()) return
+      mutationError.value = true
+      showError(error)
+      return
+    }
+    const readback = await committed.settle()
+    if (readback.kind === 'retired' || disposed || generation !== contextGeneration || !operation.isCurrent()) return
     rows.value = nextRows
-    draft.value = null
-    selectedType.value = null
-    emit('updated')
-  } catch (error: unknown) {
-    if (disposed || generation !== contextGeneration) return
-    mutationError.value = true
-    showError(error)
+    if (draft.value === submittedDraft) {
+      draft.value = null
+      associationSession.isOpen.value = false
+      selectedType.value = null
+    }
   } finally {
-    if (!disposed && generation === contextGeneration) pending.value = false
+    release()
+    if (!disposed && generation === contextGeneration) localPending.value = false
   }
 }
 
@@ -167,6 +194,7 @@ const add = async (): Promise<void> => {
     egcs_fo_isinternal: selected.egcs_fo_isinternal
   }])
 }
+const associationForm = useFormSession({ owner: associationSession, action: { kind: 'remote', context: () => actionContext }, submit: add })
 
 /** Changes whether a linked type is available to the external portal.
  * @param id - Linked attachment type ID.
@@ -234,7 +262,7 @@ const remove = async (id: string): Promise<void> => {
 
     <UModal :open="draft !== null" :title="t('funding_opportunity.add_attachment_type')" :description="t('funding_opportunity.attachment_types_help')" @update:open="value => { if (!value) closeAdd() }">
       <template #body>
-        <UForm v-if="draft" :state="draft" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="add">
+        <UForm v-if="draft" v-bind="associationForm" :state="draft" :validate="createValidator(LinkSchema)" class="space-y-4">
           <UFormField :label="t('attachments.type')" name="id" required>
             <CommonServerLookupSelect
               v-model="draft.id"

@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { TransferPaymentPerformanceIndicatorSchema } from '~~/shared/types/schemas'
 
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { toRef, watch } from 'vue'
+import { onScopeDispose, shallowRef, toRef, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import type { TransferPaymentPerformanceIndicatorItem } from '~~/shared/types/schemas'
 import type { TransferPaymentPerformanceIndicatorRow } from '~~/shared/types/transfer-payment-ui'
@@ -66,24 +67,47 @@ const isIndicatorModalOpen: Ref<boolean> = indicatorModal.isOpen
 const selectedIndicator: Ref<IndicatorForm | null> = indicatorModal.selected
 /** Opens a new indicator only while the caller can update the Program. */
 const openCreateIndicator = () => {
-  if (canUpdateChild) indicatorModal.openCreate()
+  if (resourceContext.value.kind !== 'active' || !canUpdateChild) return
+  editingTarget.value = null
+  editingOutcomeId.value = null
+  indicatorModal.openCreate()
 }
 /** @param row - Indicator selected for editing. */
 const openUpdateIndicator = (row: TransferPaymentPerformanceIndicatorRow) => {
-  if (canUpdateChild) indicatorModal.openUpdate(row)
+  if (resourceContext.value.kind !== 'active' || !canUpdateChild) return
+  editingTarget.value = String(row.id)
+  editingOutcomeId.value = row.egcs_tp_transferpaymentoutcome ? String(row.egcs_tp_transferpaymentoutcome) : null
+  indicatorModal.openUpdate(row)
 }
 const indicatorPending = useCrudModalPending(indicatorModal.captureSession)
 const isSavingIndicator = indicatorPending.isPending
 
-let indicatorModalGeneration = 0
-watch(isIndicatorModalOpen, open => {
-  if (open) indicatorModalGeneration += 1
-}, { flush: 'sync' })
-let indicatorContext = 0
+const editingTarget: Ref<string | null> = shallowRef(null)
+const editingOutcomeId: Ref<string | null> = shallowRef(null)
+const writeContext = useActionContext({
+  identity: [() => programId, selectedOutcomeId],
+  authority: () => canUpdateChild,
+  eligible: () => editingTarget.value === null || performanceIndicators.value.some(row => String(row.id) === editingTarget.value)
+})
+const deleteContext = useActionContext({
+  identity: [() => programId, selectedOutcomeId],
+  authority: () => canDeleteChild
+})
+
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const resourceContext: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const ownsContext = (captured: ResourceContext) => captured.kind === 'active' && captured === resourceContext.value
 watch([() => programId, selectedOutcomeId], () => {
-  indicatorContext += 1
+  resourceContext.value = { kind: 'active' }
   indicatorModal.close()
 }, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) indicatorModal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  resourceContext.value = { kind: 'disposed' }
+  indicatorModal.close()
+})
 
 /**
  * Saves the currently selected performance indicator record.
@@ -91,23 +115,28 @@ watch([() => programId, selectedOutcomeId], () => {
  * Correctly handles the association with an outcome, closes the modal, refreshes data, and provides success feedback.
  */
 const saveIndicator = async () => {
-  if (!selectedIndicator.value || !canUpdateChild) return
-  const outcomeId = selectedOutcomeId.value === 'all'
-    ? selectedIndicator.value.egcs_tp_transferpaymentoutcome
-    : selectedOutcomeId.value
+  const operation = writeContext.capture()
+  if (!operation) return
+  const targetId = editingTarget.value
+  const context = resourceContext.value
+  if (!(ownsContext(context) && operation.isCurrent()) || !selectedIndicator.value || !canUpdateChild) return
+  const outcomeId = targetId !== null
+    ? editingOutcomeId.value
+    : selectedOutcomeId.value === 'all'
+      ? selectedIndicator.value.egcs_tp_transferpaymentoutcome
+      : selectedOutcomeId.value
   if (!outcomeId) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('validation.outcome_required'), color: 'warning' })
     return
   }
-  const requestedContext = indicatorContext
-  const requestedModalGeneration = indicatorModalGeneration
   const session = indicatorModal.captureSession()
-  if (!indicatorPending.begin(session)) return
+  if (session === null || !indicatorPending.begin(session)) return
+  let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(selectedIndicator.value.id
-      ? `/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${selectedIndicator.value.id}`
+    const response = await fetch(getClientRequestUrl(targetId !== null
+      ? `/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${targetId}`
       : `/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators`), {
-      method: selectedIndicator.value.id ? 'PATCH' : 'POST',
+      method: targetId !== null ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         ...selectedIndicator.value,
@@ -115,13 +144,13 @@ const saveIndicator = async () => {
       })
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (requestedContext !== indicatorContext || !indicatorModal.isCurrentSession(session)) return
-    indicatorModal.closeSession(session)
+    if (!(ownsContext(context) && operation.isCurrent())) return
+    closedSession = indicatorModal.closeSession(session)
     await refreshIndicators()
-    if (requestedContext !== indicatorContext || requestedModalGeneration !== indicatorModalGeneration) return
+    if (!(ownsContext(context) && operation.isCurrent()) || !closedSession || !indicatorModal.isLatestSession(session) || indicatorStatusState.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    if (requestedContext === indicatorContext && indicatorModal.isCurrentSession(session)) showError(error)
+    if ((ownsContext(context) && operation.isCurrent()) && (indicatorModal.isCurrentSession(session) || (closedSession && indicatorModal.isLatestSession(session)))) showError(error)
   } finally {
     indicatorPending.end(session)
   }
@@ -135,22 +164,31 @@ const saveIndicator = async () => {
  * @param {TransferPaymentPerformanceIndicatorRow} row - The performance indicator record to be deleted.
  */
 const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
-  if (!canDeleteChild || !selectedOutcomeId.value) return
+  const targetId = String(row.id)
+  const context = resourceContext.value
+  if (!ownsContext(context) || !canDeleteChild || !selectedOutcomeId.value) return
   const outcomeId = selectedOutcomeId.value === 'all'
     ? row.egcs_tp_transferpaymentoutcome
     : selectedOutcomeId.value
   if (!outcomeId) return
-  const requestedContext = indicatorContext
+  const operation = deleteContext.capture()
+  if (!operation) return
   try {
-    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${row.id}`, {
-      shouldProceed: () => requestedContext === indicatorContext
+    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${targetId}`, {
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => performanceIndicators.value.find(current => String(current.id) === targetId),
+        eligible: current => String(current.id) === targetId
+      },
+      shouldProceed: () => (ownsContext(context) && operation.isCurrent()) && canDeleteChild
     })
-    if (!ok || requestedContext !== indicatorContext) return
+    if (!ok || !(ownsContext(context) && operation.isCurrent())) return
     await refreshIndicators()
-    if (requestedContext !== indicatorContext) return
+    if (!(ownsContext(context) && operation.isCurrent()) || indicatorStatusState.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (requestedContext === indicatorContext) showError(error)
+    if ((ownsContext(context) && operation.isCurrent())) showError(error)
   }
 }
 </script>
@@ -176,6 +214,7 @@ const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
     <CommonFormDialog
       v-if="selectedIndicator"
       v-model:open="isIndicatorModalOpen"
+      :action-context="writeContext"
       :state="selectedIndicator"
       :schema="TransferPaymentPerformanceIndicatorSchema"
       :title="selectedIndicator.id ? t('common.update') : t('common.add')"

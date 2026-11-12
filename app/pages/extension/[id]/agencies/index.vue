@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { getPaginationRowModel } from '@tanstack/table-core'
-import { computed, ref, watch } from 'vue'
-import type { Ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 
@@ -15,31 +15,24 @@ type Agency = ExtensionAgencyWorkspaceListItem['agencies'][number]
 const route = useRoute()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
+const { user, permissionRevision } = useAuth()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('extension-agency-workspace-list')
 const extensionKey = computed(() => String(route.params.id))
-type LoadStatus = 'pending' | 'success' | 'error'
-const data: Ref<{ items: ExtensionAgencyWorkspaceListItem[] } | null> = ref(null)
-const status: Ref<LoadStatus> = ref('pending')
-let requestSequence = 0
-/** Reloads the enabled Agencies visible through the current extension workspace. */
-const refresh = async () => {
-  const sequence = ++requestSequence
-  status.value = 'pending'
-  try {
-    const response = await fetch(getClientRequestUrl('/api/extensions/workspaces'))
+const { data, status, refresh } = useResourceRequest<{ items: ExtensionAgencyWorkspaceListItem[] }>({
+  identity: () => JSON.stringify([extensionKey.value, user.value?.id, permissionRevision.value]),
+  failureData: 'clear',
+  /**
+   * Loads the authorized current workspace.
+   * @param signal - Owning request cancellation.
+   * @returns Current workspace evidence.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl('/api/extensions/workspaces'), { signal })
     if (!response.ok) throw new Error('Workspace list request failed')
-    const result = await response.json() as { items: ExtensionAgencyWorkspaceListItem[] }
-    if (sequence !== requestSequence) return
-    data.value = result
-    status.value = 'success'
-  } catch {
-    if (sequence !== requestSequence) return
-    data.value = null
-    status.value = 'error'
+    return await response.json() as { items: ExtensionAgencyWorkspaceListItem[] }
   }
-}
-watch(extensionKey, refresh, { immediate: true })
+})
 const workspace = computed(() => data.value?.items.find(item => item.key === extensionKey.value))
 const title = computed(() => workspace.value
   ? locale.value === 'fr' ? workspace.value.label.fr : workspace.value.label.en

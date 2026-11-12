@@ -1,6 +1,7 @@
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, toValue, onBeforeUnmount, ref, watch } from 'vue'
+import { useResourceRequest } from '~/composables/useResourceRequest'
+import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { ExtensionEntityTabItem, ExtensionEntityTabsResponse } from '~~/shared/types/schemas/extensions'
 import type { GcsExtensionEntityTabTarget } from '~~/shared/utils/extensions'
@@ -48,6 +49,7 @@ const localizedLabel = (item: ExtensionEntityTabItem, locale: Ref<string>) => {
  */
 export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
   const { locale } = useI18n()
+  const { user, permissionRevision } = useAuth()
   const query = computed(() => ({
     target: options.target,
     agreementId: resolveMaybeRefString(options.agreementId),
@@ -59,20 +61,9 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
     opportunityId: resolveMaybeRefString(options.opportunityId)
   }))
 
-  const data: Ref<ExtensionEntityTabsResponse | null> = ref(null)
-  const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
-  const error: Ref<unknown | null> = ref(null)
-  let requestGeneration = 0
-  onBeforeUnmount(() => {
-    requestGeneration += 1
-  })
-  /**
-   *
-   */
-  const refresh = async () => {
-    const generation = ++requestGeneration
+  const requiredId = computed(() => {
     const resolvedQuery = query.value
-    const requiredId = options.target === 'agreement'
+    return options.target === 'agreement'
       ? resolvedQuery.agreementId
       : options.target === 'payment'
         ? resolvedQuery.paymentId
@@ -83,39 +74,34 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
             : options.target === 'opportunity'
               ? resolvedQuery.opportunityId
               : resolvedQuery.applicantRecipientId
-    if (!requiredId) {
-      data.value = null
-      error.value = null
-      status.value = 'idle'
-      return
-    }
-    try {
-      data.value = null
-      status.value = 'pending'
-      error.value = null
+  })
+  const { data, status, error, refresh: refreshRequest } = useResourceRequest<ExtensionEntityTabsResponse>({
+    identity: () => JSON.stringify([query.value, user.value?.id, permissionRevision.value]),
+    enabled: () => Boolean(requiredId.value),
+    refreshData: 'clear',
+    failureData: 'clear',
+    /**
+     * Loads tabs for the exact subject captured before the request starts.
+     * @param signal - Cancellation owned by the shared request lifecycle.
+     * @returns The host's authorized extension discovery response.
+     */
+    load: async signal => {
+      const resolvedQuery = query.value
       const requestUrl = getClientRequestUrl('/api/extensions/entity-tabs')
       for (const [key, value] of Object.entries(resolvedQuery)) {
         if (value) {
           requestUrl.searchParams.set(key, value)
         }
       }
-      const response = await fetch(requestUrl)
+      const response = await fetch(requestUrl, { signal })
       if (!response.ok) await throwFetchResponseError(response)
-      const responseData = await response.json() as ExtensionEntityTabsResponse
-      if (generation !== requestGeneration) return
-      data.value = responseData
-      status.value = 'success'
-    } catch (fetchError: unknown) {
-      if (generation !== requestGeneration) return
-      error.value = fetchError
-      data.value = null
-      status.value = 'error'
+      return response.json()
     }
+  })
+  /** Refreshes discovery without exposing the shared request's settlement result. */
+  const refresh = async (): Promise<void> => {
+    await refreshRequest()
   }
-
-  watch(query, async () => {
-    await refresh()
-  }, { immediate: true })
 
   const items = computed<ExtensionEntityTabItem[]>(() => data.value?.items ?? [])
   const tabs = computed<TranslatedTabItem[]>(() =>

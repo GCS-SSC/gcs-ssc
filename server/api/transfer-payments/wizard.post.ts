@@ -60,7 +60,7 @@ export default defineEventHandler(async event => {
         }
       }
 
-      const outcomeKey = (nameEn: string, nameFr: string) => `${nameEn.trim().toLowerCase()}|${nameFr.trim().toLowerCase()}`
+      const outcomeKey = (nameEn: string, nameFr: string) => JSON.stringify([nameEn.trim().toLowerCase(), nameFr.trim().toLowerCase()])
 
       // 1. Create Transfer Payment Profile
       const profile = await trx

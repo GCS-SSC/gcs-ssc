@@ -1,10 +1,16 @@
 /* eslint-disable jsdoc/require-jsdoc -- Internal settlement tracking for external metadata mutations. */
 
 export const observeStorageMetadataMutation = (promise: Promise<void>) => {
-  const operation = { promise, settled: false }
+  let state: 'pending' | 'settled' = 'pending'
+  const operation = {
+    promise,
+    get state() {
+      return state
+    }
+  }
   void promise.then(
-    () => { operation.settled = true },
-    () => { operation.settled = true }
+    () => { state = 'settled' },
+    () => { state = 'settled' }
   )
   return operation
 }
@@ -13,7 +19,7 @@ export const releaseStorageMetadataAfterSettlement = async (
   operation: ReturnType<typeof observeStorageMetadataMutation> | undefined,
   release: () => Promise<unknown>
 ): Promise<void> => {
-  if (!operation || operation.settled) {
+  if (!operation || operation.state === 'settled') {
     await release()
     return
   }

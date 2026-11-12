@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { onUnmounted, watch } from 'vue'
 import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import { FundingCaseAgreementNoteCreateSchema } from '~~/shared/types/schemas'
@@ -20,6 +22,12 @@ watch(() => [agreementId, canCreate, canUpdate, canDelete], () => {
 onUnmounted(() => {
   actionGeneration += 1
 })
+const createContext = useActionContext({ identity: [() => agreementId], authority: () => canCreate })
+const updateContext = useActionContext({ identity: [() => agreementId], authority: () => canUpdate })
+const deleteContext = useActionContext({ identity: [() => agreementId], authority: () => canDelete })
+const resourceAction: ResourceCrudAction = {
+  kind: 'remote', create: createContext, update: updateContext, delete: deleteContext
+}
 const permitted = (action: 'create' | 'update' | 'delete') => action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete
 /**
  * Checks current action prerequisites before opening the editor.
@@ -68,6 +76,7 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
 
 <template>
   <CommonResourceCrud
+    :action="resourceAction"
     class="w-full" :title="t('notes.title')" icon="i-lucide-sticky-note"
     :fetch-url="`/api/agreements/${agreementId}/notes`"
     :post-url="canCreate ? `/api/agreements/${agreementId}/notes` : undefined"

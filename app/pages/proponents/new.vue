@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { Ref } from 'vue'
 import { onBeforeUnmount, ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -31,6 +32,7 @@ onBeforeUnmount(() => {
   disposed = true
 })
 const canCreateProfile = computed(() => canAny('applicant_recipient', 'create', ['global', 'agency']))
+const actionContext = useActionContext({ identity: [], authority: canCreateProfile })
 const isHeroCollapsed = getHeroCollapsed('applicant-recipient-create')
 
 const breadcrumbItems = computed(() => [
@@ -46,10 +48,12 @@ const submit = async () => {
     return
   }
 
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
   try {
     isSaving.value = true
     const created = await sendJson<{ id: string }>('/api/applicant-recipients', 'POST', form.value)
-    if (disposed) return
+    if (disposed || !operation.isCurrent()) return
 
     toast.add({
       title: toast.localized('common.success'),
@@ -59,7 +63,7 @@ const submit = async () => {
 
     await navigateTo(localePath(appRouteLocations.proponentEdit(created.id)))
   } catch (error: unknown) {
-    if (!disposed) showError(error)
+    if (!disposed && operation.isCurrent()) showError(error)
   } finally {
     isSaving.value = false
   }
@@ -108,10 +112,13 @@ onMounted(() => {
           <CommonDetailSection :title="t('agency.tabs.general')">
             <ApplicantRecipientProfileFormPage
               v-model:model="form"
+              :editor-session="0"
+              :action-context="actionContext"
               :submit-label="t('common.add')"
               :cancel-label="t('common.cancel')"
               lead-agency-permission-action="create"
               :pending="isSaving"
+              @unavailable="toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })"
               @submit="submit"
               @cancel="cancel" />
           </CommonDetailSection>

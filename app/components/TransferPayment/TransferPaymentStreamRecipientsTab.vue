@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -29,6 +31,14 @@ const {
   agencyId?: string | null
 }>()
 
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const { t } = useI18n()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
@@ -80,16 +90,26 @@ const { getBilingualValue } = useBilingualValue()
 const getRecipientActionTarget = (recipient: TransferPaymentEligibleRecipientRow) =>
   `${getBilingualValue(recipient, 'recipient_name', String(recipient.id))} [${recipient.id}]`
 
+const isRetryingRecipientReferences: Ref<boolean> = ref(false)
 let contextGeneration = 0
+let deleteCapabilityGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 watch([() => transferPaymentId, () => streamId], () => {
   contextGeneration += 1
+  isRetryingRecipientReferences.value = false
   recipientModal.close()
+}, { flush: 'sync' })
+watch(() => canDeleteChild, () => {
+  deleteCapabilityGeneration += 1
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) recipientModal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
   disposed = true
   contextGeneration += 1
+  recipientModal.close()
 })
 
 /**
@@ -98,6 +118,8 @@ onBeforeUnmount(() => {
  * Closes the modal, refreshes the dataset, and provides success feedback.
  */
 const saveRecipient = async () => {
+  const operation = writeContext.capture()
+  if (!operation) return
   if (disposed || !selectedRecipient.value || !canUpdateChild) return
   const session = recipientModal.captureSession()
   if (!recipientPending.begin(session)) return
@@ -113,10 +135,10 @@ const saveRecipient = async () => {
       body: JSON.stringify(selectedRecipient.value)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!isCurrentContext(generation)) return
+    if (!(operation.isCurrent() && isCurrentContext(generation))) return
     closedSession = recipientModal.closeSession(session)
   } catch (error: unknown) {
-    if (isCurrentContext(generation) && recipientModal.captureSession() === session) showError(error)
+    if ((operation.isCurrent() && isCurrentContext(generation)) && recipientModal.captureSession() === session) showError(error)
     return
   } finally {
     recipientPending.end(session)
@@ -124,14 +146,14 @@ const saveRecipient = async () => {
 
   try {
     await refreshRecipients()
-    if (!isCurrentContext(generation) || !closedSession || recipientModal.captureSession() !== null || recipientStatusState.value === 'error') return
+    if (!(operation.isCurrent() && isCurrentContext(generation)) || !closedSession || !recipientModal.isLatestSession(session) || recipientStatusState.value === 'error') return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if ((operation.isCurrent() && isCurrentContext(generation)) && closedSession && recipientModal.isLatestSession(session)) showError(error)
   }
 }
 
@@ -143,20 +165,25 @@ const saveRecipient = async () => {
  * @param {TransferPaymentEligibleRecipientRow} row - The record to be deleted.
  */
 const deleteRecipient = async (row: TransferPaymentEligibleRecipientRow) => {
+  const operation = deleteActionContext.capture()
+  if (!operation) return
+  const id = row.id
+  if (disposed || !canDeleteChild) return
+  const generation = contextGeneration
+  const capabilityGeneration = deleteCapabilityGeneration
   try {
     const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/eligible-recipients/${row.id}`
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/eligible-recipients/${id}`,
+      {
+        operation, target: { id, resolve: () => recipients.value.find(current => current.id === id), eligible: current => current.id === id },
+        shouldProceed: () => operation.isCurrent() && isCurrentContext(generation) && canDeleteChild && capabilityGeneration === deleteCapabilityGeneration
+      }
     )
-    if (!ok) return
+    if (!ok || !(operation.isCurrent() && isCurrentContext(generation))) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
-  } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
     await refreshRecipients()
   } catch (error: unknown) {
-    showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -179,20 +206,21 @@ const recipientOptions: ComputedRef<RecipientReferenceOption[]> = computed(() =>
     egcs_ay_name_fr: original.recipient_name_fr ?? ''
   }, ...options]
 })
-const isRetryingRecipientReferences: Ref<boolean> = ref(false)
 
 /** Retries failed subtype options without changing the selected eligible recipient. */
 const retryRecipientReferences = async () => {
-  if (isRetryingRecipientReferences.value) return
+  if (disposed || isRetryingRecipientReferences.value) return
+  const generation = contextGeneration
   isRetryingRecipientReferences.value = true
   try {
     await refreshRecipientReferences()
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   } finally {
-    isRetryingRecipientReferences.value = false
+    if (isCurrentContext(generation)) isRetryingRecipientReferences.value = false
   }
 }
+const formSession = useFormSession({ owner: recipientModal, action: { kind: 'remote', context: writeContext }, submit: saveRecipient })
 </script>
 
 <template>
@@ -242,7 +270,7 @@ const retryRecipientReferences = async () => {
     v-model:open="isRecipientModalOpen"
     :title="selectedRecipient?.id ? t('common.update') : t('common.add')">
     <template #body>
-      <UForm :state="selectedRecipient" :validate="validateRecipient" class="space-y-4" @submit="saveRecipient">
+      <UForm v-bind="formSession" :state="selectedRecipient" :validate="validateRecipient" class="space-y-4">
         <div v-if="recipientReferenceError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
           <span>{{ t('common.lookup_load_failed') }}</span>
           <UButton

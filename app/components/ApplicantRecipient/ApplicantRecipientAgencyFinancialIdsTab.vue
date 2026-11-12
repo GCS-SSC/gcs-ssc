@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { ApplicantRecipientProfileRow, ApplicantRecipientAgencyFinancialIdForm } from '~~/shared/types/applicant-recipient-ui'
 import { ApplicantRecipientAgencyFinancialIdCreateSchema } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -18,7 +19,7 @@ type FinancialIdWarning = {
   resolve: (confirmed: boolean) => void
 }
 
-const { applicantRecipientId, canCreateRole = false, canUpdateRole = false, canDeleteRole = false } = defineProps<{
+const { applicantRecipientId, canCreate, canUpdate, canDelete, canCreateRole = false, canUpdateRole = false, canDeleteRole = false } = defineProps<{
   applicantRecipientId: string
   canCreate: boolean
   canUpdate: boolean
@@ -27,6 +28,24 @@ const { applicantRecipientId, canCreateRole = false, canUpdateRole = false, canD
   canUpdateRole?: boolean
   canDeleteRole?: boolean
 }>()
+
+const { canAny } = useCan()
+const createContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'create', ['global', 'agency']) && canCreateRole,
+  eligible: () => canCreate
+})
+const updateContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'update', ['global', 'agency']) && canUpdateRole,
+  eligible: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']) && canDeleteRole,
+  eligible: () => canDelete
+})
+const resourceAction = { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext } satisfies import('~/composables/useResourceCrudState').ResourceCrudAction
 
 const { t } = useI18n()
 const toast = useLocalizedToast()
@@ -173,6 +192,7 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
 <template>
   <section data-help-target="proponent.agency-financial-ids.content" data-help-kind="section" data-help-view="proponent.agency-financial-ids" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      :action="resourceAction"
       help-search-target="proponent.agency-financial-ids.search" help-save-target="proponent.agency-financial-ids.save" help-add-target="proponent.agency-financial-ids.add"
       class="w-full"
       :title="t('applicant_recipient.agency_financial_ids.title')"

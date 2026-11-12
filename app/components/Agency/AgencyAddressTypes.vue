@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyAddressTypeSchema, AgencyAddressTypeInitial, type AgencyAddressTypeItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -12,11 +14,19 @@ const columns: TableColumnInput<AgencyAddressTypeItem>[] = [
 ]
 
 const initialNewItem = { ...AgencyAddressTypeInitial }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <section data-help-view="agency.address-types" data-field-scope="agency.address-types">
     <CommonResourceCrud
+      :action="action"
       help-add-target="agency.address-types.add"
       help-save-target="agency.address-types.save"
       :title="t('agency.tabs.address_types')"

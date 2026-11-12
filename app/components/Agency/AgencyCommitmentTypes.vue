@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyCommitmentTypeSchema, type AgencyCommitmentTypeItem } from '~~/shared/types/schemas/transfer-payment'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 
@@ -16,10 +18,18 @@ const columns: TableColumnInput<AgencyCommitmentTypeItem>[] = [
 const bilingualColumns: BilingualColumnConfig<AgencyCommitmentTypeItem>[] = [
   { id: 'name', accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' } }
 ]
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.commitment_types')"
     icon="i-lucide-tags"
     :fetch-url="`/api/agency/${agencyId}/commitment-types`"

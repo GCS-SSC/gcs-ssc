@@ -1,8 +1,13 @@
 <!-- eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -->
 <script setup lang="ts">
 import { nanoid } from 'nanoid'
+import { reactive } from 'vue'
 import { useAssessmentSchemaHelperDefinitions } from '~/composables/useAssessmentSchemaHelpers'
 import type { AssessmentAnswerPathTreeNode } from '~/utils/assessment-schema'
+import {
+  createDependencyTargetAnswerPathValue,
+  parseDependencyTargetAnswerPathValue
+} from './assessment-schema-dependency'
 
 const weight = defineModel<unknown>({
   default: () => ({
@@ -83,11 +88,12 @@ const createAdjustableWeight = (): AdjustableWeight => ({
  * @param on
  */
 const getAnswersDependencyValue = (on: AdjustableDependencyOn) => {
-  if (!on.section || !on.subsection || !on.question) {
-    return ''
-  }
-
-  return `${on.section}|${on.subsection}|${on.question}`
+  return createDependencyTargetAnswerPathValue({
+    type: 'answers',
+    section: on.section ?? '',
+    subsection: on.subsection ?? '',
+    question: on.question ?? ''
+  })
 }
 
 /**
@@ -187,6 +193,12 @@ const setWeightRows = (target: Record<string, number>, rows: AdjustableWeightRow
 
 const adjustableWeightRows = ref<AdjustableWeightRow[]>([])
 
+const rowsMatchWeights = (rows: AdjustableWeightRow[], weights: Record<string, number>) => {
+  const values = Object.fromEntries(rows.filter(row => row.score.trim()).map(row => [row.score.trim(), Number(row.value)]))
+  return Object.keys(values).length === Object.keys(weights).length
+    && Object.entries(values).every(([score, value]) => weights[score] === value)
+}
+
 /**
  *
  */
@@ -201,23 +213,17 @@ const syncAdjustableWeightRowsFromModel = () => {
 
 watch(
   () => weight.value,
-  () => {
+  (value, previous) => {
+    if (value === previous && weightMode.value === 'adjustable'
+      && rowsMatchWeights(adjustableWeightRows.value, getAdjustableWeight().weights)) return
     syncAdjustableWeightRowsFromModel()
   },
   { immediate: true, deep: true }
 )
 
-watch(
-  adjustableWeightRows,
-  rows => {
-    if (weightMode.value !== 'adjustable') {
-      return
-    }
-
-    setWeightRows(getAdjustableWeight().weights, rows)
-  },
-  { deep: true }
-)
+const updateAdjustableWeightRows = () => {
+  setWeightRows(getAdjustableWeight().weights, adjustableWeightRows.value)
+}
 
 /**
  *
@@ -232,6 +238,7 @@ const addAdjustableWeightRow = () => {
 
 const removeAdjustableWeightRow = (rowId: string) => {
   adjustableWeightRows.value = adjustableWeightRows.value.filter(row => row.id !== rowId)
+  updateAdjustableWeightRows()
 }
 
 const addAdjustableScenario = () => {
@@ -250,7 +257,7 @@ const arrayWeightRowsByScenario = new WeakMap<AdjustableScenario, AdjustableWeig
  */
 const ensureScenarioRows = (scenario: AdjustableScenario) => {
   if (!arrayWeightRowsByScenario.has(scenario)) {
-    arrayWeightRowsByScenario.set(scenario, getWeightRows(scenario.weights))
+    arrayWeightRowsByScenario.set(scenario, reactive(getWeightRows(scenario.weights)))
   }
 
   return arrayWeightRowsByScenario.get(scenario)!
@@ -272,8 +279,9 @@ const addArrayWeightRow = (scenario: AdjustableScenario) => {
  * @param rowId
  */
 const removeArrayWeightRow = (scenario: AdjustableScenario, rowId: string) => {
-  const rows = ensureScenarioRows(scenario).filter(row => row.id !== rowId)
-  arrayWeightRowsByScenario.set(scenario, rows)
+  const rows = ensureScenarioRows(scenario)
+  const index = rows.findIndex(row => row.id === rowId)
+  if (index >= 0) rows.splice(index, 1)
   setWeightRows(scenario.weights, rows)
 }
 
@@ -291,10 +299,11 @@ const updateCurrentAdjustableType = (value: string | number) => {
 const updateCurrentAnswersDependencyValue = (value: string) => {
   getAdjustableWeight()
   const current = weight.value as AdjustableWeight
-  const [section = '', subsection = '', question = ''] = value.split('|')
-  current.on.section = section
-  current.on.subsection = subsection
-  current.on.question = question
+  const target = parseDependencyTargetAnswerPathValue(value)
+  if (target.type !== 'answers') return
+  current.on.section = target.section
+  current.on.subsection = target.subsection
+  current.on.question = target.question
 }
 
 const updateScenarioAdjustableType = (scenarioIndex: number, value: string | number) => {
@@ -309,10 +318,11 @@ const updateScenarioAnswersDependencyValue = (scenarioIndex: number, value: stri
   getAdjustableArrayWeight()
   const scenario = (weight.value as AdjustableWeightArray)[1][scenarioIndex]
   if (!scenario) return
-  const [section = '', subsection = '', question = ''] = value.split('|')
-  scenario.on.section = section
-  scenario.on.subsection = subsection
-  scenario.on.question = question
+  const target = parseDependencyTargetAnswerPathValue(value)
+  if (target.type !== 'answers') return
+  scenario.on.section = target.section
+  scenario.on.subsection = target.subsection
+  scenario.on.question = target.question
 }
 
 const syncAdjustableHelperTarget = (target: AdjustableDependencyOn) => {
@@ -431,10 +441,10 @@ watch(
           :key="row.id"
           class="grid grid-cols-[1fr_1fr_auto] gap-2">
           <UFormField :label="t('transfer_payment.score_key')" data-ui-target="assessment-schema.weight-editor.transfer_payment.score_key">
-            <UInput v-model="row.score" />
+            <UInput v-model="row.score" @update:model-value="updateAdjustableWeightRows" />
           </UFormField>
           <UFormField :label="t('common.weight')" data-ui-target="assessment-schema.weight-editor.adjustable.score-weight">
-            <UInput v-model.number="row.value" type="number" />
+            <UInput v-model.number="row.value" type="number" @update:model-value="updateAdjustableWeightRows" />
           </UFormField>
           <CommonActionButton
             icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default"

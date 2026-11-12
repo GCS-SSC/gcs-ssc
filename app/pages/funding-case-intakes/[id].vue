@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { shallowRef, watch } from 'vue'
+import type { Scope } from '~~/shared/utils/scopes'
+import { useActionContext } from '~/composables/useActionContext'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonSubmittedApplication from '~/components/Common/Submitted/Application.vue'
@@ -44,10 +47,17 @@ const { selectedTab } = useUrlTabState({
   tabs,
   defaultKey: tabs.value.find(tab => tab.value === String(route.query.tab ?? 'general'))?.key
 })
-const scope = computed(() => profile.value && ({
-  type: 'entity' as const, agencyId: String(profile.value.agency_id),
-  path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
-}))
+// Retain the accepted owner scope when an admitted DELETE removes its own resource.
+const acceptedOwner = shallowRef<{ agencyId: string; programId: string } | null>(null)
+watch(profile, row => {
+  if (row && String(row.id) === id) acceptedOwner.value = { agencyId: String(row.agency_id), programId: String(row.program_id) }
+}, { immediate: true, flush: 'sync' })
+const scope = computed<Scope | null>(() => acceptedOwner.value
+  ? {
+      type: 'entity', agencyId: acceptedOwner.value.agencyId,
+      path: [{ type: 'transfer_payment', id: acceptedOwner.value.programId }]
+    }
+  : null)
 const isLocked = computed(() => isStatusLocked(profile.value?.egcs_fi_status))
 const canEditRole = computed(() => Boolean(scope.value && can('funding_case', 'update', scope.value)))
 const canEdit = computed(() => canEditRole.value && isAssigned.value && !isLocked.value)
@@ -55,20 +65,38 @@ const workWarning = computed(() => !isAssigned.value
   ? toast.localized('assignments.read_only_description')
   : isLocked.value ? toast.localized('workflow.action_prerequisite_unavailable') : undefined)
 const canDelete = computed(() => Boolean(scope.value && can('funding_case', 'delete', scope.value)))
+const deleteContext = useActionContext({
+  identity: [() => String(route.params.id), () => acceptedOwner.value?.agencyId, () => acceptedOwner.value?.programId],
+  authority: canDelete,
+  eligible: () => profile.value?.id === id && isAssigned.value && !isLocked.value
+})
+const isDeleting = ref(false)
 /**
  *
  */
 const remove = async () => {
+  if (isDeleting.value) return
+  const operation = deleteContext.capture()
+  if (!canDelete.value) return
+  isDeleting.value = true
   try {
     await Promise.all([refresh(), refreshRoster()])
+    if (operation && !operation.isCurrent()) return
     if (!isAssigned.value || isLocked.value) {
       toast.add({ title: toast.localized('common.warning'), description: toast.localized(!isAssigned.value ? 'assignments.read_only_description' : 'workflow.action_prerequisite_unavailable'), color: 'warning' })
       return
     }
-    if (!await confirmDeleteRequest(`/api/funding-case-intakes/${id}`)) return
+    if (!operation?.canDispatch()) return
+    if (!await confirmDeleteRequest(`/api/funding-case-intakes/${id}`, {
+      operation,
+      target: { id, resolve: () => profile.value?.id === id ? profile.value : null, eligible: row => isAssigned.value && !isStatusLocked(row.egcs_fi_status) }
+    })) return
+    if (!operation.isCurrent()) return
     await navigateTo(localePath(appRouteLocations.fundingCaseIntakes()))
   } catch (cause: unknown) {
-    showError(cause)
+    if (operation?.isCurrent()) showError(cause)
+  } finally {
+    isDeleting.value = false
   }
 }
 const breadcrumbs = computed(() => [
@@ -129,13 +157,13 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <CommonReviewsTab entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-prerequisite-warning="workWarning" @changed="refresh" />
           </section>
           <section v-else-if="selectedTab === 'workflows'" data-help-target="intake.detail.workflow" data-help-kind="section" class="flex w-full min-w-0 flex-col">
-            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :mutation-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
           </section>
           <section v-else-if="selectedTab === 'supplementary-information'" data-help-target="intake.detail.supplementary-information" data-help-kind="section" class="flex w-full min-w-0 flex-col">
             <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
           </section>
           <section v-else-if="selectedTab === 'approval'" data-help-target="intake.detail.approval" data-help-kind="section" class="flex w-full min-w-0 flex-col">
-            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :mutation-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
           </section>
           <section v-else-if="selectedTab === 'assignments'" data-help-target="intake.detail.assignments" data-help-kind="section" class="flex w-full min-w-0 flex-col">
             <CommonAssignedUsers :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />

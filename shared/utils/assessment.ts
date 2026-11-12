@@ -762,7 +762,7 @@ const buildAssessmentOutcomeStatuses = (
       : 'completed'
 
   return {
-    name: `${outcome.section}::${outcome.subsection}::${outcome.nameEn}::${outcome.nameFr}`,
+    name: buildOutcomeKey(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr),
     label: outcome.subsectionLabel,
     status
   }

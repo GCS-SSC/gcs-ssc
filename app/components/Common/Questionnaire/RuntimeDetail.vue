@@ -2,7 +2,7 @@
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
-import { computed, defineComponent, Fragment, h, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineComponent, Fragment, h, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import type { JsonValue } from '~~/shared/types/database'
@@ -10,9 +10,10 @@ import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { QuestionnaireDefinition, QuestionnaireResponse } from '~~/shared/types/schemas/questionnaire'
 import { QuestionnaireDefinitionSchema, QuestionnaireResponsesSchema } from '~~/shared/types/schemas/questionnaire'
-import { copyQuestionnaireResponses } from '~/utils/questionnaire-runtime'
+import { copyQuestionnaireResponses, QuestionnaireMutationResultSchema } from '~/utils/questionnaire-runtime'
 import type { QuestionnaireRuntimeConfiguration } from '~/utils/questionnaire-runtime'
 import QuestionnaireRuntimeShell from './RuntimeShell.vue'
+import { useActionContext } from '~/composables/useActionContext'
 
 type QuestionnaireRuntimeDetail = {
   id: string
@@ -32,7 +33,7 @@ type QuestionnaireRuntimeDetail = {
   can_claim: boolean
   can_read: boolean
   can_update: boolean
-  can_update_role?: boolean
+  can_update_role: boolean
   can_read_assignments?: boolean
   can_manage_assignments: boolean
   is_assigned: boolean
@@ -72,83 +73,118 @@ const { getBilingualValue } = useBilingualValue()
 const endpoint = computed(() => `${configuration.apiBase}/${entityId}`)
 const runtimeIdentity = computed(() => `${configuration.entityType}-${entityId}`)
 const isHeroCollapsed = getHeroCollapsed(configuration.panelId)
+const data: Ref<QuestionnaireRuntimeDetail | null> = ref(null)
 const responses: Ref<QuestionnaireResponse[]> = ref([])
 const validationIssues: Ref<Array<{ questionKey: string; message: string; field?: 'comment' }>> = ref([])
-const mutation = useEditorMutationCoordinator({ getDraft: () => responses.value })
+const actionContext = useActionContext({
+  identity: [() => entityId, () => configuration.entityType, endpoint],
+  authority: () => data.value?.can_update_role === true,
+  eligible: () => data.value?.can_update === true && data.value.runtimeState === 'active'
+})
+const mutation = useEditorMutationCoordinator({ getDraft: () => responses.value, context: actionContext })
 const isSaving = mutation.isPending
-const hasRevisionConflict: Ref<boolean> = ref(false)
-const isClaiming: Ref<boolean> = ref(false)
-const isReloading: Ref<boolean> = ref(false)
+type ActiveTarget = { kind: 'active'; endpoint: string; entityId: string; entityType: string }
+type TargetState = ActiveTarget | { kind: 'disposed' }
+type RequestState = { kind: 'idle' } | { kind: 'pending'; target: ActiveTarget }
+type RevisionState = { kind: 'absent' } | { kind: 'current'; revision: number } | { kind: 'conflicted'; revision: number }
+const createTarget = (): ActiveTarget => ({ kind: 'active', endpoint: endpoint.value, entityId, entityType: configuration.entityType })
+const targetState = shallowRef<TargetState>(createTarget())
+const readState = shallowRef<RequestState>({ kind: 'idle' })
+const claimState = shallowRef<RequestState>({ kind: 'idle' })
+const reloadState = shallowRef<RequestState>({ kind: 'idle' })
+const revisionState = shallowRef<RevisionState>({ kind: 'absent' })
+const hasRevisionConflict = computed(() => revisionState.value.kind === 'conflicted')
+const isClaiming = computed(() => claimState.value.kind === 'pending')
+const isReloading = computed(() => reloadState.value.kind === 'pending')
 const assignmentRosterVersion: Ref<number> = ref(0)
-let targetGeneration = 0
-let readGeneration = 0
-let disposed = false
-const isCurrentTarget = (generation: number, requestedEndpoint: string) =>
-  !disposed && generation === targetGeneration && requestedEndpoint === endpoint.value
+const isCurrentTarget = (target: ActiveTarget) => targetState.value === target && target.endpoint === endpoint.value
+watch(endpoint, () => {
+  if (targetState.value.kind !== 'disposed') targetState.value = createTarget()
+}, { flush: 'sync' })
 
 onBeforeUnmount(() => {
-  disposed = true
-  targetGeneration += 1
-  readGeneration += 1
+  targetState.value = { kind: 'disposed' }
+  readState.value = { kind: 'idle' }
+  claimState.value = { kind: 'idle' }
+  reloadState.value = { kind: 'idle' }
   mutation.replaceSessionDraft(() => {})
 })
 
 const readRuntimeDetail = async (
-  requestedEndpoint: string,
-  requestedEntityId: string,
-  requestedEntityType: string
-): Promise<QuestionnaireRuntimeDetail> => {
-  const payload = await fetchQuestionnaireRuntimeDetail(requestedEndpoint)
-  if (requestedEntityType === 'commondatacollection' && (
-    !payload || payload.id !== requestedEntityId || typeof payload.name_en !== 'string' || typeof payload.name_fr !== 'string'
-    || typeof payload.can_update !== 'boolean' || !Number.isInteger(payload.egcs_cn_revision) || payload.egcs_cn_revision < 1
-    || !QuestionnaireDefinitionSchema.safeParse(payload.definition).success
-    || !payload.egcs_cn_response || !QuestionnaireResponsesSchema.safeParse(payload.egcs_cn_response.responses ?? []).success
-  )) throw new Error(t('common.unknown_error'))
-  return payload
+  target: ActiveTarget,
+  accept: (payload: QuestionnaireRuntimeDetail) => void,
+  clearOnError = false
+): Promise<QuestionnaireRuntimeDetail | null> => {
+  const request: RequestState = { kind: 'pending', target }
+  readState.value = request
+  const ownsRead = () => isCurrentTarget(target) && readState.value === request
+  try {
+    const payload = await fetchQuestionnaireRuntimeDetail(target.endpoint)
+    if (!ownsRead()) return null
+    if (target.entityType === 'commondatacollection' && (
+      !payload || payload.id !== target.entityId || typeof payload.name_en !== 'string' || typeof payload.name_fr !== 'string'
+      || typeof payload.can_update !== 'boolean' || !Number.isInteger(payload.egcs_cn_revision) || payload.egcs_cn_revision < 1
+      || !QuestionnaireDefinitionSchema.safeParse(payload.definition).success
+      || !payload.egcs_cn_response || !QuestionnaireResponsesSchema.safeParse(payload.egcs_cn_response.responses ?? []).success
+    )) throw new Error(t('common.unknown_error'))
+    accept(payload)
+    return payload
+  } catch (caughtError: unknown) {
+    if (!ownsRead()) return null
+    if (clearOnError) data.value = null
+    throw caughtError
+  } finally {
+    if (ownsRead()) readState.value = { kind: 'idle' }
+  }
 }
+const initialTarget = targetState.value
 const {
-  data,
+  data: initialData,
   error,
   status,
   refresh
 } = await useAsyncData(
   computed(() => `questionnaire-${runtimeIdentity.value}`),
   async () => {
-    const generation = targetGeneration
-    const requestedEndpoint = endpoint.value
-    const payload = await readRuntimeDetail(requestedEndpoint, entityId, configuration.entityType)
-    return isCurrentTarget(generation, requestedEndpoint) ? payload : null
+    const target = targetState.value
+    if (target.kind === 'disposed') return null
+    return readRuntimeDetail(target, payload => {
+      data.value = payload
+    })
   }
 )
+if (!data.value && initialTarget.kind === 'active' && isCurrentTarget(initialTarget) && initialData.value?.id === initialTarget.entityId) {
+  data.value = initialData.value
+}
 useFieldTooltipProvider(() => {
   if (!data.value || String(data.value.id) !== entityId) return null
   if (configuration.entityType === 'commonrecommendation') return { entityType: 'recommendation', entityId }
   if (configuration.entityType === 'commondatacollection') return { entityType: 'data_collection', entityId }
   return null
 })
-if (!embedded && !disposed) {
+if (!embedded && targetState.value.kind !== 'disposed') {
   usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(data.value) })
 }
 
-if (!disposed) {
-  watch(data, value => {
-    if (disposed || mutation.isPending.value || mutation.isDirty.value) return
+if (targetState.value.kind !== 'disposed') {
+  watch([data, isSaving], ([value]) => {
+    if (targetState.value.kind === 'disposed' || mutation.isPending.value || mutation.isDirty.value || hasRevisionConflict.value) return
     mutation.replaceSessionDraft(() => {
       responses.value = copyQuestionnaireResponses(value?.egcs_cn_response.responses ?? [])
       validationIssues.value = []
+      revisionState.value = value ? { kind: 'current', revision: value.egcs_cn_revision } : { kind: 'absent' }
     })
   }, { immediate: true })
   watch(endpoint, () => {
-    targetGeneration += 1
-    readGeneration += 1
+    readState.value = { kind: 'idle' }
+    reloadState.value = { kind: 'idle' }
     mutation.replaceSessionDraft(() => {
       responses.value = []
       validationIssues.value = []
-      hasRevisionConflict.value = false
+      revisionState.value = { kind: 'absent' }
       data.value = null
     })
-    isClaiming.value = false
+    claimState.value = { kind: 'idle' }
     assignmentRosterVersion.value = 0
   }, { flush: 'sync' })
 }
@@ -180,83 +216,79 @@ const assignmentSectionBadge = computed(() => {
 })
 
 const claim = async () => {
-  if (disposed || !data.value?.can_claim || isClaiming.value) return
-  const generation = targetGeneration
-  const requestedEndpoint = endpoint.value
-  isClaiming.value = true
+  const target = targetState.value
+  if (target.kind === 'disposed' || !data.value?.can_claim || isClaiming.value) return
+  const request: RequestState = { kind: 'pending', target }
+  claimState.value = request
+  const ownsClaim = () => isCurrentTarget(target) && claimState.value === request
   try {
-    await mutateQuestionnaire(`${requestedEndpoint}/claim`, { method: 'POST', body: {} })
-    if (!isCurrentTarget(generation, requestedEndpoint)) return
-    if (!embedded && configuration.entityType === 'commonrecommendation') {
+    await mutateQuestionnaire(`${target.endpoint}/claim`, { method: 'POST', body: {} })
+    if (!ownsClaim()) return
+    if (!embedded && target.entityType === 'commonrecommendation') {
       await refresh()
-      if (!data.value || !isCurrentTarget(generation, requestedEndpoint)) return
+      if (!data.value || !ownsClaim()) return
     } else {
       const refreshed = await refreshRuntime()
-      if (!refreshed || !isCurrentTarget(generation, requestedEndpoint)) return
+      if (!refreshed || !ownsClaim()) return
     }
     assignmentRosterVersion.value += 1
     emit('changed')
   } catch (caughtError: unknown) {
-    if (isCurrentTarget(generation, requestedEndpoint)) showError(caughtError)
+    if (ownsClaim()) showError(caughtError)
   } finally {
-    if (isCurrentTarget(generation, requestedEndpoint)) isClaiming.value = false
+    if (ownsClaim()) claimState.value = { kind: 'idle' }
   }
 }
 
 const refreshRuntime = async (): Promise<QuestionnaireRuntimeDetail | null> => {
-  if (disposed) return null
-  const generation = targetGeneration
-  const requestedEndpoint = endpoint.value
-  const request = ++readGeneration
-  try {
-    const payload = await readRuntimeDetail(requestedEndpoint, entityId, configuration.entityType)
-    if (!isCurrentTarget(generation, requestedEndpoint) || request !== readGeneration) return null
+  const target = targetState.value
+  if (target.kind === 'disposed') return null
+  return readRuntimeDetail(target, payload => {
     data.value = payload
-    return payload
-  } catch (caughtError: unknown) {
-    if (!isCurrentTarget(generation, requestedEndpoint) || request !== readGeneration) return null
-    if (embedded) data.value = null
-    throw caughtError
-  }
+  }, embedded)
 }
 const retryLoad = async () => {
-  if (disposed || isReloading.value) return
-  isReloading.value = true
+  const target = targetState.value
+  if (target.kind === 'disposed' || isReloading.value) return
+  const request: RequestState = { kind: 'pending', target }
+  reloadState.value = request
   try {
     await refreshRuntime()
   } catch {
     // The embedded load alert remains available.
   } finally {
-    if (!disposed) isReloading.value = false
+    if (reloadState.value === request) reloadState.value = { kind: 'idle' }
   }
 }
 const handleRuntimeChanged = async () => {
-  const generation = targetGeneration
-  const requestedEndpoint = endpoint.value
+  const target = targetState.value
+  if (target.kind === 'disposed') return
   try {
     const refreshed = await refreshRuntime()
-    if (refreshed && isCurrentTarget(generation, requestedEndpoint)) emit('changed')
+    if (refreshed && isCurrentTarget(target)) emit('changed')
   } catch (caughtError: unknown) {
-    if (isCurrentTarget(generation, requestedEndpoint)) showError(caughtError)
+    if (isCurrentTarget(target)) showError(caughtError)
   }
 }
 const reloadResponses = async () => {
-  const generation = targetGeneration
-  const requestedEndpoint = endpoint.value
+  const target = targetState.value
+  if (target.kind === 'disposed') return
   try {
     const refreshed = await refreshRuntime()
-    if (!refreshed || !isCurrentTarget(generation, requestedEndpoint)) return
+    if (!refreshed || !isCurrentTarget(target)) return
     mutation.replaceSessionDraft(() => {
       responses.value = copyQuestionnaireResponses(refreshed.egcs_cn_response.responses ?? [])
       validationIssues.value = []
-      hasRevisionConflict.value = false
+      revisionState.value = { kind: 'current', revision: refreshed.egcs_cn_revision }
     })
   } catch (caughtError: unknown) {
-    if (isCurrentTarget(generation, requestedEndpoint)) showError(caughtError)
+    if (isCurrentTarget(target)) showError(caughtError)
   }
 }
+
 const save = async (submit: boolean) => {
-  if (disposed || !showMutationActions.value || isSaving.value || !data.value) return
+  const target = targetState.value
+  if (target.kind === 'disposed' || !showMutationActions.value || isSaving.value || !data.value) return
   if (!isEditable.value || hasRevisionConflict.value) {
     toast.add({
       title: toast.localized('common.warning'),
@@ -265,34 +297,47 @@ const save = async (submit: boolean) => {
     })
     return
   }
-  const generation = targetGeneration
-  const requestedEndpoint = endpoint.value
-  const requestedEntityId = entityId
-  const requestedEntityType = configuration.entityType
+  if (revisionState.value.kind !== 'current') return
+  const requestedEndpoint = target.endpoint
+  const requestedEntityId = target.entityId
   validationIssues.value = submit ? configuration.validate(data.value.definition, responses.value) : []
   if (validationIssues.value.length > 0) return
   const invalidate = guidedHelpActions.begin({ kind: 'invalidated', binding: helpContext?.kind === 'task' ? helpContext.execution.binding : helpContext?.kind === 'owner' && helpContext.binding ? helpContext.binding : { resourceType: configuration.entityType, resourceId: requestedEntityId } })
-  const payload = { responses: copyQuestionnaireResponses(responses.value), revision: data.value.egcs_cn_revision }
+  const payload = { responses: copyQuestionnaireResponses(responses.value), revision: revisionState.value.revision }
   await mutation.run(submit ? 'submit' : 'save', async token => {
     try {
-      await mutateQuestionnaire(requestedEndpoint, { method: 'PUT', query: { submit }, body: payload })
-      if (!mutation.isTokenCurrent(token) || !isCurrentTarget(generation, requestedEndpoint)) return
-      const refreshed = await readRuntimeDetail(requestedEndpoint, requestedEntityId, requestedEntityType)
-      if (!mutation.isTokenCurrent(token) || !isCurrentTarget(generation, requestedEndpoint)) return
-      mutation.applyMutationRefresh(token, {
-        apply: () => {
-          data.value = refreshed
-          responses.value = copyQuestionnaireResponses(refreshed.egcs_cn_response.responses ?? [])
-        },
-        mergeMetadata: () => { data.value = refreshed }
+      const result = await mutateQuestionnaire(requestedEndpoint, { method: 'PUT', query: { submit }, body: payload })
+      if (!mutation.isTokenCurrent(token) || !isCurrentTarget(target)) return
+      const committed = QuestionnaireMutationResultSchema.parse(result)
+      if (committed.id !== requestedEntityId) throw new Error(t('common.unknown_error'))
+      readState.value = { kind: 'idle' }
+      mutation.acceptCommittedDraft(token, committed.egcs_cn_response.responses)
+      revisionState.value = { kind: 'current', revision: committed.egcs_cn_revision }
+      if (data.value) data.value = {
+        ...data.value,
+        runtimeState: committed.runtimeState,
+        egcs_cn_response: committed.egcs_cn_response,
+        egcs_cn_revision: committed.egcs_cn_revision
+      }
+      await readRuntimeDetail(target, refreshed => {
+        if (!mutation.isTokenCurrent(token)) return
+        mutation.applyMutationRefresh(token, {
+          apply: () => {
+            data.value = refreshed
+            responses.value = copyQuestionnaireResponses(refreshed.egcs_cn_response.responses ?? [])
+            revisionState.value = { kind: 'current', revision: refreshed.egcs_cn_revision }
+          },
+          mergeMetadata: () => { data.value = refreshed }
+        })
       })
+      if (!mutation.isTokenCurrent(token) || !isCurrentTarget(target)) return
       toast.add({ title: toast.localized('common.success'), description: toast.localized(`${configuration.messagePrefix}.${submit ? 'submitted_success' : 'saved_success'}`), color: 'success' })
       invalidate()
       emit('changed')
     } catch (caughtError: unknown) {
-      if (!mutation.isTokenCurrent(token) || !isCurrentTarget(generation, requestedEndpoint)) return
+      if (!mutation.isTokenCurrent(token) || !isCurrentTarget(target)) return
       const failure = caughtError as { statusCode?: number, status?: number }
-      if (failure.statusCode === 409 || failure.status === 409) hasRevisionConflict.value = true
+      if (failure.statusCode === 409 || failure.status === 409) revisionState.value = { kind: 'conflicted', revision: payload.revision }
       showError(caughtError)
     }
   })

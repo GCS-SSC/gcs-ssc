@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 import { UserActivationSchema, type UserActivation } from '~~/shared/types/schemas/user'
 
-const { pending = false } = defineProps<{
+const { pending = false, actionContext } = defineProps<{
   pending?: boolean
+  actionContext: ActionContext
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -12,12 +17,21 @@ const emit = defineEmits(['submit'])
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const validate = createValidator(UserActivationSchema)
+
+const modalSession = useModalSession()
+watch([open, state], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: () => {
+  if (!pending) emit('submit')
+} })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="t('user.activate_title')" :description="t('user.activate_description')" data-field-scope="user.activation-modal" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="emit('submit')">
+      <UForm v-if="state" :disabled="pending" :state="state" :validate="validate" class="space-y-4" v-bind="formSession">
         <p class="text-sm text-zinc-600 dark:text-zinc-300">
           {{ t('user.activate_description') }}
         </p>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 import { TransferPaymentFinancialLimitsSchema } from '~~/shared/types/schemas/transfer-payment'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -20,7 +22,7 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
 const { items, totalRecords, refresh, status, pagination } = useResourceTable<TransferPaymentFinancialLimitsRow>({
-  fetchUrl: `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits`
+  fetchUrl: computed(() => `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits`)
 })
 
 const columns = [
@@ -48,7 +50,7 @@ const columns = [
   { id: 'actions', header: '' }
 ]
 
-const { isOpen, selected, openCreate, openUpdate, captureSession, closeSession } = useCrudModal<
+const { isOpen, selected, openCreate: createDraft, openUpdate: updateDraft, captureSession, closeSession, close, isCurrentSession, isLatestSession } = useCrudModal<
   TransferPaymentFinancialLimitsRow,
   TransferPaymentFinancialLimitsForm
 >({
@@ -86,38 +88,78 @@ const isSavingFinancialLimit = financialLimitPending.isPending
 
 const canAdd = computed(() => canUpdateChild && status.value === 'success' && totalRecords.value === 0)
 
+const editingTarget: Ref<string | null> = shallowRef(null)
+const writeContext = useActionContext({
+  identity: [() => profileId, () => streamId],
+  authority: () => canUpdateChild,
+  eligible: () => editingTarget.value === null || items.value.some(row => String(row.id) === editingTarget.value)
+})
+const deleteContext = useActionContext({
+  identity: [() => profileId, () => streamId],
+  authority: () => canDeleteChild
+})
+
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const context: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const isCurrentContext = (captured: ResourceContext) => captured.kind === 'active' && context.value === captured
+watch([() => profileId, () => streamId], () => {
+  context.value = { kind: 'active' }
+  close()
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context.value = { kind: 'disposed' }
+  close()
+})
+/** Opens a new local draft under the current role and resource. */
+const openCreate = () => {
+  if (context.value.kind !== 'active' || !canUpdateChild) return
+  editingTarget.value = null
+  createDraft()
+}
+/** @param row - Accepted record whose immutable ID owns the edit. */
+const openUpdate = (row: TransferPaymentFinancialLimitsRow) => {
+  if (context.value.kind !== 'active' || !canUpdateChild) return
+  editingTarget.value = String(row.id)
+  updateDraft(row)
+}
+
 /**
  * Saves the currently selected financial limit record.
  * Performs a PATCH for an existing record, or a POST for a new record.
  * Closes the modal, refreshes the table data, and provides user feedback via toasts.
  */
 const saveFinancialLimit = async () => {
-  if (!selectedLimit.value) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  const targetId = editingTarget.value
+  if (context.value.kind === 'disposed' || !selectedLimit.value || !canUpdateChild) return
   const session = captureSession()
-  if (!financialLimitPending.begin(session)) return
+  if (session === null || !financialLimitPending.begin(session)) return
+  const requestedContext = context.value
+  const isUpdate = targetId !== null
+  const url = `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits${isUpdate ? `/${targetId}` : ''}`
+  const body = JSON.stringify(selectedLimit.value)
+  let closedSession = false
+  const ownsFeedback = () => (isCurrentContext(requestedContext) && operation.isCurrent()) && (
+    isCurrentSession(session) || (closedSession && isLatestSession(session))
+  )
   try {
-    const isUpdate = !!selectedLimit.value.id
-    const url = isUpdate
-      ? `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits/${selectedLimit.value.id}`
-      : `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits`
-    const method = isUpdate ? 'PATCH' : 'POST'
-
     const response = await fetch(getClientRequestUrl(url), {
-      method,
-      headers: {
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(selectedLimit.value)
+      method: isUpdate ? 'PATCH' : 'POST',
+      headers: { 'content-type': 'application/json' },
+      body
     })
-    if (!response.ok) {
-      await throwFetchResponseError(response)
-    }
-
-    closeSession(session)
+    if (!response.ok) await throwFetchResponseError(response)
+    if (!(isCurrentContext(requestedContext) && operation.isCurrent())) return
+    closedSession = closeSession(session)
     await refresh()
+    if (!ownsFeedback() || status.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
     financialLimitPending.end(session)
   }
@@ -131,10 +173,29 @@ const saveFinancialLimit = async () => {
  * @param {string} id - The unique identifier of the financial limit to be deleted.
  */
 const onDelete = async (id: string) => {
-  const success = await confirmDeleteRequest(
-    `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits/${id}`
-  )
-  if (success) refresh()
+  const targetId = id
+  if (context.value.kind === 'disposed' || !canDeleteChild) return
+  const requestedContext = context.value
+  const operation = deleteContext.capture()
+  if (!operation) return
+  try {
+    const removed = await confirmDeleteRequest(
+      `/api/transfer-payments/${profileId}/streams/${streamId}/financial-limits/${targetId}`,
+      {
+        operation,
+        target: {
+          id: targetId,
+          resolve: () => items.value.find(current => String(current.id) === targetId),
+          eligible: current => String(current.id) === targetId
+        },
+        shouldProceed: () => isCurrentContext(requestedContext) && operation.canDispatch()
+      }
+    )
+    if (!removed || !(isCurrentContext(requestedContext) && operation.isCurrent())) return
+    await refresh()
+  } catch (error: unknown) {
+    if ((isCurrentContext(requestedContext) && operation.isCurrent())) showError(error)
+  }
 }
 </script>
 
@@ -147,9 +208,11 @@ const onDelete = async (id: string) => {
       :total-records="totalRecords"
       :columns="columns"
       :loading="status === 'pending'"
+      :request-status="status"
       :button-label="t('common.add')"
       :show-button="canAdd"
-      @add="openCreate">
+      @add="openCreate"
+      @retry="refresh">
       <template #egcs_tp_active-cell="{ row }">
         <CommonStatusBadge :variant="row.original.egcs_tp_active ? 'active' : 'inactive'" />
       </template>
@@ -197,6 +260,7 @@ const onDelete = async (id: string) => {
     <CommonFormDialog
       v-if="selectedLimit"
       v-model:open="isModalOpen"
+      :action-context="writeContext"
       :state="selectedLimit"
       :schema="TransferPaymentFinancialLimitsSchema"
       :title="selectedLimit.id ? t('transfer_payment.financial_limit_update') : t('transfer_payment.financial_limit_create')"

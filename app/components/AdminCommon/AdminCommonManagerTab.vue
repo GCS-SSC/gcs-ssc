@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { useAdminCommonManagerTab } from '~/composables/useAdminCommonManagerTab'
 import type { z } from 'zod'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -39,12 +41,32 @@ const {
 } = useAdminCommonManagerTab()
 
 const getOptionalString = (value: unknown): string | undefined => typeof value === 'string' ? value : undefined
+const { can } = useCan()
+const createContext = useActionContext({
+  identity: [() => resource, () => fetchUrl, () => postUrl],
+  authority: () => can('system', 'create', { type: 'global' }),
+  eligible: () => !readOnly
+})
+const updateContext = useActionContext({
+  identity: [() => resource, () => fetchUrl, () => updateUrlBase],
+  authority: () => can('system', 'update', { type: 'global' }),
+  eligible: () => !readOnly
+})
+const deleteContext = useActionContext({
+  identity: [() => resource, () => fetchUrl],
+  authority: () => can('system', 'delete', { type: 'global' }),
+  eligible: () => !readOnly
+})
+const resourceAction = computed<ResourceCrudAction>(() => readOnly
+  ? { kind: 'read-only' }
+  : { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext })
 const canCreateResource = computed(() => !readOnly)
 </script>
 
 <template>
   <CommonResourceCrud
     v-model:status-filter="deletedFilter"
+    :action="resourceAction"
     :data-testid="`${resource}-panel`"
     :title="title"
     :icon="icon"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { ApplicantRecipientNoteCreateSchema } from '~~/shared/types/schemas'
 import type { TableColumnInput, BilingualColumnConfig } from '~/composables/useTableColumns'
 
@@ -8,6 +9,24 @@ const { applicantRecipientId, canCreate, canUpdate, canDelete } = defineProps<{
   canUpdate: boolean
   canDelete: boolean
 }>()
+const { canAny } = useCan()
+const createContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'create', ['global', 'agency']),
+  eligible: () => canCreate
+})
+const updateContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'update', ['global', 'agency']),
+  eligible: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']),
+  eligible: () => canDelete
+})
+const resourceAction = { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext } satisfies import('~/composables/useResourceCrudState').ResourceCrudAction
+
 const { t, locale } = useI18n()
 const { formatDate } = useDateHelpers()
 type Note = { id: string, egcs_ar_agency?: string, egcs_ar_subject_en?: string, egcs_ar_subject_fr?: string,
@@ -33,6 +52,7 @@ const lookupUrl = (state: Partial<Note>) => `/api/applicant-recipients/${applica
 <template>
   <section data-help-target="proponent.notes.content" data-help-kind="section" data-help-view="proponent.notes" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      :action="resourceAction"
       help-search-target="proponent.notes.search" help-save-target="proponent.notes.save" help-add-target="proponent.notes.add"
       class="w-full"
       :title="t('notes.title')"

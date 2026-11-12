@@ -6,8 +6,10 @@ import type { QuestionnaireDefinition } from '~~/shared/types/schemas/questionna
 import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
+import { useActionContext } from '~/composables/useActionContext'
 
 const { agencyId, canUpdateChild } = defineProps<{ agencyId: string, canUpdateChild: boolean }>()
+const actionContext = useActionContext({ identity: [() => agencyId], authority: () => canUpdateChild })
 type CollectionRow = {
   id: string
   egcs_cn_name_en: string
@@ -42,6 +44,7 @@ const bilingualColumns: BilingualColumnConfig<CollectionRow>[] = [
 
 <template>
   <CommonResourceCrud
+    :action="{ kind: 'remote', create: actionContext, update: actionContext, delete: actionContext }"
     :title="t('data_collection.catalog_title')" icon="i-lucide-clipboard-list" :fetch-url="endpoint" :post-url="endpoint"
     :schema="DataCollectionSetupCreateSchema" :initial-new-item="initialNewItem" :columns="columns" :bilingual-columns="bilingualColumns"
     :can-create="canUpdateChild" :can-update="false" :can-delete="false" :show-button="canUpdateChild" :modal-title="t('data_collection.create')" :modal-ui="{ content: 'sm:max-w-2xl' }" data-field-scope="agency.data-collections">

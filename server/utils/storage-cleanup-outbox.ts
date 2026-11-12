@@ -1,5 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Durable outbox primitives are exercised through focused worker and route tests. */
 import type { Insertable, Kysely, Transaction } from 'kysely'
+import { z } from 'zod'
+import { CoreOrExtensionEntityTargetSchema } from '../../shared/types/schemas/common'
 import type { Database, JsonValue, StorageCleanupOutboxTable } from '~~/shared/types/database'
 import { deleteProviderObject, resolveAgencyStorageProvider } from './file-storage-provider'
 import type { GcsFileStorageProviderManagedMetadataAdapter, GcsFileStorageTarget } from '@gcs-ssc/extensions/server'
@@ -9,9 +11,10 @@ import { observeStorageMetadataMutation, releaseStorageMetadataAfterSettlement }
 
 const BASE_RETRY_MS = 30_000
 const MAX_RETRY_MS = 30 * 60_000
+const storageCleanupDeletePayloadSchema = z.object({ target: CoreOrExtensionEntityTargetSchema })
 
 export type StorageCleanupRequest = Pick<Insertable<StorageCleanupOutboxTable>,
-  'provider_key' | 'agency_id' | 'purpose' | 'object_id' | 'locator'>
+  'provider_key' | 'agency_id' | 'purpose' | 'object_id' | 'locator' | 'payload'>
 
 export const enqueueStorageCleanup = async (
   trx: Transaction<Database>,
@@ -97,10 +100,14 @@ export const processStorageCleanupBatch = async (
           await completeReservedStorageCleanup(trx, String(job.id), workerId)
         })
       } else {
+        const target = job.payload === null || job.payload === undefined
+          ? undefined
+          : storageCleanupDeletePayloadSchema.parse(job.payload).target
         await deleteProviderObject({
           provider,
           reference: { objectId: job.object_id, locator: job.locator as Record<string, never> },
-          purpose: job.purpose as 'attachment'
+          purpose: job.purpose as 'attachment',
+          target
         })
       }
       await db.updateTable('storage_cleanup_outbox').set({

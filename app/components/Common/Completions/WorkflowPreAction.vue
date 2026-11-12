@@ -14,6 +14,7 @@ const {
   entityType,
   entityId,
   actionRoleAllowed = undefined,
+  mutationRoleAllowed,
   actionPrerequisiteWarning,
   canEdit = true,
   isLocked = false,
@@ -29,6 +30,7 @@ const {
   entityId: string
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
+  mutationRoleAllowed: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
   actionPrerequisiteWarning?: LocalizedToastText
   canEdit?: boolean
@@ -68,6 +70,7 @@ const completionState = useCompletionWorkflowStart({
     purpose="approval_submission"
     :can-edit="canEdit"
     :action-role-allowed="actionRoleAllowed"
+    :mutation-role-allowed="mutationRoleAllowed"
     :action-prerequisite-warning="actionPrerequisiteWarning"
     :show-pre-action-when-unconfigured="showWhenUnconfigured"
     :pre-action-show-header="showHeader"

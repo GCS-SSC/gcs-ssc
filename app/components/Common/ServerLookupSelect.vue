@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import type { ComputedRef, Ref, WritableComputedRef } from 'vue'
 import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
 import type {
@@ -10,6 +10,7 @@ import type {
 import { useSelectMenuTriggerName } from '~/composables/useSelectMenuTriggerName'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import { toAdminLookupOption } from '~/utils/admin-common-lookup'
+import { formRequirementKey } from '~/utils/form-requirement-context'
 
 defineOptions({ inheritAttrs: false })
 
@@ -19,11 +20,25 @@ type LookupRequestQuery = Record<string, LookupQueryValue | string[]>
 type LookupModelValue = string | string[] | undefined
 type LookupResponse = AdminCommonLookupResponse & { total?: number }
 
-interface DeferredHydrationFailure {
-  requestId: number
+type HydrationRequest = {
   signature: string
-  error: unknown
+  controllers: AbortController[]
 }
+type HydrationState =
+  | { kind: 'idle' }
+  | { kind: 'pending'; request: HydrationRequest }
+  | { kind: 'awaiting-collection'; request: HydrationRequest; error: unknown }
+  | { kind: 'disposed' }
+type CollectionSettlement =
+  | { kind: 'awaiting'; generation: number }
+  | { kind: 'pending'; generation: number }
+  | { kind: 'success'; generation: number }
+  | { kind: 'error'; generation: number }
+type CollectionEvidence = { kind: 'unaccepted' } | { kind: 'accepted'; generation: number }
+type CatalogVersionState =
+  | { kind: 'ready' }
+  | { kind: 'error' }
+  | { kind: 'checking'; request: symbol; failed: boolean }
 
 const {
   fetchUrl,
@@ -74,23 +89,25 @@ const valuesModel = defineModel<string[]>('values', { default: () => [] })
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 const selectMenuRef = useSelectMenuTriggerName()
+const form = inject(formRequirementKey, undefined)
+const isInteractionDisabled = computed(() => disabled || Boolean(form?.disabled.value))
 
 const searchTerm: Ref<string> = ref('')
 const menuOpen: Ref<boolean> = ref(false)
 const debouncedSearchTerm: Readonly<Ref<string>> = refDebounced(searchTerm, 250)
 const selectedItemsByValue: Ref<Record<string, AdminCommonLookupResponseItem>> = ref({})
 const unavailableSelectedValues: Ref<Set<string>> = ref(new Set())
-const isHydratingSelectedItem: Ref<boolean> = ref(false)
-const isCheckingCatalogVersions: Ref<boolean> = ref(false)
-const catalogCheckFailed: Ref<boolean> = ref(false)
+const hydrationState = shallowRef<HydrationState>({ kind: 'idle' })
+const isHydratingSelectedItem = computed(() => hydrationState.value.kind === 'pending' || hydrationState.value.kind === 'awaiting-collection')
+const catalogVersionState = shallowRef<CatalogVersionState>({ kind: 'ready' })
+const isCheckingCatalogVersions = computed(() => catalogVersionState.value.kind === 'checking')
+const catalogCheckFailed = computed(() => catalogVersionState.value.kind === 'error'
+  || (catalogVersionState.value.kind === 'checking' && catalogVersionState.value.failed))
 const autoSelectionAvailable: Ref<boolean> = ref(autoSelectSingle)
 const selectedItemSequenceByValue = new Map<string, number>()
 const staleSelectedValues = new Set<string>()
 let operationSequence = 0
-let hydrateRequestId = 0
-let disposed = false
-let hydrationAbortControllers: AbortController[] = []
-let deferredHydrationFailure: DeferredHydrationFailure | null = null
+const isDisposed = () => hydrationState.value.kind === 'disposed'
 
 const normalizeValues = (value: LookupModelValue): string[] => {
   const values = Array.isArray(value) ? value : value === undefined || value === null ? [] : [value]
@@ -120,7 +137,7 @@ const normalizedValues: ComputedRef<string[]> = computed(() => normalizeValues(m
  * @param value - Selected lookup id value or values.
  */
 const onModelUpdate = (value: LookupModelValue) => {
-  if (isCheckingCatalogVersions.value || catalogCheckFailed.value) return
+  if (isDisposed() || isInteractionDisabled.value || isCheckingCatalogVersions.value || catalogCheckFailed.value) return
   autoSelectionAvailable.value = false
   const normalized = normalizeValues(value)
   if (closeOnSelect) menuOpen.value = false
@@ -168,12 +185,11 @@ const status = fetchState.status
 const collectionError: Ref<unknown | null> = fetchState.error ?? ref(null)
 const refreshCollection = fetchState.refresh ?? (async () => undefined)
 const queryGeneration: Ref<number> = ref(0)
-const responseGeneration: Ref<number> = ref(-1)
-const collectionSettlementGeneration: Ref<number> = ref(-1)
-const collectionPendingGeneration: Ref<number> = ref(status.value === 'pending' ? 0 : -1)
+const collectionEvidence = shallowRef<CollectionEvidence>({ kind: 'unaccepted' })
+const collectionSettlement = shallowRef<CollectionSettlement>({ kind: status.value === 'pending' ? 'pending' : 'awaiting', generation: 0 })
 const collectionSequenceByGeneration = new Map<number, number>([[0, ++operationSequence]])
 const currentResponseItems = computed<AdminCommonLookupResponseItem[]>(() => {
-  return !isCheckingCatalogVersions.value && !catalogCheckFailed.value && responseGeneration.value === queryGeneration.value
+  return !isCheckingCatalogVersions.value && !catalogCheckFailed.value && collectionEvidence.value.kind === 'accepted' && collectionEvidence.value.generation === queryGeneration.value
     ? response.value?.items ?? []
     : []
 })
@@ -223,36 +239,39 @@ const unresolvedSelectedValues = () => normalizedValues.value.filter(value =>
  * Cancels current selected-item hydration and invalidates its results.
  */
 const cancelSelectedItemHydration = () => {
-  hydrateRequestId += 1
-  hydrationAbortControllers.forEach(controller => controller.abort())
-  hydrationAbortControllers = []
-  deferredHydrationFailure = null
-  isHydratingSelectedItem.value = false
+  const current = hydrationState.value
+  if (current.kind === 'disposed') return
+  hydrationState.value = { kind: 'idle' }
+  if (current.kind === 'pending' || current.kind === 'awaiting-collection') {
+    current.request.controllers.forEach(controller => controller.abort())
+  }
 }
 
 /**
- * Publishes a hydration failure only after the active collection cannot resolve the values.
+ * Checks whether the active hydration still owns the selected identity.
+ * @param request - Hydration operation whose result is settling.
+ * @returns Whether this request can update the selected labels.
  */
-const finalizeDeferredHydrationFailure = () => {
-  const failure = deferredHydrationFailure
-  if (
-    !failure
-    || failure.requestId !== hydrateRequestId
-    || failure.signature !== selectedHydrationSignature.value
-  ) return
+const ownsHydration = (request: HydrationRequest) => {
+  const current = hydrationState.value
+  return (current.kind === 'pending' || current.kind === 'awaiting-collection')
+    && current.request === request
+    && request.signature === selectedHydrationSignature.value
+}
 
-  deferredHydrationFailure = null
+/** Publishes a hydration failure only after the collection cannot resolve it. */
+const finalizeDeferredHydrationFailure = () => {
+  const failure = hydrationState.value
+  if (failure.kind !== 'awaiting-collection' || !ownsHydration(failure.request)) return
+
   const unresolved = unresolvedSelectedValues()
-  if (unresolved.length === 0) {
-    isHydratingSelectedItem.value = false
-    return
-  }
+  hydrationState.value = { kind: 'idle' }
+  if (unresolved.length === 0) return
 
   unavailableSelectedValues.value = new Set([
     ...unavailableSelectedValues.value,
     ...unresolved
   ])
-  isHydratingSelectedItem.value = false
   showError(failure.error)
 }
 
@@ -275,7 +294,7 @@ const reconcileSelectedItemsFromCollection = () => {
  * Reconciles the current successful collection synchronously with hydration settlement.
  */
 const reconcileCurrentSuccessfulCollection = () => {
-  if (status.value !== 'success' || responseGeneration.value !== queryGeneration.value) return
+  if (status.value !== 'success' || collectionEvidence.value.kind !== 'accepted' || collectionEvidence.value.generation !== queryGeneration.value) return
   reconcileSelectedItemsFromCollection()
 }
 
@@ -331,10 +350,9 @@ const fetchHydrationChunk = async (
  * @param values - Selected lookup values to resolve.
  */
 const hydrateSelectedItems = async (values: string[]) => {
-  if (disposed) return
+  if (isDisposed()) return
   cancelSelectedItemHydration()
-  const currentRequestId = hydrateRequestId
-  const currentSignature = selectedHydrationSignature.value
+  const request: HydrationRequest = { signature: selectedHydrationSignature.value, controllers: [] }
   const selectedValueSet = new Set(values)
   selectedItemsByValue.value = Object.fromEntries(
     Object.entries(selectedItemsByValue.value).filter(([value]) => selectedValueSet.has(value))
@@ -347,7 +365,7 @@ const hydrateSelectedItems = async (values: string[]) => {
   const missingValues = unresolvedSelectedValues()
   if (missingValues.length === 0 || typeof $fetch !== 'function') return
 
-  isHydratingSelectedItem.value = true
+  hydrationState.value = { kind: 'pending', request }
   unavailableSelectedValues.value = new Set(
     [...unavailableSelectedValues.value].filter(value => !missingValues.includes(value))
   )
@@ -360,10 +378,10 @@ const hydrateSelectedItems = async (values: string[]) => {
   try {
     const responses = await Promise.all(chunks.map(async chunk => {
       const controller = new AbortController()
-      hydrationAbortControllers.push(controller)
+      request.controllers.push(controller)
       return await fetchHydrationChunk(chunk, controller)
     }))
-    if (currentRequestId !== hydrateRequestId || currentSignature !== selectedHydrationSignature.value) return
+    if (!ownsHydration(request)) return
 
     const hydratedItems = responses.flat().filter(item => selectedValueSet.has(String(item[valueKey] ?? '')))
     mergeSelectedItems(hydratedItems, requestSequence)
@@ -374,23 +392,20 @@ const hydrateSelectedItems = async (values: string[]) => {
     ])
   } catch (error: unknown) {
     reconcileCurrentSuccessfulCollection()
-    if (
-      currentRequestId === hydrateRequestId
-      && currentSignature === selectedHydrationSignature.value
-      && !hydrationAbortControllers.some(controller => controller.signal.aborted)
-    ) {
-      deferredHydrationFailure = { requestId: currentRequestId, signature: currentSignature, error }
-      if (status.value !== 'pending' && collectionSettlementGeneration.value === queryGeneration.value) {
+    if (ownsHydration(request) && !request.controllers.some(controller => controller.signal.aborted)) {
+      hydrationState.value = { kind: 'awaiting-collection', request, error }
+      const settlement = collectionSettlement.value
+      if (status.value !== 'pending' && settlement.generation === queryGeneration.value
+        && (settlement.kind === 'success' || settlement.kind === 'error')) {
         finalizeDeferredHydrationFailure()
       }
     }
   } finally {
-    if (currentRequestId === hydrateRequestId) {
-      if (deferredHydrationFailure?.requestId !== currentRequestId) {
-        isHydratingSelectedItem.value = false
-      }
-      hydrationAbortControllers = []
+    const current = hydrationState.value
+    if (current.kind === 'pending' && current.request === request) {
+      hydrationState.value = { kind: 'idle' }
     }
+    request.controllers = []
   }
 }
 
@@ -417,18 +432,18 @@ const applyAutomaticSingleSelection = () => {
  * Retries both the visible collection and any unresolved selected-id hydration.
  */
 const retryLookup = async () => {
-  if (disposed) return
+  if (isDisposed()) return
   if (!await ensureCatalogVersions()) return
   const signature = selectedHydrationSignature.value
   try {
     await refreshCollection()
   } catch (error: unknown) {
-    if (disposed || signature !== selectedHydrationSignature.value) return
+    if (isDisposed() || signature !== selectedHydrationSignature.value) return
     collectionError.value = error
     showError(error)
     return
   }
-  if (disposed || signature !== selectedHydrationSignature.value) return
+  if (isDisposed() || signature !== selectedHydrationSignature.value) return
   await hydrateSelectedItems(normalizedValues.value)
 }
 
@@ -437,12 +452,13 @@ const { check: checkCatalogVersions } = useCatalogCacheRefresh(
   change => {
     cancelSelectedItemHydration()
     queryGeneration.value += 1
-    responseGeneration.value = -1
+    collectionEvidence.value = { kind: 'unaccepted' }
     collectionSequenceByGeneration.set(queryGeneration.value, ++operationSequence)
-    collectionPendingGeneration.value = status.value === 'pending' ? queryGeneration.value : -1
+    collectionSettlement.value = { kind: status.value === 'pending' ? 'pending' : 'awaiting', generation: queryGeneration.value }
     selectedItemSequenceByValue.clear()
     staleSelectedValues.clear()
     if (change.securityContextChanged) {
+      catalogVersionState.value = { kind: 'ready' }
       selectedItemsByValue.value = {}
       unavailableSelectedValues.value = new Set()
       return
@@ -452,7 +468,8 @@ const { check: checkCatalogVersions } = useCatalogCacheRefresh(
     return hydrateSelectedItems(normalizedValues.value)
   },
   error => {
-    catalogCheckFailed.value = true
+    const current = catalogVersionState.value
+    catalogVersionState.value = current.kind === 'checking' ? { ...current, failed: true } : { kind: 'error' }
     showError(error)
   }
 )
@@ -461,23 +478,32 @@ const { check: checkCatalogVersions } = useCatalogCacheRefresh(
  * @returns Whether the current catalog versions are available.
  */
 const ensureCatalogVersions = async (): Promise<boolean> => {
-  isCheckingCatalogVersions.value = true
+  const request = Symbol('catalog-check')
+  catalogVersionState.value = { kind: 'checking', request, failed: catalogCheckFailed.value }
   try {
     const success = await checkCatalogVersions()
-    if (!disposed) catalogCheckFailed.value = !success
+    const current = catalogVersionState.value
+    if (!isDisposed() && current.kind === 'checking' && current.request === request) {
+      catalogVersionState.value = { kind: success ? 'ready' : 'error' }
+    }
     return success
   } finally {
-    if (!disposed) isCheckingCatalogVersions.value = false
+    const current = catalogVersionState.value
+    if (!isDisposed() && current.kind === 'checking' && current.request === request) {
+      catalogVersionState.value = { kind: current.failed ? 'error' : 'ready' }
+    }
   }
 }
+
 watch(menuOpen, open => {
   if (open) void ensureCatalogVersions()
 }, { flush: 'sync' })
 
 watch(collectionRequestSignature, () => {
+  catalogVersionState.value = { kind: 'ready' }
   queryGeneration.value += 1
   collectionSequenceByGeneration.set(queryGeneration.value, ++operationSequence)
-  collectionPendingGeneration.value = status.value === 'pending' ? queryGeneration.value : -1
+  collectionSettlement.value = { kind: status.value === 'pending' ? 'pending' : 'awaiting', generation: queryGeneration.value }
 }, { flush: 'sync' })
 
 watch(selectedHydrationScopeSignature, () => {
@@ -490,31 +516,29 @@ watch(selectedHydrationScopeSignature, () => {
 }, { flush: 'sync' })
 
 onBeforeUnmount(() => {
-  disposed = true
   cancelSelectedItemHydration()
+  hydrationState.value = { kind: 'disposed' }
 })
 
 watch(status, currentStatus => {
   if (currentStatus === 'pending') {
-    collectionPendingGeneration.value = queryGeneration.value
+    collectionSettlement.value = { kind: 'pending', generation: queryGeneration.value }
     return
   }
 
-  const isInitialSettledCollection = queryGeneration.value === 0
-    && collectionSettlementGeneration.value === -1
-  if (!isInitialSettledCollection && collectionPendingGeneration.value !== queryGeneration.value) return
+  const settlement = collectionSettlement.value
+  const isInitialSettledCollection = queryGeneration.value === 0 && settlement.kind === 'awaiting'
+  if (!isInitialSettledCollection && (settlement.kind !== 'pending' || settlement.generation !== queryGeneration.value)) return
 
   if (currentStatus === 'error') {
-    collectionSettlementGeneration.value = queryGeneration.value
-    collectionPendingGeneration.value = -1
+    collectionSettlement.value = { kind: 'error', generation: queryGeneration.value }
     finalizeDeferredHydrationFailure()
     return
   }
   if (currentStatus !== 'success') return
 
-  collectionSettlementGeneration.value = queryGeneration.value
-  responseGeneration.value = queryGeneration.value
-  collectionPendingGeneration.value = -1
+  collectionSettlement.value = { kind: 'success', generation: queryGeneration.value }
+  collectionEvidence.value = { kind: 'accepted', generation: queryGeneration.value }
   reconcileSelectedItemsFromCollection()
   finalizeDeferredHydrationFailure()
   applyAutomaticSingleSelection()
@@ -597,7 +621,12 @@ const statusMessage = computed(() => {
   if (showEmptyState.value) return t('common.no_options')
   return t('common.selected_count', { count: normalizedValues.value.length })
 })
+/**
+ * Removes a selected chip while its owning form permits editing.
+ * @param value - Selected lookup ID to remove.
+ */
 const removeSelectedValue = (value: string) => {
+  if (isDisposed() || isInteractionDisabled.value) return
   autoSelectionAvailable.value = false
   model.value = normalizedValues.value.filter(item => item !== value)
 }
@@ -618,7 +647,7 @@ const removeSelectedValue = (value: string) => {
         :multiple="multiple"
         :ignore-filter="true"
         :loading="status === 'pending' || isHydratingSelectedItem || isCheckingCatalogVersions"
-        :disabled="disabled || isCollectionError || isCheckingCatalogVersions"
+        :disabled="isInteractionDisabled || isCollectionError || isCheckingCatalogVersions"
         :search-input="{ placeholder: t('common.search') }"
         v-bind="$attrs"
         @update:model-value="onModelUpdate"
@@ -652,7 +681,7 @@ const removeSelectedValue = (value: string) => {
             <button
               type="button"
               class="cursor-default rounded-sm p-0.5 text-zinc-500 hover:text-error disabled:opacity-50"
-              :disabled="disabled"
+              :disabled="isInteractionDisabled"
               :aria-label="t('common.remove_selected_item', { label: item.label })"
               @click="removeSelectedValue(item.value)">
               <UIcon name="i-lucide-x" aria-hidden="true" />

@@ -3,7 +3,11 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { buildApprovalTemplateModalSubmitRequest } from '~/utils/approval-template-modal'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import {
   ApprovalTemplateSchema
 } from '~~/shared/types/schemas'
@@ -17,10 +21,14 @@ const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<(ApprovalTemplate & { id?: string }) | null>('state', { required: true })
 
 const {
+  actionContext,
   agencyId,
   captureSession,
-  closeSession
+  closeSession,
+  captureCommitted
 } = defineProps<{
+  actionContext: ActionContext
+  captureCommitted: CaptureCommittedSettlement
   agencyId: string
   captureSession: () => CrudModalSession | null
   closeSession: (session: CrudModalSession | null) => boolean
@@ -29,7 +37,12 @@ const {
 const { t } = useI18n()
 const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
-const pending = useCrudModalPending(captureSession)
+const modalSession = useModalSession()
+watch([() => open.value, () => state.value, () => agencyId, () => captureSession()], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null && captureSession() !== null
+}, { immediate: true, flush: 'sync' })
+const pending = useCrudModalPending(modalSession.captureSession)
 const isSubmitting = pending.isPending
 const validate = createValidator(ApprovalTemplateSchema)
 
@@ -40,38 +53,46 @@ const onSubmit = async () => {
   if (!state.value) {
     return
   }
+  const committed = captureCommitted()
+  const operation = actionContext.capture()
+  if (!committed || !operation) return
   const session = captureSession()
-  if (!pending.begin(session)) return
+  const opening = modalSession.captureSession()
+  if (session === null || opening === null || !pending.begin(opening)) return
 
   try {
-    const request = buildApprovalTemplateModalSubmitRequest(state.value, agencyId)
-    const response = await fetch(getClientRequestUrl(request.url), {
-      method: request.method,
-      headers: {
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(request.body)
-    })
-    if (!response.ok) {
-      await throwFetchResponseError(response)
+    try {
+      const request = buildApprovalTemplateModalSubmitRequest(state.value, agencyId)
+      if (!committed.canDispatch() || !operation.canDispatch()) return
+      const response = await fetch(getClientRequestUrl(request.url), {
+        method: request.method,
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify(request.body)
+      })
+      if (!response.ok) {
+        await throwFetchResponseError(response)
+      }
+    } catch (error) {
+      if (operation.isCurrent() && modalSession.isCurrentSession(opening) && captureSession() === session) showError(error)
+      return
     }
-    if (closeSession(session)) {
+    const readback = await committed.settle()
+    if (readback.kind !== 'retired' && operation.isCurrent() && modalSession.isCurrentSession(opening) && captureSession() === session && closeSession(session)) {
       emit('saved')
     }
-  } catch (error) {
-    if (session !== null && captureSession() === session) {
-      showError(error)
-    }
   } finally {
-    pending.end(session)
+    pending.end(opening)
   }
 }
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="modalTitle" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="common.approval-templates.modal">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="validate" class="space-y-4">
         <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="egcs_cn_name_en">
           <UInput v-model="state.egcs_cn_name_en" />
         </UFormField>

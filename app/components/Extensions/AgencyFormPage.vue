@@ -2,6 +2,7 @@
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import type { ExtensionAgencyRegistryItem, ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
 import { getClientRequestUrl } from '~/utils/client-request-url'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { appRouteLocations } from '~/utils/route-locations'
 
 const { flowOnly = false } = defineProps<{ flowOnly?: boolean }>()
@@ -9,46 +10,34 @@ const { flowOnly = false } = defineProps<{ flowOnly?: boolean }>()
 const route = useRoute<'extension-id-agencies-agencyId-forms-formId___en' | 'extension-id-agencies-agencyId-forms-formId___fr' | 'extension-id-agencies-agencyId-forms-formId-flow___en' | 'extension-id-agencies-agencyId-forms-formId-flow___fr'>()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
+const { user, permissionRevision } = useAuth()
 const extensionKey = computed(() => String(route.params.id))
 const agencyId = computed(() => String(route.params.agencyId))
 const formId = computed(() => String(route.params.formId))
 const editorView = computed(() => route.query.view === 'test' || route.query.view === 'publish' ? route.query.view : 'edit')
-type LoadStatus = 'pending' | 'success' | 'error'
-const list: Ref<{ items: ExtensionAgencyWorkspaceListItem[] } | null> = ref(null)
-const registry: Ref<{ items: ExtensionAgencyRegistryItem[] } | null> = ref(null)
-const status: Ref<LoadStatus> = ref('pending')
-let requestSequence = 0
-/** Loads the accessible Agency workspace and extension registration. */
-const retry = async () => {
-  const sequence = ++requestSequence
-  status.value = 'pending'
-  const responses = await Promise.allSettled([
-    fetch(getClientRequestUrl('/api/extensions/workspaces')),
-    fetch(getClientRequestUrl(`/api/extensions/agency/${agencyId.value}`))
-  ])
-  if (sequence !== requestSequence) return
-  try {
-    const [workspaces, agencyRegistry] = responses
-    if (workspaces?.status !== 'fulfilled' || !workspaces.value.ok
-      || agencyRegistry?.status !== 'fulfilled' || !agencyRegistry.value.ok) throw new Error('Unavailable')
-    const [nextList, nextRegistry] = await Promise.all([
-      workspaces.value.json() as Promise<{ items: ExtensionAgencyWorkspaceListItem[] }>,
-      agencyRegistry.value.json() as Promise<{ items: ExtensionAgencyRegistryItem[] }>
+const { data, status, refresh: retry } = useResourceRequest({
+  identity: () => JSON.stringify([extensionKey.value, agencyId.value, user.value?.id, permissionRevision.value]),
+  failureData: 'clear',
+  /**
+   * Loads the authorized current workspace.
+   * @param signal - Owning request cancellation.
+   * @returns Current workspace evidence.
+   */
+  load: async signal => {
+    const [workspaces, agencyRegistry] = await Promise.all([
+      fetch(getClientRequestUrl('/api/extensions/workspaces'), { signal }),
+      fetch(getClientRequestUrl(`/api/extensions/agency/${agencyId.value}`), { signal })
     ])
-    if (sequence !== requestSequence) return
-    list.value = nextList
-    registry.value = nextRegistry
-    status.value = 'success'
-  } catch {
-    if (sequence !== requestSequence) return
-    list.value = null
-    registry.value = null
-    status.value = 'error'
+    if (!workspaces.ok || !agencyRegistry.ok) throw new Error('Unavailable')
+    const [list, registry] = await Promise.all([
+      workspaces.json() as Promise<{ items: ExtensionAgencyWorkspaceListItem[] }>,
+      agencyRegistry.json() as Promise<{ items: ExtensionAgencyRegistryItem[] }>
+    ])
+    return { list, registry }
   }
-}
-watch([agencyId, extensionKey], () => {
-  void retry()
-}, { immediate: true })
+})
+const list = computed(() => data.value?.list)
+const registry = computed(() => data.value?.registry)
 const workspace = computed(() => list.value?.items.find(item => item.key === extensionKey.value
   && item.agencies.some(agency => agency.id === agencyId.value)))
 const agency = computed(() => workspace.value?.agencies.find(item => item.id === agencyId.value))

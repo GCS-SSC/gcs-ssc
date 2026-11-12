@@ -6,7 +6,7 @@ import type { FetchError } from 'ofetch'
 import { useStatusCatalog } from '~/composables/useStatusCatalog'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ExpandedState, Updater } from '@tanstack/vue-table'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -113,6 +113,10 @@ const monthlyEditorRow: Ref<ForecastBreakdownTableRow | null> = ref(null)
 const monthlyEditorOpen = ref(false)
 const monthlyEditorAmounts: Ref<Record<number, MoneyInput>> = ref({})
 const isSavingBreakdown: Ref<boolean> = ref(false)
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
 const breakdownReloadRequired = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
 
@@ -619,6 +623,7 @@ const reloadForecastBreakdown = async () => {
   breakdownReloadRequired.value = true
   try {
     await refreshPage()
+    if (disposed) return false
     if (overviewError.value || overviewStatus.value === 'error') {
       throw overviewError.value ?? new Error(t('common.resource_table_load_failed'))
     }
@@ -636,16 +641,18 @@ const reloadForecastBreakdown = async () => {
     breakdownReloadRequired.value = false
     return true
   } catch (error: unknown) {
-    showError(error)
+    if (!disposed) showError(error)
     return false
   } finally {
-    draftAmounts.value = pendingDrafts
-    draftFundingAmounts.value = pendingFundingDrafts
+    if (!disposed) {
+      draftAmounts.value = pendingDrafts
+      draftFundingAmounts.value = pendingFundingDrafts
+    }
   }
 }
 
 const saveForecastBreakdown = async () => {
-  if (!activeForecast.value || isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) {
+  if (disposed || !activeForecast.value || isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) {
     return
   }
 
@@ -696,17 +703,19 @@ const saveForecastBreakdown = async () => {
       // A failed response may follow a committed save; reload before any retry.
       breakdownReloadRequired.value = true
       await saveJson(`/api/agreements/${agreementId}/forecasts/${forecastId}/breakdown`, 'PATCH', { cells })
+      if (disposed) return
       const savedKeys = new Set(cells.map(cell => getDraftKey(cell.egcs_fc_fundingagreementbudgetlineitem, cell.egcs_fc_month)))
       draftAmounts.value = Object.fromEntries(Object.entries(draftAmounts.value).filter(([key]) => !savedKeys.has(key)))
       draftFundingAmounts.value = Object.fromEntries(Object.entries(draftFundingAmounts.value).filter(([key]) => !savedKeys.has(key.slice(0, key.lastIndexOf(':')))))
     }
-    if (!await reloadForecastBreakdown()) return
+    if (!await reloadForecastBreakdown() || disposed) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('agreement.forecasts.saved_breakdown'),
       color: 'success'
     })
   } catch (error: unknown) {
+    if (disposed) return
     showError(error)
     if (breakdownReloadRequired.value) await reloadForecastBreakdown()
   } finally {
@@ -903,6 +912,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
 
             <section v-else-if="selectedTab === 'completion'" data-help-view="casework.forecasts.completion" data-help-target="casework.forecasts.detail.completion" data-help-kind="section" class="space-y-6">
               <CommonCompletionPanel
+                :mutation-role-allowed="canUpdateForecast"
                 entity-type="fundingcaseforecast"
                 :entity-id="forecastId"
                 :can-complete="canUpdateForecast"
@@ -931,7 +941,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
               :can-update="canUpdateForecast && isAssigned && !activeForecastIsLocked"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.forecasts.workflows" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canUpdateForecast" data-help-view="casework.forecasts.workflows" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.forecasts.supplementary-information" data-help-target="casework.forecasts.supplementary-information.content">
               <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             </section>

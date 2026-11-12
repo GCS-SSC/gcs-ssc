@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 /* eslint-disable jsdoc/require-jsdoc -- Independent credit authoring and modal sessions have focused component coverage. */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -6,11 +7,14 @@ import type { MoneyInput } from '~~/shared/utils/money'
 import type { Currency_Codes } from '~~/shared/types/database'
 import type { CreditMemoCreateContext } from '~/utils/credit-memo-create-context'
 import { useBilingualValue } from '~/composables/useBilingualValue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
 import { AccountReceivableCreditMemoCreateSchema } from '~~/shared/types/schemas/account-receivable'
 
 const { context } = defineProps<{ context: CreditMemoCreateContext }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ created: [id: string, proponentId: string] }>()
+const { canAny } = useAuth()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { createValidator } = useZodI18n()
@@ -26,23 +30,32 @@ type State = {
   egcs_fc_receiveddate: string | Date | null
   egcs_fc_reason: string
 }
-const state: Ref<State | null> = ref(null)
-const pending: Ref<boolean> = ref(false)
+const createDraft = (): State => ({
+  egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient,
+  egcs_fc_receivable: context.egcs_fc_receivable,
+  egcs_fc_receivables: context.egcs_fc_receivable ? [context.egcs_fc_receivable] : [],
+  egcs_fc_totalamount: undefined,
+  egcs_fc_agency: context.egcs_fc_agency,
+  egcs_fc_currency: context.egcs_fc_currency,
+  egcs_fc_receiveddate: new Date().toISOString().slice(0, 10),
+  egcs_fc_reason: ''
+})
+const modal = useCrudModal<State, State>({ createState: createDraft, updateState: draft => draft })
+const state = modal.selected
+const pendingRequest = useCrudModalPending(modal.captureSession)
+const pending = pendingRequest.isPending
 const singleAgency: Ref<boolean> = ref(false)
 const identity = computed(() => `${context.egcs_fc_applicantrecipient}:${context.egcs_fc_agency ?? ''}:${context.egcs_fc_currency ?? ''}:${context.egcs_fc_receivable ?? ''}`)
-let session = 0
-onBeforeUnmount(() => {
-  session += 1
-})
+onBeforeUnmount(modal.close)
 type AgencyLookupResponse = { items: Array<{ id: string }>; total: number }
 const fetchAgencyOptions = $fetch as (url: string, options: { query: Record<string, string | number> }) => Promise<AgencyLookupResponse>
 const resolveSingleAgency = async () => {
-  const currentSession = session
+  const currentSession = modal.captureSession()
   try {
     const result = await fetchAgencyOptions('/api/account-receivable-credit-memos/lookups/agencies', {
       query: { egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient, page: 1, limit: 2 }
     })
-    if (currentSession !== session || !state.value) return
+    if (!modal.isCurrentSession(currentSession) || !state.value) return
     const agency = result.items[0]
     if (result.total === 1 && result.items.length === 1 && agency
       && (!state.value.egcs_fc_agency || state.value.egcs_fc_agency === String(agency.id))) {
@@ -54,21 +67,10 @@ const resolveSingleAgency = async () => {
   }
 }
 watch([open, identity], ([isOpen]) => {
-  session += 1
-  pending.value = false
   singleAgency.value = false
-  state.value = isOpen
-    ? {
-        egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient,
-        egcs_fc_receivable: context.egcs_fc_receivable,
-        egcs_fc_receivables: context.egcs_fc_receivable ? [context.egcs_fc_receivable] : [],
-        egcs_fc_totalamount: undefined,
-        egcs_fc_agency: context.egcs_fc_agency,
-        egcs_fc_currency: context.egcs_fc_currency,
-        egcs_fc_receiveddate: new Date().toISOString().slice(0, 10),
-        egcs_fc_reason: ''
-      }
-    : null
+  if (isOpen) {
+    modal.openCreate()
+  } else modal.close()
   if (isOpen) void resolveSingleAgency()
 }, { immediate: true, flush: 'sync' })
 watch(() => [state.value, state.value?.egcs_fc_agency] as const, ([currentState, value], [previousState, previous]) => {
@@ -87,27 +89,35 @@ const resolveReceivableCurrency = (items: Array<{ id: string; egcs_fc_currency?:
   const selected = items.find(item => String(item.id) === state.value?.egcs_fc_receivables[0])
   if (state.value && selected && typeof selected.egcs_fc_currency === 'string') state.value.egcs_fc_currency = selected.egcs_fc_currency as Currency_Codes
 }
+const actionContext = useActionContext({
+  identity: [() => identity.value, () => state.value?.egcs_fc_agency],
+  authority: () => canAny('account_receivable', 'create'),
+  eligible: () => open.value
+})
 const save = async () => {
+  const capturedAction = actionContext.capture()
+  if (!capturedAction?.canDispatch()) return
   if (!state.value || pending.value) return
-  const currentSession = session
-  pending.value = true
+  const currentSession = modal.captureSession()
+  if (!pendingRequest.begin(currentSession)) return
   try {
     const result = await sendJson<{ id: string, egcs_fc_applicantrecipient: string }>('/api/account-receivable-credit-memos', 'POST', AccountReceivableCreditMemoCreateSchema.parse(state.value))
-    if (currentSession !== session) return
+    if (!capturedAction.isCurrent() || !modal.isCurrentSession(currentSession)) return
     open.value = false
     emit('created', result.id, result.egcs_fc_applicantrecipient)
   } catch (failure) {
-    if (currentSession === session) showError(failure)
+    if (capturedAction.isCurrent() && modal.isCurrentSession(currentSession)) showError(failure)
   } finally {
-    if (currentSession === session) pending.value = false
+    pendingRequest.end(currentSession)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
   <UModal v-model:open="open" data-help-view="casework.account-receivable.credit-memo-create-modal.open" :title="t('account_receivable.create_credit_memo')" :description="t('account_receivable.credit_memo_credit_instruction')" :ui="{ content: 'sm:max-w-2xl', header: 'shrink-0' }" data-field-scope="account-receivable.credit-memo-create-modal">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="createValidator(AccountReceivableCreditMemoCreateSchema)" class="space-y-4" @submit="save">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="createValidator(AccountReceivableCreditMemoCreateSchema)" class="space-y-4">
         <dl class="text-sm">
           <dt class="text-muted">
             {{ t('account_receivable.proponent') }}

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyAttachmentTypeSchema, type AgencyAttachmentTypeItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -10,10 +12,18 @@ const columns: TableColumnInput<AgencyAttachmentTypeItem>[] = [
   { id: 'description', headerKey: 'common.description' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <CommonResourceCrud
+    :action="action"
     :title="t('agency.tabs.attachment_types')"
     icon="i-lucide-paperclip"
     :fetch-url="`/api/agency/${agencyId}/attachment-types`"

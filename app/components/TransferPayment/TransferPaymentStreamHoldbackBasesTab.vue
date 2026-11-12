@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -27,6 +29,14 @@ const { t } = useI18n()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canCreateChild
+})
+const deleteContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const { createValidator } = useZodI18n()
 
 const fetchUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/holdback-bases`)
@@ -56,23 +66,31 @@ const openCreate = () => {
   if (canCreateChild) modal.openCreate()
 }
 
-const isDeleting: Ref<boolean> = ref(false)
+const deletePending = useCrudModalPending(() => deleteContext.version.value)
+const isDeleting = deletePending.isPending
+const isRetryingAgencyHoldbacks: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 watch([() => transferPaymentId, () => streamId], () => {
   contextGeneration += 1
-  isDeleting.value = false
+  isRetryingAgencyHoldbacks.value = false
   modal.close()
+}, { flush: 'sync' })
+watch(() => canCreateChild, allowed => {
+  if (!allowed) modal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
   disposed = true
   contextGeneration += 1
+  modal.close()
 })
 
 /** Persists the selected stream holdback basis and refreshes the table. */
 const save = async () => {
   if (disposed || !selected.value || !canCreateChild || selected.value.id) return
+  const operation = writeContext.capture()
+  if (!operation) return
   const session = modal.captureSession()
   if (!pending.begin(session)) return
   const generation = contextGeneration
@@ -85,10 +103,10 @@ const save = async () => {
       body: JSON.stringify({ egcs_tp_agencyholdback: selected.value.egcs_tp_agencyholdback })
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!isCurrentContext(generation)) return
+    if (!operation.isCurrent() || !isCurrentContext(generation)) return
     closedSession = modal.closeSession(session)
   } catch (error: unknown) {
-    if (isCurrentContext(generation) && modal.captureSession() === session) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && modal.captureSession() === session) showError(error)
     return
   } finally {
     pending.end(session)
@@ -96,10 +114,10 @@ const save = async () => {
 
   try {
     await refresh()
-    if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value !== 'success') return
+    if (!operation.isCurrent() || !isCurrentContext(generation) || !closedSession || !modal.isLatestSession(session) || status.value !== 'success') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && closedSession && modal.isLatestSession(session)) showError(error)
   }
 }
 
@@ -110,20 +128,28 @@ const save = async () => {
  */
 const remove = async (row: HoldbackBasisRow) => {
   if (disposed || !canDeleteChild || isDeleting.value) return
-  const generation = contextGeneration
-  isDeleting.value = true
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const targetId = row.id
+  const deleteSession = deleteContext.version.value
+  if (!deletePending.begin(deleteSession)) return
   try {
     const ok = await confirmDeleteRequest(`${fetchUrl.value}/${row.id}`, {
-      shouldProceed: () => isCurrentContext(generation) && canDeleteChild
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => items.value.find(current => current.id === targetId),
+        eligible: () => canDeleteChild
+      }
     })
-    if (!ok || !isCurrentContext(generation)) return
+    if (!ok || !operation.isCurrent()) return
     await refresh()
-    if (!isCurrentContext(generation) || status.value !== 'success') return
+    if (!operation.isCurrent() || status.value !== 'success') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent()) showError(error)
   } finally {
-    if (isCurrentContext(generation)) isDeleting.value = false
+    deletePending.end(deleteSession)
   }
 }
 
@@ -132,20 +158,21 @@ const { data: agencyHoldbackResponse, error: agencyHoldbackError, refresh: refre
   buildUrl: () => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/holdback-bases`,
   query: { page: 1, limit: 100 }
 })
-const isRetryingAgencyHoldbacks: Ref<boolean> = ref(false)
 
 /** Retries the selected Stream reference catalogue without clearing the current draft. */
 const retryAgencyHoldbacks = async () => {
-  if (isRetryingAgencyHoldbacks.value) return
+  if (disposed || isRetryingAgencyHoldbacks.value) return
+  const generation = contextGeneration
   isRetryingAgencyHoldbacks.value = true
   try {
     await refreshAgencyHoldbacks()
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   } finally {
-    isRetryingAgencyHoldbacks.value = false
+    if (isCurrentContext(generation)) isRetryingAgencyHoldbacks.value = false
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: writeContext }, submit: save })
 </script>
 
 <template>
@@ -174,7 +201,7 @@ const retryAgencyHoldbacks = async () => {
 
   <UModal v-if="selected && canCreateChild" v-model:open="isOpen" :title="t('common.add')">
     <template #body>
-      <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
+      <UForm v-bind="formSession" :state="selected" :validate="validate" class="space-y-4">
         <div v-if="agencyHoldbackError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
           <span>{{ t('common.lookup_load_failed') }}</span>
           <UButton

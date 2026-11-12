@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import type { ActionContext } from '~/composables/useActionContext'
 import type { CrudModalSession, useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import type { AgencyProfileItem } from '~~/shared/types/schemas'
@@ -7,6 +8,8 @@ export interface AgencySaveOptions {
   selectedAgency: Ref<Partial<AgencyProfileItem> | null>
   captureSession: () => CrudModalSession | null
   closeSession: (session: CrudModalSession | null) => boolean
+  isActive: () => boolean
+  context: ActionContext
   pending: Pick<ReturnType<typeof useCrudModalPending>, 'begin' | 'end'>
   buildRequestUrl: (path: string) => RequestInfo | URL
   refresh: () => Promise<void>
@@ -62,11 +65,13 @@ export const buildAgencyHeroStats = (
  * @param options - Save state and dependencies from the agencies page.
  */
 export const saveAgencyProfile = async (options: AgencySaveOptions) => {
+  const operation = options.context.capture()
   const session = options.captureSession()
-  if (!options.selectedAgency.value || session === null || !options.pending.begin(session)) {
+  if (!operation?.canDispatch() || !options.isActive() || !options.selectedAgency.value || session === null || !options.pending.begin(session)) {
     return
   }
 
+  const ownsSession = () => options.isActive() && operation.isCurrent() && options.captureSession() === session
   const request = buildAgencySaveRequest({ ...options.selectedAgency.value })
   try {
     const response = await fetch(options.buildRequestUrl(request.path), {
@@ -78,25 +83,28 @@ export const saveAgencyProfile = async (options: AgencySaveOptions) => {
       await throwFetchResponseError(response)
     }
 
+    if (!options.isActive()) return
     if (request.method === 'POST' && options.refreshStatusCatalogAgency) {
       const created = await response.json() as { id?: string | number }
+      if (!options.isActive()) return
       if (created.id !== undefined) {
         try {
           await options.refreshStatusCatalogAgency(String(created.id))
         } catch (error: unknown) {
-          options.showError(error)
+          if (ownsSession()) options.showError(error)
         }
       }
     }
 
-    options.closeSession(session)
+    if (!options.isActive()) return
+    if (operation.isCurrent()) options.closeSession(session)
     try {
       await options.refresh()
     } catch (refreshError) {
-      options.showError(refreshError)
+      if (options.isActive() && options.captureSession() === null) options.showError(refreshError)
     }
   } catch (error: unknown) {
-    options.showError(error)
+    if (ownsSession()) options.showError(error)
   } finally {
     options.pending.end(session)
   }

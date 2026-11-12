@@ -1,5 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- page-local handlers are clear from their names and types */
+import { onScopeDispose } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
 import type { ComputedRef, Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -20,10 +22,15 @@ const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('users')
-const { can } = useCan()
+const { can, canAny } = useCan()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+let pageLifetime: 'active' | 'disposed' = 'active'
+onScopeDispose(() => {
+  pageLifetime = 'disposed'
+})
+const isPageActive = () => pageLifetime === 'active'
 
 const {
   search,
@@ -53,15 +60,41 @@ const isMutationPending: ComputedRef<boolean> = computed(
   () => isSavingUser.value || deletingUserId.value !== null || isActivatingUser.value
 )
 
+const findListedUser = (userId: string): UserListItem | null =>
+  items.value.find(user => user.id === userId) ?? null
+const editContext = useActionContext({
+  identity: [() => selectedUser.value?.id],
+  authority: () => selectedUser.value?.id
+    ? canAny('user', 'update', ['global', 'agency'])
+    : canCreateUser.value,
+  eligible: () => selectedUser.value !== null && (!selectedUser.value.id
+    || (findListedUser(selectedUser.value.id)?.can_update === true
+      && !deletedUserIds.value.has(selectedUser.value.id)))
+})
+const activationContext = useActionContext({
+  identity: [() => activatingUserId.value],
+  authority: () => can('user', 'update', { type: 'global' }),
+  eligible: () => {
+    const user = activatingUserId.value ? findListedUser(activatingUserId.value) : null
+    return user?.can_activate === true && !user.emailVerified
+  }
+})
+const collectionContext = useActionContext({ identity: [], authority: () => canAny('user', 'read', ['global', 'agency']) })
+const deleteContext = useActionContext({
+  identity: [],
+  authority: () => canAny('user', 'delete', ['global', 'agency'])
+})
+
 watch(listError, error => {
-  if (error) {
+  if (error && isPageActive()) {
     showError(error)
   }
 })
 
 const refreshUserList = async (): Promise<boolean> => {
+  if (!isPageActive()) return false
   await refresh()
-  return !listError.value
+  return isPageActive() && !listError.value
 }
 
 const userHeroStats = computed(() => [
@@ -78,24 +111,26 @@ const userHeroStats = computed(() => [
 ])
 
 const openCreateModal = () => {
-  if (!canCreateUser.value || isMutationPending.value) return
+  if (!isPageActive() || !canCreateUser.value || isMutationPending.value) return
   selectedUser.value = {}
   isModalOpen.value = true
 }
 
 const openUpdateModal = (user: UserListItem) => {
+  const userId = user.id
+  if (!userId) return
+  const currentUser = findListedUser(userId)
   if (
-    !user.can_update
-    || !user.id
-    || deletedUserIds.value.has(user.id)
+    !isPageActive()
+    || currentUser?.can_update !== true
+    || deletedUserIds.value.has(userId)
     || isMutationPending.value
   ) return
   selectedUser.value = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    image: user.image,
-    can_update: user.can_update
+    id: userId,
+    name: currentUser.name,
+    email: currentUser.email,
+    image: currentUser.image
   }
   isModalOpen.value = true
 }
@@ -103,9 +138,12 @@ const openUpdateModal = (user: UserListItem) => {
 /** Persists the canonical editable profile fields and refreshes row capabilities. */
 const saveUser = async () => {
   const item = selectedUser.value
-  if (!item || isMutationPending.value) return
+  if (!isPageActive() || !item || isMutationPending.value) return
+  const collection = collectionContext.capture()
+  let committed = false
+  const operation = editContext.capture()
+  if (!operation?.canDispatch()) return
   const isUpdate = !!item.id
-  if (isUpdate && item.can_update !== true) return
   if (item.id && deletedUserIds.value.has(item.id)) return
   if (!isUpdate && !canCreateUser.value) return
   const method = isUpdate ? 'PATCH' : 'POST'
@@ -117,11 +155,13 @@ const saveUser = async () => {
       email: item.email,
       image: item.image
     })
+    if (!isPageActive() || !operation.isCurrent() || selectedUser.value !== item) return
     isModalOpen.value = false
     selectedUser.value = null
+    committed = true
     await refreshUserList()
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && (operation.isCurrent() || (committed && collection?.isCurrent()))) showError(error)
   } finally {
     isSavingUser.value = false
   }
@@ -129,27 +169,40 @@ const saveUser = async () => {
 
 /** Deletes an authorized row and records success before refreshing the list. */
 const deleteUser = async (user: UserListItem) => {
+  const userId = user.id
+  if (!userId) return
+  const operation = deleteContext.capture()
+  const canDeleteTarget = () => findListedUser(userId)?.can_delete === true
+    && !deletedUserIds.value.has(userId)
   if (
-    !user.can_delete
-    || !user.id
+    !isPageActive()
+    || !operation?.canDispatch()
+    || !canDeleteTarget()
     || isMutationPending.value
-    || deletedUserIds.value.has(user.id)
+    || deletedUserIds.value.has(userId)
   ) return
 
   try {
-    deletingUserId.value = user.id
-    const deleted = await confirmDeleteRequest(`/api/users/${user.id}`, {
-      description: t('agency.delete_confirm')
+    deletingUserId.value = userId
+    const deleted = await confirmDeleteRequest(`/api/users/${userId}`, {
+      description: t('agency.delete_confirm'),
+      operation,
+      target: {
+        id: userId,
+        resolve: () => findListedUser(userId),
+        eligible: current => current.can_delete === true && !deletedUserIds.value.has(userId)
+      },
+      shouldProceed: canDeleteTarget
     })
-    if (!deleted) return
-    deletedUserIds.value.add(user.id)
-    if (selectedUser.value?.id === user.id) {
+    if (!deleted || !isPageActive() || !operation.isCurrent()) return
+    deletedUserIds.value.add(userId)
+    if (selectedUser.value?.id === userId) {
       isModalOpen.value = false
       selectedUser.value = null
     }
     const refreshed = await refreshUserList()
 
-    if (refreshed) {
+    if (refreshed && operation.isCurrent()) {
       const pageSize = pagination.value.pageSize
       const lastPageIndex = Math.max(Math.ceil(totalRecords.value / pageSize) - 1, 0)
       if (pagination.value.pageIndex > lastPageIndex) {
@@ -157,7 +210,7 @@ const deleteUser = async (user: UserListItem) => {
       }
     }
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && operation.isCurrent()) showError(error)
   } finally {
     deletingUserId.value = null
   }
@@ -165,8 +218,11 @@ const deleteUser = async (user: UserListItem) => {
 
 /** Opens password setup for an inactive, manually managed user. */
 const openActivationModal = (user: UserListItem) => {
-  if (!user.can_activate || user.emailVerified || !user.id || isMutationPending.value) return
-  activatingUserId.value = user.id
+  const userId = user.id
+  if (!userId) return
+  const currentUser = findListedUser(userId)
+  if (!isPageActive() || currentUser?.can_activate !== true || currentUser.emailVerified || isMutationPending.value) return
+  activatingUserId.value = userId
   activationState.value = {}
   isActivationModalOpen.value = true
 }
@@ -175,18 +231,23 @@ const openActivationModal = (user: UserListItem) => {
 const activateUser = async () => {
   const userId = activatingUserId.value
   const state = activationState.value
-  if (!userId || !state?.password || isMutationPending.value) return
+  const collection = collectionContext.capture()
+  let committed = false
+  const operation = activationContext.capture()
+  if (!isPageActive() || !userId || !state?.password || isMutationPending.value || !operation?.canDispatch()) return
 
   try {
     isActivatingUser.value = true
     await saveJson(`/api/users/${userId}/activate`, 'POST', { password: state.password })
+    if (!isPageActive() || !operation.isCurrent() || activationState.value !== state) return
     toast.add({ title: toast.localized('user.activated_success'), color: 'success' })
     isActivationModalOpen.value = false
     activationState.value = null
     activatingUserId.value = null
+    committed = true
     await refreshUserList()
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && (operation.isCurrent() || (committed && collection?.isCurrent()))) showError(error)
   } finally {
     isActivatingUser.value = false
   }
@@ -282,12 +343,14 @@ const columns: TableColumnInput<UserListItem>[] = [
         :title="selectedUser.id ? t('user.update_title') : t('user.create_title')"
         :submit-label="selectedUser.id ? t('common.update') : t('common.save')"
         :pending="isMutationPending"
+        :action-context="editContext"
         @submit="saveUser" />
       <UserActivationModal
         v-if="activationState"
         v-model:open="isActivationModalOpen"
         v-model:state="activationState"
         :pending="isActivatingUser"
+        :action-context="activationContext"
         @submit="activateUser" />
     </template>
   </CommonDetailPage>

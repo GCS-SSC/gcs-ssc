@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local event handlers are self-documenting */
+import { onScopeDispose, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useExtensionConfigurationState } from '~/composables/useExtensionConfigurationState'
 import type { ExtensionAgencyRegistryItem } from '~~/shared/types/schemas/extensions'
@@ -16,6 +17,7 @@ const toast = useLocalizedToast()
 const canEdit = computed(() => canUpdate)
 const canConfigure = (item: ExtensionAgencyRegistryItem) => canEdit.value && item.canConfigure
 const { showError } = useApiErrorToast()
+const { user, permissionRevision } = useAuth()
 const {
   isModalOpen,
   isDiscardConfirmOpen,
@@ -25,9 +27,14 @@ const {
   fallbackConfigError,
   isSavingConfiguration,
   isDirty,
+  savingExtensionKeys,
   isRowBusy,
   setRowBusy,
   openConfigure,
+  captureSession,
+  captureDraftSave,
+  acceptCommittedDraft,
+  setSessionSaving,
   resetConfigureState,
   closeConfigure,
   cancelDiscardChanges,
@@ -37,10 +44,29 @@ const {
 } = useExtensionConfigurationState<ExtensionAgencyTableRow>()
 
 const { pagination, items, totalRecords, refresh, status } = useResourceTable<ExtensionAgencyTableRow>({
-  fetchUrl: computed(() => `/api/extensions/agency/${agencyId}`)
+  fetchUrl: computed(() => `/api/extensions/agency/${agencyId}`),
+  contextKey: computed(() => JSON.stringify([user.value?.id, permissionRevision.value]))
 })
 const isLoading = computed(() => status.value === 'pending')
 const hasLoadError = computed(() => status.value === 'error')
+let lifetime: 'active' | 'disposed' = 'active'
+const isActive = () => lifetime === 'active'
+let contextVersion = 0
+watch(() => [agencyId, canUpdate, canDelete, user.value?.id, permissionRevision.value], () => {
+  contextVersion++
+  savingExtensionKeys.value = new Set()
+  resetConfigureState()
+}, { flush: 'sync' })
+watch(() => selectedItem.value ? items.value.find(row => row.extension.key === selectedItem.value?.extension.key)?.canConfigure : undefined,
+  (capability, previous) => {
+    if (!selectedItem.value || capability === previous || previous === undefined) return
+    contextVersion++
+    savingExtensionKeys.value = new Set()
+    if (capability !== true || isSavingConfiguration.value) resetConfigureState()
+  }, { flush: 'sync' })
+onScopeDispose(() => {
+  lifetime = 'disposed'
+})
 
 interface ExtensionMigrationResponse {
   extensionKey: string
@@ -73,60 +99,78 @@ const configureExtension = async (item: ExtensionAgencyTableRow) => {
 }
 
 const updateEnablement = async (item: ExtensionAgencyRegistryItem, enabled: boolean) => {
-  if (!canConfigure(item) || isRowBusy(item) || (item.storageProvider?.selected && !enabled)) {
+  if (!isActive() || !canConfigure(item) || isRowBusy(item) || (item.storageProvider?.selected && !enabled)) {
     return
   }
 
+  const requestedContext = contextVersion
+  const ownsContext = () => isActive() && contextVersion === requestedContext
   try {
     setRowBusy(item.extension.key, true)
     await postJson(`/api/extensions/agency/${agencyId}`, 'PATCH', {
       extensionKey: item.extension.key,
       enabled
     })
+    if (!ownsContext()) return
     await refresh()
+    if (!ownsContext()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsContext()) showError(error)
   } finally {
-    setRowBusy(item.extension.key, false)
+    if (ownsContext()) setRowBusy(item.extension.key, false)
   }
 }
 
 const saveConfiguration = async (item: ExtensionAgencyTableRow) => {
-  if (!canConfigure(item) || isRowBusy(item) || isSavingConfiguration.value || !isDirty.value) {
+  if (!isActive() || !canConfigure(item) || isRowBusy(item) || isSavingConfiguration.value || !isDirty.value) {
     return
   }
 
+  const configurationSession = captureSession()
+  const draftSave = captureDraftSave()
+  const requestedContext = contextVersion
+  const ownsContext = () => isActive() && contextVersion === requestedContext
+  let closedSession = false
+  const ownsFeedback = () => ownsContext() && (captureSession() === configurationSession
+    || (closedSession && captureSession() === null))
+
   try {
     setRowBusy(item.extension.key, true)
-    isSavingConfiguration.value = true
+    setSessionSaving(configurationSession, true)
     await postJson(`/api/extensions/agency/${agencyId}`, 'PATCH', {
       extensionKey: item.extension.key,
       enabled: item.enabled,
       config: draftConfig.value
     })
-    resetConfigureState()
+    if (!ownsContext()) return
+    closedSession = acceptCommittedDraft(draftSave)
     await refresh()
+    if (!ownsFeedback()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
-    setRowBusy(item.extension.key, false)
-    isSavingConfiguration.value = false
+    if (ownsContext()) setRowBusy(item.extension.key, false)
+    setSessionSaving(configurationSession, false)
   }
 }
 
 const runMigrations = async (item: ExtensionAgencyRegistryItem) => {
-  if (!canEdit.value || !item.enabled || !item.hasMigrations || isRowBusy(item)) {
+  if (!isActive() || !canEdit.value || !item.enabled || !item.hasMigrations || isRowBusy(item)) {
     return
   }
 
+  const requestedContext = contextVersion
+  const ownsContext = () => isActive() && contextVersion === requestedContext
   try {
     setRowBusy(item.extension.key, true)
     const response = await postJson<ExtensionMigrationResponse>(`/api/extensions/agency/${agencyId}/migrations`, 'POST', {
       extensionKey: item.extension.key
     })
+    if (!ownsContext()) return
     await refresh()
+    if (!ownsContext()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized(response.results.length > 0
@@ -135,40 +179,48 @@ const runMigrations = async (item: ExtensionAgencyRegistryItem) => {
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsContext()) showError(error)
   } finally {
-    setRowBusy(item.extension.key, false)
+    if (ownsContext()) setRowBusy(item.extension.key, false)
   }
 }
 
 const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
-  if (!canEdit.value || !item.enabled || !item.extension.fileStorageProvider || isRowBusy(item)) return
+  if (!isActive() || !canEdit.value || !item.enabled || !item.extension.fileStorageProvider || isRowBusy(item)) return
+  const requestedContext = contextVersion
+  const ownsContext = () => isActive() && contextVersion === requestedContext
   try {
     setRowBusy(item.extension.key, true)
     await postJson(`/api/extensions/agency/${agencyId}/storage-provider`, 'PATCH', {
       providerKey: item.extension.key
     })
+    if (!ownsContext()) return
     await refresh()
+    if (!ownsContext()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('extensions.storage_provider_selected'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsContext()) showError(error)
   } finally {
-    setRowBusy(item.extension.key, false)
+    if (ownsContext()) setRowBusy(item.extension.key, false)
   }
 }
 const selectNotificationProvider = async (item: ExtensionAgencyRegistryItem) => {
-  if (!canDelete || !item.canConfigure || !item.enabled || !item.extension.notificationProvider || isRowBusy(item)) return
+  if (!isActive() || !canDelete || !item.canConfigure || !item.enabled || !item.extension.notificationProvider || isRowBusy(item)) return
+  const requestedContext = contextVersion
+  const ownsContext = () => isActive() && contextVersion === requestedContext
   try {
     setRowBusy(item.extension.key, true)
     await postJson(`/api/extensions/agency/${agencyId}/notification-provider`, 'PATCH', {
       providerKey: item.extension.key
     })
+    if (!ownsContext()) return
     await refresh()
+    if (!ownsContext()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('extensions.notification_provider_selected'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsContext()) showError(error)
   } finally {
-    setRowBusy(item.extension.key, false)
+    if (ownsContext()) setRowBusy(item.extension.key, false)
   }
 }
 </script>

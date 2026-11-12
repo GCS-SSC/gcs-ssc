@@ -132,9 +132,17 @@ export const useAssessmentDetailPage = () => {
   const persistedResponse = ref(serializeResponse(assessmentResponse.value))
   const isDirty = computed(() => serializeResponse(assessmentResponse.value) !== persistedResponse.value)
   const isSaving: Ref<boolean> = ref(false)
+  const canUpdateAssessment = computed(() => assessment.value?.permissions?.can_update === true)
+  let permissionGeneration = 0
+  watch(canUpdateAssessment, () => {
+    permissionGeneration++
+  }, { flush: 'sync' })
   let saveGeneration = 0
+  let lifetime: 'active' | 'disposed' = 'active'
   onScopeDispose(() => {
+    lifetime = 'disposed'
     saveGeneration++
+    isSaving.value = false
   }, true)
   const totalAdditionalReviewerCount: Ref<number> = ref(0)
   const pendingAdditionalReviewerCount: Ref<number> = ref(0)
@@ -279,44 +287,32 @@ export const useAssessmentDetailPage = () => {
     answer.comment = value
   }
 
+  /** Resolves the exact persisted outcome identity shared by display and editing. */
+  const getOutcomeRecord = (section: string, subsection: string, nameEn: string, nameFr: string) => {
+    const expectedKey = createOutcomeKey(section, subsection, nameEn, nameFr)
+    return assessmentResponse.value.outcomes.find(outcome =>
+      createOutcomeKey(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr) === expectedKey)
+  }
+
   /** Applies the selected strategy and resets justification when the choice matches the recommendation. */
   const setOutcomeSelection = (section: string, subsection: string, nameEn: string, nameFr: string, value: string) => {
-    const expectedKey = createOutcomeKey(section, subsection, nameEn, nameFr)
-    for (let index = 0; index < assessmentResponse.value.outcomes.length; index++) {
-      const candidate = assessmentResponse.value.outcomes[index]!
-      if (createOutcomeKey(candidate.section, candidate.subsection, candidate.nameEn, candidate.nameFr) === expectedKey) {
-        assessmentResponse.value.outcomes[index]!.selectedStrategy = value
-        assessmentResponse.value.outcomes[index]!.accepted = value !== '' && value === candidate.recommendedStrategy
-        if (assessmentResponse.value.outcomes[index]!.accepted) {
-          assessmentResponse.value.outcomes[index]!.justification = ''
-        }
-        return
-      }
-    }
+    const outcome = getOutcomeRecord(section, subsection, nameEn, nameFr)
+    if (!outcome) return
+    outcome.selectedStrategy = value
+    outcome.accepted = value !== '' && value === outcome.recommendedStrategy
+    if (outcome.accepted) outcome.justification = ''
   }
 
   /** Stores reviewer justification for a non-recommended outcome selection. */
   const setOutcomeJustification = (section: string, subsection: string, nameEn: string, nameFr: string, value: string) => {
-    const expectedKey = createOutcomeKey(section, subsection, nameEn, nameFr)
-    for (let index = 0; index < assessmentResponse.value.outcomes.length; index++) {
-      const candidate = assessmentResponse.value.outcomes[index]!
-      if (createOutcomeKey(candidate.section, candidate.subsection, candidate.nameEn, candidate.nameFr) === expectedKey) {
-        assessmentResponse.value.outcomes[index]!.justification = value
-        return
-      }
-    }
+    const outcome = getOutcomeRecord(section, subsection, nameEn, nameFr)
+    if (outcome) outcome.justification = value
   }
 
   /** Stores reviewer comments for the selected outcome row. */
   const setOutcomeComment = (section: string, subsection: string, nameEn: string, nameFr: string, value: string) => {
-    const expectedKey = createOutcomeKey(section, subsection, nameEn, nameFr)
-    for (let index = 0; index < assessmentResponse.value.outcomes.length; index++) {
-      const candidate = assessmentResponse.value.outcomes[index]!
-      if (createOutcomeKey(candidate.section, candidate.subsection, candidate.nameEn, candidate.nameFr) === expectedKey) {
-        assessmentResponse.value.outcomes[index]!.comment = value
-        return
-      }
-    }
+    const outcome = getOutcomeRecord(section, subsection, nameEn, nameFr)
+    if (outcome) outcome.comment = value
   }
 
   /** Adds a new empty custom outcome row to the assessment payload. */
@@ -412,17 +408,19 @@ export const useAssessmentDetailPage = () => {
 
   /** Validates and persists the current full assessment response payload. */
   const saveAssessment = async (onSaved?: () => void) => {
-    if (isSaving.value) {
+    if (lifetime === 'disposed' || isSaving.value || !canUpdateAssessment.value || String(assessment.value?.id) !== reviewId.value) {
       return
     }
 
     const targetReviewId = reviewId.value
     const generation = ++saveGeneration
-    const submittedResponse = JSON.parse(serializeResponse(assessmentResponse.value))
+    const permission = permissionGeneration
+    const sourceDraft = assessmentResponse.value
+    const submittedResponse = JSON.parse(serializeResponse(sourceDraft))
     try {
       isSaving.value = true
       const validationResult = await assessmentValidationSchema.value.safeParseAsync(submittedResponse)
-      if (generation !== saveGeneration) return
+      if (generation !== saveGeneration || sourceDraft !== assessmentResponse.value || permission !== permissionGeneration || !canUpdateAssessment.value) return
 
       if (!validationResult.success) {
         const firstIssue = validationResult.error.issues[0]
@@ -493,7 +491,6 @@ export const useAssessmentDetailPage = () => {
   ])
   const outcomesTabValue = computed(() => 'outcomes')
   const reviewTabValue = computed(() => 'additional-review')
-  const canUpdateAssessment = computed(() => assessment.value?.permissions?.can_update === true)
 
   const {
     selectedTab,
@@ -596,6 +593,7 @@ export const useAssessmentDetailPage = () => {
     setAnswerComment,
     getAnswerRecord,
     ensureQuestionState,
+    getOutcomeRecord,
     setOutcomeSelection,
     setOutcomeJustification,
     setOutcomeComment,

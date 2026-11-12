@@ -117,6 +117,7 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.closeouts.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-closeout-detail-content">
           <section v-if="selectedTab === 'workflow'" data-help-view="casework.closeouts.workflow" data-help-target="casework.closeouts.detail.workflow" data-help-kind="section" class="space-y-6">
             <CommonCompletionWorkflowPreAction
+              :mutation-role-allowed="profile?.can_update_agreement_role === true"
               mode="completion"
               entity-type="fundingcaseagreementcloseout"
               :entity-id="closeoutId"
@@ -140,6 +141,7 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
 
           <CommonWorkflowSection
             v-else-if="selectedTab === 'workflows'"
+            :mutation-role-allowed="profile?.can_update_agreement_role === true"
             data-help-view="casework.closeouts.workflows"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId"

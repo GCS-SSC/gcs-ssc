@@ -134,6 +134,7 @@ export default defineEventHandler(async event => {
       && !row.egcs_cn_groupclaimedby && Boolean(actor.commonUserId)
       && await isActiveGroupMember(event.context.$db, String(row.egcs_cn_group), actor.commonUserId!)
       && (await resolveAgencyValidEntityAssigneeIdsWithDb(event.context.$db, 'commonrecommendation', recommendationId, [actor.commonUserId!])).has(actor.commonUserId!),
+    can_update_role: hasUpdateRole,
     can_update: row.runtimeState === 'active' && isWorkable
       && grant?.actions.has('update') === true && hasUpdateRole,
     can_manage_assignments: await canManageEntityAssignments(event, 'commonrecommendation', recommendationId),

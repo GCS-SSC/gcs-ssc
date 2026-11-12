@@ -151,7 +151,7 @@ export default defineEventHandler(async event => {
 
     if (body.enabled === false) {
       if (extension.fileStorageProvider) {
-        const [selection, attachment] = await Promise.all([
+        const [selection, attachment, cleanup] = await Promise.all([
           trx.selectFrom('extensions.agency_storage_selection').select('id')
             .where('agency_id', '=', agencyId).where('provider_key', '=', body.extensionKey)
             .where('_deleted', '=', false).executeTakeFirst(),
@@ -161,9 +161,12 @@ export default defineEventHandler(async event => {
             .where('Common_Attachment.egcs_cn_provider', '=', body.extensionKey)
             .where('Common_Attachment._deleted', '=', false)
             .where('Common_Attachment_Types.egcs_cn_agency', '=', agencyId)
-            .executeTakeFirst()
+            .executeTakeFirst(),
+          trx.selectFrom('storage_cleanup_outbox').select('id')
+            .where('agency_id', '=', agencyId).where('provider_key', '=', body.extensionKey)
+            .where('status', '!=', 'completed').executeTakeFirst()
         ])
-        if (selection || attachment) {
+        if (selection || attachment || cleanup) {
           return await throwApiError(event, {
             statusCode: 409,
             code: 'STORAGE_PROVIDER_IN_USE',

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import type { ActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { FundingOpportunityFormSchema } from '~~/shared/types/schemas'
 
 export interface OpportunityForm {
@@ -14,7 +18,7 @@ export interface OpportunityForm {
   egcs_fo_applicationschema: Record<string, unknown> | null
 }
 
-const { pending = false } = defineProps<{ pending?: boolean }>()
+const { pending = false, actionContext } = defineProps<{ pending?: boolean; actionContext: ActionContext }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<OpportunityForm>('state', { required: true })
 const emit = defineEmits<{ submit: [] }>()
@@ -37,12 +41,21 @@ const selectProgram = (programId: string | undefined) => {
 watch(() => state.value, next => {
   selectedProgramId.value = next.program_id
 }, { immediate: true })
+
+const modalSession = useModalSession()
+watch([open, state], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: () => {
+  if (!pending) emit('submit')
+} })
 </script>
 
 <template>
   <UModal v-model:open="open" :dismissible="!pending" :close="pending ? false : undefined" :title="t(state.id ? 'funding_opportunity.edit' : 'funding_opportunity.create')" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="funding-opportunity.opportunity-modal">
     <template #body>
-      <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
+      <UForm v-if="open" :disabled="pending" :state="state" :validate="validate" class="space-y-5" v-bind="formSession">
         <CommonSection :title="t('funding_opportunity.details')" :grid-cols="1">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('funding_opportunity.program')" required data-ui-target="funding-opportunity.opportunity-modal.funding_opportunity.program">

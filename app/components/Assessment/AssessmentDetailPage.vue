@@ -2,7 +2,7 @@
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- concise local helpers remain clear without repetitive tags */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AssessmentQuestionRow, AssessmentSubSectionRow } from '~/composables/useAssessmentSchemaEditorState'
 import { useAssessmentDetailPage } from '~/composables/useAssessmentDetailPage'
@@ -41,6 +41,7 @@ const {
   setAnswerValue,
   setAnswerComment,
   getAnswerRecord,
+  getOutcomeRecord,
   setOutcomeSelection,
   setOutcomeJustification,
   setOutcomeComment,
@@ -128,10 +129,6 @@ const filteredSubSections = computed(() => {
     )
   )
 })
-const outcomeResponseMap = computed(() => new Map(assessmentResponse.value.outcomes.map(item => [
-  `${item.section}::${item.subsection}::${item.nameEn}::${item.nameFr}`,
-  item
-])))
 const getLocalizedLabel = (value: { en: string, fr: string }) => getBilingualValue({
   label_en: value.en,
   label_fr: value.fr
@@ -163,11 +160,9 @@ const getCalculatedScore = (sectionName: string, subSectionName: string, questio
     )
     ?.value ?? 0
 )
-const getOutcomeResponse = (section: string, subsection: string, nameEn: string, nameFr: string) =>
-  outcomeResponseMap.value.get(`${section}::${subsection}::${nameEn}::${nameFr}`)
 /** Determines whether the current custom selection requires a justification. */
 const isOutcomeJustificationRequired = (section: string, subsection: string, nameEn: string, nameFr: string) => {
-  const outcome = getOutcomeResponse(section, subsection, nameEn, nameFr)
+  const outcome = getOutcomeRecord(section, subsection, nameEn, nameFr)
   if (!outcome) {
     return false
   }
@@ -229,6 +224,19 @@ const handleReviewAlignResultUpdate = (value: string | null | undefined) => {
 const selectSummarySection = (value: string) => {
   selectedTab.value = value
 }
+let validationGeneration = 0
+watch([
+  () => route.params.reviewId,
+  assessmentResponse,
+  selectedTab,
+  selectedTabKey,
+  canUpdateAssessment
+], () => {
+  validationGeneration++
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  validationGeneration++
+})
 /** Validates whichever form is currently visible before triggering persistence. */
 const validateActiveForm = async () => {
   const currentForm = isReviewTab.value
@@ -250,12 +258,13 @@ const validateActiveForm = async () => {
 }
 /** Runs tab-scoped form validation and saves only when the active form is valid. */
 const handleSave = async () => {
-  if (!canUpdateAssessment.value) {
+  if (!canUpdateAssessment.value || isSaving.value) {
     return
   }
 
+  const generation = ++validationGeneration
   const complete = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, 'assessment.detail.save', 'save-success', helpContext.value)
-  if (!await validateActiveForm()) {
+  if (!await validateActiveForm() || generation !== validationGeneration || !canUpdateAssessment.value || isSaving.value) {
     return
   }
 
@@ -328,7 +337,7 @@ const handleApprovalChanged = async () => {
                       <UFormField :label="t('transfer_payment.selected_strategy')" class="mt-4" required>
                         <URadioGroup
                           :color="getOutcomeSelectionColor(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)"
-                          :model-value="getOutcomeResponse(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.selectedStrategy"
+                          :model-value="getOutcomeRecord(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.selectedStrategy"
                           :items="outcome.options.map(option => ({
                             value: option.value,
                             label: getLocalizedLabel(option.label)
@@ -351,8 +360,8 @@ const handleApprovalChanged = async () => {
                         :required="isOutcomeJustificationRequired(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)">
                         <CommonTextarea
                           :rows="3"
-                          :model-value="getOutcomeResponse(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.justification ?? ''"
-                          :disabled="!canUpdateAssessment || getOutcomeResponse(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.selectedStrategy === outcome.recommendedStrategy"
+                          :model-value="getOutcomeRecord(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.justification ?? ''"
+                          :disabled="!canUpdateAssessment || getOutcomeRecord(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.selectedStrategy === outcome.recommendedStrategy"
                           @update:model-value="value => setOutcomeJustification(
                             outcome.section,
                             outcome.subsection,
@@ -368,7 +377,7 @@ const handleApprovalChanged = async () => {
                         <CommonTextarea
                           :rows="3"
                           :disabled="!canUpdateAssessment"
-                          :model-value="getOutcomeResponse(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.comment ?? ''"
+                          :model-value="getOutcomeRecord(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.comment ?? ''"
                           @update:model-value="value => setOutcomeComment(
                             outcome.section,
                             outcome.subsection,
@@ -530,6 +539,7 @@ const handleApprovalChanged = async () => {
                 class="border-t border-primary-500 pt-8 dark:border-primary-600"
                 :review-id="String(assessment.id)"
                 :can-update-assessment="canUpdateAssessment"
+                :read-authority="String(assessment.id) === String(route.params.reviewId) && assessment.permissions?.can_read === true"
                 :reviewers-disabled="assessment.egcs_cn_disablereviewers === true"
                 :runtime-locked="assessment.reviewRuntime?.is_locked === true"
                 @progress-change="setAdditionalReviewerProgress" />

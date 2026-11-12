@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
+import { onScopeDispose, shallowRef, watch } from 'vue'
+import type { Ref } from 'vue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { TransferPaymentStreamDocumentTemplateLinkSchema, type TransferPaymentStreamDocumentTemplateItem } from '~~/shared/types/schemas'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 
-const { transferPaymentId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
+const { transferPaymentId, streamId, agencyId, canUpdateChild, canDeleteChild } = defineProps<{
   transferPaymentId: string
   streamId: string
   agencyId: string
@@ -16,6 +21,14 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canUpdateChild
+})
+const deleteContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId, () => agencyId],
+  authority: () => canDeleteChild
+})
 const { createValidator } = useZodI18n()
 const { search, pagination, items, totalRecords, refresh, status } = useResourceTable<TransferPaymentStreamDocumentTemplateItem>({
   fetchUrl: computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/document-templates`)
@@ -27,32 +40,61 @@ const columns: TableColumnInput<TransferPaymentStreamDocumentTemplateItem>[] = [
   { accessorKey: 'egcs_ay_active', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const selected = ref<{ egcs_tp_agencydocumenttemplate?: string } | null>(null)
-const isOpen = ref(false)
-const isSaving = ref(false)
+type TemplateLinkDraft = { egcs_tp_agencydocumenttemplate?: string }
+type ResourceContext = { kind: 'active' } | { kind: 'disposed' }
+const context: Ref<ResourceContext> = shallowRef({ kind: 'active' })
+const isCurrentContext = (owner: ResourceContext) => owner.kind === 'active' && context.value === owner
+const modal = useCrudModal<TemplateLinkDraft, TemplateLinkDraft>({
+  createState: () => ({}),
+  updateState: draft => ({ ...draft })
+})
+const { selected, isOpen } = modal
+const pending = useCrudModalPending(modal.captureSession)
+const isSaving = pending.isPending
 const validate = withFormRequirements(createValidator(TransferPaymentStreamDocumentTemplateLinkSchema), TransferPaymentStreamDocumentTemplateLinkSchema)
+watch([() => transferPaymentId, () => streamId, () => agencyId], () => {
+  context.value = { kind: 'active' }
+  modal.close()
+}, { flush: 'sync' })
+watch(() => canUpdateChild, allowed => {
+  if (!allowed) modal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context.value = { kind: 'disposed' }
+  modal.close()
+})
 const openCreate = () => {
-  selected.value = {}
-  isOpen.value = true
+  if (context.value.kind === 'active' && canUpdateChild) modal.openCreate()
 }
 /** Links the selected Agency template to this Stream. */
 const save = async () => {
-  if (!selected.value?.egcs_tp_agencydocumenttemplate || isSaving.value) return
-  isSaving.value = true
+  const templateId = selected.value?.egcs_tp_agencydocumenttemplate
+  const operation = writeContext.capture()
+  if (!operation) return
+  const session = modal.captureSession()
+  const owner = context.value
+  if (!templateId || session === null || !canUpdateChild || !operation.isCurrent() || !isCurrentContext(owner) || !pending.begin(session)) return
+  const endpoint = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/document-templates`
+  let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/document-templates`), {
+    const response = await fetch(getClientRequestUrl(endpoint), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ egcs_tp_agencydocumenttemplate: selected.value.egcs_tp_agencydocumenttemplate })
+      body: JSON.stringify({ egcs_tp_agencydocumenttemplate: templateId })
     })
     if (!response.ok) await throwFetchResponseError(response)
-    isOpen.value = false
-    selected.value = null
+    if (!operation.isCurrent() || !isCurrentContext(owner)) return
+    closedSession = modal.closeSession(session)
+  } catch (error) {
+    if (operation.isCurrent() && isCurrentContext(owner) && modal.isCurrentSession(session)) showError(error)
+    return
+  } finally {
+    pending.end(session)
+  }
+  try {
     await refresh()
   } catch (error) {
-    showError(error)
-  } finally {
-    isSaving.value = false
+    if (operation.isCurrent() && isCurrentContext(owner) && (modal.isCurrentSession(session) || (closedSession && modal.isLatestSession(session)))) showError(error)
   }
 }
 /**
@@ -60,13 +102,26 @@ const save = async () => {
  * @param item - Stream template link selected for removal.
  */
 const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
+  const owner = context.value
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const targetId = item.id
+  if (!canDeleteChild || !isCurrentContext(owner)) return
   try {
-    const confirmed = await confirmDeleteRequest(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/document-templates/${item.id}`)
-    if (confirmed) await refresh()
+    const confirmed = await confirmDeleteRequest(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/document-templates/${item.id}`, {
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => items.value.find(current => current.id === targetId),
+        eligible: () => canDeleteChild
+      }
+    })
+    if (confirmed && operation.isCurrent()) await refresh()
   } catch (error) {
-    showError(error)
+    if (operation.isCurrent()) showError(error)
   }
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: writeContext }, submit: save })
 </script>
 
 <template>
@@ -102,7 +157,7 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
   </CommonResourceLayout>
   <UModal v-if="selected" v-model:open="isOpen" :title="t('transfer_payment.document_templates.create')" :description="t('common.form_dialog_description')" data-field-scope="transfer-payment.document-templates-tab">
     <template #body>
-      <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
+      <UForm v-bind="formSession" :state="selected" :validate="validate" class="space-y-4">
         <UFormField :label="t('transfer_payment.document_templates.title')" name="egcs_tp_agencydocumenttemplate" required>
           <CommonServerLookupSelect
             v-model="selected.egcs_tp_agencydocumenttemplate"

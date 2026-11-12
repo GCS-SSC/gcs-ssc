@@ -4,7 +4,10 @@ import type { Database } from '../../../shared/types/database'
 
 // Clean-cutover baseline: transfer payment. Edit this subject directly.
 
-/** Installs the current up definitions for this subject on a fresh database. */
+/**
+ * Installs the current up definitions for this subject on a fresh database.
+ * @param db - Fresh database receiving this subject baseline.
+ */
 export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 CREATE SEQUENCE "Transfer_Payment_Agreement_Subtype_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
@@ -510,7 +513,10 @@ CREATE INDEX tp_stream_search_abbreviation_fr_exact ON "Transfer_Payment_Stream"
 END $baseline$`.execute(db)
 }
 
-/** Installs the current installFunctions definitions for this subject on a fresh database. */
+/**
+ * Installs the current installFunctions definitions for this subject on a fresh database.
+ * @param db - Fresh database receiving this subject baseline.
+ */
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 CREATE FUNCTION guard_program_financial_id_agency()
@@ -698,7 +704,7 @@ AS $function$
           WHERE line.egcs_fc_accountreceivablechartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT line._deleted AND NOT debt._deleted)
         OR EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Credit_Memo_Line" line
           JOIN "Funding_Case_Account_Receivable_Credit_Memo" memo ON memo.id=line.egcs_fc_creditmemo
-          JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
+          JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=line.egcs_fc_receivable
           JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement
           WHERE line.egcs_fc_creditmemochartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT memo._deleted AND NOT line._deleted)
         OR EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
@@ -1106,7 +1112,10 @@ $function$;
 END $baseline$`.execute(db)
 }
 
-/** Installs the current installForeignKeys definitions for this subject on a fresh database. */
+/**
+ * Installs the current installForeignKeys definitions for this subject on a fresh database.
+ * @param db - Fresh database receiving this subject baseline.
+ */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 ALTER TABLE "Transfer_Payment_Agreement_Subtype" ADD CONSTRAINT "tp_fk_agreement_subtype_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
@@ -1203,7 +1212,10 @@ ALTER TABLE "Transfer_Payment_Stream_Workflow" ADD CONSTRAINT "Transfer_Payment_
 END $baseline$`.execute(db)
 }
 
-/** Installs the current installTriggers definitions for this subject on a fresh database. */
+/**
+ * Installs the current installTriggers definitions for this subject on a fresh database.
+ * @param db - Fresh database receiving this subject baseline.
+ */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 CREATE TRIGGER guard_program_agency_immutable BEFORE UPDATE OF egcs_tp_agency ON "Transfer_Payment_Profile" FOR EACH ROW EXECUTE FUNCTION guard_program_agency_immutable();

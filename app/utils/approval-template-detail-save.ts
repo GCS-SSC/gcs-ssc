@@ -13,6 +13,8 @@ export interface ApprovalTemplateDetailSaveOptions {
   t: (key: string) => string
   showError: (error: unknown) => void
   showSuccess?: boolean
+  shouldProceed?: () => boolean
+  canSettle: () => boolean
 }
 
 /**
@@ -79,7 +81,7 @@ export const buildApprovalTemplateDetailPayload = (
  * Saves an approval template detail editor state through the existing PATCH flow.
  *
  * @param options - Save dependencies and current editor state.
- * @returns Whether validation and persistence completed successfully.
+ * @returns Whether validation and persistence completed for the current owner.
  */
 export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetailSaveOptions): Promise<boolean> => {
   const {
@@ -88,15 +90,19 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
     validate,
     toast,
     showError,
-    showSuccess = true
+    showSuccess = true,
+    shouldProceed = () => true,
+    canSettle
   } = options
-  if (!state) {
+  if (!state || !shouldProceed()) {
     return false
   }
 
+  let dispatched = false
   try {
     const payload = buildApprovalTemplateDetailPayload(state)
     const result = await validate(payload)
+    if (!shouldProceed()) return false
     if (result.length > 0) {
       toast.add({
         title: toast.localized('common.error'),
@@ -110,6 +116,7 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
       return false
     }
 
+    dispatched = true
     const response = await fetch(requestUrl, {
       method: 'PATCH',
       headers: {
@@ -120,6 +127,7 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
+    if (!canSettle()) return false
     if (showSuccess) {
       toast.add({
         title: toast.localized('common.success'),
@@ -129,7 +137,7 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
     }
     return true
   } catch (error) {
-    showError(error)
+    if (dispatched ? canSettle() : shouldProceed()) showError(error)
     return false
   }
 }

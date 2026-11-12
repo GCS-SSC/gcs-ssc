@@ -31,7 +31,7 @@ export const executeAccessLogRead = async <R>(business: Kysely<Database>, query:
     sql: redactAuditSql(compiled.sql).slice(0, 32768),
     parameters: compiled.parameters.slice(0, 1000).map(() => '[REDACTED: unclassified parameter]'),
     inputs: finalizeAuditInputs(prepareAuditInputCandidate(compiled, identity.http)),
-    duration_ms: 0, outcome: 'failed', transaction_outcome: 'rolled_back', row_count: null,
+    duration_ms: 0, outcome: 'failed', transaction_outcome: 'pending', row_count: null,
     returned_identities: [], limitations: ['parameters_redacted', 'returned_identities_unavailable'],
     table_name: 'audit.access_event', error_code: null, scope_type: 'unresolved', agency_id: null, agency_ids: [],
     attribution_error: 'failed_statement_ownership_unavailable'

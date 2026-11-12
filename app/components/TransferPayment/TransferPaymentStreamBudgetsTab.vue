@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useCrudModalPending } from '~/composables/useCrudModal'
@@ -25,6 +27,11 @@ const { t, n, locale } = useI18n()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+
+const deleteContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canDeleteChild
+})
 const { createValidator } = useZodI18n()
 
 const {
@@ -47,9 +54,21 @@ const streamBudgetColumns: TableColumnInput<TransferPaymentStreamBudgetRow>[] = 
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
+const editingTarget = ref<string | null>(null)
 const streamBudgetModal = useCrudModal<TransferPaymentStreamBudgetRow, TransferPaymentStreamBudgetForm>({
-  createState: () => ({}),
-  updateState: row => ({ ...row })
+  createState: () => {
+    editingTarget.value = null
+    return {}
+  },
+  updateState: row => {
+    editingTarget.value = row.id
+    return { ...row }
+  }
+})
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canUpdateChild,
+  eligible: () => (editingTarget.value === null || streamBudgets.value.some(row => row.id === editingTarget.value))
 })
 
 const isStreamBudgetModalOpen: Ref<boolean> = streamBudgetModal.isOpen
@@ -61,13 +80,13 @@ const isSavingStreamBudget = streamBudgetPending.isPending
 const getStreamBudgetActionTarget = (row: TransferPaymentStreamBudgetRow) =>
   `${row.fiscal_year_display || row.fiscal_year || row.id} [${row.id}]`
 
-const isDeletingStreamBudget: Ref<boolean> = ref(false)
+const deletePending = useCrudModalPending(() => deleteContext.version.value)
+const isDeletingStreamBudget = deletePending.isPending
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
-watch([() => transferPaymentId, () => streamId], () => {
+watch([() => transferPaymentId, () => streamId, () => canUpdateChild], () => {
   contextGeneration += 1
-  isDeletingStreamBudget.value = false
   streamBudgetModal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -83,16 +102,19 @@ const openCreateStreamBudget = () => {
 /** Persists the selected stream budget and refreshes the table. */
 const saveStreamBudget = async () => {
   if (disposed || !selectedStreamBudget.value || !canUpdateChild) return
+  const targetId = editingTarget.value
+  const operation = writeContext.capture()
+  if (!operation) return
   const session = streamBudgetModal.captureSession()
   if (!streamBudgetPending.begin(session)) return
-  const isUpdate = Boolean(selectedStreamBudget.value.id)
+  const isUpdate = targetId !== null
   const generation = contextGeneration
   let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(selectedStreamBudget.value.id
-      ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets/${selectedStreamBudget.value.id}`
+    const response = await fetch(getClientRequestUrl(targetId
+      ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets/${targetId}`
       : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets`), {
-      method: selectedStreamBudget.value.id ? 'PATCH' : 'POST',
+      method: targetId ? 'PATCH' : 'POST',
       headers: {
         'content-type': 'application/json'
       },
@@ -101,10 +123,10 @@ const saveStreamBudget = async () => {
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
-    if (!isCurrentContext(generation)) return
+    if (!operation.isCurrent() || !isCurrentContext(generation)) return
     closedSession = streamBudgetModal.closeSession(session)
   } catch (error: unknown) {
-    if (isCurrentContext(generation) && streamBudgetModal.captureSession() === session) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && streamBudgetModal.captureSession() === session) showError(error)
     return
   } finally {
     streamBudgetPending.end(session)
@@ -112,14 +134,14 @@ const saveStreamBudget = async () => {
 
   try {
     await refreshStreamBudgets()
-    if (!isCurrentContext(generation) || !closedSession || streamBudgetModal.captureSession() !== null || streamBudgetStatusState.value !== 'success') return
+    if (!operation.isCurrent() || !isCurrentContext(generation) || !closedSession || !streamBudgetModal.isLatestSession(session) || streamBudgetStatusState.value !== 'success') return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -130,23 +152,34 @@ const saveStreamBudget = async () => {
  */
 const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
   if (disposed || !canDeleteChild || isDeletingStreamBudget.value) return
-  const generation = contextGeneration
-  isDeletingStreamBudget.value = true
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const targetId = row.id
+  const deleteSession = deleteContext.version.value
+  if (!deletePending.begin(deleteSession)) return
   try {
     const ok = await confirmDeleteRequest(
       `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets/${row.id}`,
-      { shouldProceed: () => isCurrentContext(generation) && canDeleteChild }
+      {
+        operation,
+        target: {
+          id: targetId,
+          resolve: () => streamBudgets.value.find(current => current.id === targetId),
+          eligible: () => canDeleteChild
+        }
+      }
     )
-    if (!ok || !isCurrentContext(generation)) return
+    if (!ok || !operation.isCurrent()) return
     await refreshStreamBudgets()
-    if (!isCurrentContext(generation) || streamBudgetStatusState.value !== 'success') return
+    if (!operation.isCurrent() || streamBudgetStatusState.value !== 'success') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent()) showError(error)
   } finally {
-    if (isCurrentContext(generation)) isDeletingStreamBudget.value = false
+    deletePending.end(deleteSession)
   }
 }
+const formSession = useFormSession({ owner: streamBudgetModal, action: { kind: 'remote', context: writeContext }, submit: saveStreamBudget })
 </script>
 
 <template>
@@ -214,7 +247,7 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
     v-model:open="isStreamBudgetModalOpen"
     :title="selectedStreamBudget?.id ? t('common.update') : t('common.add')">
     <template #body>
-      <UForm :state="selectedStreamBudget" :validate="validateStreamBudget" class="space-y-4" @submit="saveStreamBudget">
+      <UForm v-bind="formSession" :state="selectedStreamBudget" :validate="validateStreamBudget" class="space-y-4">
         <TransferPaymentFieldsTransferPaymentStreamBudgetFields
           v-model:model="selectedStreamBudget"
           :transfer-payment-id="transferPaymentId" />

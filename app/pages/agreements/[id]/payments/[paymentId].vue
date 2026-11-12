@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { moneyMatchesSearch } from '~/utils/money-search'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
@@ -6,7 +8,7 @@ import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-returns -- legacy page callbacks remain concise during request isolation */
 import type { FetchError } from 'ofetch'
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
@@ -41,6 +43,7 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { getBilingualValue } = useBilingualValue()
 const { saveJson } = useJsonRequest()
+const { canAny } = useAuth()
 const { isRecordLocked } = useBusinessStatusState()
 
 const agreementId = route.params.id as string
@@ -73,20 +76,34 @@ const { selectedTab } = useUrlTabState({
 })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 
+const lineTarget: Ref<string | null> = ref(null)
 const lineModal = useCrudModal<FundingCaseAgreementPaymentLineRow, FundingCaseAgreementPaymentLineForm>({
-  createState: () => ({ egcs_fc_fundingagreementpayment: paymentId }),
+  createState: () => {
+    lineTarget.value = null
+    return { egcs_fc_fundingagreementpayment: paymentId }
+  },
   /**
    *
    * @param line
    */
-  updateState: line => ({
-    id: line.id,
-    egcs_fc_fundingagreementpayment: line.egcs_fc_fundingagreementpayment,
-    egcs_fc_fundingagreementcommitmentline: line.egcs_fc_fundingagreementcommitmentline,
-    egcs_fc_amount: line.egcs_fc_amount
-  })
+  updateState: line => {
+    lineTarget.value = String(line.id)
+    return {
+      id: line.id,
+      egcs_fc_fundingagreementpayment: line.egcs_fc_fundingagreementpayment,
+      egcs_fc_fundingagreementcommitmentline: line.egcs_fc_fundingagreementcommitmentline,
+      egcs_fc_amount: line.egcs_fc_amount
+    }
+  }
 })
 
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+  lineModal.close()
+})
+const isCurrentPage = () => !disposed && String(route.params.id) === agreementId
+  && String(route.params.paymentId) === paymentId
 const selectedLine = lineModal.selected
 const savedCodingOptions = computed(() => (payment.value?.lines ?? []).filter(line => line.id === selectedLine.value?.id).map(line => ({
   value: String(line.egcs_fc_fundingagreementcommitmentline),
@@ -142,6 +159,33 @@ const canDeletePaymentLine = computed(() =>
   isAssigned.value
   && !isRecordLocked(payment.value)
 )
+const createLineCollectionContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.paymentId],
+  authority: () => canAny('agreement', 'create'),
+  eligible: () => isCurrentPage() && payment.value?.id === paymentId && canCreatePaymentLine.value
+})
+const updateLineCollectionContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.paymentId],
+  authority: () => canAny('agreement', 'update'),
+  eligible: () => isCurrentPage() && payment.value?.id === paymentId && canUpdatePayment.value
+})
+const createLineContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.paymentId, lineTarget],
+  authority: () => canAny('agreement', 'create'),
+  eligible: () => isCurrentPage() && payment.value?.id === paymentId && canCreatePaymentLine.value
+})
+const updateLineContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.paymentId, lineTarget],
+  authority: () => canAny('agreement', 'update'),
+  eligible: () => isCurrentPage() && payment.value?.id === paymentId && canUpdatePayment.value
+    && Boolean(payment.value.lines?.some(line => String(line.id) === lineTarget.value))
+})
+const deleteLineContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.paymentId],
+  authority: () => canAny('agreement', 'delete'),
+  eligible: () => isCurrentPage() && payment.value?.id === paymentId && canDeletePaymentLine.value
+})
+
 const breadcrumbItems = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
   { label: getBilingualValue(profile.value, 'egcs_fc_title', agreementId), to: authorizedRouteLocation(profile.value?.can_read_agreement, localePath(appRouteLocations.agreementDetail(agreementId))) },
@@ -219,32 +263,40 @@ const refreshPage = async () => {
 
 /** Creates or updates a payment coding line, then refreshes detail and approvals. */
 const saveLine = async () => {
-  if (!selectedLine.value) {
+  if (!selectedLine.value || !isCurrentPage()) {
     return
   }
   const lineState = selectedLine.value
-  const isUpdate = Boolean(lineState.id)
+  const lineId = lineTarget.value
+  const isUpdate = lineId !== null
+  const operation = (isUpdate ? updateLineContext : createLineContext).capture()
+  if (!operation?.canDispatch()) return
+  const settlement = (isUpdate ? updateLineCollectionContext : createLineCollectionContext).capture()
+  if (!settlement?.canDispatch()) return
   const session = lineModal.captureSession()
-  if (!linePending.begin(session)) return
+  if (!lineModal.isCurrentSession(session) || !linePending.begin(session)) return
+  let closed = false
 
   try {
     await saveJson(
       isUpdate
-        ? `/api/agreements/${agreementId}/payment-lines/${lineState.id}`
+        ? `/api/agreements/${agreementId}/payment-lines/${lineId}`
         : `/api/agreements/${agreementId}/payment-lines`,
       isUpdate ? 'PATCH' : 'POST',
       lineState
     )
 
-    lineModal.closeSession(session)
+    if (!isCurrentPage() || !settlement.isCurrent()) return
+    closed = lineModal.closeSession(session)
     await refreshPage()
+    if (!isCurrentPage() || !settlement.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentPage() && settlement.isCurrent() && (lineModal.isCurrentSession(session) || (closed && lineModal.captureSession() === null))) showError(error)
   } finally {
     linePending.end(session)
   }
@@ -255,20 +307,32 @@ const saveLine = async () => {
  * @param lineId
  */
 const deleteLine = async (lineId: string) => {
+  const operation = deleteLineContext.capture()
+  if (!operation?.canDispatch()) return
   try {
-    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/payment-lines/${lineId}`)
-    if (!ok) {
+    if (!isCurrentPage() || !operation.isCurrent()) return
+    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/payment-lines/${lineId}`, {
+      operation,
+      target: {
+        id: lineId,
+        resolve: () => payment.value?.lines?.find(line => String(line.id) === lineId),
+        eligible: () => canDeletePaymentLine.value
+      },
+      shouldProceed: isCurrentPage
+    })
+    if (!ok || !isCurrentPage() || !operation.isCurrent()) {
       return
     }
 
     await refreshPage()
+    if (!isCurrentPage() || !operation.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentPage() && operation.isCurrent()) showError(error)
   }
 }
 
@@ -277,6 +341,7 @@ const handleCompleted = async () => {
 }
 
 useFieldTooltipProvider(() => payment.value && String(payment.value.id) === String(route.params.paymentId) ? { entityType: 'fundingcasepayment', entityId: payment.value.id } : null)
+const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote', context: () => lineTarget.value !== null ? updateLineContext : createLineContext }, submit: saveLine })
 </script>
 
 <template>
@@ -391,6 +456,7 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
             <section v-else-if="selectedTab === 'completion'" id="payment-completion" data-help-view="casework.payments.completion" data-help-target="casework.payments.detail.completion" data-help-kind="section" class="space-y-6">
               <AgreementPaymentRecoverySummary :payment="payment" />
               <CommonCompletionPanel
+                :mutation-role-allowed="canAny('agreement', 'update')"
                 entity-type="fundingcasepayment"
                 :entity-id="paymentId"
                 :can-complete="canUpdatePayment"
@@ -416,7 +482,7 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
               :can-update="canUpdatePayment"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.payments.workflows" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canAny('agreement', 'update')" data-help-view="casework.payments.workflows" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.payments.supplementary-information" data-help-target="casework.payments.supplementary-information.content">
               <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
             </section>
@@ -430,7 +496,7 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
 
     <UModal v-if="selectedLine" v-model:open="isLineModalOpen" data-help-view="casework.payments.detail.is-line-modal-open" :title="selectedLine.id ? t('agreement.payments.edit_line') : t('agreement.payments.add_line')" :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedLine" :validate="validateLine" :validate-on="[]" class="space-y-4" @submit="saveLine">
+        <UForm v-bind="formSession" :state="selectedLine" :validate="validateLine" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.payments.commitment_line')" name="egcs_fc_fundingagreementcommitmentline">
             <CommonServerLookupSelect
               v-model="selectedLine.egcs_fc_fundingagreementcommitmentline"

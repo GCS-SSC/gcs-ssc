@@ -4,10 +4,35 @@ import { randomUUID } from 'node:crypto'
 import { getMigrationPromise } from '../utils/migration-readiness'
 import type { AccessLogRequest } from '../utils/access-log-queue'
 
-export default defineNitroPlugin(async nitroApp => {
-  const dbLease = await acquireDbLease()
+type RequestPluginState =
+  | { kind: 'starting' }
+  | { kind: 'active'; removeHooks: (() => void)[] }
+  | { kind: 'closed' }
 
-  nitroApp.hooks.hook('request', event => {
+export default defineNitroPlugin(async nitroApp => {
+  const lifecycle: { state: RequestPluginState } = { state: { kind: 'starting' } }
+  nitroApp.hooks.hookOnce('close', async () => {
+    const previous = lifecycle.state
+    lifecycle.state = { kind: 'closed' }
+    if (previous.kind === 'active') {
+      for (const removeHook of previous.removeHooks) removeHook()
+    }
+
+    const closingLease = await acquisition.catch(() => undefined)
+    if (!closingLease) return
+    // Shutdown joins both acquisition and startup before releasing this generation.
+    await getMigrationPromise(closingLease.generationId)?.catch(() => {
+      // Startup already reports its failure; shutdown must still release the lease.
+    })
+    await closingLease.release()
+  })
+
+  const acquisition = acquireDbLease()
+  const dbLease = await acquisition
+  if (lifecycle.state.kind === 'closed') return
+
+  const removeRequest = nitroApp.hooks.hook('request', event => {
+    if (lifecycle.state.kind !== 'active') return
     const accessRequest: AccessLogRequest = { complete: false }
     event.context.accessLogRequest = accessRequest
     // A disconnected client may never reach Nitro's afterResponse hook.
@@ -20,16 +45,10 @@ export default defineNitroPlugin(async nitroApp => {
     event.context.$dbHealthCheck = dbLease.healthCheck
   })
 
-  nitroApp.hooks.hook('afterResponse', event => {
+  const removeAfterResponse = nitroApp.hooks.hook('afterResponse', event => {
+    if (lifecycle.state.kind !== 'active') return
     event.context.accessLogRequest.complete = true
   })
 
-  nitroApp.hooks.hookOnce('close', async () => {
-    // Nitro can request shutdown before its asynchronous startup plugins finish.
-    // Keep this lease until startup settles so the worker cannot exit mid-migration.
-    await getMigrationPromise(dbLease.generationId)?.catch(() => {
-      // Startup already reports its failure; shutdown must still release the lease.
-    })
-    await dbLease.release()
-  })
+  lifecycle.state = { kind: 'active', removeHooks: [removeRequest, removeAfterResponse] }
 })

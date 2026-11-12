@@ -1,7 +1,12 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Catalog actions are explicit HTTP-boundary adapters. */
 import GuidedHelpPublisherFlow from './PublisherFlow.vue'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import type { ActionContext, CapturedActionContext } from '~/composables/useActionContext'
+import { useGuidedHelpRequestOwner } from '~/composables/useGuidedHelpRequestOwner'
+import { useFormSession } from '~/composables/useFormSession'
+import { useModalSession } from '~/composables/useModalSession'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { GuideDraftSchema, GuideDocumentSchema } from '@gcs-ssc/guided-help/contracts'
@@ -52,17 +57,56 @@ const settings: Ref<ReturnType<typeof catalogDraft> | null> = ref(null)
 const versions: Ref<HelpVersion[]> = ref([])
 const previewDiagnostics: Ref<ContractDiagnostic[]> = ref([])
 const diagnosticText = (diagnostic: ContractDiagnostic) => t(`guided_help.diagnostics.${diagnostic.code}`, { view: diagnostic.view ?? '', target: diagnostic.target ?? '', step: diagnostic.stepId ?? '' })
-const loading = ref(false)
 type PendingAction = 'save' | 'publish' | 'retire' | 'clone' | 'delete' | 'unpublish'
-const pendingAction = ref<PendingAction | null>(null)
-const pending = computed(() => pendingAction.value !== null)
-const loadError = ref(false)
-let generation = 0
+const initialization = useGuidedHelpRequestOwner<'initialize'>()
+const loadingRequest = useGuidedHelpRequestOwner<'load'>()
+const selectionRequest = useGuidedHelpRequestOwner<'select'>()
+const mutationRequest = useGuidedHelpRequestOwner<PendingAction>()
+const groupRequests = new Map<string, ReturnType<typeof useGuidedHelpRequestOwner<'load'>>>()
+const editorEpoch = shallowRef(0)
+const pendingAction = computed(() => mutationRequest.state.value.kind === 'pending' ? mutationRequest.state.value.action : null)
+const pending = mutationRequest.pending
+const loading = computed(() => initialization.pending.value || loadingRequest.pending.value)
+const loadError = computed(() => [initialization.status.value, loadingRequest.status.value, selectionRequest.status.value].includes('error'))
+watch(() => [context.value, 'guideId' in route.params ? route.params.guideId : undefined, route.query.catalog, route.query.mode], (target, previous) => {
+  if (target.every((value, index) => value === previous[index])) return
+  selectionRequest.reset()
+  const [owner, guideId, catalogId, mode] = target
+  const sameSelectedRecord = owner === previous[0] && mode === previous[3] && (mode === 'catalog'
+    ? guideId === selectedCatalog.value?.egcs_ay_guide && catalogId === selectedCatalog.value?.id
+    : guideId === selected.value?.id)
+  if (sameSelectedRecord) return
+  editorEpoch.value += 1
+  mutationRequest.reset()
+}, { flush: 'sync' })
 const scope = computed(() => context.value === 'system' ? { type: 'global' as const } : { type: 'agency' as const, agencyId: context.value })
 const canEdit = computed(() => Boolean(context.value) && can('help', 'update', scope.value))
 const guideDirty = computed(() => Boolean(selected.value) && (JSON.stringify(GuideDraftSchema.safeParse(document.value).data) !== JSON.stringify(GuideDraftSchema.safeParse(selected.value?.egcs_cn_document).data) || sharedOffer.value !== selected.value?.egcs_cn_shared))
 const catalogDirty = computed(() => Boolean(selectedCatalog.value?.id) && JSON.stringify(settings.value) !== JSON.stringify(catalogDraft(selectedCatalog.value!)))
 const canDelete = computed(() => Boolean(context.value) && can('help', 'delete', scope.value))
+const editorIdentity = [() => context.value, () => editorEpoch.value]
+const updateContext = useActionContext({
+  identity: editorIdentity,
+  authority: canEdit,
+  eligible: () => selectedCatalog.value !== null || (document.value !== null && selected.value?.publicationState !== 'retired')
+})
+const retireContext = useActionContext({
+  identity: editorIdentity,
+  authority: canDelete,
+  eligible: () => selected.value !== null && selected.value.publicationState !== 'retired'
+})
+const retirementKey = retireContext.version
+const deleteContext = useActionContext({
+  identity: editorIdentity,
+  authority: canDelete,
+  eligible: () => selected.value?.capabilities?.canDelete === true
+})
+const canCopyInto = (owner: string) => can('help', 'update', { type: 'agency', agencyId: owner })
+const copyDestination: Ref<string | null> = ref(null)
+const copyContext = useActionContext({
+  identity: [...editorIdentity, () => copyDestination.value],
+  authority: () => copyDestination.value !== null && canCopyInto(copyDestination.value)
+})
 const agencyId = computed(() => context.value && context.value !== 'system' ? context.value : null)
 const ownedEndpoint = computed(() => `/api/guided-help${agencyId.value ? `?agencyId=${agencyId.value}` : ''}`)
 const catalogEndpoint = computed(() => `/api/agency/${agencyId.value}/guided-help`)
@@ -70,6 +114,7 @@ const label = (value: { en: string, fr: string }) => value[locale.value === 'fr'
 const newestVersion = (guide: HelpGuide) => [...guide.versions].sort((left, right) => right.version - left.version)[0]
 const views = computed(() => guidedHelpLedger.views.filter(view => view.discoverable !== false).map(view => ({ value: view.key, label: label(view.label) })))
 const resetSelection = () => {
+  selectionRequest.reset()
   previewDiagnostics.value = []
   selected.value = null
   document.value = null
@@ -78,15 +123,15 @@ const resetSelection = () => {
   versions.value = []
 }
 const reload = async () => {
-  const request = ++generation
+  loadingRequest.reset()
   resetSelection()
   guides.value = []
   catalogs.value = []
   shared.value = []
   roles.value = []
   if (!context.value) return
-  loading.value = true
-  loadError.value = false
+  const request = loadingRequest.begin('load')
+  if (!request) return
   try {
     const [owned, catalog, library, roleOptions] = await Promise.all([
       helpRequest<{ items: HelpGuide[] }>(ownedEndpoint.value),
@@ -94,35 +139,53 @@ const reload = async () => {
       agencyId.value ? helpRequest<{ items: { id: string, document: GuideDraft, sourceVersionId: string, version: number, sourceAttribution?: HelpAttribution }[] }>(`/api/guided-help/shared?agencyId=${agencyId.value}`) : Promise.resolve({ items: [] }),
       agencyId.value ? helpRequest<{ items: HelpOption[] }>(`${catalogEndpoint.value}/roles`) : Promise.resolve({ items: [] })
     ])
-    if (request !== generation) return
+    if (!loadingRequest.isCurrent(request)) return
     guides.value = owned.items
     catalogs.value = catalog.items
     shared.value = library.items.map(item => ({ id: item.id, sourceAttribution: item.sourceAttribution, egcs_cn_document: item.document, egcs_cn_shared: true, versions: [{ id: item.sourceVersionId, version: item.version, document: item.document as HelpVersion['document'] }] }))
     roles.value = roleOptions.items
+    loadingRequest.succeed(request)
   } catch (error) {
-    if (request === generation) {
-      loadError.value = true
-      showError(error)
-    }
-  } finally { if (request === generation) loading.value = false }
+    if (loadingRequest.fail(request, error)) showError(error)
+  }
 }
+watch(context, () => loadingRequest.reset(), { flush: 'sync' })
 watch(context, async () => {
+  if (detail) return
+  const epoch = editorEpoch.value
   await reload()
-  if (!detail) await router.replace({ path: route.path, query: { ...route.query, context: context.value || undefined } })
+  if (epoch === editorEpoch.value) await router.replace({ path: route.path, query: { ...route.query, context: context.value || undefined } })
 })
 onBeforeUnmount(() => {
-  generation++
+  editorEpoch.value += 1
+  for (const request of groupRequests.values()) request.dispose()
 })
 const initialize = async () => {
-  loadError.value = false
+  const request = initialization.begin('initialize')
+  if (!request) return
   try {
     const options = await helpRequest<{ items: HelpOption[], canSystem: boolean }>('/api/guided-help/contexts')
+    if (!initialization.isCurrent(request)) return
     contexts.value = options.items
     canSystem.value = options.canSystem
     if (!detail) {
-      groups.value = [...(options.canSystem ? [{ id: 'system', name: { en: '', fr: '' } }] : []), ...options.items].map(item => ({ ...item, guides: [], catalogs: [], loaded: false, loading: false, error: false, canEdit: can('help', 'update', item.id === 'system' ? { type: 'global' } : { type: 'agency', agencyId: item.id }) }))
+      for (const owner of groupRequests.values()) owner.dispose()
+      groupRequests.clear()
+      groups.value = [...(options.canSystem ? [{ id: 'system', name: { en: '', fr: '' } }] : []), ...options.items].map(item => {
+        const owner = useGuidedHelpRequestOwner<'load'>()
+        groupRequests.set(item.id, owner)
+        return {
+          ...item, guides: [], catalogs: [],
+          get loaded() { return owner.status.value === 'success' },
+          get loading() { return owner.pending.value },
+          get error() { return owner.status.value === 'error' },
+          canEdit: can('help', 'update', item.id === 'system' ? { type: 'global' } : { type: 'agency', agencyId: item.id })
+        }
+      })
       const agency = options.items[0]
-      offers.value = agency ? (await helpRequest<{ items: { id: string, document: GuideDraft, sourceVersionId: string, version: number, sourceAttribution?: HelpAttribution }[] }>(`/api/guided-help/shared?agencyId=${agency.id}`)).items.map(item => ({ id: item.id, sourceAttribution: item.sourceAttribution, egcs_cn_document: item.document, egcs_cn_shared: true, publicationState: 'published', versions: [{ id: item.sourceVersionId, version: item.version, document: item.document as HelpVersion['document'] }] })) : []
+      const availableOffers: HelpGuide[] = agency ? (await helpRequest<{ items: { id: string, document: GuideDraft, sourceVersionId: string, version: number, sourceAttribution?: HelpAttribution }[] }>(`/api/guided-help/shared?agencyId=${agency.id}`)).items.map(item => ({ id: item.id, sourceAttribution: item.sourceAttribution, egcs_cn_document: item.document, egcs_cn_shared: true, publicationState: 'published', versions: [{ id: item.sourceVersionId, version: item.version, document: item.document as HelpVersion['document'] }] })) : []
+      if (!initialization.isCurrent(request)) return
+      offers.value = availableOffers
     }
     const picking = user.value?.id ? readHelpPicker(user.value.id) : null
     if (picking && !detail) {
@@ -132,14 +195,16 @@ const initialize = async () => {
     const requestedContext = detail && typeof route.query.context === 'string' ? route.query.context : ''
     if (!picking && requestedContext && (requestedContext === 'system' ? options.canSystem : options.items.some(item => item.id === requestedContext))) {
       context.value = requestedContext
-      await nextTick()
+      const epoch = editorEpoch.value
       await reload()
+      if (!initialization.isCurrent(request) || epoch !== editorEpoch.value) return
       await loadRouteSelection()
     }
     if (picking && (picking.context === 'system' ? options.canSystem : options.items.some(item => item.id === picking.context))) {
       context.value = picking.context
-      await nextTick()
+      const epoch = editorEpoch.value
       await reload()
+      if (!initialization.isCurrent(request) || epoch !== editorEpoch.value) return
       selected.value = picking.guide
       document.value = picking.document
       sharedOffer.value = picking.shared
@@ -151,97 +216,132 @@ const initialize = async () => {
       selectedStep.value = picking.stepId
     }
   } catch (error) {
-    loadError.value = true
-    showError(error)
-  }
+    if (initialization.fail(request, error)) showError(error)
+  } finally { initialization.succeed(request) }
 }
 onMounted(initialize)
-const mutate = async (kind: PendingAction, action: () => Promise<void>) => {
+const mutate = async (kind: PendingAction, action: (operation: CapturedActionContext, current: () => boolean, canContinue: () => boolean) => Promise<void>, actionContext: ActionContext = updateContext) => {
   if (pending.value) return
-  pendingAction.value = kind
+  const operation = actionContext.capture()
+  if (!operation) return
+  const request = mutationRequest.begin(kind)
+  if (!request) return
+  const epoch = editorEpoch.value
+  const current = () => mutationRequest.isCurrent(request) && editorEpoch.value === epoch && operation.isCurrent()
+  const canContinue = () => current() && operation.canDispatch()
   try {
-    await action()
+    await action(operation, current, canContinue)
+    mutationRequest.succeed(request)
   } catch (error) {
-    showError(error)
-  } finally {
-    pendingAction.value = null
+    if (current() && mutationRequest.fail(request, error)) showError(error)
+    else mutationRequest.succeed(request)
   }
 }
 const openGuide = async (guide: HelpGuide) => {
-  const request = generation
-  const detail = await helpRequest<HelpGuide>(`/api/guided-help/${guide.id}`)
-  if (request !== generation) return
-  selectedCatalog.value = null
-  settings.value = null
-  selected.value = detail
-  document.value = structuredClone(detail.egcs_cn_document)
-  sharedOffer.value = detail.egcs_cn_shared
+  const request = selectionRequest.begin('select')
+  if (!request) return
+  try {
+    const detail = await helpRequest<HelpGuide>(`/api/guided-help/${guide.id}`)
+    if (!selectionRequest.succeed(request)) return
+    selectedCatalog.value = null
+    settings.value = null
+    selected.value = detail
+    document.value = structuredClone(detail.egcs_cn_document)
+    sharedOffer.value = detail.egcs_cn_shared
+  } catch (error) {
+    if (selectionRequest.fail(request, error)) showError(error)
+  }
 }
 const createGuide = () => {
   resetSelection()
   document.value = blankGuide()
   sharedOffer.value = false
 }
-const persistGuide = async (): Promise<boolean> => {
-  if (!document.value || !canEdit.value) return false
-  const errors = await validateDraft(document.value)
+const persistGuide = async (current: () => boolean, canContinue: () => boolean): Promise<boolean> => {
+  if (!document.value || !canContinue()) return false
+  const body = { egcs_cn_document: JSON.parse(JSON.stringify(document.value)), egcs_cn_shared: sharedOffer.value }
+  const endpoint = selected.value ? `/api/guided-help/${selected.value.id}` : ownedEndpoint.value
+  const method = selected.value ? 'PATCH' : 'POST'
+  const errors = await validateDraft(body.egcs_cn_document)
+  if (!canContinue()) return false
   if (errors.length) {
     focusDraftError({ errors })
     showError(new Error(errors[0]!.message))
     return false
   }
-  const request = generation
-  const result = await helpRequest<HelpGuide>(selected.value ? `/api/guided-help/${selected.value.id}` : ownedEndpoint.value, selected.value ? 'PATCH' : 'POST', { egcs_cn_document: document.value, egcs_cn_shared: sharedOffer.value })
-  if (request !== generation) return false
+  const result = await helpRequest<HelpGuide>(endpoint, method, body)
+  if (!current()) return false
+  const unchanged = JSON.stringify(document.value) === JSON.stringify(body.egcs_cn_document) && sharedOffer.value === body.egcs_cn_shared
   selected.value = result
-  document.value = structuredClone(result.egcs_cn_document)
+  if (unchanged) document.value = structuredClone(result.egcs_cn_document)
   if (('guideId' in route.params ? route.params.guideId : undefined) === 'new') await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(result.id), query: { context: context.value, section: selectedTab.value } }))
+  if (!current()) return false
   const index = guides.value.findIndex(guide => guide.id === result.id)
   if (index < 0) guides.value.push(result)
   else guides.value[index] = result
   return true
 }
-const saveGuide = () => mutate('save', async () => {
-  await persistGuide()
+const saveGuide = () => mutate('save', async (_operation, current, canContinue) => {
+  await persistGuide(current, canContinue)
 })
-const guideAction = (action: 'publish' | 'retire' | 'delete') => mutate(action, async () => {
+const guideAction = (action: 'publish' | 'retire' | 'delete') => mutate(action, async (operation, current, canContinue) => {
   if (action === 'retire' && guideDirty.value) {
     showError(new Error(t('common.save_changes_before_action')))
     return
   }
   if (action === 'publish') {
-    if (!document.value || !canEdit.value) return
+    if (!document.value || !canContinue()) return
     const errors = await validatePublication(document.value)
+    if (!canContinue()) return
     if (errors.length) {
       focusDraftError({ errors })
       await nextTick()
+      if (!canContinue()) return
       guideForm.value?.setErrors(errors)
       showError(new Error(errors[0]!.message))
       return
     }
-    if ((!selected.value || guideDirty.value) && !await persistGuide()) return
+    if ((!selected.value || guideDirty.value) && !await persistGuide(current, canContinue)) return
+    if (guideDirty.value) return
   }
-  if (!selected.value) return
+  if (!canContinue() || !selected.value) return
+  const targetId = selected.value.id
   if (action === 'delete') {
-    if (!await confirmDeleteRequest(`/api/guided-help/${selected.value.id}`)) return
-  } else await helpRequest(`/api/guided-help/${selected.value.id}/${action}`, 'POST')
+    if (!await confirmDeleteRequest(`/api/guided-help/${targetId}`, {
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => selected.value?.id === targetId ? selected.value : null,
+        eligible: guide => guide.capabilities?.canDelete === true
+      },
+      shouldProceed: () => current() && selected.value?.id === targetId && selected.value.capabilities?.canDelete === true
+    })) return
+  } else await helpRequest(`/api/guided-help/${targetId}/${action}`, 'POST')
+  if (!current()) return
   await reload()
+  if (!current()) return
   if (action === 'delete') await goIndex()
   else await loadRouteSelection()
-})
+}, action === 'delete' ? deleteContext : action === 'retire' ? retireContext : updateContext)
 const openCatalog = async (catalog: HelpCatalog) => {
-  const request = generation
-  const detail = await helpRequest<HelpCatalog>(`${catalogEndpoint.value}/${catalog.id}`)
-  if (request !== generation) return
-  selected.value = null
-  document.value = null
-  selectedCatalog.value = detail
-  settings.value = catalogDraft(detail)
-  // Offered sources and owned sources expose only the versions the actor may inspect.
-  const source = [...guides.value, ...shared.value].find(guide => guide.id === detail.egcs_ay_guide)
-  versions.value = detail.sourceVersions ?? source?.versions ?? []
+  const request = selectionRequest.begin('select')
+  if (!request) return
+  try {
+    const detail = await helpRequest<HelpCatalog>(`${catalogEndpoint.value}/${catalog.id}`)
+    if (!selectionRequest.succeed(request)) return
+    selected.value = null
+    document.value = null
+    selectedCatalog.value = detail
+    settings.value = catalogDraft(detail)
+    // Offered sources and owned sources expose only the versions the actor may inspect.
+    const source = [...guides.value, ...shared.value].find(guide => guide.id === detail.egcs_ay_guide)
+    versions.value = detail.sourceVersions ?? source?.versions ?? []
+  } catch (error) {
+    if (selectionRequest.fail(request, error)) showError(error)
+  }
 }
 const adopt = (guide: HelpGuide) => {
+  selectionRequest.reset()
   const version = newestVersion(guide)
   if (!version) return
   selected.value = null
@@ -250,41 +350,53 @@ const adopt = (guide: HelpGuide) => {
   settings.value = catalogDraft(selectedCatalog.value)
   versions.value = guide.versions
 }
-const persistCatalog = async (): Promise<boolean> => {
-  if (!selectedCatalog.value || !settings.value || !canEdit.value) return false
+const persistCatalog = async (current: () => boolean, canContinue: () => boolean): Promise<boolean> => {
+  if (!selectedCatalog.value || !settings.value || !canContinue()) return false
+  const body = { ...(!selectedCatalog.value.id ? { egcs_ay_guide: selectedCatalog.value.egcs_ay_guide } : {}), ...JSON.parse(JSON.stringify(settings.value)) }
+  const snapshot = JSON.stringify(settings.value)
+  const endpoint = `${catalogEndpoint.value}${selectedCatalog.value.id ? `/${selectedCatalog.value.id}` : ''}`
+  const method = selectedCatalog.value.id ? 'PATCH' : 'POST'
   const errors = await validateSettings(settings.value)
+  if (!canContinue()) return false
   if (errors.length) {
     catalogForm.value?.setErrors(errors)
     return false
   }
-  const request = generation
-  const result = await helpRequest<HelpCatalog>(`${catalogEndpoint.value}${selectedCatalog.value.id ? `/${selectedCatalog.value.id}` : ''}`, selectedCatalog.value.id ? 'PATCH' : 'POST', { ...(!selectedCatalog.value.id ? { egcs_ay_guide: selectedCatalog.value.egcs_ay_guide } : {}), ...settings.value })
-  if (request !== generation) return false
+  const result = await helpRequest<HelpCatalog>(endpoint, method, body)
+  if (!current()) return false
   selectedCatalog.value = result
-  settings.value = catalogDraft(result)
+  if (JSON.stringify(settings.value) === snapshot) settings.value = catalogDraft(result)
   const index = catalogs.value.findIndex(item => item.id === result.id)
   if (index < 0) catalogs.value.push(result)
   else catalogs.value[index] = result
   await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(result.egcs_ay_guide), query: { context: context.value, mode: 'catalog', catalog: result.id } }))
-  return true
+  return current()
 }
-const saveCatalog = () => mutate('save', async () => {
-  await persistCatalog()
+const saveCatalog = () => mutate('save', async (_operation, current, canContinue) => {
+  await persistCatalog(current, canContinue)
 })
-const catalogAction = (action: 'publish' | 'unpublish') => mutate(action, async () => {
+const formOwner = useModalSession()
+watch([editorEpoch, document, settings], () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = document.value !== null || settings.value !== null
+}, { immediate: true, flush: 'sync' })
+const guideFormSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: updateContext }, submit: saveGuide })
+const catalogFormSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: updateContext }, submit: saveCatalog })
+const catalogAction = (action: 'publish' | 'unpublish') => mutate(action, async (_operation, current, canContinue) => {
   if (action === 'unpublish' && catalogDirty.value) {
     showError(new Error(t('common.save_changes_before_action')))
     return
   }
-  if (action === 'publish' && (!selectedCatalog.value?.id || catalogDirty.value) && !await persistCatalog()) return
-  if (!selectedCatalog.value?.id) return
+  if (action === 'publish' && (!selectedCatalog.value?.id || catalogDirty.value) && !await persistCatalog(current, canContinue)) return
+  if (!canContinue() || !selectedCatalog.value?.id || catalogDirty.value) return
   await helpRequest(`${catalogEndpoint.value}/${selectedCatalog.value.id}/${action}`, 'POST')
+  if (!current()) return
   await reload()
-  await loadRouteSelection()
+  if (current()) await loadRouteSelection()
 })
-const clone = (versionId: string) => mutate('clone', async () => {
+const clone = (versionId: string) => mutate('clone', async (_operation, current) => {
   const result = await helpRequest<HelpGuide>(`${catalogEndpoint.value}/clone`, 'POST', { sourceVersionId: versionId })
-  await goGuide(result.id)
+  if (current()) await goGuide(result.id)
 })
 const preview = (draft: GuideDraft, previewContext = context.value) => {
   const parsed = GuideDocumentSchema.safeParse(draft)
@@ -312,27 +424,30 @@ const goCatalog = (sourceId: string, catalogId?: string, ownerContext = context.
 const loadGroup = async (id: string) => {
   const group = groups.value.find(item => item.id === id)
   if (!group || group.loading || group.loaded) return
-  group.loading = true
-  group.error = false
-  const request = generation
+  const owner = groupRequests.get(id)
+  const request = owner?.begin('load')
+  if (!owner || !request) return
   try {
     const [owned, catalog] = await Promise.all([
       helpRequest<{ items: HelpGuide[] }>(`/api/guided-help${id === 'system' ? '' : `?agencyId=${id}`}`),
       id === 'system' ? Promise.resolve({ items: [] }) : helpRequest<{ items: HelpCatalog[] }>(`/api/agency/${id}/guided-help`)
     ])
-    if (request !== generation) return
+    if (!owner.isCurrent(request)) return
     group.guides = owned.items
     group.catalogs = catalog.items
-    group.loaded = true
+    owner.succeed(request)
   } catch (error) {
-    group.error = true
-    showError(error)
-  } finally { group.loading = false }
+    if (owner.fail(request, error)) showError(error)
+  }
 }
-const cloneInto = (ownerContext: string, versionId: string) => mutate('clone', async () => {
-  const result = await helpRequest<HelpGuide>(`/api/agency/${ownerContext}/guided-help/clone`, 'POST', { sourceVersionId: versionId })
-  await goGuide(result.id, ownerContext)
-})
+const cloneInto = (ownerContext: string, versionId: string) => {
+  if (pending.value) return
+  copyDestination.value = ownerContext
+  return mutate('clone', async (_operation, current) => {
+    const result = await helpRequest<HelpGuide>(`/api/agency/${ownerContext}/guided-help/clone`, 'POST', { sourceVersionId: versionId })
+    if (current()) await goGuide(result.id, ownerContext)
+  }, copyContext)
+}
 const loadRouteSelection = async () => {
   if (!detail || !context.value) return
   const id = String(('guideId' in route.params ? route.params.guideId : undefined))
@@ -340,13 +455,19 @@ const loadRouteSelection = async () => {
     if (typeof route.query.catalog === 'string') {
       const entry = catalogs.value.find(item => item.id === route.query.catalog)
       if (entry) await openCatalog(entry)
-      else loadError.value = true
+      else {
+        const request = selectionRequest.begin('select')
+        if (request) selectionRequest.fail(request, new Error('Guide selection unavailable'))
+      }
     } else {
       const existing = catalogs.value.find(item => item.egcs_ay_guide === id)
       const guide = [...guides.value, ...shared.value].find(item => item.id === id)
       if (existing) await openCatalog(existing)
       else if (guide) adopt(guide)
-      else loadError.value = true
+      else {
+        const request = selectionRequest.begin('select')
+        if (request) selectionRequest.fail(request, new Error('Guide selection unavailable'))
+      }
     }
   } else if (id === 'new') createGuide()
   else await openGuide({ id } as HelpGuide)
@@ -388,15 +509,31 @@ const secondaryActions = computed<DropdownMenuItem[][]>(() => [
     ...(!isCatalog.value && canDelete.value && selected.value?.capabilities?.canDelete ? [{ label: t('common.delete'), icon: 'i-lucide-trash', color: 'error' as const, disabled: pending.value, onSelect: () => guideAction('delete') }] : [])
   ]
 ].filter(items => items.length > 0))
-watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () => route.query.catalog, () => route.query.mode], () => {
-  if (context.value) void loadRouteSelection().catch(showError)
-})
+watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () => route.query.catalog, () => route.query.mode, () => route.query.context], async (target, previous) => {
+  if (!detail) return
+  const requestedOwner = typeof route.query.context === 'string' ? route.query.context : ''
+  const authorizedOwner = requestedOwner === 'system' ? canSystem.value : contexts.value.some(owner => owner.id === requestedOwner)
+  if (!authorizedOwner) {
+    context.value = ''
+    await reload()
+    return
+  }
+  if (context.value !== requestedOwner) {
+    context.value = requestedOwner
+    const epoch = editorEpoch.value
+    await reload()
+    if (epoch !== editorEpoch.value) return
+  }
+  const canonicalGuide = previous[0] === 'new' && target[0] === selected.value?.id
+  const canonicalCatalog = previous[1] === undefined && target[1] === selectedCatalog.value?.id && target[0] === selectedCatalog.value?.egcs_ay_guide
+  if (context.value && !(target[3] === previous[3] && target[2] === previous[2] && (canonicalGuide || canonicalCatalog))) await loadRouteSelection()
+}, { flush: 'sync' })
 </script>
 
 <template>
   <CommonDetailPage id="guided-help" v-model:collapsed="collapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="guided-help.manager" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
-      <CommonPublicationDetailHero v-if="detail" :name="selectedTitle" :description="heroDescription" icon="i-lucide-book-open" :type-label-key="isCatalog ? 'guided_help.catalog' : 'guided_help.help'" :publication-state="state ?? 'draft'" :publication-version="publicationVersion" version-label-key="guided_help.version" :has-unpublished-changes="hasUnpublishedChanges" :is-collapsed="collapsed" :is-mutation-pending="pending" :is-publishing="pendingAction === 'publish'" :is-retiring="pendingAction === 'retire'" :can-manage="canEdit && Boolean(document || settings)" :can-retire="!isCatalog && canDelete" publish-label-key="common.publish" retire-label-key="common.retire" @publish="publishCurrent" @retire="guideAction('retire')">
+      <CommonPublicationDetailHero v-if="detail" :key="`retirement-${retirementKey}`" :action-context="retireContext" :name="selectedTitle" :description="heroDescription" icon="i-lucide-book-open" :type-label-key="isCatalog ? 'guided_help.catalog' : 'guided_help.help'" :publication-state="state ?? 'draft'" :publication-version="publicationVersion" version-label-key="guided_help.version" :has-unpublished-changes="hasUnpublishedChanges" :is-collapsed="collapsed" :is-mutation-pending="pending" :is-publishing="pendingAction === 'publish'" :is-retiring="pendingAction === 'retire'" :can-manage="canEdit && Boolean(document || settings)" :can-retire="!isCatalog && canDelete" publish-label-key="common.publish" retire-label-key="common.retire" @publish="publishCurrent" @retire="guideAction('retire')">
         <template #actions>
           <CommonSaveButton v-if="canEdit && state !== 'retired' && (document || settings)" type="button" :label="t('common.save')" color="neutral" variant="outline" :loading="pendingAction === 'save'" :disabled="pending" @click="saveCurrent" />
           <UButton v-if="secondaryActions.flat().length === 1" :label="t('guided_help.preview')" icon="i-lucide-play" color="neutral" variant="outline" :disabled="pending || (isCatalog ? !pinnedVersion : !document)" @click="previewCurrent" />
@@ -437,7 +574,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
             </p>
             <div v-if="document" class="space-y-8">
               <CommonDetailSection v-if="document && selectedTab === 'general'" :title="t(selectedTabKey)">
-                <UForm ref="guideForm" :state="document" :validate="validateDraft" novalidate @submit="saveGuide" @error="focusDraftError">
+                <UForm ref="guideForm" v-bind="guideFormSession" :state="document" :validate="validateDraft" novalidate @error="focusDraftError">
                   <GuidedHelpPublisherFields v-model="document" data-field-container="Composite editor; its individual field declarations own their identities." section="general" :disabled="!canEdit || pending || state === 'retired'" @pick="pick">
                     <template #sharing>
                       <USwitch v-model="sharedOffer" :required="false" :label="t('guided_help.share_all')" :disabled="!canEdit || pending || state === 'retired'" data-ui-target="guided-help.manager.sharedOffer" />
@@ -459,7 +596,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
               <p class="text-sm text-muted">
                 {{ t('guided_help.distribution_hint') }}
               </p>
-              <UForm ref="catalogForm" :state="settings" :validate="validateSettings" class="space-y-6" novalidate @submit="saveCatalog">
+              <UForm ref="catalogForm" v-bind="catalogFormSession" :state="settings" :validate="validateSettings" class="space-y-6" novalidate>
                 <fieldset :disabled="!canEdit || pending" class="grid gap-6 xl:grid-cols-2">
                   <UFormField :label="t('guided_help.source_version')" required name="egcs_ay_sourceversion">
                     <USelectMenu v-model="settings.egcs_ay_sourceversion" :items="versions.map(version => ({ value: version.id, label: String(version.version) }))" value-key="value" class="w-full" />

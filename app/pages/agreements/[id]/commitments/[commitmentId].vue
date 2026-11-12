@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { moneyMatchesSearch } from '~/utils/money-search'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
@@ -6,7 +8,7 @@ import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import type { FetchError } from 'ofetch'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
@@ -41,6 +43,7 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { getBilingualValue } = useBilingualValue()
 const { saveJson } = useJsonRequest()
+const { canAny } = useAuth()
 const { isRecordLocked } = useBusinessStatusState()
 
 const agreementId = route.params.id as string
@@ -65,19 +68,31 @@ const tabs = [
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'lines' })
 const isHeroCollapsed = getHeroCollapsed('agreement-commitment-detail')
 
+const lineTarget: Ref<string | null> = ref(null)
 const lineModal = useCrudModal<FundingCaseAgreementCommitmentLineBalanceRow, FundingCaseAgreementCommitmentLineForm>({
-  createState: () => ({
-    egcs_fc_commitment: commitmentId
-  }),
-  updateState: line => ({
-    id: line.id,
-    egcs_fc_commitment: line.egcs_fc_commitment,
-    egcs_fc_commitmentlinenumber: line.egcs_fc_commitmentlinenumber,
-    egcs_fc_transferpaymentstreamchartofaccount: line.egcs_fc_transferpaymentstreamchartofaccount,
-    egcs_fc_amount: line.egcs_fc_amount
-  })
+  createState: () => {
+    lineTarget.value = null
+    return { egcs_fc_commitment: commitmentId }
+  },
+  updateState: line => {
+    lineTarget.value = String(line.id)
+    return {
+      id: line.id,
+      egcs_fc_commitment: line.egcs_fc_commitment,
+      egcs_fc_commitmentlinenumber: line.egcs_fc_commitmentlinenumber,
+      egcs_fc_transferpaymentstreamchartofaccount: line.egcs_fc_transferpaymentstreamchartofaccount,
+      egcs_fc_amount: line.egcs_fc_amount
+    }
+  }
 })
 
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+  lineModal.close()
+})
+const isCurrentPage = () => !disposed && String(route.params.id) === agreementId
+  && String(route.params.commitmentId) === commitmentId
 const selectedLine = lineModal.selected
 const savedCodingOptions = computed(() => (commitment.value?.lines ?? []).filter(line => line.id === selectedLine.value?.id).map(line => ({
   value: String(line.egcs_fc_transferpaymentstreamchartofaccount),
@@ -134,6 +149,33 @@ const canDeleteCommitmentLine = computed(() =>
   isAssigned.value
   && !isRecordLocked(commitment.value)
 )
+
+const createLineCollectionContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.commitmentId],
+  authority: () => canAny('agreement', 'create'),
+  eligible: () => isCurrentPage() && commitment.value?.id === commitmentId && canCreateCommitmentLine.value
+})
+const updateLineCollectionContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.commitmentId],
+  authority: () => canAny('agreement', 'update'),
+  eligible: () => isCurrentPage() && commitment.value?.id === commitmentId && canUpdateCommitment.value
+})
+const createLineContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.commitmentId, lineTarget],
+  authority: () => canAny('agreement', 'create'),
+  eligible: () => isCurrentPage() && commitment.value?.id === commitmentId && canCreateCommitmentLine.value
+})
+const updateLineContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.commitmentId, lineTarget],
+  authority: () => canAny('agreement', 'update'),
+  eligible: () => isCurrentPage() && commitment.value?.id === commitmentId && canUpdateCommitment.value
+    && Boolean(commitment.value.lines?.some(line => String(line.id) === lineTarget.value))
+})
+const deleteLineContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.commitmentId],
+  authority: () => canAny('agreement', 'delete'),
+  eligible: () => isCurrentPage() && commitment.value?.id === commitmentId && canDeleteCommitmentLine.value
+})
 
 const breadcrumbItems = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
@@ -220,52 +262,72 @@ const refreshPage = async () => {
 }
 
 const saveLine = async () => {
-  if (!selectedLine.value) {
+  if (!selectedLine.value || !isCurrentPage()) {
     return
   }
   const lineState = selectedLine.value
-  const isUpdate = Boolean(lineState.id)
+  const lineId = lineTarget.value
+  const isUpdate = lineId !== null
+  const operation = (isUpdate ? updateLineContext : createLineContext).capture()
+  if (!operation?.canDispatch()) return
+  const settlement = (isUpdate ? updateLineCollectionContext : createLineCollectionContext).capture()
+  if (!settlement?.canDispatch()) return
   const session = lineModal.captureSession()
-  if (!linePending.begin(session)) return
+  if (!lineModal.isCurrentSession(session) || !linePending.begin(session)) return
+  let closed = false
 
   try {
     await saveJson(
       isUpdate
-        ? `/api/agreements/${agreementId}/commitment-lines/${lineState.id}`
+        ? `/api/agreements/${agreementId}/commitment-lines/${lineId}`
         : `/api/agreements/${agreementId}/commitment-lines`,
       isUpdate ? 'PATCH' : 'POST',
       lineState
     )
 
-    lineModal.closeSession(session)
+    if (!isCurrentPage() || !settlement.isCurrent()) return
+    closed = lineModal.closeSession(session)
     await refreshPage()
+    if (!isCurrentPage() || !settlement.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentPage() && settlement.isCurrent() && (lineModal.isCurrentSession(session) || (closed && lineModal.captureSession() === null))) showError(error)
   } finally {
     linePending.end(session)
   }
 }
 
 const deleteLine = async (lineId: string) => {
+  const operation = deleteLineContext.capture()
+  if (!operation?.canDispatch()) return
   try {
-    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/commitment-lines/${lineId}`)
-    if (!ok) {
+    if (!isCurrentPage() || !operation.isCurrent()) return
+    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/commitment-lines/${lineId}`, {
+      operation,
+      target: {
+        id: lineId,
+        resolve: () => commitment.value?.lines?.find(line => String(line.id) === lineId),
+        eligible: () => canDeleteCommitmentLine.value
+      },
+      shouldProceed: isCurrentPage
+    })
+    if (!ok || !isCurrentPage() || !operation.isCurrent()) {
       return
     }
 
     await refreshPage()
+    if (!isCurrentPage() || !operation.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentPage() && operation.isCurrent()) showError(error)
   }
 }
 
@@ -274,6 +336,7 @@ const handleCompleted = async () => {
 }
 
 useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) === String(route.params.commitmentId) ? { entityType: 'fundingcaseagreementcommitment', entityId: commitment.value.id } : null)
+const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote', context: () => lineTarget.value !== null ? updateLineContext : createLineContext }, submit: saveLine })
 </script>
 
 <template>
@@ -385,6 +448,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
 
             <section v-else-if="selectedTab === 'completion'" data-help-view="casework.commitments.completion" data-help-target="casework.commitments.detail.completion" data-help-kind="section" class="space-y-6">
               <CommonCompletionPanel
+                :mutation-role-allowed="canAny('agreement', 'update')"
                 entity-type="fundingcaseagreementcommitment"
                 :entity-id="commitmentId"
                 :can-complete="canUpdateCommitment"
@@ -410,7 +474,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
               :can-update="canUpdateCommitment"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.commitments.workflows" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canAny('agreement', 'update')" data-help-view="casework.commitments.workflows" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.commitments.supplementary-information" data-help-target="casework.commitments.supplementary-information.content">
               <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
             </section>
@@ -428,7 +492,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
       :title="selectedLine.id ? t('agreement.commitments.edit_line') : t('agreement.commitments.add_line')"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedLine" :validate="validateLine" :validate-on="[]" class="space-y-4" @submit="saveLine">
+        <UForm v-bind="formSession" :state="selectedLine" :validate="validateLine" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.commitments.line_number')" name="egcs_fc_commitmentlinenumber">
             <UInputNumber v-model="selectedLine.egcs_fc_commitmentlinenumber" :min="1" :max="32767" />
           </UFormField>

@@ -4,8 +4,12 @@ import type { Currency_Codes } from '~~/shared/types/database'
 import { useBudgetCalculationPreview } from '~/composables/useBudgetCalculationPreview'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
+import { useActionContext } from '~/composables/useActionContext'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, shallowReactive, watch } from 'vue'
 import type { ExpandedState, Updater } from '@tanstack/vue-table'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -132,35 +136,53 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageSize: 50
 })
 
+const fiscalYearTarget: Ref<string | null> = ref(null)
+const lineItemTarget: Ref<string | null> = ref(null)
+const fundingSourceTarget: Ref<{ lineId: string; subtype: string | null } | null> = ref(null)
+
 const fiscalYearModal = useCrudModal<FundingCaseAgreementBudgetFiscalYearRow, FundingCaseAgreementBudgetFiscalYearForm>({
-  createState: () => ({}),
-  updateState: fiscalYear => ({
-    id: fiscalYear.id,
-    egcs_fc_fiscalyear: fiscalYear.egcs_fc_fiscalyear
-  })
+  createState: () => {
+    fiscalYearTarget.value = null
+    return {}
+  },
+  updateState: fiscalYear => {
+    fiscalYearTarget.value = fiscalYear.id
+    return { id: fiscalYear.id, egcs_fc_fiscalyear: fiscalYear.egcs_fc_fiscalyear }
+  }
 })
 const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, FundingCaseAgreementBudgetLineItemForm>({
-  createState: () => ({
-    egcs_fc_currency: agreementCurrency,
-    egcs_fc_applicantrecipient: proponents.value.length === 1 ? proponents.value[0]?.id : undefined,
-    egcs_fc_fundingsources: []
-  }),
-  updateState: lineItem => ({
-    ...lineItem,
-    id: lineItem.id,
-    egcs_fc_fundingagreementbudgetfiscalyear: lineItem.egcs_fc_fundingagreementbudgetfiscalyear,
-    egcs_fc_organizationcostcategory: lineItem.egcs_fc_organizationcostcategory,
-    egcs_fc_costsubsection: lineItem.egcs_fc_costsubsection,
-    egcs_fc_description: lineItem.egcs_fc_description,
-    egcs_fc_totalamount: lineItem.egcs_fc_totalamount,
-    egcs_fc_programfunding: lineItem.egcs_fc_programfunding,
-    egcs_fc_fundingsources: lineItem.egcs_fc_fundingsources.map(source => ({ ...source })),
-    egcs_fc_currency: lineItem.egcs_fc_currency
-  })
+  createState: () => {
+    lineItemTarget.value = null
+    return {
+      egcs_fc_currency: agreementCurrency,
+      egcs_fc_applicantrecipient: proponents.value.length === 1 ? proponents.value[0]?.id : undefined,
+      egcs_fc_fundingsources: []
+    }
+  },
+  updateState: lineItem => {
+    lineItemTarget.value = lineItem.id
+    return {
+      ...lineItem,
+      id: lineItem.id,
+      egcs_fc_fundingagreementbudgetfiscalyear: lineItem.egcs_fc_fundingagreementbudgetfiscalyear,
+      egcs_fc_organizationcostcategory: lineItem.egcs_fc_organizationcostcategory,
+      egcs_fc_costsubsection: lineItem.egcs_fc_costsubsection,
+      egcs_fc_description: lineItem.egcs_fc_description,
+      egcs_fc_totalamount: lineItem.egcs_fc_totalamount,
+      egcs_fc_programfunding: lineItem.egcs_fc_programfunding,
+      egcs_fc_fundingsources: lineItem.egcs_fc_fundingsources.map(source => ({ ...source })),
+      egcs_fc_currency: lineItem.egcs_fc_currency
+    }
+  }
 })
 
 const selectedFiscalYear = fiscalYearModal.selected
-const fundingSourceModal = useCrudModal<FundingSourceEdit, FundingSourceEdit>({ updateState: item => ({ ...item, source: { ...item.source } }) })
+const fundingSourceModal = useCrudModal<FundingSourceEdit, FundingSourceEdit>({
+  updateState: item => {
+    fundingSourceTarget.value = { lineId: item.lineId, subtype: item.originalSubtype }
+    return { ...item, source: { ...item.source } }
+  }
+})
 const selectedFundingSource = fundingSourceModal.selected
 const isFundingSourceModalOpen = fundingSourceModal.isOpen
 const validateFundingSource = createValidator(FundingCaseAgreementFundingSourceSchema)
@@ -203,6 +225,11 @@ const overviewEndpoint = computed<string>(() => `${resourceBase.value}/budget-ov
 const fiscalYearLookupEndpoint = computed<string>(() => fiscalYearLookupUrl ?? `/api/agreements/${agreementId}/budget-fiscal-years/lookups/fiscal-years`)
 let fiscalYearContextGeneration = 0
 const pendingDeletes = new Map<string, symbol>()
+const pendingFundingPlans = shallowReactive(new Set<string>())
+const fundingPlanKey = (base: string, lineId: string) => `${base}/budget-line-items/${lineId}`
+const isFundingPlanPending = computed(() => Boolean(selectedFundingSource.value
+  && pendingFundingPlans.has(fundingPlanKey(resourceBase.value, selectedFundingSource.value.lineId))))
+const targetGuardCleanups = new Set<() => void>()
 const targetKey = computed(() => actionTarget ? `${actionTarget.kind}:${actionTarget.agreementId}:${actionTarget.kind === 'amendment' ? actionTarget.amendmentId : ''}` : '')
 watch([() => agreementId, resourceBase, fiscalYearLookupEndpoint, targetKey, () => staticMode], () => {
   fiscalYearContextGeneration += 1
@@ -214,9 +241,10 @@ watch([() => agreementId, resourceBase, fiscalYearLookupEndpoint, targetKey, () 
 onUnmounted(() => {
   fiscalYearContextGeneration += 1
   pendingDeletes.clear()
+  for (const cleanup of targetGuardCleanups) cleanup()
 })
 const canSaveFiscalYear = computed(() => !staticMode && Boolean(selectedFiscalYear.value)
-  && (selectedFiscalYear.value?.id ? canUpdateFiscalYear : canCreateFiscalYear))
+  && (fiscalYearTarget.value !== null ? canUpdateFiscalYear : canCreateFiscalYear))
 const useOverviewFetch = useFetch as unknown as (url: Ref<string>) => {
   data: Ref<FundingCaseAgreementBudgetOverviewRow | null>
   refresh: () => Promise<void>
@@ -568,17 +596,67 @@ const getLineItemById = (id: string) => lineItems.value.find((lineItem: FundingC
 const permitted = (action: AgreementChildAction, area: AgreementChildArea) => !staticMode && (area === 'budget-year'
   ? action === 'create' ? canCreateFiscalYear : action === 'update' ? canUpdateFiscalYear : canDeleteFiscalYear
   : action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete)
+type BudgetArea = 'budget-year' | 'budget-line'
+const scopeIdentity = [() => agreementId, resourceBase, targetKey]
+const actionContexts = {
+  'budget-year': {
+    create: useActionContext({ identity: scopeIdentity, authority: () => canCreateFiscalYear, eligible: () => !staticMode }),
+    update: useActionContext({ identity: scopeIdentity, authority: () => canUpdateFiscalYear, eligible: () => !staticMode }),
+    delete: useActionContext({ identity: scopeIdentity, authority: () => canDeleteFiscalYear, eligible: () => !staticMode })
+  },
+  'budget-line': {
+    create: useActionContext({ identity: scopeIdentity, authority: () => canCreate, eligible: () => !staticMode }),
+    update: useActionContext({ identity: scopeIdentity, authority: () => canUpdate, eligible: () => !staticMode }),
+    delete: useActionContext({ identity: scopeIdentity, authority: () => canDelete, eligible: () => !staticMode })
+  }
+}
+const committedReadback = async (): Promise<CommittedReadbackResult> => {
+  await refreshOverview()
+  return overviewStatus.value === 'error'
+    ? { kind: 'unavailable', error: new Error(t('common.resource_table_load_failed')) }
+    : { kind: 'available' }
+}
+const committedCaptures = {
+  'budget-year': {
+    create: useCommittedSettlement({ context: actionContexts['budget-year'].create, settle: committedReadback }),
+    update: useCommittedSettlement({ context: actionContexts['budget-year'].update, settle: committedReadback })
+  },
+  'budget-line': {
+    create: useCommittedSettlement({ context: actionContexts['budget-line'].create, settle: committedReadback }),
+    update: useCommittedSettlement({ context: actionContexts['budget-line'].update, settle: committedReadback })
+  }
+}
+const fiscalYearContext = useActionContext({
+  identity: [...scopeIdentity, fiscalYearTarget],
+  authority: () => fiscalYearTarget.value === null ? canCreateFiscalYear : canUpdateFiscalYear,
+  eligible: () => !staticMode && (fiscalYearTarget.value === null || Boolean(getFiscalYearById(fiscalYearTarget.value)))
+})
+const lineItemContext = useActionContext({
+  identity: [...scopeIdentity, lineItemTarget],
+  authority: () => lineItemTarget.value === null ? canCreate : canUpdate,
+  eligible: () => !staticMode && (lineItemTarget.value === null || Boolean(getLineItemById(lineItemTarget.value)))
+})
+const fundingSourceContext = useActionContext({
+  identity: [...scopeIdentity, () => fundingSourceTarget.value?.lineId, () => fundingSourceTarget.value?.subtype],
+  authority: () => canUpdate,
+  eligible: () => {
+    const target = fundingSourceTarget.value
+    const line = target ? getLineItemById(target.lineId) : undefined
+    return !staticMode && Boolean(line && (target?.subtype === null || line.egcs_fc_fundingsources.some(source => source.egcs_fc_fundingsubtype === target?.subtype)))
+  }
+})
 let openingIntent = 0
 const pendingOpens = new Map<string, { generation: number; token: symbol }>()
-const openBudgetAction = (action: 'create' | 'update', area: AgreementChildArea, open: (current: () => boolean) => void | Promise<void>) => {
-  if (!permitted(action, area)) return
+const openBudgetAction = (action: 'create' | 'update', area: BudgetArea, open: (current: () => boolean) => void | Promise<void>) => {
+  const operation = actionContexts[area][action].capture()
+  if (!operation || !permitted(action, area)) return
   const key = `${area}:${action}`
   if (pendingOpens.get(key)?.generation === fiscalYearContextGeneration) return
   const intent = ++openingIntent
   const generation = fiscalYearContextGeneration
   const modal = area === 'budget-year' ? fiscalYearModal : lineItemModal
   const session = modal.captureSession()
-  const current = () => intent === openingIntent && generation === fiscalYearContextGeneration && modal.captureSession() === session && permitted(action, area)
+  const current = () => operation.canDispatch() && intent === openingIntent && generation === fiscalYearContextGeneration && modal.captureSession() === session && permitted(action, area)
   if (!actionTarget) return open(current)
   const token = Symbol(key)
   pendingOpens.set(key, { generation, token })
@@ -655,75 +733,89 @@ const saveFiscalYear = async () => {
     return
   }
   const fiscalYearState = selectedFiscalYear.value
-  const isUpdate = Boolean(fiscalYearState.id)
+  const targetId = fiscalYearTarget.value
+  const isUpdate = targetId !== null
+  const operation = fiscalYearContext.capture()
+  const committed = committedCaptures['budget-year'][isUpdate ? 'update' : 'create']()
+  if (!operation || !committed) return
   const requestedContextGeneration = fiscalYearContextGeneration
   const requestedBase = resourceBase.value
   const session = fiscalYearModal.captureSession()
   if (!fiscalYearPending.begin(session)) return
 
-  const current = () => requestedContextGeneration === fiscalYearContextGeneration && fiscalYearModal.captureSession() === session && canSaveFiscalYear.value
+  const ownsSettlement = () => operation.isCurrent() && requestedContextGeneration === fiscalYearContextGeneration
+  const current = () => operation.canDispatch() && committed.canDispatch() && ownsSettlement() && fiscalYearModal.isCurrentSession(session) && canSaveFiscalYear.value
   try {
-    if (!current() || (actionTarget && !await check(isUpdate ? 'update' : 'create', 'budget-year', current)) || !current()) return
-    await saveJson(
-      isUpdate
-        ? `${requestedBase}/budget-fiscal-years/${fiscalYearState.id}`
-        : `${requestedBase}/budget-fiscal-years`,
-      isUpdate ? 'PATCH' : 'POST',
-      fiscalYearState
-    )
-
-    if (!current() || !fiscalYearModal.closeSession(session)) return
-    await refreshOverview()
-    if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
+    try {
+      if (!current() || (actionTarget && !await check(isUpdate ? 'update' : 'create', 'budget-year', current)) || !current()) return
+      await saveJson(
+        isUpdate
+          ? `${requestedBase}/budget-fiscal-years/${targetId}`
+          : `${requestedBase}/budget-fiscal-years`,
+        isUpdate ? 'PATCH' : 'POST',
+        fiscalYearState
+      )
+    } catch (error: unknown) {
+      if (ownsSettlement() && fiscalYearModal.isCurrentSession(session)) showError(error)
+      return
+    }
+    const closed = operation.isCurrent() && fiscalYearModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!closed || settlement.kind !== 'refreshed' || !fiscalYearModal.isLatestSession(session)) return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
-  } catch (error: unknown) {
-    if (requestedContextGeneration === fiscalYearContextGeneration && fiscalYearModal.captureSession() === session) showError(error)
   } finally {
     fiscalYearPending.end(session)
   }
 }
 
 const saveLineItem = async () => {
-  if (!selectedLineItem.value || !permitted(selectedLineItem.value.id ? 'update' : 'create', 'budget-line')) {
+  if (!selectedLineItem.value || !permitted(lineItemTarget.value !== null ? 'update' : 'create', 'budget-line')) {
     return
   }
   const lineItemState = selectedLineItem.value
-  const isUpdate = Boolean(lineItemState.id)
+  const targetId = lineItemTarget.value
+  const isUpdate = targetId !== null
+  const operation = lineItemContext.capture()
+  const committed = committedCaptures['budget-line'][isUpdate ? 'update' : 'create']()
+  if (!operation || !committed) return
   const session = lineItemModal.captureSession()
   const requestedContextGeneration = fiscalYearContextGeneration
   const requestedBase = resourceBase.value
-  const current = () => requestedContextGeneration === fiscalYearContextGeneration && lineItemModal.captureSession() === session && permitted(isUpdate ? 'update' : 'create', 'budget-line')
+  const ownsSettlement = () => operation.isCurrent() && requestedContextGeneration === fiscalYearContextGeneration
+  const current = () => operation.canDispatch() && committed.canDispatch() && ownsSettlement() && lineItemModal.isCurrentSession(session) && permitted(isUpdate ? 'update' : 'create', 'budget-line')
   if (!lineItemPending.begin(session)) return
 
   try {
-    if (!current() || (actionTarget && !await check(isUpdate ? 'update' : 'create', 'budget-line', current)) || !current()) return
-    await saveJson(
-      isUpdate
-        ? `${requestedBase}/budget-line-items/${lineItemState.id}`
-        : `${requestedBase}/budget-line-items`,
-      isUpdate ? 'PATCH' : 'POST',
-      {
-        ...lineItemState,
-        egcs_fc_fundingsources: isUpdate ? undefined : lineItemState.egcs_fc_fundingsources,
-        egcs_fc_programfunding: lineItemState.egcs_fc_calculationmode && lineItemState.egcs_fc_calculationmode !== 'manual' ? undefined : lineItemState.egcs_fc_programfunding,
-        egcs_fc_percentage: lineItemState.egcs_fc_allowpercentageoverride ? lineItemState.egcs_fc_percentage ?? undefined : undefined
-      }
-    )
-
-    if (!current() || !lineItemModal.closeSession(session)) return
-    await refreshOverview()
-    if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
+    try {
+      if (!current() || (actionTarget && !await check(isUpdate ? 'update' : 'create', 'budget-line', current)) || !current()) return
+      await saveJson(
+        isUpdate
+          ? `${requestedBase}/budget-line-items/${targetId}`
+          : `${requestedBase}/budget-line-items`,
+        isUpdate ? 'PATCH' : 'POST',
+        {
+          ...lineItemState,
+          egcs_fc_fundingsources: isUpdate ? undefined : lineItemState.egcs_fc_fundingsources,
+          egcs_fc_programfunding: lineItemState.egcs_fc_calculationmode && lineItemState.egcs_fc_calculationmode !== 'manual' ? undefined : lineItemState.egcs_fc_programfunding,
+          egcs_fc_percentage: lineItemState.egcs_fc_allowpercentageoverride ? lineItemState.egcs_fc_percentage ?? undefined : undefined
+        }
+      )
+    } catch (error: unknown) {
+      if (ownsSettlement() && lineItemModal.isCurrentSession(session)) showError(error)
+      return
+    }
+    const closed = operation.isCurrent() && lineItemModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!closed || settlement.kind !== 'refreshed' || !lineItemModal.isLatestSession(session)) return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
-  } catch (error: unknown) {
-    if (current()) showError(error)
   } finally {
     lineItemPending.end(session)
   }
@@ -743,29 +835,38 @@ const checkFiscalYearLines = async (id: string, area: 'budget-year' | 'budget-li
   }
   return true
 }
-const deleteBudgetRecord = async (id: string, area: 'budget-year' | 'budget-line') => {
+const deleteBudgetRecord = async (id: string, area: BudgetArea) => {
+  const operation = actionContexts[area].delete.capture()
+  if (!operation) return
   const key = `${area}:${id}`
   if (!permitted('delete', area) || pendingDeletes.has(key)) return
   const token = Symbol(key)
   pendingDeletes.set(key, token)
   const generation = fiscalYearContextGeneration
   const base = resourceBase.value
-  const current = () => generation === fiscalYearContextGeneration && base === resourceBase.value && pendingDeletes.get(key) === token && permitted('delete', area)
+  const ownsSettlement = () => operation.isCurrent() && generation === fiscalYearContextGeneration && base === resourceBase.value && pendingDeletes.get(key) === token
+  const current = () => operation.canDispatch() && ownsSettlement() && permitted('delete', area)
   try {
-    if (!await check('delete', area, current) || !current() || !await checkFiscalYearLines(id, area, base, current)) return
     const deleted = await confirmDeleteRequest(`${base}/${area === 'budget-year' ? 'budget-fiscal-years' : 'budget-line-items'}/${id}`, {
+      operation,
+      target: {
+        id,
+        resolve: () => area === 'budget-year' ? getFiscalYearById(id) : getLineItemById(id),
+        eligible: () => permitted('delete', area)
+      },
       shouldProceed: current,
       confirm: async () => {
+        if (!await check('delete', area, current) || !current() || !await checkFiscalYearLines(id, area, base, current)) return false
         if (!await confirmDelete() || !current()) return false
         return await check('delete', area, current) && current() && await checkFiscalYearLines(id, area, base, current)
       }
     })
-    if (!deleted || !current()) return
+    if (!deleted || !ownsSettlement()) return
     await refreshOverview()
-    if (!current() || overviewStatus.value === 'error') return
+    if (!ownsSettlement() || overviewStatus.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (ownsSettlement()) showError(error)
   } finally {
     if (pendingDeletes.get(key) === token) pendingDeletes.delete(key)
   }
@@ -786,8 +887,7 @@ const openCreateFundingSource = (row: BudgetLeafRow) => openBudgetAction('update
     source: { egcs_fc_fundingsubtype: '', egcs_fc_amount: zeroMoney(requireBudgetCurrency(row)), egcs_fc_description_en: '', egcs_fc_description_fr: '' }
   })
 })
-const persistFundingSource = async (lineId: string, originalSubtype: string | null, replacement: BudgetFundingSource | null, current: () => boolean) => {
-  const base = resourceBase.value
+const persistFundingSource = async (base: string, lineId: string, originalSubtype: string | null, replacement: BudgetFundingSource | null, current: () => boolean, ownsSettlement: () => boolean) => {
   const fresh = await $fetch<FundingCaseAgreementBudgetOverviewRow, string>(`${base}/budget-overview`)
   if (!current()) return false
   const line = fresh.lineItems.find(item => item.id === lineId)
@@ -798,50 +898,85 @@ const persistFundingSource = async (lineId: string, originalSubtype: string | nu
     ? replacement ? [replacement] : []
     : [source])
   if (originalSubtype === null && replacement) sources.push(replacement)
+  if (!current()) return false
   await saveJson(`${base}/budget-line-items/${lineId}`, 'PATCH', { egcs_fc_fundingsources: sources })
-  return current()
+  return ownsSettlement()
 }
 const saveFundingSource = async () => {
   const selected = selectedFundingSource.value
-  if (!selected || !permitted('update', 'budget-line')) return
+  const target = fundingSourceTarget.value
+  const operation = fundingSourceContext.capture()
+  const collectionOperation = actionContexts['budget-line'].update.capture()
+  if (!selected || !target || !operation || !collectionOperation || !permitted('update', 'budget-line')) return
+  const base = resourceBase.value
+  const key = fundingPlanKey(base, target.lineId)
+  if (pendingFundingPlans.has(key)) return
   const session = fundingSourceModal.captureSession()
   const generation = fiscalYearContextGeneration
-  const current = () => generation === fiscalYearContextGeneration && fundingSourceModal.isCurrentSession(session) && permitted('update', 'budget-line')
+  const ownsSettlement = () => collectionOperation.isCurrent() && generation === fiscalYearContextGeneration
+  const current = () => operation.canDispatch() && ownsSettlement() && fundingSourceModal.isCurrentSession(session) && permitted('update', 'budget-line')
   if (!fundingSourcePending.begin(session)) return
+  pendingFundingPlans.add(key)
   try {
+    const replacement = { ...selected.source, ...FundingCaseAgreementFundingSourceSchema.parse(selected.source) }
     if (!current() || (actionTarget && !await check('update', 'budget-line', current)) || !current()) return
-    if (!await persistFundingSource(selected.lineId, selected.originalSubtype, { ...selected.source, ...FundingCaseAgreementFundingSourceSchema.parse(selected.source) }, current)) return
-    if (!fundingSourceModal.closeSession(session)) return
+    if (!await persistFundingSource(base, target.lineId, target.subtype, replacement, current, ownsSettlement)) return
+    if (!ownsSettlement()) return
+    const closed = fundingSourceModal.closeSession(session)
     await refreshOverview()
-    if (generation !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
-    expandedFundingRows.value[selected.lineId] = true
+    if (!ownsSettlement() || overviewStatus.value === 'error') return
+    expandedFundingRows.value[target.lineId] = true
+    if (!closed || !fundingSourceModal.isLatestSession(session)) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized(selected.originalSubtype === null ? 'common.added_success' : 'common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (ownsSettlement() && fundingSourceModal.isCurrentSession(session)) showError(error)
   } finally {
+    pendingFundingPlans.delete(key)
     fundingSourcePending.end(session)
   }
 }
+const fiscalYearFormSession = useFormSession({ owner: fiscalYearModal, action: { kind: 'remote', context: fiscalYearContext }, submit: saveFiscalYear })
+const lineItemFormSession = useFormSession({ owner: lineItemModal, action: { kind: 'remote', context: lineItemContext }, submit: saveLineItem })
+const fundingSourceFormSession = useFormSession({ owner: fundingSourceModal, action: { kind: 'remote', context: fundingSourceContext }, submit: saveFundingSource })
 const deleteFundingSource = async (row: BudgetLeafRow) => {
+  const operation = actionContexts['budget-line'].delete.capture()
+  if (!operation) return
   const source = row.fundingSources?.[0]
   const lineId = row.lineItemId
   if (row.fundingKind !== 'other' || !lineId || !source || !permitted('delete', 'budget-line')) return
+  const base = resourceBase.value
+  const planKey = fundingPlanKey(base, lineId)
   const key = `funding:${row.id}`
-  if (pendingDeletes.has(key)) return
+  if (pendingDeletes.has(key) || pendingFundingPlans.has(planKey)) return
+  pendingFundingPlans.add(planKey)
   const token = Symbol(key)
   pendingDeletes.set(key, token)
   const generation = fiscalYearContextGeneration
-  const current = () => generation === fiscalYearContextGeneration && pendingDeletes.get(key) === token && permitted('delete', 'budget-line')
+  const subtype = source.egcs_fc_fundingsubtype
+  const resolvesSource = () => Boolean(getLineItemById(lineId)?.egcs_fc_fundingsources.some(accepted => accepted.egcs_fc_fundingsubtype === subtype))
+  let sourceEligible = true
+  const stopTargetGuard = watch(resolvesSource, accepted => {
+    if (!accepted) sourceEligible = false
+  }, { immediate: true, flush: 'sync' })
+  const cleanupTargetGuard = () => {
+    stopTargetGuard()
+    targetGuardCleanups.delete(cleanupTargetGuard)
+  }
+  targetGuardCleanups.add(cleanupTargetGuard)
+  const ownsSettlement = () => operation.isCurrent() && generation === fiscalYearContextGeneration && pendingDeletes.get(key) === token
+  const current = () => operation.canDispatch() && ownsSettlement() && sourceEligible && resolvesSource() && permitted('delete', 'budget-line')
   try {
     if (!await check('delete', 'budget-line', current) || !current() || !await confirmDelete() || !current()) return
     if (!await check('delete', 'budget-line', current) || !current()) return
-    if (!await persistFundingSource(lineId, source.egcs_fc_fundingsubtype, null, current)) return
+    if (!await persistFundingSource(base, lineId, subtype, null, current, ownsSettlement)) return
     await refreshOverview()
-    if (!current() || overviewStatus.value === 'error') return
+    if (!ownsSettlement() || overviewStatus.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (current()) showError(error)
+    if (ownsSettlement()) showError(error)
   } finally {
+    cleanupTargetGuard()
+    pendingFundingPlans.delete(planKey)
     if (pendingDeletes.get(key) === token) pendingDeletes.delete(key)
   }
 }
@@ -1168,7 +1303,7 @@ const formatSignedBudgetDifference = (value: Money) => {
       v-model:open="isFiscalYearModalOpen" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget > Fiscal years" data-scope-label-fr="Ententes > Budget > Exercices financiers"
       :title="selectedFiscalYear.id ? t('agreement.budget.edit_fiscal_year') : t('agreement.budget.add_fiscal_year')">
       <template #body>
-        <UForm :state="selectedFiscalYear" :validate="validateFiscalYear" :validate-on="[]" class="space-y-4" data-help-view="agreement.budget.fiscal-year-dialog" data-help-label-en="Agreements — Fiscal year editor" data-help-label-fr="Ententes — Éditeur d’exercice financier" @submit="saveFiscalYear">
+        <UForm v-bind="fiscalYearFormSession" :state="selectedFiscalYear" :validate="validateFiscalYear" :validate-on="[]" class="space-y-4" data-help-view="agreement.budget.fiscal-year-dialog" data-help-label-en="Agreements — Fiscal year editor" data-help-label-fr="Ententes — Éditeur d’exercice financier">
           <UFormField :label="t('agreement.budget.fiscal_year')" name="egcs_fc_fiscalyear">
             <CommonServerLookupSelect
               v-model="selectedFiscalYear.egcs_fc_fiscalyear"
@@ -1200,11 +1335,12 @@ const formatSignedBudgetDifference = (value: Money) => {
       :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] overflow-y-auto' }">
       <template #body>
         <UForm
+          v-bind="lineItemFormSession"
           :state="selectedLineItem"
           :validate="validateLineItem"
           :validate-on="[]"
           class="space-y-6"
-          data-help-view="agreement.budget.line-item-dialog" data-help-label-en="Agreements — Line item editor" data-help-label-fr="Ententes — Éditeur de ligne budgétaire" @submit="saveLineItem">
+          data-help-view="agreement.budget.line-item-dialog" data-help-label-en="Agreements — Line item editor" data-help-label-fr="Ententes — Éditeur de ligne budgétaire">
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UFormField :label="t('agreement.budget.fiscal_year')" name="egcs_fc_fundingagreementbudgetfiscalyear">
               <CommonBilingualSelectMenu
@@ -1310,7 +1446,7 @@ const formatSignedBudgetDifference = (value: Money) => {
       v-model:open="isFundingSourceModalOpen"
       :title="selectedFundingSource.originalSubtype === null ? t('agreement.funding_sources.add') : `${t('common.edit')}: ${t('agreement.funding_sources.title')}`">
       <template #body>
-        <UForm :state="selectedFundingSource.source" :validate="validateFundingSource" :validate-on="[]" class="space-y-6" data-help-view="agreement.budget.funding-source-dialog" data-help-label-en="Agreements — Funding source editor" data-help-label-fr="Ententes — Éditeur de source de financement" @submit="saveFundingSource">
+        <UForm v-bind="fundingSourceFormSession" :state="selectedFundingSource.source" :validate="validateFundingSource" :validate-on="[]" class="space-y-6" data-help-view="agreement.budget.funding-source-dialog" data-help-label-en="Agreements — Funding source editor" data-help-label-fr="Ententes — Éditeur de source de financement">
           <div class="space-y-4">
             <UFormField :label="t('agreement.funding_sources.subtype')" name="egcs_fc_fundingsubtype" required>
               <CommonServerLookupSelect
@@ -1338,7 +1474,7 @@ const formatSignedBudgetDifference = (value: Money) => {
           </div>
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.budget.funding-source-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="fundingSourceModal.close()" />
-            <CommonSaveButton :label="selectedFundingSource.originalSubtype === null ? t('common.add') : t('common.update')" :loading="fundingSourcePending.isPending.value" :disabled="fundingSourcePending.isPending.value || !canUpdate || staticMode" data-help-target="agreement.budget.funding-source-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
+            <CommonSaveButton :label="selectedFundingSource.originalSubtype === null ? t('common.add') : t('common.update')" :loading="isFundingPlanPending" :disabled="isFundingPlanPending || !canUpdate || staticMode" data-help-target="agreement.budget.funding-source-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

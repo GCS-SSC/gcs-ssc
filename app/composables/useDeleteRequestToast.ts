@@ -1,6 +1,9 @@
+import { getCurrentScope, onScopeDispose } from 'vue'
+import type { DeleteConfirmationOptions, DeleteTarget } from '~/composables/useConfirmDeleteRequest'
 import type { ConfirmDialogOptions } from '~~/shared/types/ui'
 
-type DeleteRequestToastOptions = {
+type DeleteRequestToastOptions<Row> = Pick<DeleteConfirmationOptions<Row>, 'shouldProceed' | 'operation'> & {
+  target: DeleteTarget<Row>
   refresh: () => Promise<void> | void
   confirmOptions?: Partial<ConfirmDialogOptions>
   successTitle?: string
@@ -13,6 +16,12 @@ type DeleteRequestToastOptions = {
  * @returns Delete request toast helper.
  */
 export const useDeleteRequestToast = () => {
+  let lifetime: 'active' | 'disposed' = 'active'
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      lifetime = 'disposed'
+    })
+  }
   const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
   const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -24,16 +33,22 @@ export const useDeleteRequestToast = () => {
    * @param options - Refresh callback and optional confirmation or success-message overrides.
    * @returns True when the delete was confirmed and completed; false for cancellation or handled errors.
    */
-  const confirmDeleteWithToast = async (url: string, options: DeleteRequestToastOptions): Promise<boolean> => {
+  const confirmDeleteWithToast = async <Row>(url: string, options: DeleteRequestToastOptions<Row>): Promise<boolean> => {
+    const shouldProceed = () => lifetime === 'active' && (!options.shouldProceed || options.shouldProceed())
+    const isCurrent = () => lifetime === 'active'
+      && Boolean(options.operation?.isCurrent())
+    if (!shouldProceed() || !options.operation?.canDispatch()) return false
     try {
-      const ok = options.confirmOptions
-        ? await confirmDeleteRequest(url, options.confirmOptions)
-        : await confirmDeleteRequest(url)
-      if (!ok) {
+      const confirmationOptions = {
+        ...options.confirmOptions, shouldProceed, operation: options.operation, target: options.target
+      }
+      const ok = await confirmDeleteRequest(url, confirmationOptions)
+      if (!ok || !isCurrent()) {
         return false
       }
 
       await options.refresh()
+      if (!isCurrent()) return false
       toast.add({
         title: options.successTitle ?? toast.localized('common.success'),
         description: options.successDescription ?? toast.localized('common.deleted_success'),
@@ -42,7 +57,7 @@ export const useDeleteRequestToast = () => {
 
       return true
     } catch (error: unknown) {
-      showError(error)
+      if (isCurrent()) showError(error)
       return false
     }
   }

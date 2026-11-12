@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import type { Ref } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -29,15 +33,25 @@ const columns = computed<TableColumnInput<Row>[]>(() => [
   { id: 'status', headerKey: 'funding_opportunity.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ])
-const modalOpen = ref(false)
-const pending = ref(false)
+const modalSession = useModalSession()
+const { isOpen: modalOpen } = modalSession
+const mutation = useCrudModalPending(modalSession.captureSession)
+const pending = mutation.isPending
 const toast = useLocalizedToast()
 const form: Ref<IntakeForm> = ref({ attachments: [] })
+const actionContext = useActionContext({
+  identity: [() => props.opportunityId, () => form.value.egcs_fi_fundingopportunity],
+  authority: () => props.canCreate,
+  eligible: () => props.createAvailable !== false
+})
+watch([() => props.opportunityId, () => props.canCreate, () => props.createAvailable], () => {
+  modalOpen.value = false
+}, { flush: 'sync' })
 /**
  *
  */
 const openCreate = () => {
-  if (!props.canCreate || pending.value) return
+  if (modalSession.isDisposed() || !props.canCreate || pending.value) return
   if (props.createAvailable === false) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
     return
@@ -52,30 +66,49 @@ const openCreate = () => {
  *
  */
 const submit = async () => {
-  if (pending.value || !props.canCreate) return
-  pending.value = true
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
+  const session = modalSession.captureSession()
+  const draft = form.value
+  const opportunityId = props.opportunityId
+  if (session === null || !props.canCreate || props.createAvailable === false || !mutation.begin(session)) return
+  const ownsContext = () => operation.isCurrent() && !modalSession.isDisposed() && form.value === draft && props.opportunityId === opportunityId
+  const ownsOpening = () => ownsContext() && modalSession.isCurrentSession(session)
+  const ownsCompletion = () => ownsContext() && modalSession.captureSession() === null
   let createdId: string | undefined
+  let completed = false
   try {
+    const attachments = draft.attachments.map(attachment => ({
+      ...attachment,
+      providerMetadata: JSON.stringify(attachment.providerMetadata)
+    }))
     const response = await fetch(getClientRequestUrl('/api/funding-case-intakes'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        egcs_fi_fundingopportunity: props.opportunityId ?? form.value.egcs_fi_fundingopportunity,
-        egcs_fi_applicantrecipient: form.value.egcs_fi_applicantrecipient
+        egcs_fi_fundingopportunity: opportunityId ?? draft.egcs_fi_fundingopportunity,
+        egcs_fi_applicantrecipient: draft.egcs_fi_applicantrecipient
       })
     })
     if (!response.ok) await throwFetchResponseError(response)
     const created = await response.json() as { id: string }
+    if (!ownsOpening()) return
     createdId = String(created.id)
     let uploadError: unknown
-    for (const draft of form.value.attachments) {
+    for (const attachment of attachments) {
+      if (!ownsOpening()) return
+      if (!operation.canDispatch()) {
+        uploadError = new Error('Attachment upload admission ended')
+        break
+      }
+      if (!ownsOpening()) return
       const body = new FormData()
-      body.set('file', draft.file)
-      body.set('attachmentTypeId', draft.attachmentTypeId ?? '')
-      body.set('nameEn', draft.nameEn)
-      body.set('nameFr', draft.nameFr)
-      body.set('descriptionEn', draft.descriptionEn)
-      body.set('descriptionFr', draft.descriptionFr)
-      body.set('providerMetadata', JSON.stringify(draft.providerMetadata))
+      body.set('file', attachment.file)
+      body.set('attachmentTypeId', attachment.attachmentTypeId ?? '')
+      body.set('nameEn', attachment.nameEn)
+      body.set('nameFr', attachment.nameFr)
+      body.set('descriptionEn', attachment.descriptionEn)
+      body.set('descriptionFr', attachment.descriptionFr)
+      body.set('providerMetadata', attachment.providerMetadata)
       try {
         const upload = await fetch(getClientRequestUrl(`/api/attachments/fundingcaseintake/${createdId}`), {
           method: 'POST', body
@@ -86,20 +119,25 @@ const submit = async () => {
         break
       }
     }
+    if (!ownsOpening()) return
     modalOpen.value = false
+    completed = true
     await refresh()
-    await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
+    if (!ownsCompletion()) return
     if (uploadError) {
       toast.add({ title: toast.localized('funding_case_intake.attachment_upload_failed'), color: 'error' })
     }
+    await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
   } catch (error: unknown) {
+    if (!(completed ? ownsCompletion() : ownsOpening())) return
+    showError(error)
     if (createdId) {
       modalOpen.value = false
+      completed = true
       await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
     }
-    showError(error)
   } finally {
-    pending.value = false
+    mutation.end(session)
   }
 }
 </script>
@@ -130,6 +168,6 @@ const submit = async () => {
         </div>
       </template>
     </CommonResourceLayout>
-    <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" :lock-opportunity="!!opportunityId" @submit="submit" />
+    <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :action-context="actionContext" :pending="pending" :lock-opportunity="!!opportunityId" @submit="submit" />
   </div>
 </template>

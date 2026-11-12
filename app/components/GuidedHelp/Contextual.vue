@@ -15,6 +15,7 @@ import { createGuideSession } from '@gcs-ssc/guided-help/session'
 import type { GuideSessionSnapshot } from '@gcs-ssc/guided-help/session'
 import '@gcs-ssc/guided-help/style.css'
 import { useGuidedHelpDiscovery } from '~/composables/useGuidedHelpDiscovery'
+import { useGuidedHelpRequestOwner } from '~/composables/useGuidedHelpRequestOwner'
 import { helpRequest } from '~/utils/guided-help-client'
 import { clearHelpPicker, readHelpPicker, saveHelpPicker } from '~/utils/guided-help-picker'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -38,26 +39,27 @@ const returnTarget: Ref<GuideTargetRef | null> = ref(null)
 const routeIdentity = () => JSON.stringify([typeof route.value.name === 'string' ? route.value.name.replace(/___(?:en|fr)$/, '') : '', route.value.params])
 let loadedView: { element: HTMLElement; key: string; route: string } | null = null
 const journeyRuntime: Ref<GuidedHelpWorkflowRuntime | null> = ref(null)
-const journeyAuthorized = ref(false)
-const journeyLoading = ref(false)
-const journeyFailed = ref(false)
-let journeyGeneration = 0
-let selectionGeneration = 0
+const journeyRequest = useGuidedHelpRequestOwner<'journey'>()
+const selectionRequest = useGuidedHelpRequestOwner<'selection'>()
+const discoveryRequest = useGuidedHelpRequestOwner<'discovery' | 'launch'>()
+const journeyAuthorized = computed(() => journeyRequest.state.value.kind === 'success')
+const journeyLoading = journeyRequest.pending
+const journeyFailed = computed(() => journeyRequest.state.value.kind === 'error')
 let runtimeBindingId = ''
-const loading = ref(false)
+const loading = computed(() => discoveryRequest.state.value.kind === 'pending' && discoveryRequest.state.value.action === 'launch')
 const { items, loading: discoveryLoading, active, requestedGuideId } = useGuidedHelpDiscovery()
 const snapshot: Ref<GuideSessionSnapshot | null> = ref(null)
 const previewDocument: Ref<GuideDocument | null> = ref(null)
 const previewJourney: Ref<GuideJourneySession> = ref({ binding: null, cursor: null })
 const previewAgencyId = ref('')
-const journeyReaderKey = ref(0)
-const pickerMessageKey = ref('')
-const pickerMessage = computed(() => pickerMessageKey.value ? t(pickerMessageKey.value) : '')
+const readerKey = ref(0)
+type PickerState = { kind: 'inactive' } | { kind: 'selecting' } | { kind: 'selected' }
+const pickerState: Ref<PickerState> = ref({ kind: 'inactive' })
+const pickerMessage = computed(() => pickerState.value.kind === 'inactive' ? '' : t(pickerState.value.kind === 'selecting' ? 'guided_help.pick_instructions' : 'guided_help.pick_selected'))
 const previewStepId: Ref<string | undefined> = ref(undefined)
 const previewPath: Ref<string[] | undefined> = ref(undefined)
 let session: ReturnType<typeof createGuideSession> | null = null
 let observer: MutationObserver | null = null
-let generation = 0
 const agencyId = computed(() => {
   const agencyRoute = /\/(?:agencies|agences)\/([^/]+)/.exec(route.value.path)
   return viewAgencyId.value || agencyRoute?.[1] || ''
@@ -73,9 +75,9 @@ watch(() => Boolean(document.value), (value, previous) => {
   active.value = value
   if (!value && previous && user.value?.id) void discover()
 }, { immediate: true })
-watch(loading, value => {
+watch(discoveryRequest.pending, value => {
   discoveryLoading.value = value
-})
+}, { flush: 'sync' })
 const readDeclaredContext = (element: HTMLElement | null | undefined): GuideObservedContext | null => {
   try {
     const parsed = GuideObservedContextSchema.safeParse(JSON.parse(element?.dataset.helpContext ?? ''))
@@ -159,46 +161,50 @@ const exit = () => {
   previewStepId.value = undefined
   previewPath.value = undefined
   session?.clear()
-  journeyGeneration++
-  selectionGeneration++
+  discoveryRequest.reset()
+  journeyRequest.reset()
+  selectionRequest.reset()
   journeyRuntime.value = null
   runtimeBindingId = ''
-  journeyAuthorized.value = false
-  journeyLoading.value = false
-  journeyFailed.value = false
 }
 const discover = async () => {
-  const request = ++generation
+  discoveryRequest.reset()
   items.value = []
   if (!currentView.value || guidedHelpLedger.views.find(view => view.key === currentView.value)?.discoverable === false || (!agencyId.value && currentView.value !== 'agreements.list')) return
-  discoveryLoading.value = true
+  const request = discoveryRequest.begin('discovery')
+  if (!request) return
   try {
     const discoveryUrl = currentView.value === 'agreements.list'
       ? `/api/guided-help/discovery?view=${encodeURIComponent(currentView.value)}`
       : `/api/agency/${agencyId.value}/guided-help/discovery?view=${encodeURIComponent(currentView.value)}${viewReviewId.value ? `&reviewId=${encodeURIComponent(viewReviewId.value)}` : ''}${viewAgreementId.value ? `&agreementId=${encodeURIComponent(viewAgreementId.value)}` : ''}`
     const result = await helpRequest<{ items: { id: string, agencyId?: string, document: GuideDocument }[] }>(discoveryUrl)
-    if (request === generation) items.value = result.items
+    if (!discoveryRequest.isCurrent(request)) return
+    items.value = result.items
+    discoveryRequest.succeed(request)
   } catch (error) {
-    if (request === generation) showError(error)
-  } finally {
-    if (request === generation) discoveryLoading.value = false
+    if (discoveryRequest.isCurrent(request)) {
+      discoveryRequest.fail(request, error)
+      showError(error)
+    }
   }
 }
 const launch = async (id: string) => {
   const launchAgencyId = items.value.find(item => item.id === id)?.agencyId ?? agencyId.value
   if (loading.value || !user.value?.id || !launchAgencyId || !currentView.value) return
-  const request = ++generation
+  const request = discoveryRequest.begin('launch')
+  if (!request) return
   const launchedUser = user.value.id
-  loading.value = true
   try {
     const result = await helpRequest<{ agencyId: string, catalogId: string, publicationVersionId: string, sourceVersionId: string, document: GuideDocument }>(`/api/agency/${launchAgencyId}/guided-help/${id}/launch`, 'POST', { view: currentView.value, ...(viewReviewId.value ? { reviewId: viewReviewId.value } : {}), ...(viewAgreementId.value ? { agreementId: viewAgreementId.value } : {}) })
-    if (request !== generation || launchedUser !== user.value?.id) return
+    if (!discoveryRequest.isCurrent(request) || launchedUser !== user.value?.id) return
     previewDocument.value = null
     snapshot.value = session?.launch({ userId: launchedUser, agencyId: result.agencyId, publicationId: result.publicationVersionId, versionId: result.sourceVersionId, document: result.document }) ?? null
+    discoveryRequest.succeed(request)
   } catch (error) {
-    if (request === generation) showError(error)
-  } finally {
-    if (request === generation) loading.value = false
+    if (discoveryRequest.isCurrent(request)) {
+      discoveryRequest.fail(request, error)
+      showError(error)
+    }
   }
 }
 const journeyRegistration = computed(() => guidedHelpJourneys.find(item => item.adapter === document.value?.journey?.adapter))
@@ -249,35 +255,31 @@ const persistJourney = (cursor: GuideJourneyCursor | null) => {
 const refreshJourney = async () => {
   const binding = journeyBinding.value
   const registration = journeyRegistration.value
-  const request = ++journeyGeneration
-  journeyAuthorized.value = false
-  journeyFailed.value = false
+  journeyRequest.reset()
   if (!binding || !registration) {
     journeyRuntime.value = null
     runtimeBindingId = ''
-    journeyLoading.value = false
     return
   }
   if (runtimeBindingId !== binding.resourceId) journeyRuntime.value = null
   const expectedAgencyId = previewDocument.value ? previewAgencyId.value : snapshot.value?.agencyId
   if (!expectedAgencyId) return
-  journeyLoading.value = true
+  const request = journeyRequest.begin('journey')
+  if (!request) return
   try {
     const agreement = await helpRequest<{ id: string; agency_id: string }>(`/api/agreements/${encodeURIComponent(binding.resourceId)}`)
-    if (request !== journeyGeneration) return
+    if (!journeyRequest.isCurrent(request)) return
     if (String(agreement.id) !== binding.resourceId || String(agreement.agency_id) !== expectedAgencyId) throw new Error(t('workflow.help.journey_unavailable'))
     const runtime = await helpRequest<GuidedHelpWorkflowRuntime>(`/api/workflows/runtime?entityType=fundingcaseagreement&entityId=${encodeURIComponent(binding.resourceId)}&purpose=${registration.purpose}`)
-    if (request !== journeyGeneration) return
+    if (!journeyRequest.isCurrent(request)) return
     journeyRuntime.value = runtime
     runtimeBindingId = binding.resourceId
-    journeyAuthorized.value = true
+    journeyRequest.succeed(request)
   } catch (error) {
-    if (request === journeyGeneration) {
-      journeyFailed.value = true
+    if (journeyRequest.isCurrent(request)) {
+      journeyRequest.fail(request, error)
       showError(error)
     }
-  } finally {
-    if (request === journeyGeneration) journeyLoading.value = false
   }
 }
 const bindAgreement = async (binding: GuideJourneyBinding) => {
@@ -285,10 +287,11 @@ const bindAgreement = async (binding: GuideJourneyBinding) => {
   const actor = user.value?.id
   if (!actor || !document.value?.journey || journeyBinding.value || binding.resourceType !== 'fundingcaseagreement') return
   const selectedDocument = document.value
-  const selectedGeneration = ++selectionGeneration
+  const request = selectionRequest.begin('selection')
+  if (!request) return
   try {
     const agreement = await helpRequest<{ id: string; agency_id: string }>(`/api/agreements/${encodeURIComponent(binding.resourceId)}`)
-    if (actor !== user.value?.id || selectedGeneration !== selectionGeneration || selectedDocument !== document.value || journeyBinding.value) return
+    if (actor !== user.value?.id || !selectionRequest.isCurrent(request) || selectedDocument !== document.value || journeyBinding.value) return
     const selectedAgency = String(agreement.agency_id)
     if (String(agreement.id) !== binding.resourceId) return
     if (previewDocument.value) {
@@ -305,7 +308,12 @@ const bindAgreement = async (binding: GuideJourneyBinding) => {
     const updated = session?.updateJourney(actor, { binding, cursor: null })
     if (updated) snapshot.value = { ...updated, document: current.document }
   } catch (error) {
-    if (actor === user.value?.id && selectedDocument === document.value) showError(error)
+    if (selectionRequest.isCurrent(request) && actor === user.value?.id && selectedDocument === document.value) {
+      selectionRequest.fail(request, error)
+      showError(error)
+    }
+  } finally {
+    selectionRequest.succeed(request)
   }
 }
 const receiveSignal = (signal: GuideActionSignal) => {
@@ -353,19 +361,20 @@ const preview = (event: Event) => {
   const context = (event as CustomEvent<{ agencyId?: string }>).detail.agencyId
   previewAgencyId.value = context ?? ''
   previewJourney.value = { binding: null, cursor: null }
-  journeyReaderKey.value += 1
+  readerKey.value += 1
 }
 const completePicker = () => {
-  picking = null
-  pickerMessageKey.value = ''
+  pickerState.value = { kind: 'inactive' }
 }
-let picking: { view: string, target: string } | null = null
-const pick = (event: Event) => {
-  picking = (event as CustomEvent<{ view: string, target: string }>).detail
-  pickerMessageKey.value = 'guided_help.pick_instructions'
+const pick = () => {
+  pickerState.value = { kind: 'selecting' }
+}
+const cancelPicker = () => {
+  completePicker()
+  clearHelpPicker()
 }
 const pickTarget = (event: MouseEvent) => {
-  if (!picking || !(event.target instanceof Element)) return
+  if (pickerState.value.kind !== 'selecting' || !(event.target instanceof Element)) return
   const target = event.target.closest<HTMLElement>('[data-help-target]')
   const key = target?.dataset.helpTarget
   const view = guidedHelpLedger.views.find(item => item.targets.some(candidate => candidate.key === key))
@@ -375,27 +384,23 @@ const pickTarget = (event: MouseEvent) => {
   const state = user.value?.id ? readHelpPicker(user.value.id) : null
   const declaration = view.targets.find(item => item.key === key)
   if (state && declaration) saveHelpPicker({ ...state, selected: { view: view.key, target: declaration.key, kind: declaration.kind } })
-  picking = null
-  pickerMessageKey.value = 'guided_help.pick_selected'
+  pickerState.value = { kind: 'selected' }
 }
 watch(() => user.value?.id, (id, previousId) => {
   if (previousId && previousId !== id) {
     exit()
-    journeyReaderKey.value++
+    readerKey.value++
     clearHelpPicker()
-    pickerMessageKey.value = ''
-    picking = null
+    pickerState.value = { kind: 'inactive' }
   }
-  generation++
-  journeyGeneration++
+  discoveryRequest.reset()
+  journeyRequest.reset()
   items.value = []
-  loading.value = false
   previewDocument.value = null
   if (!id) {
     exit()
     clearHelpPicker()
-    pickerMessageKey.value = ''
-    picking = null
+    pickerState.value = { kind: 'inactive' }
     return
   }
   snapshot.value = session?.restore(id) ?? null
@@ -408,10 +413,8 @@ watch(requestedGuideId, id => {
 })
 watch([agencyId, currentView, viewReviewId, viewAgreementId, () => user.value?.id], () => {
   requestedGuideId.value = null
-  generation++
-  loading.value = false
+  discoveryRequest.reset()
   items.value = []
-  discoveryLoading.value = false
   if (user.value?.id && !document.value) void discover()
 })
 onMounted(() => {
@@ -420,8 +423,7 @@ onMounted(() => {
     snapshot.value = session.restore(user.value.id)
     const storedPicker = readHelpPicker(user.value.id)
     if (storedPicker) {
-      picking = { view: '', target: '' }
-      pickerMessageKey.value = 'guided_help.pick_instructions'
+      pickerState.value = { kind: 'selecting' }
     }
   }
   readView()
@@ -435,9 +437,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   active.value = false
   items.value = []
-  generation++
-  journeyGeneration++
-  selectionGeneration++
+  discoveryRequest.dispose()
+  journeyRequest.dispose()
+  selectionRequest.dispose()
   observer?.disconnect()
   window.removeEventListener('guided-help:preview', preview)
   window.removeEventListener('guided-help:pick', pick)
@@ -447,9 +449,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <GuidedHelpJourney v-if="document?.journey" :key="journeyReaderKey" :document="document" :snapshot="journeySnapshot" :locale="locale === 'fr' ? 'fr' : 'en'" :current-view="currentView" :ledger="guidedHelpLedger" :action-channel="actionChannel" :observed-context="observedContext" :return-target="returnTarget" :presentation="journeyPresentation" :freshness="journeyLoading ? 'loading' : journeyFailed ? 'unavailable' : 'ready'" :initial-cursor="previewDocument ? previewJourney.cursor : snapshot?.journey?.cursor" :initial-execution-id="previewDocument ? previewJourney.executionId : snapshot?.journey?.executionId" :notice="previewDocument ? t('guided_help.preview_warning') : undefined" @select="persistJourney" @exit="exit" @signal="receiveSignal" />
-  <GuidedHelpPanel v-if="document && !document.journey" :document="document" :locale="locale === 'fr' ? 'fr' : 'en'" :current-view="currentView" :ledger="guidedHelpLedger" :action-channel="actionChannel" :observed-context="observedContext" :initial-step-id="previewDocument ? previewStepId : snapshot?.stepId" :initial-path="previewDocument ? previewPath : snapshot?.path" :notice="previewDocument ? t('guided_help.preview_warning') : undefined" @select="select" @exit="exit" />
+  <GuidedHelpJourney v-if="document?.journey" :key="readerKey" :document="document" :snapshot="journeySnapshot" :locale="locale === 'fr' ? 'fr' : 'en'" :current-view="currentView" :ledger="guidedHelpLedger" :action-channel="actionChannel" :observed-context="observedContext" :return-target="returnTarget" :presentation="journeyPresentation" :freshness="journeyLoading ? 'loading' : journeyFailed ? 'unavailable' : 'ready'" :initial-cursor="previewDocument ? previewJourney.cursor : snapshot?.journey?.cursor" :initial-execution-id="previewDocument ? previewJourney.executionId : snapshot?.journey?.executionId" :notice="previewDocument ? t('guided_help.preview_warning') : undefined" @select="persistJourney" @exit="exit" @signal="receiveSignal" />
+  <GuidedHelpPanel v-if="document && !document.journey" :key="readerKey" :document="document" :locale="locale === 'fr' ? 'fr' : 'en'" :current-view="currentView" :ledger="guidedHelpLedger" :action-channel="actionChannel" :observed-context="observedContext" :initial-step-id="previewDocument ? previewStepId : snapshot?.stepId" :initial-path="previewDocument ? previewPath : snapshot?.path" :notice="previewDocument ? t('guided_help.preview_warning') : undefined" @select="select" @exit="exit" />
   <div v-if="pickerMessage" role="status" class="bg-default fixed top-4 left-1/2 z-50 -translate-x-1/2 rounded-md border p-4 shadow-lg">
-    {{ pickerMessage }} <UButton :to="localePath(appRouteLocations.guidedHelp())" :label="t('guided_help.pick_return')" /> <UButton :label="t('common.cancel')" @click="picking = null; pickerMessage = ''; clearHelpPicker()" />
+    {{ pickerMessage }} <UButton :to="localePath(appRouteLocations.guidedHelp())" :label="t('guided_help.pick_return')" /> <UButton :label="t('common.cancel')" @click="cancelPicker" />
   </div>
 </template>

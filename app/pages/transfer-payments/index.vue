@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onScopeDispose } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -25,6 +27,11 @@ const { can, canAny } = useCan()
 const { toDateInput } = useDateHelpers()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+let pageLifetime: 'active' | 'disposed' = 'active'
+onScopeDispose(() => {
+  pageLifetime = 'disposed'
+})
+const isPageActive = () => pageLifetime === 'active'
 
 const {
   search,
@@ -66,7 +73,6 @@ const {
   })
 })
 
-const { isWizardOpen, isSavingWizard, saveWizard } = useTransferPaymentWizard(refresh)
 const profilePending = useCrudModalPending(captureProfileSession)
 const isSavingProfile = profilePending.isPending
 
@@ -77,10 +83,13 @@ const isSavingProfile = profilePending.isPending
  */
 const saveProfile = async () => {
   const payload = selectedProfile.value
-  if (!payload) return
+  const operation = profileContext.capture()
+  const pageOperation = pageContext.capture()
+  if (!isPageActive() || !payload || !operation?.canDispatch()) return
   const session = captureProfileSession()
-  if (!profilePending.begin(session)) return
+  if (session === null || !profilePending.begin(session)) return
 
+  let completed = false
   try {
     const request = buildTransferPaymentProfileSaveRequest(payload)
     const response = await fetch(getClientRequestUrl(request.url), {
@@ -90,6 +99,12 @@ const saveProfile = async () => {
     })
     if (!response.ok) await throwFetchResponseError(response)
 
+    if (!isPageActive() || !pageOperation?.isCurrent()) return
+    if (!operation.isCurrent() || captureProfileSession() !== session) {
+      await refresh()
+      return
+    }
+    completed = true
     await completeTransferPaymentProfileSave({
       isUpdate: request.isUpdate,
       close: () => closeProfileSession(session),
@@ -98,7 +113,7 @@ const saveProfile = async () => {
       toast
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && pageOperation?.isCurrent() && ((operation.isCurrent() && captureProfileSession() === session) || (completed && captureProfileSession() === null))) showError(error)
   } finally {
     profilePending.end(session)
   }
@@ -112,17 +127,31 @@ const saveProfile = async () => {
  * @param {TransferPaymentProfileRow} profile - The profile record to be deleted.
  */
 const deleteProfile = async (profile: TransferPaymentProfileRow) => {
+  const operation = deleteContext.capture()
+  const profileId = profile.id
+  const agencyId = profile.egcs_tp_agency
+  const currentTarget = () => profiles.value.find(row => row.id === profileId && row.egcs_tp_agency === agencyId)
+  const target = currentTarget()
+  if (!isPageActive() || !operation?.canDispatch() || !target || !canDeleteProfile(target)) return
   try {
-    const deleted = await confirmDeleteRequest(`/api/transfer-payments/${profile.id}`)
-    if (!deleted) return
+    const deleted = await confirmDeleteRequest(`/api/transfer-payments/${profile.id}`, {
+      operation,
+      target: { id: profileId, resolve: currentTarget, eligible: canDeleteProfile },
+      shouldProceed: () => {
+        const current = currentTarget()
+        return isPageActive() && Boolean(current && canDeleteProfile(current))
+      }
+    })
+    if (!deleted || !isPageActive() || !operation.isCurrent()) return
     await refresh()
+    if (!isPageActive() || !operation.isCurrent()) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isPageActive() && operation.isCurrent()) showError(error)
   }
 }
 
@@ -141,7 +170,7 @@ const canCreateProfile: ComputedRef<boolean> = computed(() =>
  * @param {TransferPaymentProfileRow} profile - The profile record to check update permissions for.
  * @returns {boolean} True if authorized.
  */
-const canUpdateProfile = (profile: TransferPaymentProfileRow) => {
+const canUpdateProfile = (profile: Pick<TransferPaymentProfileForm, 'id' | 'egcs_tp_agency'>) => {
   return can('transfer_payment', 'update', {
     type: 'entity',
     agencyId: String(profile.egcs_tp_agency),
@@ -163,6 +192,25 @@ const canDeleteProfile = (profile: TransferPaymentProfileRow) => {
     path: [{ type: 'transfer_payment', id: String(profile.id) }]
   })
 }
+const pageContext = useActionContext({ identity: [], authority: () => canAny('transfer_payment', 'read', ['global', 'agency', 'program']) })
+const wizardContext = useActionContext({ identity: [], authority: canCreateProfile })
+const { isWizardOpen, isSavingWizard, saveWizard } = useTransferPaymentWizard(refresh, {
+  context: wizardContext,
+  collectionContext: pageContext
+})
+const currentProfile = computed(() => profiles.value.find(profile => profile.id === selectedProfile.value?.id))
+const profileContext = useActionContext({
+  identity: [() => selectedProfile.value?.id, () => currentProfile.value?.egcs_tp_agency ?? selectedProfile.value?.egcs_tp_agency],
+  authority: () => selectedProfile.value?.id
+    ? canUpdateProfile(selectedProfile.value)
+    : canAny('transfer_payment', 'create', ['global', 'agency']),
+  eligible: () => !selectedProfile.value?.id || Boolean(currentProfile.value
+    && currentProfile.value.egcs_tp_agency === selectedProfile.value.egcs_tp_agency)
+})
+const deleteContext = useActionContext({
+  identity: [],
+  authority: () => canAny('transfer_payment', 'delete', ['global', 'agency', 'program'])
+})
 </script>
 
 <template>
@@ -198,6 +246,7 @@ const canDeleteProfile = (profile: TransferPaymentProfileRow) => {
 
       <TransferPaymentWizardModal
         v-model:open="isWizardOpen"
+        :action-context="wizardContext"
         :pending="isSavingWizard"
         @submit="saveWizard" />
 
@@ -208,6 +257,7 @@ const canDeleteProfile = (profile: TransferPaymentProfileRow) => {
         :title="selectedProfile.id ? t('transfer_payment.update_title') : t('transfer_payment.create_title')"
         :submit-label="selectedProfile.id ? t('common.update') : t('common.add')"
         :pending="isSavingProfile"
+        :action-context="profileContext"
         @submit="saveProfile" />
     </template>
   </CommonDetailPage>

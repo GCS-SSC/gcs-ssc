@@ -31,6 +31,15 @@ interface BufferedAccess {
   bytes: number
 }
 
+type QueueLifecycle =
+  | { kind: 'accepting' }
+  | { kind: 'stopping'; deadline: number }
+  | { kind: 'stopped' }
+
+type DrainState =
+  | { kind: 'idle' }
+  | { kind: 'flushing'; completion: Promise<void> }
+
 const MAX_EVENTS = 2000
 const MAX_BYTES = 32 * 1024 * 1024
 const BATCH_SIZE = 100
@@ -61,9 +70,11 @@ export const createAccessLogQueue = (
   // Keep split batches across ticks so a poison batch cannot repeatedly consume the budget
   // before any of its smaller neighbors have a chance to be persisted.
   const batches: BufferedAccess[][] = []
-  let flushing: Promise<void> | undefined
-  let stopping = false
-  let shutdownDeadline = Infinity
+  let lifecycle: QueueLifecycle = { kind: 'accepting' }
+  let drainState: DrainState = { kind: 'idle' }
+  const shutdownDeadline = () => lifecycle.kind === 'stopping'
+    ? lifecycle.deadline
+    : lifecycle.kind === 'stopped' ? -Infinity : Infinity
   const stats = () => ({ backlog: pending.size, bytes, oldestAgeMs: pending.size
     ? Math.max(0, Date.now() - Date.parse(pending.values().next().value!.event.created_at))
     : 0 })
@@ -82,7 +93,7 @@ export const createAccessLogQueue = (
       batches.push(ready.slice(offset, offset + BATCH_SIZE))
     }
     while (batches.length && attemptedBatches < batchBudget
-      && Date.now() < Math.min(deadline, shutdownDeadline)) {
+      && Date.now() < Math.min(deadline, shutdownDeadline())) {
       const batch = batches.shift()!
       const started = Date.now()
       attemptedBatches++
@@ -118,19 +129,21 @@ export const createAccessLogQueue = (
     if (failed) throw new Error('Access log persistence failed')
   }
   const flush = async (force = false, deadline = Infinity): Promise<void> => {
-    if (flushing) return await flushing
-    if ((!force && stopping) || pending.size === 0) return
-    flushing = drain(deadline, force ? Infinity : maxBatchesPerFlush).finally(() => {
-      flushing = undefined
+    if (drainState.kind === 'flushing') return await drainState.completion
+    if ((!force && lifecycle.kind !== 'accepting') || pending.size === 0) return
+    const completion = drain(deadline, force ? Infinity : maxBatchesPerFlush).finally(() => {
+      drainState = { kind: 'idle' }
     })
-    await flushing
+    drainState = { kind: 'flushing', completion }
+    await completion
   }
   return {
     add: (event: AccessEvidence, ready: () => boolean): boolean => {
       // Leave room for the eventual transaction outcome string as it settles.
       const size = Buffer.byteLength(JSON.stringify(event), 'utf8') + 128
-      if (stopping || pending.size >= MAX_EVENTS || bytes + size > MAX_BYTES) {
-        report({ event: 'audit.access_dropped', id: event.id, reason: stopping ? 'shutdown' : 'queue_full', ...stats() })
+      if (lifecycle.kind !== 'accepting' || pending.size >= MAX_EVENTS || bytes + size > MAX_BYTES) {
+        report({ event: 'audit.access_dropped', id: event.id,
+          reason: lifecycle.kind !== 'accepting' ? 'shutdown' : 'queue_full', ...stats() })
         return false
       }
       pending.add({ event, ready, bytes: size })
@@ -139,18 +152,20 @@ export const createAccessLogQueue = (
     },
     flush: () => flush(),
     shutdown: async () => {
-      stopping = true
+      if (lifecycle.kind === 'stopped') return
       // Stop starting new batches after five seconds; an in-flight DB operation must settle
       // before its driver is destroyed (PostgreSQL acquisition/statement timeouts still apply).
-      shutdownDeadline = Date.now() + 5000
-      await flushing?.catch(() => {})
+      const deadline = Date.now() + 5000
+      lifecycle = { kind: 'stopping', deadline }
+      await (drainState.kind === 'flushing' ? drainState.completion.catch(() => {}) : undefined)
       try {
-        await flush(true, shutdownDeadline)
+        await flush(true, deadline)
       } catch { /* The final attempt is best effort; remaining evidence is reported below. */ } finally {
         if (pending.size) report({ event: 'audit.access_dropped', reason: 'shutdown', ...stats() })
         batches.length = 0
         pending.clear()
         bytes = 0
+        lifecycle = { kind: 'stopped' }
       }
     }
   }

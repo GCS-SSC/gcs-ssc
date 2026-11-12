@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import type { ActionContext } from '~/composables/useActionContext'
 import { TransferPaymentProfileSchema, type TransferPaymentProfileItem } from '~~/shared/types/schemas'
 
 type TransferPaymentProfileForm = Partial<Omit<TransferPaymentProfileItem, 'egcs_tp_datestart' | 'egcs_tp_dateend'> & {
@@ -6,11 +10,12 @@ type TransferPaymentProfileForm = Partial<Omit<TransferPaymentProfileItem, 'egcs
   egcs_tp_dateend?: string
 }>
 
-const { title, submitLabel, fixedAgencyId, pending = false } = defineProps<{
+const { title, submitLabel, fixedAgencyId, pending = false, actionContext } = defineProps<{
   title: string
   submitLabel: string
   fixedAgencyId?: string
   pending?: boolean
+  actionContext: ActionContext
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -34,12 +39,18 @@ watchEffect(() => {
 const onSubmit = () => {
   emit('submit')
 }
+const modalSession = useModalSession()
+watch([() => open.value, () => state.value, () => fixedAgencyId], () => {
+  modalSession.isOpen.value = false
+  modalSession.isOpen.value = open.value && state.value !== null
+}, { immediate: true, flush: 'sync' })
+const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
 </script>
 
 <template>
   <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="transfer-payment.modal">
     <template #body>
-      <UForm v-if="open" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm v-if="open" v-bind="formSession" :state="state" :validate="validate" :disabled="pending" class="space-y-4">
         <TransferPaymentFieldsTransferPaymentProfileFields
           v-model:model="state"
           is-stacked

@@ -1,23 +1,22 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
 import type { TableColumn } from '@nuxt/ui'
+import { useLocalRowEditor } from '~/composables/useLocalRowEditor'
+import type { ActionContext } from '~/composables/useActionContext'
 import { toRaw } from 'vue'
-import type { Ref } from 'vue'
 import type { ApprovalTemplateEditorStep } from '~/types/approval-template-editor'
 import { createApprovalTemplateEditorStep } from '~/utils/approval-template-editor-steps'
 
 const steps = defineModel<ApprovalTemplateEditorStep[]>('steps', {
   default: () => []
 })
-const { approvalTemplateId } = defineProps<{ approvalTemplateId: string }>()
+const { approvalTemplateId, actionContext } = defineProps<{ approvalTemplateId: string; actionContext: ActionContext }>()
 const emit = defineEmits<{ save: [] }>()
 
 const { t, locale } = useI18n()
 
-const isEditorOpen: Ref<boolean> = ref(false)
-const editorMode: Ref<'create' | 'edit'> = ref('create')
-const editingIndex: Ref<number | null> = ref(null)
-const draftStep: Ref<ApprovalTemplateEditorStep | null> = ref(null)
+const rowEditor = useLocalRowEditor<ApprovalTemplateEditorStep, number>()
+const { isOpen: isEditorOpen, mode: editorMode, target: editingIndex, draft: draftStep, close: resetEditor } = rowEditor
 
 type StepRow = {
   id: string
@@ -49,22 +48,12 @@ const columns = computed<TableColumn<StepRow>[]>(() => [
   { id: 'actions', header: t('common.actions') }
 ])
 
-const resetEditor = () => {
-  isEditorOpen.value = false
-  editorMode.value = 'create'
-  editingIndex.value = null
-  draftStep.value = null
-}
-
 const openCreateEditor = () => {
   const nextSequence = steps.value.length === 0
     ? 1
     : Math.max(...steps.value.map(step => step.egcs_cn_sequence)) + 1
 
-  editorMode.value = 'create'
-  editingIndex.value = null
-  draftStep.value = createApprovalTemplateEditorStep({ egcs_cn_sequence: nextSequence })
-  isEditorOpen.value = true
+  rowEditor.openCreate(createApprovalTemplateEditorStep({ egcs_cn_sequence: nextSequence }))
 }
 
 const openEditEditor = (sourceIndex: number) => {
@@ -73,13 +62,12 @@ const openEditEditor = (sourceIndex: number) => {
     return
   }
 
-  editorMode.value = 'edit'
-  editingIndex.value = sourceIndex
-  draftStep.value = structuredClone(toRaw(currentStep))
-  isEditorOpen.value = true
+  rowEditor.openEdit(sourceIndex, structuredClone(toRaw(currentStep)))
 }
 
 const saveDraft = async () => {
+  const operation = actionContext.capture()
+  if (!operation) return
   if (!draftStep.value) {
     return
   }
@@ -92,10 +80,12 @@ const saveDraft = async () => {
 
   resetEditor()
   await nextTick()
+  if (!operation.canDispatch()) return
   emit('save')
 }
 
 const removeStep = (sourceIndex: number) => {
+  if (!actionContext.capture()?.canDispatch()) return
   steps.value.splice(sourceIndex, 1)
   emit('save')
 }
@@ -136,6 +126,7 @@ defineExpose({
       v-model:step="draftStep"
       :mode="editorMode"
       :approval-template-id="approvalTemplateId"
+      :action-context="actionContext"
       @save="saveDraft"
       @cancel="resetEditor" />
   </div>

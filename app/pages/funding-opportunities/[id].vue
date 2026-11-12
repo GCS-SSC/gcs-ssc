@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { shallowRef, watch, onScopeDispose } from 'vue'
+import type { Scope } from '~~/shared/utils/scopes'
+import { useActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -32,6 +36,11 @@ const { getHeroCollapsed } = useDashboard()
 const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+let pageLifetime: 'active' | 'disposed' = 'active'
+onScopeDispose(() => {
+  pageLifetime = 'disposed'
+})
+const isPageActive = () => pageLifetime === 'active'
 const statusCatalog = useStatusCatalog()
 void statusCatalog.load()
 const { data: profile, error, status, refresh } = await useFetch<Opportunity, Error, string>(`/api/funding-opportunities/${id}`)
@@ -49,15 +58,52 @@ const tabs = computed(() => [
 ])
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'general' })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
-const scope = computed(() => profile.value && ({
-  type: 'entity' as const, agencyId: String(profile.value.agency_id),
-  path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
-}))
+// Retain the accepted owner scope when an admitted DELETE removes its own resource.
+const acceptedOwner = shallowRef<{ agencyId: string; programId: string } | null>(null)
+watch(profile, row => {
+  if (row && String(row.id) === id) acceptedOwner.value = { agencyId: String(row.agency_id), programId: String(row.program_id) }
+}, { immediate: true, flush: 'sync' })
+const scope = computed<Scope | null>(() => acceptedOwner.value
+  ? {
+      type: 'entity', agencyId: acceptedOwner.value.agencyId,
+      path: [{ type: 'transfer_payment', id: acceptedOwner.value.programId }]
+    }
+  : null)
 const statusDefinition = computed(() => statusCatalog.getById(profile.value?.egcs_fo_status))
 const isWritable = computed(() => Boolean(statusDefinition.value && !statusDefinition.value.deleted
   && !statusDefinition.value.readOnly && !statusDefinition.value.terminal))
 const canEdit = computed(() => Boolean(scope.value && can('transfer_payment', 'update', scope.value)))
 const canDelete = computed(() => Boolean(scope.value && can('transfer_payment', 'delete', scope.value)))
+const actionIdentity = [() => String(route.params.id), () => acceptedOwner.value?.agencyId, () => acceptedOwner.value?.programId]
+const updateContext = useActionContext({ identity: actionIdentity, authority: canEdit, eligible: isWritable })
+const captureCommitted = useCommittedSettlement({
+  context: updateContext,
+  /** Reads canonical Opportunity evidence after an acknowledged write.
+   * @returns Explicit read availability from the actual request state.
+   */
+  settle: async () => {
+    await refresh()
+    return error.value || status.value !== 'success' || String(profile.value?.id) !== id
+      ? { kind: 'unavailable', error: error.value }
+      : { kind: 'available' }
+  }
+})
+const attachmentMutationPending = ref(false)
+const attachmentMutationLane = {
+  pending: attachmentMutationPending,
+  /** Reserves the complete attachment list until transport and readback finish.
+   * @returns A release callback owned by this persistent page, or null without admission.
+   */
+  acquire: (): (() => void) | null => {
+    if (attachmentMutationPending.value || error.value || status.value !== 'success'
+      || String(profile.value?.id) !== id || !updateContext.capture()?.canDispatch()) return null
+    attachmentMutationPending.value = true
+    return () => {
+      attachmentMutationPending.value = false
+    }
+  }
+}
+const deleteContext = useActionContext({ identity: actionIdentity, authority: canDelete, eligible: isWritable })
 const isWithinIntakeWindow = computed(() => {
   if (!profile.value) return false
   const today = new Date().toISOString().slice(0, 10)
@@ -68,12 +114,23 @@ const canCreateIntake = computed(() => Boolean(scope.value && can('funding_case'
 const intakeAvailable = computed(() => isWritable.value && !statusDefinition.value?.isDraft && isWithinIntakeWindow.value)
 const modalOpen = ref(false)
 const pending = ref(false)
+const isDeleting = ref(false)
+let editorGeneration = 0
+let deleteEligibilityGeneration = 0
+if (isPageActive()) {
+  watch([modalOpen, canEdit, isWritable], () => {
+    editorGeneration += 1
+  }, { flush: 'sync' })
+  watch([canDelete, isWritable], () => {
+    deleteEligibilityGeneration += 1
+  }, { flush: 'sync' })
+}
 const form = ref<OpportunityForm>({ egcs_fo_transferpaymentstreams: [], egcs_fo_applicationschema: null })
 /**
  *
  */
 const edit = () => {
-  if (!profile.value || pending.value) return
+  if (!isPageActive() || !canEdit.value || !profile.value || pending.value || isDeleting.value) return
   if (!isWritable.value) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
     return
@@ -96,7 +153,15 @@ const edit = () => {
  *
  */
 const submit = async () => {
-  if (pending.value || !profile.value) return
+  if (!isPageActive() || pending.value || isDeleting.value || !profile.value || !canEdit.value || !modalOpen.value) return
+  if (!isWritable.value) {
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+    return
+  }
+  const operation = updateContext.capture()
+  if (!operation?.canDispatch()) return
+  const generation = editorGeneration
+  const ownsEditor = () => operation.isCurrent() && isPageActive() && generation === editorGeneration
   pending.value = true
   try {
     const body = {
@@ -113,10 +178,17 @@ const submit = async () => {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    modalOpen.value = false
-    await refresh()
+    if (!operation.isCurrent() || !isPageActive()) return
+    const closed = ownsEditor()
+    if (closed) modalOpen.value = false
+    const closedGeneration = editorGeneration
+    try {
+      await refresh()
+    } catch (cause: unknown) {
+      if (closed && operation.isCurrent() && isPageActive() && closedGeneration === editorGeneration) showError(cause)
+    }
   } catch (cause: unknown) {
-    showError(cause)
+    if (ownsEditor()) showError(cause)
   } finally {
     pending.value = false
   }
@@ -125,15 +197,29 @@ const submit = async () => {
  *
  */
 const remove = async () => {
+  if (!isPageActive() || !canDelete.value || pending.value || isDeleting.value) return
   if (!isWritable.value) {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
     return
   }
+  const operation = deleteContext.capture()
+  if (!operation?.canDispatch()) return
+  const generation = deleteEligibilityGeneration
+  const ownsDeletion = () => isPageActive()
+    && generation === deleteEligibilityGeneration
+    && canDelete.value && isWritable.value
+  isDeleting.value = true
   try {
-    if (!await confirmDeleteRequest(`/api/funding-opportunities/${id}`)) return
+    if (!await confirmDeleteRequest(`/api/funding-opportunities/${id}`, {
+      operation,
+      target: { id, resolve: () => profile.value?.id === id ? profile.value : null, eligible: () => isWritable.value },
+      shouldProceed: ownsDeletion
+    }) || !operation.isCurrent()) return
     await navigateTo(localePath(appRouteLocations.fundingOpportunities()))
   } catch (cause: unknown) {
-    showError(cause)
+    if (operation.isCurrent()) showError(cause)
+  } finally {
+    isDeleting.value = false
   }
 }
 const streamsLabel = computed(() => profile.value
@@ -213,13 +299,13 @@ const breadcrumbs = computed(() => [
           <div v-else-if="selectedTab === 'applications'" class="space-y-5">
             <FundingCaseIntakeApplicationsTable :opportunity-id="id" :can-create="canCreateIntake" :create-available="intakeAvailable" />
           </div>
-          <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
-          <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />
-          <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.egcs_fo_attachmenttypes" :can-edit="canEdit" @updated="refresh" />
+          <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :action-context="updateContext" :capture-committed="captureCommitted" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" />
+          <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :action-context="updateContext" :capture-committed="captureCommitted" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" />
+          <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :action-context="updateContext" :capture-committed="captureCommitted" :opportunity-id="id" :mutation-lane="attachmentMutationLane" :attachment-types="profile.egcs_fo_attachmenttypes" :can-edit="canEdit" />
           <ExtensionEntityTabPanel v-else-if="selectedExtensionTab" :item="selectedExtensionTab" />
         </CommonDetailWorkspace>
       </div>
-      <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :action-context="updateContext" :pending="pending" @submit="submit" />
     </template>
   </CommonDetailPage>
 </template>

@@ -604,6 +604,46 @@ export const activateRetriedApprovalRuntime = async (
   return true
 }
 
+const cancelReviewRuntimeSubtrees = async (
+  db: Transaction<Database>,
+  input: { runtimeId: string, runtimeItemIds: string[], actorId?: string, reason: string }
+) => {
+  const items = await db.selectFrom('Common_Runtime_Item').select(['id', 'egcs_cn_parentruntimeitem', 'egcs_cn_state'])
+    .where('egcs_cn_runtime', '=', input.runtimeId).where('_deleted', '=', false).forUpdate().execute()
+  const descendants = new Set(input.runtimeItemIds)
+  let added = true
+  while (added) {
+    added = false
+    for (const item of items) if (item.egcs_cn_parentruntimeitem !== null
+      && descendants.has(String(item.egcs_cn_parentruntimeitem)) && !descendants.has(String(item.id))) {
+      descendants.add(String(item.id))
+      added = true
+    }
+  }
+  const depthOf = (itemId: string): number => {
+    const visited = new Set<string>()
+    let currentId: string | null = itemId
+    let depth = 0
+    while (currentId !== null) {
+      if (visited.has(currentId)) throw new Error('Runtime item hierarchy contains a cycle')
+      visited.add(currentId)
+      const item = items.find(candidate => String(candidate.id) === currentId)
+      if (!item?.egcs_cn_parentruntimeitem) return depth
+      currentId = String(item.egcs_cn_parentruntimeitem)
+      depth += 1
+    }
+    return depth
+  }
+  const targetedItems = items.filter(item => descendants.has(String(item.id)))
+    .sort((left, right) => depthOf(String(right.id)) - depthOf(String(left.id)))
+  for (const item of targetedItems) {
+    if (!RUNTIME_TERMINAL_STATES.has(item.egcs_cn_state)) await transitionRuntimeItem(db, {
+      runtimeId: input.runtimeId, runtimeItemId: String(item.id), from: item.egcs_cn_state,
+      to: 'cancelled', actorId: input.actorId, reason: input.reason
+    })
+  }
+}
+
 export const advanceReviewRuntimeAfterTerminalItem = async (
   db: Transaction<Database>, reviewId: string, actorId?: string
 ) => {
@@ -651,12 +691,12 @@ export const advanceReviewRuntimeAfterTerminalItem = async (
     || current.reviewState === 'denied'
     || current.reviewState === 'failed'
   if (shortCircuit) {
-    for (const sibling of siblings) {
-      if (!RUNTIME_TERMINAL_STATES.has(sibling.egcs_cn_state)) await transitionRuntimeItem(db, {
-        runtimeId: String(current.runtimeId), runtimeItemId: String(sibling.id), from: sibling.egcs_cn_state,
-        to: 'cancelled', actorId, reason: 'review_set_short_circuit'
-      })
-    }
+    await cancelReviewRuntimeSubtrees(db, {
+      runtimeId: String(current.runtimeId),
+      runtimeItemIds: siblings.filter(sibling => !RUNTIME_TERMINAL_STATES.has(sibling.egcs_cn_state))
+        .map(sibling => String(sibling.id)),
+      actorId, reason: 'review_set_short_circuit'
+    })
   }
   const states = (await db.selectFrom('Common_Runtime_Item').select('egcs_cn_state')
     .where('egcs_cn_parentruntimeitem', '=', String(current.setItemId)).where('egcs_cn_kind', '=', 'review')
@@ -790,40 +830,10 @@ const cancelWithTransaction = async (
     .forUpdate(['Common_Runtime_Item', 'Common_Runtime']).executeTakeFirst()
   if (!current) return null
   if (RUNTIME_TERMINAL_STATES.has(current.state)) return 'TERMINAL' as const
-  const items = await db.selectFrom('Common_Runtime_Item').select(['id', 'egcs_cn_parentruntimeitem', 'egcs_cn_state'])
-    .where('egcs_cn_runtime', '=', String(current.runtimeId)).where('_deleted', '=', false).forUpdate().execute()
-  const descendants = new Set([String(current.itemId)])
-  let added = true
-  while (added) {
-    added = false
-    for (const item of items) if (item.egcs_cn_parentruntimeitem !== null
-      && descendants.has(String(item.egcs_cn_parentruntimeitem)) && !descendants.has(String(item.id))) {
-      descendants.add(String(item.id))
-      added = true
-    }
-  }
-  const depthOf = (itemId: string): number => {
-    const visited = new Set<string>()
-    let currentId: string | null = itemId
-    let depth = 0
-    while (currentId !== null) {
-      if (visited.has(currentId)) throw new Error('Runtime item hierarchy contains a cycle')
-      visited.add(currentId)
-      const item = items.find(candidate => String(candidate.id) === currentId)
-      if (!item?.egcs_cn_parentruntimeitem) return depth
-      currentId = String(item.egcs_cn_parentruntimeitem)
-      depth += 1
-    }
-    return depth
-  }
-  const targetedItems = items.filter(item => descendants.has(String(item.id)))
-    .sort((left, right) => depthOf(String(right.id)) - depthOf(String(left.id)))
-  for (const item of targetedItems) {
-    if (!RUNTIME_TERMINAL_STATES.has(item.egcs_cn_state)) await transitionRuntimeItem(db, {
-      runtimeId: String(current.runtimeId), runtimeItemId: String(item.id), from: item.egcs_cn_state,
-      to: 'cancelled', actorId, reason: 'explicit_cancellation'
-    })
-  }
+  await cancelReviewRuntimeSubtrees(db, {
+    runtimeId: String(current.runtimeId), runtimeItemIds: [String(current.itemId)],
+    actorId, reason: 'explicit_cancellation'
+  })
   if (current.runtimeKind === 'review_set' && !RUNTIME_TERMINAL_STATES.has(current.rootState)) {
     await transitionRuntime(db, {
       runtimeId: String(current.runtimeId), from: current.rootState, to: 'cancelled',
@@ -1062,8 +1072,11 @@ export const cloneDeniedRuntimeReview = async (
         egcs_cn_name_en: sourceApproval.egcs_cn_name_en,
         egcs_cn_name_fr: sourceApproval.egcs_cn_name_fr,
         egcs_cn_routingslip: String(newSlip.id),
-        egcs_cn_defaultuser: String(sourceApproval.egcs_cn_defaultuser),
-        egcs_cn_assigneduser: String(sourceApproval.egcs_cn_defaultuser),
+        egcs_cn_defaultuser: sourceApproval.egcs_cn_defaultuser,
+        egcs_cn_defaultgroup: sourceApproval.egcs_cn_defaultgroup,
+        egcs_cn_requiregroupdetails: sourceApproval.egcs_cn_requiregroupdetails,
+        egcs_cn_assigneduser: sourceApproval.egcs_cn_defaultuser,
+        egcs_cn_assignedgroup: sourceApproval.egcs_cn_defaultgroup,
         egcs_cn_isadded: sourceApproval.egcs_cn_isadded
       }).returning('id').executeTakeFirstOrThrow()
       const approvalCertifications = await db.selectFrom('Common_Approval_Certification').selectAll()

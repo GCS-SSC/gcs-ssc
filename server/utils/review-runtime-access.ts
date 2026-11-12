@@ -14,7 +14,7 @@ import {
 } from '~~/server/utils/applicant-recipient-auth'
 import { authorize, authorizeAssignedItem, authorizeFreshAssignedItem, authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import type { AuthContext } from '~~/server/utils/authorize'
-import type { Database, Entity_Type } from '~~/shared/types/database'
+import type { Database, Entity_Type, Workflow_Purpose } from '~~/shared/types/database'
 import { resolveAgreementAmendmentRuntimeContext } from '~~/server/utils/agreement-amendment'
 import { resolveAgreementClaimReconcileRuntimeContext, resolveAgreementClaimRuntimeContext } from '~~/server/utils/agreement-claim'
 import { resolveAgreementCommitmentRuntimeContext } from '~~/server/utils/agreement-commitment'
@@ -1891,8 +1891,14 @@ export const executeFreshAuthorizedWorkflowOwnerRecovery = async <T>(
 export const executeFreshAuthorizedCurrentRecommendationWrite = async <T>(
   event: H3Event,
   entityContext: ReviewRuntimeEntityContext,
-  callback: ReviewRuntimeWriteCallback<T>
+  callback: (trx: Transaction<Database>, recommendationId: string) => Promise<T>,
+  purpose: Workflow_Purpose = 'standard'
 ): Promise<T> => {
+  let recommendationId: string | null = null
+  const executeSelected = async (trx: Transaction<Database>) => {
+    if (!recommendationId) throw new Error('Current Recommendation was not authorized')
+    return await callback(trx, recommendationId)
+  }
   const authorizeRecommendation = async (
     trx: Transaction<Database>,
     authContext: AuthContext,
@@ -1905,12 +1911,14 @@ export const executeFreshAuthorizedCurrentRecommendationWrite = async <T>(
       .where('Common_Runtime.egcs_cn_entitytype', '=', current.entityType)
       .where('Common_Runtime.egcs_cn_entityid', '=', current.entityId)
       .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
+      .where('Common_Runtime.egcs_cn_purpose', '=', purpose)
       .where('Common_Runtime.egcs_cn_state', '=', 'active')
       .where('Common_Runtime._deleted', '=', false)
       .where('Common_Runtime_Item.egcs_cn_state', '=', 'active')
+      .where('Common_Runtime_Item.egcs_cn_kind', '=', 'recommendation')
       .where('Common_Runtime_Item._deleted', '=', false)
       .where('Common_Recommendation._deleted', '=', false)
-      .orderBy('Common_Recommendation.id', 'desc')
+      .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
       .forUpdate('Common_Recommendation')
       .executeTakeFirst()
     if (!recommendation) {
@@ -1920,7 +1928,8 @@ export const executeFreshAuthorizedCurrentRecommendationWrite = async <T>(
         key: 'apiErrors.admin_common.not_found'
       })
     }
-    await authorizeFreshAssignedItem(event, trx, authContext, 'commonrecommendation', String(recommendation.id))
+    recommendationId = String(recommendation.id)
+    await authorizeFreshAssignedItem(event, trx, authContext, 'commonrecommendation', recommendationId)
   }
 
   if (entityContext.entityType.includes(':')) {
@@ -1928,7 +1937,7 @@ export const executeFreshAuthorizedCurrentRecommendationWrite = async <T>(
       event,
       entityContext,
       async (evidence, current) => await authorizeRecommendation(evidence.trx, evidence.auth, current),
-      callback
+      executeSelected
     )
   }
 
@@ -1941,10 +1950,7 @@ export const executeFreshAuthorizedCurrentRecommendationWrite = async <T>(
       event.context.$db,
       entityContext.agreementId,
       agreementContext,
-      async trx => callback(
-        trx,
-        lockedRuntimeTarget ?? await requireLockedReviewRuntimeTarget(event, trx, entityContext)
-      ),
+      executeSelected,
       {
         action: 'update',
         blocksApprovalSubmission: false,
@@ -1972,7 +1978,7 @@ export const executeFreshAuthorizedCurrentRecommendationWrite = async <T>(
       : entityContext
     const current = await requireLockedReviewRuntimeTarget(event, trx, ownerContext)
     await authorizeRecommendation(trx, authContext, current)
-    return await callback(trx, current)
+    return await executeSelected(trx)
   })
 }
 

@@ -4,6 +4,9 @@ import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref } from 'vue'
+import { useModalSession } from '~/composables/useModalSession'
+import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
 import type { Ref } from 'vue'
 import type { TransferPaymentProfileForm } from '~~/shared/types/transfer-payment-ui'
 
@@ -53,15 +56,27 @@ const hasLoadError = computed(() => status.value === 'error' || Boolean(error.va
 
 provideBilingualFieldScope(() => profile.value ? { subject: 'transfer_payment', agencyId: String(profile.value.egcs_tp_agency), permissionAction: 'update' } : null)
 
-const isUpdateModalOpen: Ref<boolean> = ref(false)
+const profileModal = useModalSession()
+const isUpdateModalOpen = profileModal.isOpen
+const profilePending = useCrudModalPending(profileModal.captureSession)
+const isSavingProfile = profilePending.isPending
 const selectedProfile: Ref<TransferPaymentProfileForm | null> = ref(null)
+const { can } = useCan()
+const profileActionContext = useActionContext({
+  identity: [() => String(id), () => profile.value?.egcs_tp_agency],
+  authority: () => Boolean(profile.value && can('transfer_payment', 'update', {
+    type: 'entity', agencyId: String(profile.value.egcs_tp_agency),
+    path: [{ type: 'transfer_payment', id: String(id) }]
+  })),
+  eligible: () => Boolean(profile.value)
+})
 
 /**
  * Prepares the transfer payment profile data for editing and opens the update modal.
  * Formats start and end dates into a format compatible with date input fields.
  */
 const openUpdateProfile = () => {
-  if (!profile.value) return
+  if (!profile.value || !canUpdateProfile.value || profileModal.isDisposed()) return
   selectedProfile.value = {
     ...profile.value,
     egcs_tp_datestart: toDateInput(profile.value.egcs_tp_datestart),
@@ -75,19 +90,34 @@ const openUpdateProfile = () => {
  * Closes the modal, refreshes the profile data, and provides success feedback.
  */
 const updateProfile = async () => {
-  if (!selectedProfile.value || !canUpdateProfile.value) return
+  const operation = profileActionContext.capture()
+  const session = profileModal.captureSession()
+  if (!operation?.canDispatch() || !selectedProfile.value || !canUpdateProfile.value || session === null || profileModal.isDisposed() || !profilePending.begin(session)) return
+  const draft = selectedProfile.value
+  let saved = false
+  const ownsSave = () => !profileModal.isDisposed()
+    && operation.isCurrent()
+    && selectedProfile.value === draft
+    && (saved ? !isUpdateModalOpen.value : profileModal.isCurrentSession(session))
   try {
     const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${id}`), {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(selectedProfile.value)
+      body: JSON.stringify(draft)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    isUpdateModalOpen.value = false
+    if (profileModal.isDisposed() || !operation.isCurrent()) return
+    if (ownsSave()) {
+      saved = true
+      isUpdateModalOpen.value = false
+    }
     await refreshProfile()
+    if (!ownsSave()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (ownsSave()) showError(error)
+  } finally {
+    profilePending.end(session)
   }
 }
 </script>
@@ -140,6 +170,8 @@ const updateProfile = async () => {
       v-model:state="selectedProfile"
       :title="t('transfer_payment.update_title')"
       :submit-label="t('common.update')"
+      :pending="isSavingProfile"
+      :action-context="profileActionContext"
       @submit="updateProfile" />
   </div>
 </template>

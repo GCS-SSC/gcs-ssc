@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { TransferPaymentStreamRecommendationSetupCreateSchema, TransferPaymentStreamRecommendationSetupPatchSchema } from '~~/shared/types/schemas'
 /* eslint-disable jsdoc/require-jsdoc -- page-local handlers */
 import type { FetchError } from 'ofetch'
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AgencyProfileItem, TransferPaymentStreamRecommendationSetupItem, TransferPaymentStreamRecommendationSetupMemberItem } from '~~/shared/types/schemas'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -60,7 +63,7 @@ const validate = withFormRequirements(
   async () => await validateDraft(getDraft()),
   TransferPaymentStreamRecommendationSetupCreateSchema
 )
-const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', { type: 'agency', agencyId }))
+const canManagePublication = computed(() => can('agency', 'update', { type: 'agency', agencyId }))
 const isEditable = computed(() => state.value?.publicationState !== 'retired')
 const canUpdate = computed(() => canManagePublication.value && isEditable.value)
 const canCreate = computed(() => canManagePublication.value && isEditable.value)
@@ -85,7 +88,21 @@ const getDraft = () => state.value
       egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
     }
   : null
-const mutation = useEditorMutationCoordinator({ getDraft })
+let disposed = false
+onScopeDispose(() => {
+  disposed = true
+})
+const formOwner = useModalSession()
+watch(state, () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = state.value !== null
+}, { immediate: true, flush: 'sync' })
+const actionContext = useActionContext({
+  identity: [() => String(route.params.id), () => String(route.params.recommendationSetId)],
+  authority: canManagePublication,
+  eligible: () => Boolean(agency.value) && state.value !== null && state.value.publicationState !== 'retired'
+})
+const mutation = useEditorMutationCoordinator({ getDraft, context: actionContext })
 const initialSetup = setup.value
 if (initialSetup) {
   mutation.replaceSessionDraft(() => {
@@ -101,13 +118,14 @@ watch(selectedSection, value => {
 })
 const retryLoad = async () => {
   await refresh()
+  if (disposed) return
   const refreshedSetup = setup.value
   if (refreshedSetup && !loadError.value) {
     mutation.replaceSessionDraft(() => {
       state.value = cloneSetup(refreshedSetup)
     })
     await nextTick()
-    detailContent.value?.focus()
+    if (!disposed) detailContent.value?.focus()
   }
 }
 
@@ -135,7 +153,9 @@ const mergeMemberMetadata = (value: SetupDetail) => {
   state.value.hasUnpublishedChanges = value.hasUnpublishedChanges
 }
 const refreshForMutation = async (token: EditorMutationToken) => {
+  if (!mutation.isTokenCurrent(token)) return false
   await refresh()
+  if (loadError.value || loadStatus.value !== 'success') return false
   const refreshedSetup = setup.value
   if (!refreshedSetup) return false
   return mutation.applyMutationRefresh(token, {
@@ -146,13 +166,18 @@ const refreshForMutation = async (token: EditorMutationToken) => {
 const persistSetup = async (token: EditorMutationToken, showSuccess: boolean) => {
   if (!state.value) return false
   await formRef.value?.validate()
-  const response = await fetch(getClientRequestUrl(endpoint), { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+  if (!mutation.canContinue(token)) return false
+  const body = {
     egcs_cn_name_en: state.value.egcs_cn_name_en,
-    egcs_cn_name_fr: state.value.egcs_cn_name_fr, egcs_cn_description_en: state.value.egcs_cn_description_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_description_en: state.value.egcs_cn_description_en,
     egcs_cn_description_fr: state.value.egcs_cn_description_fr,
     egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
-  }) })
+  }
+  if (!mutation.canContinue(token)) return false
+  const response = await fetch(getClientRequestUrl(endpoint), { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   if (!response.ok) await throwFetchResponseError(response)
+  mutation.acceptCommittedDraft(token, body)
   if (!await refreshForMutation(token)) {
     if (mutation.isTokenCurrent(token)) showPreservedDraft()
     return false
@@ -168,7 +193,7 @@ const save = async () => {
     try {
       await persistSetup(token, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -178,6 +203,7 @@ const publicationAction = async (action: 'publish' | 'retire') => {
   await mutation.run(action, async token => {
     try {
       if (action === 'publish' && mutation.isDirty.value && !await persistSetup(token, false)) return
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/${action}`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
       if (!await refreshForMutation(token)) {
@@ -186,7 +212,7 @@ const publicationAction = async (action: 'publish' | 'retire') => {
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized(`recommendation_setup.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -216,15 +242,25 @@ const editMember = (member: TransferPaymentStreamRecommendationSetupMemberItem) 
 }
 const deleteMember = async (member: TransferPaymentStreamRecommendationSetupMemberItem) => {
   if (!canDelete.value || mutation.isPending.value || blockDirtyAction()) return
+  const memberId = String(member.id)
   await mutation.run('delete-member', async token => {
     try {
-      deletingMemberId.value = String(member.id)
-      const deleted = await confirmDeleteRequest(`${endpoint}/items/${member.id}`)
+      deletingMemberId.value = memberId
+      const deleted = await confirmDeleteRequest(`${endpoint}/items/${memberId}`, {
+        operation: token.operation,
+        target: {
+          id: memberId,
+          resolve: () => state.value?.members.find(current => String(current.id) === memberId),
+          eligible: () => canDelete.value
+        },
+        shouldProceed: () => mutation.canContinue(token) && canDelete.value
+          && Boolean(state.value?.members.some(current => String(current.id) === memberId))
+      })
       if (deleted) await refreshForMutation(token)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     } finally {
-      deletingMemberId.value = null
+      if (deletingMemberId.value === memberId) deletingMemberId.value = null
     }
   })
 }
@@ -239,12 +275,31 @@ const onSchemaCreated = async (payload: { schemaId: string }) => {
 }
 const runMemberMutation: EditorMutationRunner = async request => {
   if (mutation.isPending.value || blockDirtyAction()) return undefined
+  const memberDraft = selectedMember.value
+  const schemaDraft = schemaCreateState.value
+  const memberWasOpen = isMemberModalOpen.value
+  const schemaWasOpen = isSchemaCreateModalOpen.value
   return await mutation.run('member', async token => {
+    if (!mutation.canContinue(token)) return undefined
     const result = await request()
-    await refreshForMutation(token)
+    if (!mutation.isTokenCurrent(token)) return undefined
+    if (result === undefined) return undefined
+    let readbackUnavailable = false
+    try {
+      await refreshForMutation(token)
+      readbackUnavailable = Boolean(loadError.value) || loadStatus.value !== 'success'
+    } catch (error) {
+      readbackUnavailable = true
+      if (mutation.isTokenCurrent(token)) showError(error)
+    }
+    if (readbackUnavailable && mutation.isTokenCurrent(token)) {
+      if (memberWasOpen && selectedMember.value === memberDraft) isMemberModalOpen.value = false
+      if (schemaWasOpen && schemaCreateState.value === schemaDraft) isSchemaCreateModalOpen.value = false
+    }
     return result
   })
 }
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: actionContext }, submit: save })
 </script>
 
 <template>
@@ -282,8 +337,8 @@ const runMemberMutation: EditorMutationRunner = async request => {
         role="region"
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
-        <CommonPublicationDetailHero icon="i-lucide-message-square-quote" type-label-key="transfer_payment.recommendation_setup" publish-label-key="recommendation_setup.publish" retire-label-key="recommendation_setup.retire" :name="getBilingualValue(state, 'egcs_cn_name')" :publication-version="state.publicationVersion" :publication-state="state.publicationState" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
-        <UForm ref="recommendationSetupForm" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col" @submit="save">
+        <CommonPublicationDetailHero :action-context="actionContext" icon="i-lucide-message-square-quote" type-label-key="transfer_payment.recommendation_setup" publish-label-key="recommendation_setup.publish" retire-label-key="recommendation_setup.retire" :name="getBilingualValue(state, 'egcs_cn_name')" :publication-version="state.publicationVersion" :publication-state="state.publicationState" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
+        <UForm v-bind="formSession" ref="recommendationSetupForm" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col">
           <CommonDesignTimeEditorShell>
             <template #sidebar>
               <AssessmentSchemaDetailSidebar v-if="canUpdate" v-model="selectedSection" data-field-container="Composite editor; its individual field declarations own their identities." :section-tabs="sectionTabs" :is-saving="isSaving" :disabled="mutation.isPending.value" :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }" @save="save" />
@@ -359,8 +414,8 @@ const runMemberMutation: EditorMutationRunner = async request => {
             </CommonDesignTimeEditorSections>
           </CommonDesignTimeEditorShell>
         </UForm>
-        <AgencyRecommendationSetItemModal v-if="selectedMember && canUpdate" v-model:open="isMemberModalOpen" v-model:state="selectedMember" :recommendation-setup-id="setupId" :agency-id="agencyId" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" />
-        <AgencyRecommendationSetSchemaCreateModal v-if="schemaCreateState && canCreate" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :recommendation-setup-id="setupId" :agency-id="agencyId" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" @created="onSchemaCreated" />
+        <AgencyRecommendationSetItemModal v-if="selectedMember && canUpdate" v-model:open="isMemberModalOpen" v-model:state="selectedMember" :recommendation-setup-id="setupId" :agency-id="agencyId" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" :action-context="actionContext" />
+        <AgencyRecommendationSetSchemaCreateModal v-if="schemaCreateState && canCreate" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :recommendation-setup-id="setupId" :agency-id="agencyId" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" :action-context="actionContext" @created="onSchemaCreated" />
       </div>
     </template>
   </CommonDetailPage>

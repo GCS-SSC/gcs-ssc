@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -40,12 +41,22 @@ const {
 } = useResourceTable<TransferPaymentStreamRow>({
   fetchUrl: computed(() => `/api/transfer-payments/${programId}/streams`)
 })
+const wizardContext = useActionContext({
+  identity: [() => programId],
+  authority: () => canUpdateChild
+})
+const deleteContext = useActionContext({
+  identity: [() => programId],
+  authority: () => canDeleteChild
+})
+const collectionContext = useActionContext({ identity: [() => programId], authority: true })
 const { isStreamWizardOpen, isSavingStreamWizard, saveStreamWizard } = useTransferPaymentStreamWizard(
   () => programId,
   async () => {
     await refreshStreams()
     return streamStatusState.value === 'success'
-  }
+  },
+  { context: wizardContext, collectionContext }
 )
 
 const submitStreamWizard = async (data: TransferPaymentStreamPolymorphicWizard) => {
@@ -95,6 +106,12 @@ const streamModal = useCrudModal<TransferPaymentStreamRow, Partial<TransferPayme
   }
 })
 
+const profileContext = useActionContext({
+  identity: [() => programId],
+  authority: () => canUpdateChild,
+  eligible: () => persistedStream.value === null || streams.value.some(row => row.id === persistedStream.value?.id)
+})
+
 const isStreamModalOpen: Ref<boolean> = streamModal.isOpen
 const selectedStream: Ref<Partial<TransferPaymentStreamItem> | null> = streamModal.selected
 const openCreateStream = () => {
@@ -116,29 +133,36 @@ const isSavingStream = streamPending.isPending
  */
 const saveStream = async () => {
   if (disposed || !selectedStream.value || !canUpdateChild) return
+  const operation = profileContext.capture()
+  const collectionOperation = collectionContext.capture()
+  if (!operation) return
   const session = streamModal.captureSession()
   if (!streamPending.begin(session)) return
   const generation = contextGeneration
   const requestedProgramId = programId
+  const targetId = persistedStream.value?.id ?? null
   const payload = {
     ...selectedStream.value,
     egcs_tp_parentstream: selectedStream.value.egcs_tp_parentstream || null
   }
-  const isUpdate = Boolean(payload.id)
+  const isUpdate = targetId !== null
   let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(payload.id
-      ? `/api/transfer-payments/${requestedProgramId}/streams/${payload.id}`
+    const response = await fetch(getClientRequestUrl(targetId
+      ? `/api/transfer-payments/${requestedProgramId}/streams/${targetId}`
       : `/api/transfer-payments/${requestedProgramId}/streams`), {
       method: isUpdate ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!isCurrentContext(generation)) return
+    if (!operation.isCurrent() || !isCurrentContext(generation)) {
+      if (collectionOperation?.isCurrent()) await refreshStreams()
+      return
+    }
     closedSession = streamModal.closeSession(session)
   } catch (error: unknown) {
-    if (isCurrentContext(generation) && streamModal.captureSession() === session) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation) && streamModal.captureSession() === session) showError(error)
     return
   } finally {
     streamPending.end(session)
@@ -146,14 +170,14 @@ const saveStream = async () => {
 
   try {
     await refreshStreams()
-    if (!isCurrentContext(generation) || !closedSession || streamModal.captureSession() !== null || streamStatusState.value === 'error') return
+    if (!operation.isCurrent() || !isCurrentContext(generation) || !closedSession || !streamModal.isLatestSession(session) || streamStatusState.value === 'error') return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent() && isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -165,22 +189,35 @@ const saveStream = async () => {
  * @param {TransferPaymentStreamRow} stream - The stream record to be deleted.
  */
 const deleteStream = async (stream: TransferPaymentStreamRow) => {
-  if (disposed || !canDeleteChild || !streams.value.some(row => String(row.id) === String(stream.id))) return
-  const generation = contextGeneration
+  if (disposed || !canDeleteChild) return
+  const operation = deleteContext.capture()
+  if (!operation) return
+  const targetId = stream.id
   const requestedProgramId = programId
   try {
-    const ok = await confirmDeleteRequest(`/api/transfer-payments/${requestedProgramId}/streams/${stream.id}`)
-    if (!ok || !isCurrentContext(generation)) return
+    const ok = await confirmDeleteRequest(`/api/transfer-payments/${requestedProgramId}/streams/${targetId}`, {
+      operation,
+      target: {
+        id: targetId,
+        resolve: () => streams.value.find(row => row.id === targetId),
+        eligible: () => canDeleteChild
+      }
+    })
+    if (!ok || !operation.isCurrent()) return
     await refreshStreams()
-    if (!isCurrentContext(generation) || streamStatusState.value === 'error') return
+    if (!operation.isCurrent() || streamStatusState.value === 'error') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    if (isCurrentContext(generation)) showError(error)
+    if (operation.isCurrent()) showError(error)
   }
 }
 
 watch(() => programId, () => {
   contextGeneration += 1
+  streamModal.close()
+  isStreamWizardOpen.value = false
+}, { flush: 'sync' })
+watch(wizardContext.version, () => {
   streamModal.close()
   isStreamWizardOpen.value = false
 }, { flush: 'sync' })
@@ -271,6 +308,7 @@ onBeforeUnmount(() => {
       :program-id="programId"
       :persisted-stream="persistedStream ?? undefined"
       :persisted-program-id="persistedProgramId ?? undefined"
+      :action-context="profileContext"
       :pending="isSavingStream"
       @submit="saveStream" />
 
@@ -279,6 +317,7 @@ onBeforeUnmount(() => {
       :key="programId"
       v-model:open="isStreamWizardOpen"
       :program-id="programId"
+      :action-context="wizardContext"
       :pending="isSavingStreamWizard"
       @submit="submitStreamWizard" />
   </div>

@@ -10,6 +10,7 @@ const {
   entityType,
   entityId,
   actionRoleAllowed = undefined,
+  mutationRoleAllowed,
   completionPrerequisiteWarning,
   workflowPrerequisiteWarning,
   canComplete,
@@ -30,6 +31,7 @@ const {
   entityType: Entity_Type & Workflow_Target_Entity_Type
   entityId: string
   actionRoleAllowed?: boolean
+  mutationRoleAllowed: boolean
   completionPrerequisiteWarning?: LocalizedToastText
   workflowPrerequisiteWarning?: LocalizedToastText
   canComplete: boolean
@@ -89,6 +91,7 @@ const refreshLifecycle = () => {
       hide-when-unconfigured
       :can-edit="canWorkWorkflow"
       :action-role-allowed="actionRoleAllowed"
+      :mutation-role-allowed="mutationRoleAllowed"
       :action-prerequisite-warning="workflowPrerequisiteWarning"
       :refresh-key="lifecycleRefreshKey"
       @changed="refreshLifecycle" />

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { CapturedActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
 import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
@@ -44,11 +48,11 @@ type PaymentCalculatorResult = GcsPaymentAmountCalculatorResult
 
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 
-const { agreementId, currency: agreementCurrency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency: agreementCurrency, canCreate, canCreateRole, canUpdate, canDelete } = defineProps<{
   agreementId: string
   currency: Currency_Codes
   canCreate: boolean
-  canCreateRole?: boolean
+  canCreateRole: boolean
   canUpdate: boolean
   canDelete: boolean
 }>()
@@ -99,20 +103,28 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageSize: 25
 })
 
+const editingTarget: Ref<string | null> = ref(null)
+
 const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, PaymentWizardForm>({
-  createState: () => ({ egcs_fc_currency: agreementCurrency }),
-  updateState: payment => ({
-    id: payment.id,
-    egcs_fc_applicantrecipient: payment.egcs_fc_applicantrecipient,
-    egcs_fc_commitmenttype: payment.commitment_type ?? undefined,
-    egcs_fc_fiscalyear: payment.egcs_fc_fiscalyear,
-    egcs_fc_paymenttype: payment.egcs_fc_paymenttype,
-    egcs_fc_periodstart: payment.egcs_fc_periodstart,
-    egcs_fc_periodend: payment.egcs_fc_periodend,
-    egcs_fc_paymentamount: payment.egcs_fc_paymentamount,
-    egcs_fc_currency: payment.egcs_fc_currency,
-    egcs_fc_comment: payment.egcs_fc_comment
-  })
+  createState: () => {
+    editingTarget.value = null
+    return { egcs_fc_currency: agreementCurrency }
+  },
+  updateState: payment => {
+    editingTarget.value = String(payment.id)
+    return {
+      id: payment.id,
+      egcs_fc_applicantrecipient: payment.egcs_fc_applicantrecipient,
+      egcs_fc_commitmenttype: payment.commitment_type ?? undefined,
+      egcs_fc_fiscalyear: payment.egcs_fc_fiscalyear,
+      egcs_fc_paymenttype: payment.egcs_fc_paymenttype,
+      egcs_fc_periodstart: payment.egcs_fc_periodstart,
+      egcs_fc_periodend: payment.egcs_fc_periodend,
+      egcs_fc_paymentamount: payment.egcs_fc_paymentamount,
+      egcs_fc_currency: payment.egcs_fc_currency,
+      egcs_fc_comment: payment.egcs_fc_comment
+    }
+  }
 })
 
 const selectedPayment = paymentModal.selected
@@ -169,10 +181,23 @@ const paymentLabel = (field: string) => {
 const memoCodingOptions = (memoIndex: number) => (offsetPreview.value?.egcs_fc_creditmemos[memoIndex]?.egcs_fc_codingaccounts ?? [])
   .map(account => ({ value: account.id, label: locale.value === 'fr' ? account.egcs_fc_name_fr : account.egcs_fc_name_en }))
 const selectedMemoCodingLabel = (memoIndex: number, codingId?: string) => memoCodingOptions(memoIndex).find(item => item.value === codingId)?.label ?? t('common.not_available')
+const capturePaymentValidationOwner = (state: PaymentWizardForm) => {
+  const operation = formContext.capture()
+  const session = paymentModal.captureSession()
+  const owner = agreementId
+  const preview = offsetPreview.value
+  const step = currentStep.value
+  const signature = JSON.stringify(state)
+  return () => Boolean(operation?.canDispatch()) && !disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session
+    && selectedPayment.value === state && owner === agreementId && preview === offsetPreview.value
+    && step === currentStep.value && signature === JSON.stringify(state)
+}
 const validatePayment = withFormRequirements(async (state: PaymentWizardForm) => {
+  const isCurrent = capturePaymentValidationOwner(state)
+  const preview = offsetPreview.value
   const errors = await validatePaymentSchema(state)
   for (const [memoIndex, memo] of (state.egcs_fc_offsetcreditmemos ?? []).entries()) {
-    const expected = offsetPreview.value?.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount
+    const expected = preview?.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount
     const names = memo.egcs_fc_lines.map(line => line.egcs_fc_codingaccount).filter(Boolean)
     if (new Set(names).size !== names.length) errors.push({
       name: `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`, message: t('agreement.payments.wizard.duplicate_coding')
@@ -185,17 +210,19 @@ const validatePayment = withFormRequirements(async (state: PaymentWizardForm) =>
       // The schema keeps invalid money on its individual field.
     }
   }
-  wizardErrors.value = errors
+  if (isCurrent()) wizardErrors.value = errors
   return errors
 }, FundingCaseAgreementPaymentCreateSchema)
 const preparePaymentOffset = async () => {
   if (!selectedPayment.value || isSavingPayment.value || isPaymentAboveCalculatorCeiling.value || paymentCalculatorResult.value?.loading) return false
   if (!selectedPayment.value.id && (!paymentCalculatorsReady.value || hasPaymentAmountCalculatorConflict.value)) return false
+  const operation = formContext.capture()
+  if (!operation?.canDispatch()) return false
   const header = paymentHeader()
   const session = paymentModal.captureSession()
   const signature = paymentHeaderSignature.value
   const owner = agreementId
-  const isCurrent = () => !disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session
+  const isCurrent = () => operation.canDispatch() && !disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session
     && owner === agreementId && signature === paymentHeaderSignature.value
   if (!header?.id && !await checkCreationPrerequisites(isCurrent)) return false
   if (!isCurrent()) return false
@@ -205,9 +232,10 @@ const preparePaymentOffset = async () => {
   if (errors.length) return false
   if (!paymentPending.begin(session)) return false
   try {
-    const previewUrl = header?.id ? `/api/agreements/${owner}/payments/${header.id}/preview` : `/api/agreements/${owner}/payments/preview`
+    const recordId = editingTarget.value
+    const previewUrl = recordId !== null ? `/api/agreements/${owner}/payments/${recordId}/preview` : `/api/agreements/${owner}/payments/preview`
     const preview = await sendJson<PaymentOffsetPreview>(previewUrl, 'POST', header)
-    if (disposed || !isPaymentModalOpen.value || paymentModal.captureSession() !== session || owner !== agreementId || signature !== paymentHeaderSignature.value || !selectedPayment.value) return false
+    if (!isCurrent() || !selectedPayment.value) return false
     offsetPreview.value = preview
     selectedPayment.value.egcs_fc_offsetdatetoken = preview.egcs_fc_offsetdatetoken
     selectedPayment.value.egcs_fc_offsetdate = preview.egcs_fc_offsetdate
@@ -219,7 +247,7 @@ const preparePaymentOffset = async () => {
     goToStep('credit-memos')
     return true
   } catch (error) {
-    if (!disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session && owner === agreementId && signature === paymentHeaderSignature.value) showError(error)
+    if (isCurrent()) showError(error)
     return false
   } finally {
     paymentPending.end(session)
@@ -230,7 +258,10 @@ const nextPaymentStep = async () => {
   if (currentStep.value === 'payment') {
     await preparePaymentOffset()
   } else if (currentStep.value === 'credit-memos' && selectedPayment.value && offsetPreview.value) {
-    if (!(await validatePayment(selectedPayment.value)).length) goToStep('review')
+    const state = selectedPayment.value
+    const isCurrent = capturePaymentValidationOwner(state)
+    const errors = await validatePayment(state)
+    if (isCurrent() && !errors.length) goToStep('review')
   }
 }
 const changePaymentStep = async (step: string) => {
@@ -241,7 +272,12 @@ const changePaymentStep = async (step: string) => {
     goToStep(step as PaymentWizardStep)
     return
   }
-  while (stepIndex.value < targetIndex) {
+  const operation = formContext.capture()
+  if (!operation?.canDispatch()) return
+  const session = paymentModal.captureSession()
+  const owner = agreementId
+  const isCurrent = () => operation.canDispatch() && !disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session && owner === agreementId
+  while (isCurrent() && stepIndex.value < targetIndex) {
     const previousIndex = stepIndex.value
     await nextPaymentStep()
     if (stepIndex.value === previousIndex) break
@@ -268,11 +304,13 @@ watch(agreementIdRef, () => {
 const useOverviewFetch = useFetch as unknown as (url: Ref<string>) => {
   data: Ref<FundingCaseAgreementPaymentOverviewRow | null>
   refresh: () => Promise<void>
+  error: Ref<unknown>
   status: Ref<'idle' | 'pending' | 'success' | 'error'>
 }
 const {
   data: overview,
   refresh: refreshOverview,
+  error: overviewError,
   status: overviewStatus
 } = useOverviewFetch(computed(() => `/api/agreements/${agreementId}/payments-overview`))
 
@@ -285,6 +323,37 @@ const columns: TableColumnInput<FundingCaseAgreementPaymentRow>[] = [
   { id: 'comment', accessorKey: 'egcs_fc_comment', headerKey: 'common.comment' },
   { id: 'actions', headerKey: 'common.actions', meta: { class: { th: 'w-40', td: 'w-40' } } }
 ]
+
+const payments = computed<FundingCaseAgreementPaymentOverviewRow['payments']>(() => overview.value?.payments ?? [])
+const createContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canCreateRole
+})
+const updateContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canDelete
+})
+const committedReadback = async () => {
+  await refreshOverview()
+  return overviewStatus.value === 'success'
+    ? { kind: 'available' as const }
+    : { kind: 'unavailable' as const, error: overviewError.value }
+}
+const captureCreateCommitted = useCommittedSettlement({ context: createContext, settle: committedReadback })
+const captureUpdateCommitted = useCommittedSettlement({ context: updateContext, settle: committedReadback })
+const formContext = useActionContext({
+  identity: [agreementIdRef, editingTarget],
+  authority: () => editingTarget.value === null ? canCreateRole : canUpdate,
+  eligible: () => {
+    if (editingTarget.value === null) return canCreate
+    const record = payments.value.find(row => String(row.id) === editingTarget.value)
+    return Boolean(record && !isRecordLocked(record))
+  }
+})
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
 const tableRows = computed<FundingCaseAgreementPaymentRow[]>(() => (overview.value?.payments ?? []).filter((row: FundingCaseAgreementPaymentRow) => {
@@ -314,7 +383,8 @@ const warnRecordPrerequisite = () => toast.add({
 const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementPaymentRow | null> => {
   const owner = agreementId
   const generation = recordActionGeneration
-  const current = tableRows.value.find(row => String(row.id) === recordId)
+  if (!isCurrent()) return null
+  const current = payments.value.find(row => String(row.id) === recordId)
   if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
   if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
   if (!current || isRecordLocked(current)) {
@@ -342,16 +412,22 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete',
     return null
   }
 }
-const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementPaymentRow) => void | Promise<void>) => {
+const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementPaymentRow, operation: CapturedActionContext) => void | Promise<void>) => {
   if (pendingRecordActions.value.has(recordId)) return
+  const operation = (action === 'delete' ? deleteContext : updateContext).capture()
+  if (!operation?.canDispatch()) return
   const intent = action === 'update' ? ++modalIntent : modalIntent
   const session = paymentModal.captureSession()
-  const isCurrent = () => action === 'delete' || (intent === modalIntent && paymentModal.captureSession() === session)
+  const isCurrent = () => operation.canDispatch() && (action === 'delete' || (intent === modalIntent && paymentModal.captureSession() === session))
   const token = Symbol(recordId)
   pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
   try {
-    const record = await loadWorkableRecord(recordId, action, isCurrent)
-    if (record && isCurrent()) await work(record)
+    const record = action === 'delete' ? payments.value.find(row => String(row.id) === recordId) : await loadWorkableRecord(recordId, action, isCurrent)
+    if (action === 'delete' && record && isRecordLocked(record)) {
+      warnRecordPrerequisite()
+      return
+    }
+    if (record && isCurrent()) await work(record, operation)
   } finally {
     if (pendingRecordActions.value.get(recordId) === token) {
       const remaining = new Map(pendingRecordActions.value)
@@ -365,7 +441,9 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
   const owner = agreementId
   const generation = recordActionGeneration
   try {
+    if (!isCurrent()) return false
     const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
+    if (!isCurrent()) return false
     if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
     if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
     if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
@@ -377,9 +455,11 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
 }
 const openCreatePayment = async () => {
   if (isOpeningCreate.value) return
+  const operation = createContext.capture()
+  if (!operation?.canDispatch()) return
   const intent = ++modalIntent
   const session = paymentModal.captureSession()
-  const isCurrent = () => intent === modalIntent && paymentModal.captureSession() === session
+  const isCurrent = () => operation.canDispatch() && intent === modalIntent && paymentModal.captureSession() === session
   isOpeningCreate.value = true
   const generation = recordActionGeneration
   try {
@@ -401,20 +481,27 @@ watch([agreementIdRef, () => canCreate, () => canCreateRole,
   pendingExtensionCreateAction.value = null
 }, { flush: 'sync' })
 const activateExtensionCreateAction = async (value: string) => {
-  if (!(canCreateRole ?? canCreate) || pendingExtensionCreateAction.value !== null) return
+  if (!canCreateRole || pendingExtensionCreateAction.value !== null) return
+  const operation = createContext.capture()
+  if (!operation?.canDispatch()) return
   const generation = extensionCreateGeneration
-  const isCurrent = () => !disposed && generation === extensionCreateGeneration
+  const isCurrent = () => operation.canDispatch() && !disposed && generation === extensionCreateGeneration
   pendingExtensionCreateAction.value = value
   try {
     if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
     readyExtensionCreateActions.value = new Set([...readyExtensionCreateActions.value, value])
   } finally {
-    if (isCurrent()) pendingExtensionCreateAction.value = null
+    if (!disposed && generation === extensionCreateGeneration) pendingExtensionCreateAction.value = null
   }
 }
 
 const handleExtensionCreated = async () => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const isCurrent = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  if (!isCurrent()) return
   await refreshOverview()
+  if (!isCurrent() || overviewStatus.value === 'error') return
   toast.add({
     title: toast.localized('common.success'),
     description: toast.localized('common.added_success'),
@@ -507,46 +594,62 @@ const handlePaymentCalculatorExtensionPayload = (extensionKey: string, value: Re
 }
 
 const savePayment = async () => {
-  if (!selectedPayment.value) {
+  if (disposed || !selectedPayment.value) {
     return
   }
   if (isPaymentAboveCalculatorCeiling.value) {
     return
   }
   if (!selectedPayment.value.id && (!paymentCalculatorsReady.value || hasPaymentAmountCalculatorConflict.value)) return
+  const operation = formContext.capture()
+  if (!operation?.canDispatch()) return
   const paymentState = selectedPayment.value
-  const isUpdate = Boolean(paymentState.id)
+  const recordId = editingTarget.value
+  const isUpdate = recordId !== null
   if (currentStep.value !== 'review' || !offsetPreview.value || paymentCalculatorResult.value?.loading) {
     await nextPaymentStep()
     return
   }
+  const committed = (isUpdate ? captureUpdateCommitted : captureCreateCommitted)()
+  if (!committed) return
   const session = paymentModal.captureSession()
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const intent = modalIntent
+  const ownsScope = () => operation.isCurrent() && !disposed && owner === agreementId && generation === recordActionGeneration
+  const ownsFeedback = () => ownsScope() && intent === modalIntent && paymentModal.isLatestSession(session)
   if (!paymentPending.begin(session)) return
 
   try {
-    if (isUpdate && !await loadWorkableRecord(String(paymentState.id), 'update',
-      () => isPaymentModalOpen.value && paymentModal.captureSession() === session)) return
-    if (!isUpdate && !await checkCreationPrerequisites(
-      () => isPaymentModalOpen.value && paymentModal.captureSession() === session)) return
-    if (disposed || paymentModal.captureSession() !== session) return
-    await saveJson(
-      isUpdate
-        ? `/api/agreements/${agreementId}/payments/${paymentState.id}`
-        : `/api/agreements/${agreementId}/payments`,
-      isUpdate ? 'PATCH' : 'POST',
-      paymentState
-    )
-
-    if (!paymentModal.closeSession(session)) return
-    await refreshOverview()
-    if (overviewStatus.value === 'error') return
+    try {
+      if (isUpdate && !await loadWorkableRecord(String(recordId), 'update',
+        () => operation.canDispatch() && isPaymentModalOpen.value && paymentModal.captureSession() === session)) return
+      if (!isUpdate && !await checkCreationPrerequisites(
+        () => operation.canDispatch() && isPaymentModalOpen.value && paymentModal.captureSession() === session)) return
+      if (!ownsFeedback() || !operation.canDispatch() || !committed.canDispatch()) return
+      await saveJson(
+        isUpdate
+          ? `/api/agreements/${owner}/payments/${recordId}`
+          : `/api/agreements/${owner}/payments`,
+        isUpdate ? 'PATCH' : 'POST',
+        paymentState
+      )
+    } catch (error: unknown) {
+      if (ownsFeedback() && paymentModal.isCurrentSession(session)) showError(error)
+      return
+    }
+    const closesInitiatingSession = ownsScope() && paymentModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!ownsFeedback() || !closesInitiatingSession || settlement.kind === 'retired') return
+    if (settlement.kind === 'unavailable') {
+      showError(settlement.error)
+      return
+    }
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
-  } catch (error: unknown) {
-    if (!disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session) showError(error)
   } finally {
     paymentPending.end(session)
   }
@@ -554,16 +657,23 @@ const savePayment = async () => {
 
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const confirmDelete = useDeleteConfirm()
-const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', async () => {
+const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', async (_record, operation) => {
   const owner = agreementId
   const generation = recordActionGeneration
-  const shouldProceed = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  const shouldProceed = () => operation.isCurrent() && !disposed && owner === agreementId && generation === recordActionGeneration
   try {
     const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/payments/${recordId}`, {
+      operation,
+      target: {
+        id: recordId,
+        resolve: () => payments.value.find(row => String(row.id) === recordId),
+        eligible: row => !isRecordLocked(row)
+      },
       shouldProceed,
       confirm: async () => {
-        if (!await confirmDelete() || !shouldProceed()) return false
-        return Boolean(await loadWorkableRecord(recordId, 'delete')) && shouldProceed()
+        if (!await loadWorkableRecord(recordId, 'delete', operation.canDispatch) || !operation.canDispatch()) return false
+        if (!await confirmDelete() || !operation.canDispatch()) return false
+        return operation.canDispatch() && Boolean(await loadWorkableRecord(recordId, 'delete', operation.canDispatch)) && operation.canDispatch()
       }
     })
     if (!deleted || !shouldProceed()) return
@@ -574,6 +684,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
     if (shouldProceed()) showError(error)
   }
 })
+const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remote', context: formContext }, submit: savePayment })
 </script>
 
 <template>
@@ -589,20 +700,20 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
       table-class="w-full max-w-full"
       :ui="{ base: 'w-full min-w-[56rem] table-fixed', th: 'whitespace-normal', td: 'whitespace-normal' }"
       :button-label="t('agreement.payments.add')"
-      :show-button="(canCreateRole ?? canCreate) && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict && !hasPaymentAmountCalculatorConflict))"
+      :show-button="canCreateRole && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict && !hasPaymentAmountCalculatorConflict))"
       :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.payments.search')"
       help-add-target="agreement.payments.add"
       help-search-target="agreement.payments.search" @add="openCreatePayment" @retry="refreshOverview">
       <template #actions>
         <UAlert
-          v-if="(canCreateRole ?? canCreate) && extensionCreateError"
+          v-if="canCreateRole && extensionCreateError"
           role="alert"
           color="error"
           :title="t('common.load_failed')"
           :actions="[{ label: t('common.retry'), onClick: () => refreshExtensionCreateActions() }]" />
         <div
-          v-if="(canCreateRole ?? canCreate) && hasExtensionCreateConflict"
+          v-if="canCreateRole && hasExtensionCreateConflict"
           role="status"
           tabindex="0"
           :aria-label="t('extensions.create_operation_conflict')"
@@ -619,7 +730,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
           <UIcon name="i-lucide-alert-triangle" aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
           <span>{{ t('extensions.payment_amount_calculator_conflict') }}</span>
         </div>
-        <template v-if="(canCreateRole ?? canCreate) && extensionReplacementCreateAction && !hasExtensionCreateConflict">
+        <template v-if="canCreateRole && extensionReplacementCreateAction && !hasExtensionCreateConflict">
           <ExtensionCreateActionHost
             v-if="canCreate || readyExtensionCreateActions.has(extensionReplacementCreateAction.value)"
             :item="extensionReplacementCreateAction"
@@ -632,7 +743,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
             :disabled="pendingExtensionCreateAction !== null"
             @click="activateExtensionCreateAction(extensionReplacementCreateAction.value)" />
         </template>
-        <template v-if="canCreateRole ?? canCreate">
+        <template v-if="canCreateRole">
           <template v-for="action in extensionAppendCreateActions" :key="action.value">
             <ExtensionCreateActionHost
               v-if="canCreate || readyExtensionCreateActions.has(action.value)"
@@ -760,7 +871,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
       :ui="{ content: 'rounded-none shadow-none ring-0' }"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="flex h-full flex-col" data-help-view="agreement.payments.payment-dialog" data-help-label-en="Agreements — Payment editor" data-help-label-fr="Ententes — Éditeur de paiement" @submit="savePayment">
+        <UForm v-bind="formSession" :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="flex h-full flex-col" data-help-view="agreement.payments.payment-dialog" data-help-label-en="Agreements — Payment editor" data-help-label-fr="Ententes — Éditeur de paiement">
           <CommonWizardShell
             data-testid="payment-create-wizard"
             :current-step="currentStep" :steps="steps" :is-first-step="isFirstStep" :is-last-step="isLastStep"

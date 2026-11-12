@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-returns -- local visual-editor mutations are self-descriptive */
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onScopeDispose, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import { nanoid } from 'nanoid'
@@ -21,6 +21,9 @@ import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 import type { Scope } from '~~/shared/utils/scopes'
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useModalSession } from '~/composables/useModalSession'
+import { useFormSession } from '~/composables/useFormSession'
+import { useActionContext } from '~/composables/useActionContext'
 import { z } from 'zod'
 import { AgencyProfileSchema, AgencyReviewSchemaCreateSchema } from '~~/shared/types/schemas'
 
@@ -80,7 +83,7 @@ const selectedSection: Ref<string> = ref('checklist-general')
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-checklist-schema-detail')
 const profileScope = computed<Scope>(() => ({ type: 'agency', agencyId }))
-const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', profileScope.value))
+const canManagePublication = computed(() => can('agency', 'update', profileScope.value))
 const canEdit = computed(() => canManagePublication.value && state.value?.publicationState !== 'retired')
 const activeLocale = computed<'en' | 'fr'>(() => locale.value === 'fr' ? 'fr' : 'en')
 const getNavigationLabel = (label: { en?: string; fr?: string }, fallback: string) => getAssessmentLocaleLabel(label, activeLocale.value, fallback)
@@ -162,17 +165,34 @@ const toPersistedDefinition = (value: EditorDefinition): ChecklistDefinition => 
 })
 const ruleHelpDefinition = computed(() => definition.value === null ? null : toPersistedDefinition(definition.value))
 
-const getDraft = () => state.value && definition.value
-  ? {
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_outcomename_en: state.value.egcs_cn_outcomename_en,
-      egcs_cn_outcomename_fr: state.value.egcs_cn_outcomename_fr,
-      egcs_cn_disablereviewers: state.value.egcs_cn_disablereviewers,
-      egcs_cn_checklistschema: toPersistedDefinition(definition.value)
-    }
-  : null
-const mutation = useEditorMutationCoordinator({ getDraft })
+const getDraft = () => {
+  if (!state.value || !definition.value) return null
+  const persisted = toPersistedDefinition(definition.value)
+  const parsed = ChecklistDefinitionSchema.safeParse(persisted)
+  return {
+    egcs_cn_name_en: state.value.egcs_cn_name_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_outcomename_en: state.value.egcs_cn_outcomename_en,
+    egcs_cn_outcomename_fr: state.value.egcs_cn_outcomename_fr,
+    egcs_cn_disablereviewers: state.value.egcs_cn_disablereviewers,
+    egcs_cn_checklistschema: parsed.success ? parsed.data : persisted
+  }
+}
+const writeContext = useActionContext({
+  identity: [() => String(route.params.id), () => String(route.params.schemaId)],
+  authority: canManagePublication,
+  eligible: () => Boolean(agency.value) && state.value !== null && state.value.publicationState !== 'retired'
+})
+const mutation = useEditorMutationCoordinator({ getDraft, context: writeContext })
+const formOwner = useModalSession()
+watch([state, definition], () => {
+  formOwner.isOpen.value = false
+  formOwner.isOpen.value = state.value !== null && definition.value !== null
+}, { immediate: true, flush: 'sync' })
+let isActive = true
+onScopeDispose(() => {
+  isActive = false
+})
 const isSaving = computed(() => mutation.isActionPending('save'))
 const isPublishing = computed(() => mutation.isActionPending('publish'))
 const isRetiring = computed(() => mutation.isActionPending('retire'))
@@ -212,29 +232,34 @@ const fetchPayload = async () => {
 
 /** Reloads the editor as a new session and creates stable editor-only row keys. */
 const loadSession = async () => {
-  isLoadRetrying.value = true
+  if (!isActive) return
   try {
     const payload = await fetchPayload()
+    if (!isActive) return
     mutation.replaceSessionDraft(() => applyPayload(payload))
     loadError.value = null
   } catch (error) {
+    if (!isActive) return
     state.value = null
     definition.value = null
     loadError.value = error
     throw error
-  } finally {
-    isLoadRetrying.value = false
   }
 }
 const retryLoad = async () => {
+  if (!isActive || isLoadRetrying.value) return
+  isLoadRetrying.value = true
   try {
     await refreshAgency()
+    if (!isActive) return
     if (agencyError.value) throw agencyError.value
     await loadSession()
     await nextTick()
     detailContent.value?.focus()
   } catch (error) {
-    showError(error)
+    if (isActive) showError(error)
+  } finally {
+    if (isActive) isLoadRetrying.value = false
   }
 }
 onMounted(retryLoad)
@@ -242,6 +267,11 @@ onMounted(retryLoad)
 const showPreservedDraft = () => toast.add({
   title: toast.localized('common.warning'),
   description: toast.localized('common.newer_changes_preserved'),
+  color: 'warning'
+})
+const showSynchronizationWarning = () => toast.add({
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.saved_refresh_failed'),
   color: 'warning'
 })
 const blockDirtyAction = () => {
@@ -254,6 +284,7 @@ const blockDirtyAction = () => {
   return true
 }
 const refreshForMutation = async (token: EditorMutationToken) => {
+  if (!mutation.isTokenCurrent(token)) return false
   const payload = await fetchPayload()
   return mutation.applyMutationRefresh(token, {
     apply: () => applyPayload(payload),
@@ -295,19 +326,22 @@ watch(selectedSection, sectionId => {
 const persist = async (token: EditorMutationToken, showSuccess: boolean) => {
   if (!state.value || !definition.value) return false
   const persistedDefinition = ChecklistDefinitionSchema.parse(toPersistedDefinition(definition.value))
+  const body = {
+    egcs_cn_name_en: state.value.egcs_cn_name_en,
+    egcs_cn_name_fr: state.value.egcs_cn_name_fr,
+    egcs_cn_outcomename_en: state.value.egcs_cn_outcomename_en,
+    egcs_cn_outcomename_fr: state.value.egcs_cn_outcomename_fr,
+    egcs_cn_disablereviewers: state.value.egcs_cn_disablereviewers,
+    egcs_cn_checklistschema: persistedDefinition
+  }
+  if (!mutation.canContinue(token)) return false
   const response = await fetch(getClientRequestUrl(endpoint), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      egcs_cn_name_en: state.value.egcs_cn_name_en,
-      egcs_cn_name_fr: state.value.egcs_cn_name_fr,
-      egcs_cn_outcomename_en: state.value.egcs_cn_outcomename_en,
-      egcs_cn_outcomename_fr: state.value.egcs_cn_outcomename_fr,
-      egcs_cn_disablereviewers: state.value.egcs_cn_disablereviewers,
-      egcs_cn_checklistschema: persistedDefinition
-    })
+    body: JSON.stringify(body)
   })
   if (!response.ok) await throwFetchResponseError(response)
+  mutation.acceptCommittedDraft(token, body)
   if (!await refreshForMutation(token)) {
     if (mutation.isTokenCurrent(token)) showPreservedDraft()
     return false
@@ -321,16 +355,20 @@ const persist = async (token: EditorMutationToken, showSuccess: boolean) => {
 /** Validates and saves the visual editor state. */
 const save = async () => {
   if (!state.value || !definition.value || !canEdit.value || mutation.isPending.value) return false
+  const session = formOwner.captureSession()
+  const operation = writeContext.capture()
+  if (!operation) return false
   try {
     await checklistForm.value?.validate()
   } catch {
     return false
   }
+  if (!formOwner.isCurrentSession(session) || !operation.canDispatch() || mutation.isPending.value) return false
   return await mutation.run('save', async token => {
     try {
       return await persist(token, true)
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
       return false
     }
   }) === true
@@ -342,15 +380,24 @@ const publish = async () => {
   await mutation.run('publish', async token => {
     try {
       if (mutation.isDirty.value && !await persist(token, false)) return
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/publish`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!await refreshForMutation(token)) {
-        if (mutation.isTokenCurrent(token)) showPreservedDraft()
-        return
+      const committedSchema: SchemaPayload = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(committedSchema)
+      try {
+        if (!await refreshForMutation(token)) {
+          if (mutation.isTokenCurrent(token)) showPreservedDraft()
+          return
+        }
+      } catch {
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('checklist_schema.published'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
@@ -361,15 +408,25 @@ const retire = async () => {
   if (blockDirtyAction()) return
   await mutation.run('retire', async token => {
     try {
+      if (!mutation.canContinue(token)) return
       const response = await fetch(getClientRequestUrl(`${endpoint}/retire`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
-      if (!await refreshForMutation(token)) return
+      const committedSchema: SchemaPayload = await response.json()
+      if (!mutation.isTokenCurrent(token)) return
+      mergePublicationMetadata(committedSchema)
+      try {
+        if (!await refreshForMutation(token)) return
+      } catch {
+        if (!mutation.isTokenCurrent(token)) return
+        showSynchronizationWarning()
+      }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('checklist_schema.retired'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (mutation.isTokenCurrent(token)) showError(error)
     }
   })
 }
+const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: writeContext }, submit: save })
 </script>
 
 <template>
@@ -408,6 +465,7 @@ const retire = async () => {
         :aria-label="title"
         tabindex="-1">
         <AssessmentSchemaDetailHero
+          :action-context="writeContext"
           :name="title"
           :entity-type="state.egcs_cn_entitytype"
           :publication-version="state.publicationVersion"
@@ -448,7 +506,7 @@ const retire = async () => {
             </aside>
           </template>
 
-          <UForm ref="checklistForm" :state="state" :validate="validateMetadata">
+          <UForm v-bind="formSession" ref="checklistForm" :state="state" :validate="validateMetadata">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
                 <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')" role="tabpanel" :aria-label="t('checklist_schema.general')">

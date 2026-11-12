@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Money } from '~~/shared/utils/money'
@@ -10,6 +11,7 @@ import { buildAccountReceivableAdjustmentRows, type AccountReceivableAdjustmentR
 
 const { receivable, agreementId } = defineProps<{ receivable: AccountReceivableDetail, agreementId: string }>()
 const emit = defineEmits<{ adjust: [], changed: [] }>()
+const { canAny } = useAuth()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -36,6 +38,10 @@ const columns: TableColumnInput<AccountReceivableAdjustmentRow>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const amount = (value: Money | null) => formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
+const deleteContext = useActionContext({
+  identity: [() => agreementId, () => receivable.id],
+  authority: () => canAny('account_receivable', 'delete')
+})
 /**
  * Deletes only the selected independently assigned draft Adjustment.
  * @param row - Selected independently assigned draft record.
@@ -46,16 +52,21 @@ const deleteAdjustment = async (row: AccountReceivableAdjustmentRow) => {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
+  const targetId = row.adjustment.id
+  const capturedAction = deleteContext.capture()
+  if (!capturedAction?.canDispatch()) return
   const owner = `${agreementId}:${receivable.id}`
   deletingId.value = row.adjustment.id
   try {
-    const deleted = await confirmDeleteRequest(`/api/account-receivables/${row.adjustment.id}`, {
+    const deleted = await confirmDeleteRequest(`/api/account-receivables/${targetId}`, {
+      operation: capturedAction,
+      target: { id: targetId, resolve: () => rows.value.find(item => item.adjustment.id === targetId)?.adjustment, eligible: item => item.egcs_fc_candeleterole && item.egcs_fc_candelete },
       shouldProceed: () => !disposed && `${agreementId}:${receivable.id}` === owner
-        && rows.value.some(item => item.adjustment.id === row.adjustment.id && item.adjustment.egcs_fc_candeleterole && item.adjustment.egcs_fc_candelete)
+        && rows.value.some(item => item.adjustment.id === targetId && item.adjustment.egcs_fc_candeleterole && item.adjustment.egcs_fc_candelete)
     })
-    if (deleted && !disposed && `${agreementId}:${receivable.id}` === owner) emit('changed')
+    if (deleted && capturedAction.isCurrent() && !disposed && `${agreementId}:${receivable.id}` === owner) emit('changed')
   } catch (error) {
-    if (!disposed && `${agreementId}:${receivable.id}` === owner) showError(error)
+    if (capturedAction.isCurrent() && !disposed && `${agreementId}:${receivable.id}` === owner) showError(error)
   } finally {
     if (!disposed && `${agreementId}:${receivable.id}` === owner) deletingId.value = null
   }

@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useActionContext, type CapturedActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 /* eslint-disable jsdoc/require-jsdoc -- local wizard event helpers are self-documenting and not public APIs */
-import { computed, ref, useId, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, shallowRef, useId, watch } from 'vue'
 import type { Ref } from 'vue'
-import type { FormError, FormSubmitEvent } from '#ui/types'
+import type { FormError } from '#ui/types'
+import { useModalSession } from '~/composables/useModalSession'
 import type {
   FundingHistoryFormState,
   FundingHistorySimilarityResponse,
@@ -14,10 +17,18 @@ import { compareMoney, formatMoneyText, parseMoney, zeroMoney, type Money, type 
 const {
   applicantRecipientId,
   applicantRecipientLabel,
+  canCreate,
+  canCreateRole,
+  canUpdate,
+  canUpdateRole,
   history = null
 } = defineProps<{
   applicantRecipientId: string
   applicantRecipientLabel: string
+  canCreate: boolean
+  canCreateRole: boolean
+  canUpdate: boolean
+  canUpdateRole: boolean
   history?: VisibleFundingHistoryRow | null
 }>()
 
@@ -47,12 +58,50 @@ type FundingHistoryStep = typeof stepOrder[number]
 const state: Ref<FundingHistoryFormState | null> = ref(null)
 const currentStep: Ref<FundingHistoryStep> = ref('recipients')
 const errors: Ref<FormError[]> = ref([])
-const isSaving: Ref<boolean> = ref(false)
-const isCheckingSimilarity: Ref<boolean> = ref(false)
-const isPending = computed(() => isSaving.value || isCheckingSimilarity.value)
-const warnings: Ref<FundingHistorySimilarityWarning[]> = ref([])
-const isWarningOpen: Ref<boolean> = ref(false)
-let continueAfterWarning: (() => Promise<void> | void) | null = null
+type WizardAction = { kind: 'advance'; step: FundingHistoryStep } | { kind: 'save' }
+type WizardOperation = {
+  session: number
+  applicantRecipientId: string
+  draft: FundingHistoryFormState
+  action: WizardAction
+  authority: CapturedActionContext
+}
+type WizardWorkflow =
+  | { kind: 'closed' | 'editing' | 'disposed' }
+  | { kind: 'checking' | 'saving'; operation: WizardOperation }
+  | {
+    kind: 'warning' | 'warning_closing'
+    operation: WizardOperation
+    warnings: FundingHistorySimilarityWarning[]
+    resume: 'action' | 'recheck_save'
+  }
+
+const actionContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => history ? canUpdateRole : canCreateRole,
+  eligible: () => history ? canUpdate : canCreate
+})
+const modal = useModalSession()
+const workflow: Ref<WizardWorkflow> = shallowRef({ kind: 'closed' })
+const isPending = computed(() => workflow.value.kind === 'checking' || workflow.value.kind === 'saving')
+const warnings = computed(() => workflow.value.kind === 'warning' || workflow.value.kind === 'warning_closing'
+  ? workflow.value.warnings
+  : [])
+const isWarningOpen = computed({
+  get: () => workflow.value.kind === 'warning',
+  set: (isOpen: boolean) => {
+    if (!isOpen && workflow.value.kind === 'warning') {
+      const closing: WizardWorkflow = { ...workflow.value, kind: 'warning_closing' }
+      workflow.value = closing
+      void nextTick(() => {
+        if (workflow.value === closing) workflow.value = { kind: 'editing' }
+      })
+    }
+  }
+})
+const ownsOperation = (operation: WizardOperation) => modal.isCurrentSession(operation.session)
+  && state.value === operation.draft
+  && operation.authority.isCurrent()
 
 const steps = computed(() => stepOrder.map((value, index) => ({
   value,
@@ -97,18 +146,24 @@ const stateFromHistory = (item: VisibleFundingHistoryRow): FundingHistoryFormSta
   confirmations: []
 })
 
-watch(open, isOpen => {
+watch([open, () => applicantRecipientId, () => history?.historyId ?? history?.rowKey], ([isOpen]) => {
+  modal.isOpen.value = false
+  errors.value = []
   if (!isOpen) {
     state.value = null
-    errors.value = []
-    warnings.value = []
-    isWarningOpen.value = false
-    continueAfterWarning = null
+    workflow.value = { kind: 'closed' }
     return
   }
 
+  modal.isOpen.value = true
   state.value = history ? stateFromHistory(history) : newState()
   currentStep.value = 'recipients'
+  workflow.value = { kind: 'editing' }
+}, { immediate: true, flush: 'sync' })
+
+onScopeDispose(() => {
+  workflow.value = { kind: 'disposed' }
+  state.value = null
 })
 
 const requirementId = useId()
@@ -225,40 +280,46 @@ const findErrorCode = (error: unknown): string | undefined => {
   return candidate.data?.code || candidate.data?.statusMessage || candidate.statusMessage
 }
 
-const checkSimilarity = async (continuation: () => Promise<void> | void): Promise<void> => {
-  if (!state.value) return
-  if (state.value.historyId) {
-    await continuation()
+const checkSimilarity = async (action: WizardAction): Promise<void> => {
+  const session = modal.captureSession()
+  if (session === null || !state.value || workflow.value.kind !== 'editing') return
+  const authority = actionContext.capture()
+  if (!authority?.canDispatch()) return
+  const operation: WizardOperation = { session, applicantRecipientId, draft: state.value, action, authority }
+  if (operation.draft.historyId) {
+    await performAction(operation)
     return
   }
-  isCheckingSimilarity.value = true
+  const request: WizardWorkflow = { kind: 'checking', operation }
+  workflow.value = request
   try {
     const fetchSimilarity = $fetch as unknown as SimilarityFetch
     const response = await fetchSimilarity(
-      `/api/applicant-recipients/${applicantRecipientId}/funding-history/similarity`,
+      `/api/applicant-recipients/${operation.applicantRecipientId}/funding-history/similarity`,
       {
         method: 'POST',
         body: {
-          ...payload(state.value),
-          excludeHistoryId: state.value.historyId
+          ...payload(operation.draft),
+          excludeHistoryId: operation.draft.historyId
         }
       }
     )
-    const unconfirmed = response.warnings.filter(warning => !state.value?.confirmations.includes(warning.fingerprint))
+    if (!ownsOperation(operation) || workflow.value !== request) return
+    const unconfirmed = response.warnings.filter(warning => !operation.draft.confirmations.includes(warning.fingerprint))
     if (unconfirmed.length > 0) {
-      warnings.value = unconfirmed
-      continueAfterWarning = continuation
-      isWarningOpen.value = true
+      workflow.value = { kind: 'warning', operation, warnings: unconfirmed, resume: 'action' }
       return
     }
-    await continuation()
+    await performAction(operation)
   } catch (error: unknown) {
+    if (!ownsOperation(operation) || workflow.value !== request) return
     const code = findErrorCode(error)
     if (code?.includes('CONFLICT') || code?.includes('DUPLICATE')) {
+      const step = action.kind === 'advance' ? action.step : 'agreement'
       errors.value = [{
-        name: currentStep.value === 'agency'
+        name: step === 'agency'
           ? 'egcs_ar_agencyname_en'
-          : currentStep.value === 'program'
+          : step === 'program'
             ? 'egcs_ar_programname_en'
             : 'egcs_ar_agreementnumber',
         message: t('applicant_recipient.funding_history.validation.exact_conflict')
@@ -267,39 +328,55 @@ const checkSimilarity = async (continuation: () => Promise<void> | void): Promis
     }
     showError(error)
   } finally {
-    isCheckingSimilarity.value = false
+    if (workflow.value === request) workflow.value = { kind: 'editing' }
   }
 }
 
 const nextStep = async () => {
-  if (!state.value || isPending.value) return
+  if (!state.value || workflow.value.kind !== 'editing') return
   errors.value = validateState(state.value, currentStep.value)
   if (errors.value.length > 0) return
-  const advance = () => {
-    currentStep.value = stepOrder[currentStepIndex.value + 1] || currentStep.value
-  }
+  const action: WizardAction = { kind: 'advance', step: currentStep.value }
   if (currentStep.value === 'agency' || currentStep.value === 'program' || currentStep.value === 'agreement') {
-    await checkSimilarity(advance)
+    await checkSimilarity(action)
     return
   }
-  advance()
+  currentStep.value = stepOrder[currentStepIndex.value + 1] || currentStep.value
 }
 
 const previousStep = () => {
+  if (workflow.value.kind !== 'editing') return
   currentStep.value = stepOrder[currentStepIndex.value - 1] || currentStep.value
 }
 
+const dismissWarnings = () => {
+  if (workflow.value.kind === 'warning' || workflow.value.kind === 'warning_closing') {
+    workflow.value = { kind: 'editing' }
+  }
+}
+
 const confirmWarnings = async () => {
-  if (!state.value) return
-  state.value.confirmations = [...new Set([...state.value.confirmations, ...warnings.value.map(warning => warning.fingerprint)])]
-  warnings.value = []
-  const continuation = continueAfterWarning
-  continueAfterWarning = null
-  await continuation?.()
+  const warning = workflow.value
+  if (warning.kind !== 'warning' && warning.kind !== 'warning_closing') return
+  if (!ownsOperation(warning.operation) || !warning.operation.authority.canDispatch()) {
+    workflow.value = { kind: 'editing' }
+    return
+  }
+  const data = warning.operation.draft
+  data.confirmations = [...new Set([...data.confirmations, ...warning.warnings.map(item => item.fingerprint)])]
+  workflow.value = { kind: 'editing' }
+  if (warning.resume === 'recheck_save') {
+    await checkSimilarity({ kind: 'save' })
+    return
+  }
+  await performAction(warning.operation)
 }
 
 const invalidateConfirmations = () => {
   if (state.value) state.value.confirmations = []
+  if (workflow.value.kind === 'checking' || workflow.value.kind === 'warning' || workflow.value.kind === 'warning_closing') {
+    workflow.value = { kind: 'editing' }
+  }
 }
 
 const addRecipient = () => {
@@ -329,62 +406,78 @@ const selectedProgramLabel = computed(() => state.value
   ? localized(state.value.egcs_ar_programname_en, state.value.egcs_ar_programname_fr)
   : t('common.none'))
 
-const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
-  if (!state.value || isPending.value) return
+const performAction = async (operation: WizardOperation): Promise<void> => {
+  if (!ownsOperation(operation) || !operation.authority.canDispatch()) return
+  if (operation.action.kind === 'advance') {
+    currentStep.value = stepOrder[stepOrder.indexOf(operation.action.step) + 1] || operation.action.step
+    workflow.value = { kind: 'editing' }
+    return
+  }
+
+  const request: WizardWorkflow = { kind: 'saving', operation }
+  workflow.value = request
+  const data = operation.draft
+  const historyId = data.historyId
+  try {
+    const url = historyId
+      ? `/api/applicant-recipients/${operation.applicantRecipientId}/funding-history/${historyId}`
+      : `/api/applicant-recipients/${operation.applicantRecipientId}/funding-history`
+    const mutateFundingHistory = $fetch as unknown as MutationFetch
+    await mutateFundingHistory(url, {
+      method: historyId ? 'PATCH' : 'POST',
+      body: payload(data)
+    })
+    if (modal.isDisposed() || !operation.authority.isCurrent() || applicantRecipientId !== operation.applicantRecipientId) return
+    if (!ownsOperation(operation) || workflow.value !== request) {
+      emit('saved')
+      return
+    }
+    toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized(historyId ? 'common.updated_success' : 'common.created_success'),
+      color: 'success'
+    })
+    open.value = false
+    emit('saved')
+  } catch (error: unknown) {
+    if (!ownsOperation(operation) || workflow.value !== request) return
+    const code = findErrorCode(error)
+    if (code === 'FUNDING_HISTORY_SIMILARITY_CONFIRMATION_REQUIRED') {
+      const response = (error as {
+        data?: FundingHistorySimilarityResponse & { details?: Array<{ message?: string }> }
+      }).data
+      const requiredWarnings = response?.warnings || response?.details?.flatMap((detail) => {
+        if (!detail.message) return []
+        try {
+          return [JSON.parse(detail.message) as FundingHistorySimilarityWarning]
+        } catch {
+          return []
+        }
+      }) || []
+      workflow.value = { kind: 'warning', operation, warnings: requiredWarnings, resume: 'recheck_save' }
+      return
+    }
+    if (code?.includes('CONFLICT') || code?.includes('DUPLICATE')) {
+      errors.value = [{ name: 'egcs_ar_agreementnumber', message: t('applicant_recipient.funding_history.validation.exact_conflict') }]
+      currentStep.value = 'agreement'
+      return
+    }
+    showError(error)
+  } finally {
+    if (workflow.value === request) workflow.value = { kind: 'editing' }
+  }
+}
+
+const save = async () => {
+  if (!state.value || workflow.value.kind !== 'editing') return
   errors.value = validateState(state.value)
   if (errors.value.length > 0) {
     currentStep.value = fieldStep(errors.value[0]?.name)
     return
   }
-
-  await checkSimilarity(async () => {
-    if (!state.value) return
-    isSaving.value = true
-    try {
-      const url = state.value.historyId
-        ? `/api/applicant-recipients/${applicantRecipientId}/funding-history/${state.value.historyId}`
-        : `/api/applicant-recipients/${applicantRecipientId}/funding-history`
-      const mutateFundingHistory = $fetch as unknown as MutationFetch
-      await mutateFundingHistory(url, {
-        method: state.value.historyId ? 'PATCH' : 'POST',
-        body: payload(state.value)
-      })
-      toast.add({
-        title: toast.localized('common.success'),
-        description: toast.localized(state.value.historyId ? 'common.updated_success' : 'common.created_success'),
-        color: 'success'
-      })
-      open.value = false
-      emit('saved')
-    } catch (error: unknown) {
-      const code = findErrorCode(error)
-      if (code === 'FUNDING_HISTORY_SIMILARITY_CONFIRMATION_REQUIRED') {
-        const response = (error as {
-          data?: FundingHistorySimilarityResponse & { details?: Array<{ message?: string }> }
-        }).data
-        warnings.value = response?.warnings || response?.details?.flatMap((detail) => {
-          if (!detail.message) return []
-          try {
-            return [JSON.parse(detail.message) as FundingHistorySimilarityWarning]
-          } catch {
-            return []
-          }
-        }) || []
-        continueAfterWarning = () => save({ data: state.value as FundingHistoryFormState } as FormSubmitEvent<FundingHistoryFormState>)
-        isWarningOpen.value = true
-        return
-      }
-      if (code?.includes('CONFLICT') || code?.includes('DUPLICATE')) {
-        errors.value = [{ name: 'egcs_ar_agreementnumber', message: t('applicant_recipient.funding_history.validation.exact_conflict') }]
-        currentStep.value = 'agreement'
-        return
-      }
-      showError(error)
-    } finally {
-      isSaving.value = false
-    }
-  })
+  await checkSimilarity({ kind: 'save' })
 }
+const formSession = useFormSession({ owner: modal, action: { kind: 'remote', context: actionContext }, onDenied: () => toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' }), submit: save })
 </script>
 
 <template>
@@ -395,7 +488,7 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
     fullscreen
     :ui="{ content: 'rounded-none shadow-none ring-0' }" data-field-scope="applicant-recipient.funding-history-wizard-modal">
     <template #body>
-      <UForm v-if="state" :state="state" :validate="validate" class="flex h-full flex-col lg:flex-row" @submit="save">
+      <UForm v-if="state" v-bind="formSession" :state="state" :validate="validate" class="flex h-full flex-col lg:flex-row">
         <CommonWizardShell
           :current-step="currentStep"
           :steps="steps"
@@ -593,5 +686,5 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
     v-model:open="isWarningOpen"
     :warnings="warnings"
     data-field-scope="applicant-recipient.funding-history-wizard-modal"
-    @confirm="confirmWarnings" @back="continueAfterWarning = null" />
+    @confirm="confirmWarnings" @back="dismissWarnings" />
 </template>

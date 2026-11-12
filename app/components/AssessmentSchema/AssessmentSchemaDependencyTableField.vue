@@ -1,7 +1,7 @@
 <!-- eslint-disable jsdoc/require-jsdoc -->
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import type { Ref } from 'vue'
+import { useLocalRowEditor } from '~/composables/useLocalRowEditor'
 import { toRaw } from 'vue'
 import type { DependencyRuleUi, DependencySummaryRow } from '~/components/AssessmentSchema/assessment-schema-dependency'
 import { buildDependencySummaryRows, createDependencyRuleUi, getDependencyModelFromRules, getDependencyRulesFromModel } from '~/components/AssessmentSchema/assessment-schema-dependency'
@@ -18,10 +18,8 @@ const {
 
 const { t } = useI18n()
 
-const isModalOpen: Ref<boolean> = ref(false)
-const editorMode: Ref<'create' | 'edit'> = ref('create')
-const editingIndex: Ref<number | null> = ref(null)
-const draftRule: Ref<DependencyRuleUi | null> = ref(null)
+const rowEditor = useLocalRowEditor<DependencyRuleUi, number>()
+const { isOpen: isModalOpen, mode: editorMode, target: editingIndex, draft: draftRule, close: closeModal } = rowEditor
 
 const dependencyRules = computed<DependencyRuleUi[]>({
   get: () => getDependencyRulesFromModel(depends.value),
@@ -45,18 +43,8 @@ const columns = computed<TableColumn<DependencySummaryRow>[]>(() => [
   { id: 'actions', header: t('common.actions') }
 ])
 
-const closeModal = () => {
-  isModalOpen.value = false
-  editorMode.value = 'create'
-  editingIndex.value = null
-  draftRule.value = null
-}
-
 const openCreate = () => {
-  editorMode.value = 'create'
-  editingIndex.value = null
-  draftRule.value = structuredClone(createDependencyRuleUi())
-  isModalOpen.value = true
+  rowEditor.openCreate(structuredClone(createDependencyRuleUi()))
 }
 
 const openEdit = (index: number) => {
@@ -65,10 +53,7 @@ const openEdit = (index: number) => {
     return
   }
 
-  editorMode.value = 'edit'
-  editingIndex.value = index
-  draftRule.value = structuredClone(toRaw(current))
-  isModalOpen.value = true
+  rowEditor.openEdit(index, structuredClone(toRaw(current)))
 }
 
 const saveRule = () => {

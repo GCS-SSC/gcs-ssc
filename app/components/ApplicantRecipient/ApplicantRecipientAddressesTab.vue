@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
 import type { ApplicantRecipientAddressForm } from '~~/shared/types/applicant-recipient-ui'
 import { ApplicantRecipientAddressCreateSchema } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -9,6 +10,24 @@ const { applicantRecipientId, canCreate, canUpdate, canDelete } = defineProps<{
   canUpdate: boolean
   canDelete: boolean
 }>()
+
+const { canAny } = useCan()
+const createContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'create', ['global', 'agency']),
+  eligible: () => canCreate
+})
+const updateContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'update', ['global', 'agency']),
+  eligible: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [() => applicantRecipientId],
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']),
+  eligible: () => canDelete
+})
+const resourceAction = { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext } satisfies import('~/composables/useResourceCrudState').ResourceCrudAction
 
 const { t } = useI18n()
 const { items: jurisdictionItems } = useEnumSelectOptions({ name: 'jurisdiction' })
@@ -52,6 +71,7 @@ const updateNumericFieldValue = (state: ApplicantRecipientAddressForm, key: Nume
 <template>
   <section data-help-target="proponent.addresses.content" data-help-kind="section" data-help-view="proponent.addresses" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      :action="resourceAction"
       help-search-target="proponent.addresses.search" help-save-target="proponent.addresses.save" help-add-target="proponent.addresses.add"
       class="w-full"
       :title="t('applicant_recipient.addresses.title')"

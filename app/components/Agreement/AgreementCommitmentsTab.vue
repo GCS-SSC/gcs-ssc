@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
+import { useActionContext } from '~/composables/useActionContext'
+import type { CapturedActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
@@ -24,11 +29,11 @@ type CommitmentTableRow = FundingCaseAgreementCommitmentRow & {
   total_amount: Money
 }
 
-const { agreementId, currency: agreementCurrency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency: agreementCurrency, canCreate, canCreateRole, canUpdate, canDelete } = defineProps<{
   agreementId: string
   currency: Currency_Codes
   canCreate: boolean
-  canCreateRole?: boolean
+  canCreateRole: boolean
   canUpdate: boolean
   canDelete: boolean
 }>()
@@ -78,14 +83,22 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageSize: 25
 })
 
+const editingTarget: Ref<string | null> = ref(null)
+
 const commitmentModal = useCrudModal<FundingCaseAgreementCommitmentRow, FundingCaseAgreementCommitmentForm>({
-  createState: () => ({ egcs_fc_currency: agreementCurrency }),
-  updateState: commitment => ({
-    id: commitment.id,
-    egcs_fc_type: commitment.egcs_fc_type,
-    egcs_fc_totalamount: commitment.egcs_fc_totalamount,
-    egcs_fc_currency: commitment.egcs_fc_currency
-  })
+  createState: () => {
+    editingTarget.value = null
+    return { egcs_fc_currency: agreementCurrency }
+  },
+  updateState: commitment => {
+    editingTarget.value = String(commitment.id)
+    return {
+      id: commitment.id,
+      egcs_fc_type: commitment.egcs_fc_type,
+      egcs_fc_totalamount: commitment.egcs_fc_totalamount,
+      egcs_fc_currency: commitment.egcs_fc_currency
+    }
+  }
 })
 
 const selectedCommitment = commitmentModal.selected
@@ -120,6 +133,36 @@ const columns: TableColumnInput<CommitmentTableRow>[] = [
 ]
 
 const commitments = computed<FundingCaseAgreementCommitmentOverviewRow['commitments']>(() => overview.value?.commitments ?? [])
+const createContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canCreateRole
+})
+const updateContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canUpdate
+})
+const deleteContext = useActionContext({
+  identity: [agreementIdRef],
+  authority: () => canDelete
+})
+const committedReadback = async (): Promise<CommittedReadbackResult> => {
+  await refreshOverview()
+  return overviewStatus.value === 'error'
+    ? { kind: 'unavailable', error: new Error(t('common.resource_table_load_failed')) }
+    : { kind: 'available' }
+}
+const captureCreateCommitted = useCommittedSettlement({ context: createContext, settle: committedReadback })
+const captureUpdateCommitted = useCommittedSettlement({ context: updateContext, settle: committedReadback })
+const formContext = useActionContext({
+  identity: [agreementIdRef, editingTarget],
+  authority: () => editingTarget.value === null ? canCreateRole : canUpdate,
+  eligible: () => {
+    if (editingTarget.value === null) return canCreate
+    const record = commitments.value.find(row => String(row.id) === editingTarget.value)
+    return Boolean(record && !isRecordLocked(record))
+  }
+})
+
 const lines = computed<FundingCaseAgreementCommitmentOverviewRow['lines']>(() => overview.value?.lines ?? [])
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
 
@@ -160,7 +203,8 @@ const warnRecordPrerequisite = () => toast.add({
 const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementCommitmentRow | null> => {
   const owner = agreementId
   const generation = recordActionGeneration
-  const current = tableRows.value.find(row => String(row.id) === recordId)
+  if (!isCurrent()) return null
+  const current = commitments.value.find(row => String(row.id) === recordId)
   if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
   if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
   if (!current || isRecordLocked(current)) {
@@ -188,16 +232,22 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete',
     return null
   }
 }
-const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementCommitmentRow) => void | Promise<void>) => {
+const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementCommitmentRow, operation: CapturedActionContext) => void | Promise<void>) => {
   if (pendingRecordActions.value.has(recordId)) return
+  const operation = (action === 'delete' ? deleteContext : updateContext).capture()
+  if (!operation?.canDispatch()) return
   const intent = action === 'update' ? ++modalIntent : modalIntent
   const session = commitmentModal.captureSession()
-  const isCurrent = () => action === 'delete' || (intent === modalIntent && commitmentModal.captureSession() === session)
+  const isCurrent = () => operation.canDispatch() && (action === 'delete' || (intent === modalIntent && commitmentModal.captureSession() === session))
   const token = Symbol(recordId)
   pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
   try {
-    const record = await loadWorkableRecord(recordId, action, isCurrent)
-    if (record && isCurrent()) await work(record)
+    const record = action === 'delete' ? commitments.value.find(row => String(row.id) === recordId) : await loadWorkableRecord(recordId, action, isCurrent)
+    if (action === 'delete' && record && isRecordLocked(record)) {
+      warnRecordPrerequisite()
+      return
+    }
+    if (record && isCurrent()) await work(record, operation)
   } finally {
     if (pendingRecordActions.value.get(recordId) === token) {
       const remaining = new Map(pendingRecordActions.value)
@@ -211,7 +261,9 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
   const owner = agreementId
   const generation = recordActionGeneration
   try {
+    if (!isCurrent()) return false
     const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
+    if (!isCurrent()) return false
     if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
     if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
     if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
@@ -223,9 +275,11 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
 }
 const openCreateCommitment = async () => {
   if (isOpeningCreate.value) return
+  const operation = createContext.capture()
+  if (!operation?.canDispatch()) return
   const intent = ++modalIntent
   const session = commitmentModal.captureSession()
-  const isCurrent = () => intent === modalIntent && commitmentModal.captureSession() === session
+  const isCurrent = () => operation.canDispatch() && intent === modalIntent && commitmentModal.captureSession() === session
   isOpeningCreate.value = true
   const generation = recordActionGeneration
   try {
@@ -246,20 +300,27 @@ watch([agreementIdRef, () => canCreate, () => canCreateRole,
   pendingExtensionCreateAction.value = null
 }, { flush: 'sync' })
 const activateExtensionCreateAction = async (value: string) => {
-  if (!(canCreateRole ?? canCreate) || pendingExtensionCreateAction.value !== null) return
+  if (!canCreateRole || pendingExtensionCreateAction.value !== null) return
+  const operation = createContext.capture()
+  if (!operation?.canDispatch()) return
   const generation = extensionCreateGeneration
-  const isCurrent = () => !disposed && generation === extensionCreateGeneration
+  const isCurrent = () => operation.canDispatch() && !disposed && generation === extensionCreateGeneration
   pendingExtensionCreateAction.value = value
   try {
     if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
     readyExtensionCreateActions.value = new Set([...readyExtensionCreateActions.value, value])
   } finally {
-    if (isCurrent()) pendingExtensionCreateAction.value = null
+    if (!disposed && generation === extensionCreateGeneration) pendingExtensionCreateAction.value = null
   }
 }
 
 const handleExtensionCreated = async () => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const isCurrent = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  if (!isCurrent()) return
   await refreshOverview()
+  if (!isCurrent() || overviewStatus.value === 'error') return
   toast.add({
     title: toast.localized('common.success'),
     description: toast.localized('common.added_success'),
@@ -272,38 +333,54 @@ const openUpdateCommitment = (record: FundingCaseAgreementCommitmentRow) => runR
 })
 
 const saveCommitment = async () => {
-  if (!selectedCommitment.value) {
+  if (disposed || !selectedCommitment.value) {
     return
   }
+  const operation = formContext.capture()
+  if (!operation?.canDispatch()) return
   const commitmentState = selectedCommitment.value
-  const isUpdate = Boolean(commitmentState.id)
+  const recordId = editingTarget.value
+  const isUpdate = recordId !== null
+  const committed = (isUpdate ? captureUpdateCommitted : captureCreateCommitted)()
+  if (!committed) return
   const session = commitmentModal.captureSession()
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const intent = modalIntent
+  const ownsScope = () => operation.isCurrent() && !disposed && owner === agreementId && generation === recordActionGeneration
+  const ownsFeedback = () => ownsScope() && intent === modalIntent && commitmentModal.isCurrentSession(session)
   if (!commitmentPending.begin(session)) return
 
   try {
-    if (isUpdate && !await loadWorkableRecord(String(commitmentState.id), 'update',
-      () => isCommitmentModalOpen.value && commitmentModal.captureSession() === session)) return
-    if (!isUpdate && !await checkCreationPrerequisites(
-      () => isCommitmentModalOpen.value && commitmentModal.captureSession() === session)) return
-    if (disposed || commitmentModal.captureSession() !== session) return
-    await saveJson(
-      isUpdate
-        ? `/api/agreements/${agreementId}/commitments/${commitmentState.id}`
-        : `/api/agreements/${agreementId}/commitments`,
-      isUpdate ? 'PATCH' : 'POST',
-      commitmentState
-    )
-
-    if (!commitmentModal.closeSession(session)) return
-    await refreshOverview()
-    if (overviewStatus.value === 'error') return
+    try {
+      if (isUpdate && !await loadWorkableRecord(String(recordId), 'update',
+        () => operation.canDispatch() && isCommitmentModalOpen.value && commitmentModal.captureSession() === session)) return
+      if (!isUpdate && !await checkCreationPrerequisites(
+        () => operation.canDispatch() && isCommitmentModalOpen.value && commitmentModal.captureSession() === session)) return
+      if (!ownsFeedback() || !operation.canDispatch() || !committed.canDispatch()) return
+      await saveJson(
+        isUpdate
+          ? `/api/agreements/${owner}/commitments/${recordId}`
+          : `/api/agreements/${owner}/commitments`,
+        isUpdate ? 'PATCH' : 'POST',
+        commitmentState
+      )
+    } catch (error: unknown) {
+      if (ownsFeedback()) showError(error)
+      return
+    }
+    const closed = operation.isCurrent() && commitmentModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (!closed || !commitmentModal.isLatestSession(session) || settlement.kind === 'retired') return
+    if (settlement.kind === 'unavailable') {
+      showError(settlement.error)
+      return
+    }
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
-  } catch (error: unknown) {
-    if (!disposed && isCommitmentModalOpen.value && commitmentModal.captureSession() === session) showError(error)
   } finally {
     commitmentPending.end(session)
   }
@@ -311,16 +388,23 @@ const saveCommitment = async () => {
 
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const confirmDelete = useDeleteConfirm()
-const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete', async () => {
+const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete', async (_record, operation) => {
   const owner = agreementId
   const generation = recordActionGeneration
-  const shouldProceed = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  const shouldProceed = () => operation.isCurrent() && !disposed && owner === agreementId && generation === recordActionGeneration
   try {
     const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/commitments/${recordId}`, {
+      operation,
+      target: {
+        id: recordId,
+        resolve: () => commitments.value.find(row => String(row.id) === recordId),
+        eligible: row => !isRecordLocked(row)
+      },
       shouldProceed,
       confirm: async () => {
-        if (!await confirmDelete() || !shouldProceed()) return false
-        return Boolean(await loadWorkableRecord(recordId, 'delete')) && shouldProceed()
+        if (!await loadWorkableRecord(recordId, 'delete', operation.canDispatch) || !operation.canDispatch()) return false
+        if (!await confirmDelete() || !operation.canDispatch()) return false
+        return operation.canDispatch() && Boolean(await loadWorkableRecord(recordId, 'delete', operation.canDispatch)) && operation.canDispatch()
       }
     })
     if (!deleted || !shouldProceed()) return
@@ -331,6 +415,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
     if (shouldProceed()) showError(error)
   }
 })
+const formSession = useFormSession({ owner: commitmentModal, action: { kind: 'remote', context: formContext }, submit: saveCommitment })
 </script>
 
 <template>
@@ -344,20 +429,20 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
       :loading="overviewStatus === 'pending'"
       :request-status="overviewStatus"
       :button-label="t('agreement.commitments.add')"
-      :show-button="(canCreateRole ?? canCreate) && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict))"
+      :show-button="canCreateRole && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict))"
       :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.commitments.search')"
       help-add-target="agreement.commitments.add"
       help-search-target="agreement.commitments.search" @add="openCreateCommitment" @retry="refreshOverview">
       <template #actions>
         <UAlert
-          v-if="(canCreateRole ?? canCreate) && extensionCreateError"
+          v-if="canCreateRole && extensionCreateError"
           role="alert"
           color="error"
           :title="t('common.load_failed')"
           :actions="[{ label: t('common.retry'), onClick: () => refreshExtensionCreateActions() }]" />
         <div
-          v-if="(canCreateRole ?? canCreate) && hasExtensionCreateConflict"
+          v-if="canCreateRole && hasExtensionCreateConflict"
           role="status"
           tabindex="0"
           :aria-label="t('extensions.create_operation_conflict')"
@@ -365,7 +450,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
           <UIcon name="i-lucide-alert-triangle" aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
           <span>{{ t('extensions.create_operation_conflict') }}</span>
         </div>
-        <template v-if="(canCreateRole ?? canCreate) && extensionReplacementCreateAction && !hasExtensionCreateConflict">
+        <template v-if="canCreateRole && extensionReplacementCreateAction && !hasExtensionCreateConflict">
           <ExtensionCreateActionHost
             v-if="canCreate || readyExtensionCreateActions.has(extensionReplacementCreateAction.value)"
             :item="extensionReplacementCreateAction"
@@ -378,7 +463,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
             :disabled="pendingExtensionCreateAction !== null"
             @click="activateExtensionCreateAction(extensionReplacementCreateAction.value)" />
         </template>
-        <template v-if="canCreateRole ?? canCreate">
+        <template v-if="canCreateRole">
           <template v-for="action in extensionAppendCreateActions" :key="action.value">
             <ExtensionCreateActionHost
               v-if="canCreate || readyExtensionCreateActions.has(action.value)"
@@ -457,7 +542,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
       :title="selectedCommitment.id ? t('agreement.commitments.edit') : t('agreement.commitments.add')"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedCommitment" :validate="validateCommitment" :validate-on="[]" class="space-y-4" data-help-view="agreement.commitments.commitment-dialog" data-help-label-en="Agreements — Commitment editor" data-help-label-fr="Ententes — Éditeur d’engagement" @submit="saveCommitment">
+        <UForm v-bind="formSession" :state="selectedCommitment" :validate="validateCommitment" :validate-on="[]" class="space-y-4" data-help-view="agreement.commitments.commitment-dialog" data-help-label-en="Agreements — Commitment editor" data-help-label-fr="Ententes — Éditeur d’engagement">
           <UFormField :label="t('agreement.commitments.type')" name="egcs_fc_type">
             <CommonServerLookupSelect
               v-model="selectedCommitment.egcs_fc_type"

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useActionContext } from '~/composables/useActionContext'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
@@ -97,37 +100,27 @@ const { isRecordLocked } = useBusinessStatusState()
 const id = route.params.id as string
 const isChildDetailRoute = computed(() => isAgreementChildRoute(route))
 
-const profile: Ref<AgreementDetailProfile | null> = ref(null)
+const { data: profile, error, status, refresh: refreshProfile } = useResourceRequest<AgreementDetailProfile>({
+  identity: id,
+  enabled: computed(() => !isChildDetailRoute.value),
+  /**
+   * Reads the authorized Agreement while its page owns the request.
+   * @param signal - Request lifetime cancellation.
+   * @returns Current Agreement profile.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), { signal })
+    if (!response.ok) await throwFetchResponseError(response)
+    return await response.json() as AgreementDetailProfile
+  }
+})
 const { label: riskSourceLabel, workflowLabel: riskSourceWorkflowLabel, completedAt: riskSourceCompletedAt } = useAgreementRiskSource(() => profile.value?.risk_source)
-const error: Ref<unknown | null> = ref(null)
-const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 usePageResourceError({
   identity: () => route.path,
   errors: [() => isChildDetailRoute.value ? null : error.value],
   pending: () => status.value === 'pending',
   hasContent: () => Boolean(profile.value)
 })
-/**
- * Refreshes the current Agreement profile.
- *
- * @returns Whether the readback succeeded.
- */
-const refreshProfile = async () => {
-  try {
-    status.value = 'pending'
-    error.value = null
-    const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`))
-    if (!response.ok) await throwFetchResponseError(response)
-    profile.value = await response.json() as AgreementDetailProfile
-    status.value = 'success'
-    return true
-  } catch (fetchError: unknown) {
-    error.value = fetchError
-    status.value = 'error'
-    return false
-  }
-}
-if (!isChildDetailRoute.value) void refreshProfile()
 const {
   tabs: extensionTabs,
   status: extensionTabsStatus,
@@ -140,7 +133,7 @@ const {
 })
 
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
-const isSaving: Ref<boolean> = ref(false)
+const profileFormSession = ref(0)
 const { can, canAny, permissionsReady } = useCan()
 const { user: currentActor, permissionRevision } = useAuth()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
@@ -149,10 +142,17 @@ const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update
 const canCreateFinancialChildRole = computed(() => profile.value?.can_create_child_records_role === true)
 const canUpdateFinancialChildRole = computed(() => profile.value?.can_update_child_records_role === true)
 const canDeleteFinancialChildRole = computed(() => profile.value?.can_delete_child_records_role === true)
+const actionContext = useActionContext({
+  identity: [() => id, () => profile.value?.agency_id, () => profile.value?.program_id],
+  authority: canUpdateFinancialChildRole,
+  eligible: canUpdateBusinessRecord
+})
+const mutations = useEditorMutationCoordinator({ getDraft: () => selectedProfile.value, context: actionContext })
+const isSaving = mutations.isPending
 const { check: checkProfileAction } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId: id }))
 const isCheckingProfileEdit = ref(false)
 let profileActionGeneration = 0
-watch(() => [profile.value?.id, canUpdateFinancialChildRole.value, currentActor.value?.id, permissionRevision.value], () => {
+watch([() => profile.value?.id, canUpdateFinancialChildRole, () => currentActor.value?.id, permissionRevision], () => {
   profileActionGeneration += 1
 }, { flush: 'sync' })
 onUnmounted(() => {
@@ -320,7 +320,12 @@ const breadcrumbItems = computed(() => [
   { label: getBilingualValue(profile.value, 'egcs_fc_title', id) }
 ])
 
-watch(profile, value => {
+/**
+ * Replaces the editable profile from accepted server evidence.
+ * @param value - Current persisted profile, or absent evidence.
+ */
+const hydrateProfile = (value: AgreementDetailProfile | null) => {
+  profileFormSession.value += 1
   if (!value) {
     selectedProfile.value = null
     return
@@ -331,7 +336,12 @@ watch(profile, value => {
     egcs_fc_authorizedassistancestartdate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistancestartdate)),
     egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistanceenddate))
   }
-}, { immediate: true })
+}
+watch(profile, value => {
+  if (!mutations.isPending.value && (!value || value.id !== selectedProfile.value?.id || !mutations.isDirty.value)) {
+    mutations.replaceSessionDraft(() => hydrateProfile(value))
+  }
+}, { immediate: true, flush: 'sync' })
 
 /**
  * Saves agreement changes from the inline edit view and refreshes the detail page.
@@ -341,63 +351,60 @@ const submit = async () => {
     return
   }
 
-  const generation = profileActionGeneration
-  const originalDraft = selectedProfile.value
-  const proceed = () => generation === profileActionGeneration && selectedProfile.value === originalDraft && canUpdateFinancialChildRole.value
-  try {
-    isSaving.value = true
-    if (!await checkProfileAction('update', 'profile', proceed) || !proceed()) return
-    const {
-      egcs_fc_status: _status,
-      can_delete: _canDelete,
-      can_update: _canUpdate,
-      can_create_child_records_role: _canCreateChildRecordsRole,
-      can_update_child_records_role: _canUpdateChildRecordsRole,
-      can_delete_child_records_role: _canDeleteChildRecordsRole,
-      can_create_child_records: _canCreateChildRecords,
-      can_update_child_records: _canUpdateChildRecords,
-      can_delete_child_records: _canDeleteChildRecords,
-      ...body
-    } = selectedProfile.value
-    const currentFields = profile.value?.egcs_fc_customfields ?? {}
-    const changedFields = Object.fromEntries(Object.entries(body.egcs_fc_customfields ?? {}).filter(([key, value]) => value !== currentFields[key]))
-    body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
+  await mutations.run('update', async token => {
+    const generation = profileActionGeneration
+    const originalDraft = selectedProfile.value
+    if (!originalDraft) return
+    const proceed = () => mutations.isTokenCurrent(token) && generation === profileActionGeneration && canUpdateFinancialChildRole.value
+    const ownsDraft = () => mutations.canContinue(token) && proceed() && selectedProfile.value === originalDraft && JSON.stringify(selectedProfile.value) === token.expectedDraft
+    let stage: 'checking' | 'writing' = 'checking'
+    try {
+      if (!await checkProfileAction('update', 'profile', ownsDraft) || !ownsDraft()) return
+      const {
+        egcs_fc_status: _status,
+        can_delete: _canDelete,
+        can_update: _canUpdate,
+        can_create_child_records_role: _canCreateChildRecordsRole,
+        can_update_child_records_role: _canUpdateChildRecordsRole,
+        can_delete_child_records_role: _canDeleteChildRecordsRole,
+        can_create_child_records: _canCreateChildRecords,
+        can_update_child_records: _canUpdateChildRecords,
+        can_delete_child_records: _canDeleteChildRecords,
+        ...body
+      } = originalDraft
+      const currentFields = profile.value?.egcs_fc_customfields ?? {}
+      const changedFields = Object.fromEntries(Object.entries(body.egcs_fc_customfields ?? {}).filter(([key, value]) => value !== currentFields[key]))
+      body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
 
-    const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    if (!response.ok) await throwFetchResponseError(response)
+      stage = 'writing'
+      const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!response.ok) await throwFetchResponseError(response)
 
-    if (!await refreshProfile()) return
+      if (!proceed()) return
+      mutations.acceptCommittedDraft(token)
+      if (!await refreshProfile() || !proceed()) return
+      mutations.applyMutationRefresh(token, { apply: () => hydrateProfile(profile.value) })
 
-    toast.add({
-      title: toast.localized('common.success'),
-      description: toast.localized('common.updated_success'),
-      color: 'success'
-    })
-  } catch (caughtError: unknown) {
-    showError(caughtError)
-  } finally {
-    isSaving.value = false
-  }
+      toast.add({
+        title: toast.localized('common.success'),
+        description: toast.localized('common.updated_success'),
+        color: 'success'
+      })
+    } catch (caughtError: unknown) {
+      if (proceed() && (stage === 'writing' || ownsDraft())) showError(caughtError)
+    }
+  })
 }
 
 /**
  * Resets unsaved inline edits back to the last loaded agreement state.
  */
 const cancel = () => {
-  if (!profile.value) {
-    selectedProfile.value = null
-    return
-  }
-
-  selectedProfile.value = {
-    ...profile.value,
-    egcs_fc_authorizedassistancestartdate: toDateInput(agreementCalendarDate(profile.value.egcs_fc_authorizedassistancestartdate)),
-    egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(profile.value.egcs_fc_authorizedassistanceenddate))
-  }
+  mutations.replaceSessionDraft(() => hydrateProfile(profile.value))
 }
 
 useFieldTooltipProvider(() => profile.value && String(profile.value.id) === String(route.params.id) ? { entityType: 'agreement', entityId: profile.value.id } : null)
@@ -438,6 +445,8 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <AgreementProfileFormPage
               v-if="selectedTab === 'general' && selectedProfile && canUpdateBusinessRecord"
               v-model:model="selectedProfile"
+              :action-context="actionContext"
+              :editor-session="profileFormSession"
               :submit-label="t('common.update')"
               :cancel-label="t('common.cancel')"
               permission-action="update"
@@ -503,6 +512,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               v-else-if="selectedTab === 'recommendation'"
               data-help-view="agreement.recommendation" data-help-label-en="Agreements — Recommendation" data-help-label-fr="Ententes — Recommandation" data-help-target="agreement.recommendation.content" data-help-kind="section"
               mode="recommendation_submission"
+              :mutation-role-allowed="canUpdateFinancialChildRole"
               :show-header="false"
               show-when-unconfigured
               entity-type="fundingcaseagreement"
@@ -589,6 +599,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
                   entity-type="fundingcaseagreement"
                   :entity-id="id"
                   purpose="risk_rating"
+                  :mutation-role-allowed="canUpdateFinancialChildRole"
                   help-start-target="agreement.risk-rating.start"
                   help-step-target="agreement.risk-rating.step-view"
                   help-review-open-target="agreement.risk-rating.review-open"
@@ -611,6 +622,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               entity-type="fundingcaseagreement"
               :entity-id="id"
               purpose="standard"
+              :mutation-role-allowed="canUpdateFinancialChildRole"
               :can-edit="Boolean(profile.can_update)"
               @changed="refreshProfile" />
 

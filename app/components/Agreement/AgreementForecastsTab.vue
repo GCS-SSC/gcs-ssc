@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
+import { useActionContext } from '~/composables/useActionContext'
+import type { CapturedActionContext } from '~/composables/useActionContext'
 import { moneyMatchesSearch } from '~/utils/money-search'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc */
@@ -97,15 +101,28 @@ const validateForecast = createValidator(FundingCaseAgreementForecastCreateSchem
 const useOverviewFetch = useFetch as unknown as (url: Ref<string>) => {
   data: Ref<FundingCaseAgreementForecastOverviewRow | null>
   refresh: () => Promise<void>
+  error: Ref<unknown>
   status: Ref<'idle' | 'pending' | 'success' | 'error'>
 }
 const {
   data: overview,
   refresh: refreshOverview,
+  error: overviewError,
   status: overviewStatus
 } = useOverviewFetch(computed(() => `/api/agreements/${agreementId}/forecasts-overview`))
 
 const forecasts = computed<FundingCaseAgreementForecastOverviewRow['forecasts']>(() => overview.value?.forecasts ?? [])
+const createContext = useActionContext({ identity: [agreementIdRef], authority: () => canCreateRole })
+const deleteContext = useActionContext({ identity: [agreementIdRef], authority: () => canDeleteRole })
+const captureCommitted = useCommittedSettlement({
+  context: createContext,
+  settle: async () => {
+    await refreshOverview()
+    return overviewStatus.value === 'success'
+      ? { kind: 'available' }
+      : { kind: 'unavailable', error: overviewError.value }
+  }
+})
 const forecastsRequiringRevision = computed(() => forecasts.value.filter(forecast =>
   forecast.egcs_fc_active && forecast.forecast_revision_required
 ))
@@ -225,6 +242,7 @@ const captureAction = () => {
   return () => isScopeActive && agreementId === owner && actionGeneration === generation
 }
 const checkPrerequisites = async (isCurrent: () => boolean, recordId?: string): Promise<boolean> => {
+  if (!isCurrent()) return false
   const owner = agreementId
   try {
     const [parent, roster, freshOverview] = await Promise.all([
@@ -259,22 +277,25 @@ const checkPrerequisites = async (isCurrent: () => boolean, recordId?: string): 
     return false
   }
 }
-const runAction = async (work: (isCurrent: () => boolean) => Promise<void>) => {
+const runAction = async (action: 'create' | 'delete', work: (isCurrent: () => boolean, operation: CapturedActionContext) => Promise<void>) => {
   if (pendingAction.value || overviewStatus.value === 'pending') return
+  const operation = (action === 'create' ? createContext : deleteContext).capture()
+  if (!operation) return
   const token = Symbol('forecast-action')
-  const isCurrent = captureAction()
+  const ownsScope = captureAction()
+  const isCurrent = () => operation.isCurrent() && ownsScope()
   pendingAction.value = token
   try {
-    await work(isCurrent)
+    await work(isCurrent, operation)
   } catch (error: unknown) {
     if (isCurrent()) showError(error)
   } finally {
     if (pendingAction.value === token) pendingAction.value = null
   }
 }
-const createForecastVersion = (row: ForecastGroupedRow) => runAction(async isCurrent => {
+const createForecastVersion = (row: ForecastGroupedRow) => runAction('create', async (isCurrent, operation) => {
   const forecast = getRepresentativeGroupedRow(row)
-  if (!forecast || !await checkPrerequisites(isCurrent)) return
+  if (!forecast || !await checkPrerequisites(() => isCurrent() && operation.canDispatch()) || !operation.canDispatch()) return
   const owner = agreementId
   isCreatingVersion.value = true
   try {
@@ -285,43 +306,66 @@ const createForecastVersion = (row: ForecastGroupedRow) => runAction(async isCur
     if (isCurrent()) await navigateTo(localePath(appRouteLocations.agreementForecastDetail(owner, String(created.id))))
   } finally { if (isCurrent()) isCreatingVersion.value = false }
 })
-const openCreateForecast = () => runAction(async isCurrent => {
+const openCreateForecast = () => runAction('create', async (isCurrent, operation) => {
   const session = forecastModal.captureSession()
-  if (await checkPrerequisites(isCurrent) && isCurrent() && forecastModal.captureSession() === session) forecastModal.openCreate()
+  if (await checkPrerequisites(() => isCurrent() && operation.canDispatch()) && operation.canDispatch() && isCurrent() && forecastModal.captureSession() === session) forecastModal.openCreate()
 })
 
 const saveForecast = async () => {
   if (!selectedForecast.value) return
+  const operation = createContext.capture()
+  const committed = captureCommitted()
+  if (!operation || !committed) return
   const forecastState = selectedForecast.value
   const session = forecastModal.captureSession()
   const isCurrentScope = captureAction()
-  const isCurrent = () => isCurrentScope() && forecastModal.isCurrentSession(session)
+  const isCurrent = () => operation.isCurrent() && isCurrentScope() && forecastModal.isCurrentSession(session)
   if (!forecastPending.begin(session)) return
   try {
-    if (!await checkPrerequisites(isCurrent) || !isCurrent()) return
-    await sendJson(`/api/agreements/${agreementId}/forecasts`, 'POST', forecastState)
-    if (!isCurrent() || !forecastModal.closeSession(session)) return
-    await refreshOverview()
-    if (!isCurrentScope() || overviewStatus.value === 'error') return
+    try {
+      if (!await checkPrerequisites(() => isCurrent() && operation.canDispatch()) || !isCurrent() || !operation.canDispatch() || !committed.canDispatch()) return
+      await sendJson(`/api/agreements/${agreementId}/forecasts`, 'POST', forecastState)
+    } catch (error: unknown) {
+      if (isCurrent()) showError(error)
+      return
+    }
+    const closesInitiatingSession = operation.isCurrent() && isCurrentScope() && forecastModal.closeSession(session)
+    const settlement = await committed.settle()
+    if (settlement.kind !== 'refreshed' || !forecastModal.isLatestSession(session) || !closesInitiatingSession) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
-  } catch (error: unknown) {
-    if (isCurrent()) showError(error)
   } finally { forecastPending.end(session) }
 }
 
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const confirmDelete = useDeleteConfirm()
-const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
-  if (!await checkPrerequisites(isCurrent, forecastId)) return
+const deleteForecast = (forecastId: string) => runAction('delete', async (isCurrent, operation) => {
+  const current = forecasts.value.find(forecast => String(forecast.id) === forecastId)
+  if (current && isRecordLocked(current)) {
+    warnPrerequisite('agreement.child_records.work_prerequisite')
+    return
+  }
+  if (current?.egcs_fc_active && current.forecast_revision_required) {
+    warnPrerequisite('agreement.budget_controls.forecast_revision_required')
+    return
+  }
   const owner = agreementId
   const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/forecasts/${forecastId}`, {
+    operation,
+    target: {
+      id: forecastId,
+      resolve: () => forecasts.value.find(forecast => String(forecast.id) === forecastId),
+      eligible: forecast => !isRecordLocked(forecast) && !(forecast.egcs_fc_active && forecast.forecast_revision_required)
+    },
     shouldProceed: isCurrent,
-    confirm: async () => Boolean(await confirmDelete()) && isCurrent() && await checkPrerequisites(isCurrent, forecastId)
+    confirm: async () => await checkPrerequisites(() => isCurrent() && operation.canDispatch(), forecastId)
+      && Boolean(await confirmDelete()) && operation.canDispatch()
+      && await checkPrerequisites(() => isCurrent() && operation.canDispatch(), forecastId)
   })
   if (!deleted || !isCurrent()) return
   await refreshOverview()
   if (isCurrent()) toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
 })
+const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remote', context: createContext }, submit: saveForecast })
 </script>
 
 <template>
@@ -448,7 +492,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
       v-model:open="isForecastModalOpen"
       :title="t('agreement.forecasts.add')">
       <template #body>
-        <UForm :state="selectedForecast" :validate="validateForecast" :validate-on="[]" class="space-y-4" data-help-view="agreement.forecasts.forecast-dialog" data-help-label-en="Agreements — Forecast editor" data-help-label-fr="Ententes — Éditeur de prévision" @submit="saveForecast">
+        <UForm v-bind="formSession" :state="selectedForecast" :validate="validateForecast" :validate-on="[]" class="space-y-4" data-help-view="agreement.forecasts.forecast-dialog" data-help-label-en="Agreements — Forecast editor" data-help-label-fr="Ententes — Éditeur de prévision">
           <UFormField :label="t('agreement.forecasts.fiscal_year')" name="egcs_fc_fiscalyear" required>
             <CommonBilingualSelectMenu
               v-model="selectedForecast.egcs_fc_fiscalyear"

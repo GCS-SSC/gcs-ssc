@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch, type Ref } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useFormSession } from '~/composables/useFormSession'
 import { getGroupedRowModel, type ExpandedState } from '@tanstack/vue-table'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -19,6 +22,14 @@ type AssignmentForm = {
 type Option = AssignedAgencyCustomFieldDefinition['options'][number]
 type FieldRow = { id: string, sectionGroup: string, section: AgreementCustomFieldSection | null, fieldGroup: string, categoryGroup: string, field: AssignedAgencyCustomFieldDefinition | null, option: Option | null }
 
+const writeContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canUpdateChild
+})
+const deleteActionContext = useActionContext({
+  identity: [() => transferPaymentId, () => streamId],
+  authority: () => canUpdateChild
+})
 const { transferPaymentId, streamId, canUpdateChild } = defineProps<{
   transferPaymentId: string, streamId: string, canUpdateChild: boolean, canDeleteChild: boolean
 }>()
@@ -39,7 +50,17 @@ const assignmentModal = useCrudModal<AssignmentForm>({
 })
 const editingAssignmentId: Ref<string | undefined> = ref<string>()
 const sectionModal = useCrudModal<Partial<AgreementCustomFieldSection>>({ createState: () => ({ egcs_tp_displayorder: 0 }), updateState: section => ({ ...section }) })
-const saving: Ref<boolean> = ref(false)
+const sectionPending = useCrudModalPending(sectionModal.captureSession)
+const assignmentPending = useCrudModalPending(assignmentModal.captureSession)
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && contextGeneration === generation
+onScopeDispose(() => {
+  disposed = true
+  contextGeneration += 1
+  sectionModal.close()
+  assignmentModal.close()
+})
 const search: Ref<string> = ref('')
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
 const expandedRows: Ref<ExpandedState> = ref({})
@@ -82,48 +103,78 @@ const editAssignment = (field: AssignedAgencyCustomFieldDefinition) => {
 }
 /** Saves a Stream-owned section. */
 const saveSection = async () => {
-  if (!sectionModal.selected.value || saving.value) return
+  const operation = writeContext.capture()
+  if (!operation) return
+  if (disposed || !canUpdateChild || !sectionModal.selected.value) return
   const session = sectionModal.captureSession()
-  saving.value = true
+  if (session === null || !sectionPending.begin(session)) return
+  const generation = contextGeneration
+  let closedSession = false
   try {
     const { id, ...body } = sectionModal.selected.value
     const response = await fetch(getClientRequestUrl(`${baseUrl.value}/custom-fields/sections${id ? `/${id}` : ''}`), { method: id ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     if (!response.ok) await throwFetchResponseError(response)
-    sectionModal.closeSession(session)
+    if (!(operation.isCurrent() && isCurrentContext(generation))) return
+    closedSession = sectionModal.closeSession(session)
     await refresh()
   } catch (error) {
-    showError(error)
+    if ((operation.isCurrent() && isCurrentContext(generation)) && (sectionModal.isCurrentSession(session) || (closedSession && sectionModal.isLatestSession(session)))) showError(error)
   } finally {
-    saving.value = false
+    sectionPending.end(session)
   }
 }
 /** Saves only assignment properties through the Stream assignment route. */
 const saveAssignment = async () => {
+  const operation = writeContext.capture()
+  if (!operation) return
   const selected = assignmentModal.selected.value
-  if (!selected || saving.value) return
+  if (disposed || !canUpdateChild || !selected) return
   const session = assignmentModal.captureSession()
-  saving.value = true
+  if (session === null || !assignmentPending.begin(session)) return
+  const generation = contextGeneration
+  let closedSession = false
   try {
     const assignmentId = editingAssignmentId.value
     const { egcs_tp_agencyfield, ...settings } = selected
     const body = assignmentId ? settings : { egcs_tp_agencyfield, ...settings }
     const response = await fetch(getClientRequestUrl(`${assignmentUrl.value}${assignmentId ? `/${assignmentId}` : ''}`), { method: assignmentId ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     if (!response.ok) await throwFetchResponseError(response)
-    assignmentModal.closeSession(session)
+    if (!(operation.isCurrent() && isCurrentContext(generation))) return
+    closedSession = assignmentModal.closeSession(session)
     await refresh()
   } catch (error) {
-    showError(error)
+    if ((operation.isCurrent() && isCurrentContext(generation)) && (assignmentModal.isCurrentSession(session) || (closedSession && assignmentModal.isLatestSession(session)))) showError(error)
   } finally {
-    saving.value = false
+    assignmentPending.end(session)
   }
 }
 /**
- * Deletes one Stream-owned section or assignment.
- * @param path - Authorized Stream child endpoint.
+ * Deletes the selected accepted Stream section or field assignment.
+ * @param target - Fixed section or assignment identity captured by the control.
+ * @param target.kind - Whether this removes a section or its field assignment.
+ * @param target.id - Persisted section or assignment identifier.
  */
-const remove = async (path: string) => {
-  if (await confirmDeleteRequest(path)) await refresh()
+const remove = async (target: { kind: 'section' | 'assignment'; id: string }) => {
+  const operation = deleteActionContext.capture()
+  if (!operation || disposed || !canUpdateChild) return
+  const { kind, id } = target
+  const generation = contextGeneration
+  const path = kind === 'section' ? `${baseUrl.value}/custom-fields/sections/${id}` : `${assignmentUrl.value}/${id}`
+  const resolve = (): AgreementCustomFieldSection | AssignedAgencyCustomFieldDefinition | undefined => kind === 'section'
+    ? data.value?.sections.find(current => current.id === id)
+    : data.value?.items.find(current => current.assignmentId === id)
+  try {
+    const removed = await confirmDeleteRequest(path, {
+      operation,
+      target: { id, resolve, eligible: current => kind === 'section' ? current.id === id : 'assignmentId' in current && current.assignmentId === id },
+      shouldProceed: () => isCurrentContext(generation) && canUpdateChild
+    })
+    if (removed && operation.isCurrent() && isCurrentContext(generation)) await refresh()
+  } catch (error) {
+    if (operation.isCurrent() && isCurrentContext(generation)) showError(error)
+  }
 }
+
 const filteredSections = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
   const sections: Array<AgreementCustomFieldSection | null> = [...(data.value?.sections ?? []), null]
@@ -149,14 +200,17 @@ watch(search, () => {
 watch(filteredSections, sections => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(sections.length / pagination.value.pageSize) - 1))
 })
-watch(baseUrl, () => {
+watch([baseUrl, () => canUpdateChild], () => {
+  contextGeneration += 1
   search.value = ''
   pagination.value.pageIndex = 0
   expandedRows.value = {}
   sectionModal.close()
   assignmentModal.close()
   editingAssignmentId.value = undefined
-})
+}, { flush: 'sync' })
+const sectionFormSession = useFormSession({ owner: sectionModal, action: { kind: 'remote', context: writeContext }, submit: saveSection })
+const assignmentFormSession = useFormSession({ owner: assignmentModal, action: { kind: 'remote', context: writeContext }, submit: saveAssignment })
 </script>
 
 <template>
@@ -224,17 +278,17 @@ watch(baseUrl, () => {
         <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-2">
           <CommonActionButton v-if="canUpdateChild" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.assign_field')" @click="openAssignment(row.original.section?.id ?? null)" />
           <CommonActionButton v-if="canUpdateChild && row.original.section" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="sectionModal.openUpdate(row.original.section)" />
-          <CommonActionButton v-if="canUpdateChild && row.original.section" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${baseUrl}/custom-fields/sections/${row.original.section.id}`)" />
+          <CommonActionButton v-if="canUpdateChild && row.original.section" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove({ kind: 'section', id: row.original.section.id })" />
         </div>
         <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-2">
           <CommonActionButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="editAssignment(row.original.field)" />
-          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${assignmentUrl}/${row.original.field.assignmentId}`)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove({ kind: 'assignment', id: row.original.field.assignmentId })" />
         </div>
       </template>
     </CommonResourceLayout>
     <UModal v-model:open="sectionModal.isOpen.value" :title="t('custom_fields.section')">
       <template #body>
-        <UForm v-if="sectionModal.selected.value" data-field-scope="transfer-payment.custom-field-section" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4" @submit="saveSection">
+        <UForm v-if="sectionModal.selected.value" v-bind="sectionFormSession" data-field-scope="transfer-payment.custom-field-section" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_tp_name_en" required>
             <UInput v-model="sectionModal.selected.value.egcs_tp_name_en" class="w-full" />
           </UFormField>
@@ -244,13 +298,13 @@ watch(baseUrl, () => {
           <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
             <UInput v-model.number="sectionModal.selected.value.egcs_tp_displayorder" type="number" min="0" />
           </UFormField>
-          <CommonSaveButton :label="t('common.save')" :loading="saving" />
+          <CommonSaveButton :label="t('common.save')" :loading="sectionPending.isPending.value" />
         </UForm>
       </template>
     </UModal>
     <UModal v-model:open="assignmentModal.isOpen.value" :title="t('custom_fields.assign_field')">
       <template #body>
-        <UForm v-if="assignmentModal.selected.value" data-field-scope="transfer-payment.custom-field-assignment" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4" @submit="saveAssignment">
+        <UForm v-if="assignmentModal.selected.value" v-bind="assignmentFormSession" data-field-scope="transfer-payment.custom-field-assignment" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4">
           <UFormField :label="t('custom_fields.agency_field')" name="egcs_tp_agencyfield" required>
             <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />
           </UFormField>
@@ -262,7 +316,7 @@ watch(baseUrl, () => {
           <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
             <UInput v-model.number="assignmentModal.selected.value.egcs_tp_displayorder" type="number" min="0" />
           </UFormField>
-          <CommonSaveButton :label="t('common.save')" :loading="saving" />
+          <CommonSaveButton :label="t('common.save')" :loading="assignmentPending.isPending.value" />
         </UForm>
       </template>
     </UModal>

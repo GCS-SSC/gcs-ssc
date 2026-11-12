@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
+import { useFormSession } from '~/composables/useFormSession'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { watch } from 'vue'
+import { onScopeDispose, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { buildDocumentTemplateFormData, getDocumentTemplateSaveRequest, type DocumentTemplateFormState } from '~/utils/document-template-form'
@@ -77,6 +79,19 @@ const {
 } = templateModal
 
 const selectedTemplate: Ref<TemplateFormState | null> = selected
+const createActionContext = useActionContext({ identity: [() => agencyId], authority: () => canCreate })
+const updateActionContext = useActionContext({
+  identity: [() => agencyId], authority: () => canUpdate,
+  eligible: () => items.value.some(row => row.id === selectedTemplate.value?.id)
+})
+const formActionContext = () => selectedTemplate.value?.id ? updateActionContext : createActionContext
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+type CatalogContext = { kind: 'active' } | { kind: 'disposed' }
+const context: Ref<CatalogContext> = shallowRef({ kind: 'active' })
+const ownsContext = (owner: CatalogContext) => owner.kind === 'active' && context.value === owner
+watch([() => canCreate, () => canUpdate], () => {
+  if (selectedTemplate.value && (selectedTemplate.value.id ? !canUpdate : !canCreate)) templateModal.close()
+}, { flush: 'sync' })
 const templatePending = useCrudModalPending(captureSession)
 const isSaving = templatePending.isPending
 const fileInputVersion: Ref<number> = ref(0)
@@ -123,7 +138,14 @@ watch(() => selectedTemplate.value?.egcs_ay_templatekind, kind => {
   selectedTemplate.value.egcs_ay_outputformats = [...compatibleOutputFormats[kind]]
   clearSelectedTemplateFiles()
 }, { flush: 'sync' })
-watch(() => agencyId, () => templateModal.close())
+watch(() => agencyId, () => {
+  context.value = { kind: 'active' }
+  templateModal.close()
+}, { flush: 'sync' })
+onScopeDispose(() => {
+  context.value = { kind: 'disposed' }
+  templateModal.close()
+})
 
 const onFileChange = (event: Event, language: 'en' | 'fr') => {
   const input = event.target as HTMLInputElement
@@ -135,12 +157,20 @@ const onFileChange = (event: Event, language: 'en' | 'fr') => {
 }
 
 const saveTemplate = async () => {
-  if (!selectedTemplate.value) return
+  const operation = formActionContext().capture()
+  if (!operation?.canDispatch()) return
+  const owner = context.value
+  if (!selectedTemplate.value || !ownsContext(owner)
+    || (selectedTemplate.value.id ? !canUpdate : !canCreate)) return
   const item = selectedTemplate.value
   const formData = buildDocumentTemplateFormData(item)
   const request = getDocumentTemplateSaveRequest(agencyId, item)
   const session = captureSession()
-  if (!templatePending.begin(session)) return
+  if (session === null || !templatePending.begin(session)) return
+  let closedSession = false
+  const ownsFeedback = () => operation.isCurrent() && ownsContext(owner) && (
+    templateModal.isCurrentSession(session) || (closedSession && captureSession() === null)
+  )
 
   try {
     const response = await fetch(getClientRequestUrl(request.url), {
@@ -148,37 +178,46 @@ const saveTemplate = async () => {
       body: formData
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!closeSession(session)) return
+    if (!operation.isCurrent() || !ownsContext(owner)) return
+    closedSession = closeSession(session)
   } catch (error: unknown) {
-    if (captureSession() === session) showError(error)
+    if (ownsFeedback()) showError(error)
     return
   } finally {
     templatePending.end(session)
   }
 
-  toast.add({ title: toast.localized('common.success'), description: request.isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
+  if (ownsFeedback()) toast.add({ title: toast.localized('common.success'), description: request.isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
   try {
     await refresh()
   } catch (error: unknown) {
-    showError(error)
+    if (ownsFeedback()) showError(error)
   }
 }
 
 const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
+  const owner = context.value
+  const operation = deleteActionContext.capture()
+  const id = row.id
   try {
-    const ok = await confirmDeleteRequest(`/api/agency/${agencyId}/document-templates/${row.id}`)
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`/api/agency/${agencyId}/document-templates/${id}`, {
+      operation,
+      target: { id, resolve: () => items.value.find(item => item.id === id), eligible: () => canDelete },
+      shouldProceed: () => ownsContext(owner)
+    })
+    if (!ok || !operation?.isCurrent() || !ownsContext(owner)) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (operation?.isCurrent() && ownsContext(owner)) showError(error)
     return
   }
   try {
     await refresh()
   } catch (error: unknown) {
-    showError(error)
+    if (operation?.isCurrent() && ownsContext(owner)) showError(error)
   }
 }
+const formSession = useFormSession({ owner: templateModal, action: { kind: 'remote', context: formActionContext }, submit: saveTemplate })
 </script>
 
 <template>
@@ -278,7 +317,7 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
       :title="selectedTemplate.id ? t('transfer_payment.document_templates.update') : t('transfer_payment.document_templates.create')"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedTemplate" :validate="validate" class="space-y-4" @submit="saveTemplate">
+        <UForm v-bind="formSession" :state="selectedTemplate" :validate="validate" class="space-y-4">
           <UFormField :label="t('transfer_payment.entity_type')" name="egcs_ay_entitytype">
             <CommonEnumSelect
               v-model="selectedTemplate.egcs_ay_entitytype"

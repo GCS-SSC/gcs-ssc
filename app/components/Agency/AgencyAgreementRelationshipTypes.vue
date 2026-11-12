@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useActionContext } from '~/composables/useActionContext'
+import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyAgreementRelationshipTypeSchema, AgencyAgreementRelationshipTypeInitial, type AgencyAgreementRelationshipTypeItem } from '~~/shared/types/schemas'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -12,11 +14,19 @@ const columns: TableColumnInput<AgencyAgreementRelationshipTypeItem>[] = [
 ]
 
 const initialNewItem = { ...AgencyAgreementRelationshipTypeInitial }
+
+const action: ResourceCrudAction = {
+  kind: 'remote',
+  create: useActionContext({ identity: [() => agencyId], authority: () => canCreate }),
+  update: useActionContext({ identity: [() => agencyId], authority: () => canUpdate }),
+  delete: useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+}
 </script>
 
 <template>
   <section data-field-scope="agency.agreement-relationship-types">
     <CommonResourceCrud
+      :action="action"
       :title="t('agency.tabs.agreement_relationship_types')"
       icon="i-lucide-link"
       :fetch-url="`/api/agency/${agencyId}/agreement-relationship-types`"

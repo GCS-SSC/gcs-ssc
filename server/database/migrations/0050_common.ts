@@ -2435,10 +2435,9 @@ AS $function$
           JOIN "Common_Runtime_Item" item ON item.id = review.egcs_cn_runtimeitem
           WHERE review.id = evidence_row.egcs_cn_review;
       ELSIF TG_TABLE_NAME = 'Common_Review_Response' THEN
-        SELECT item.egcs_cn_state INTO runtime_state FROM "Common_Assessment" assessment
-          JOIN "Common_Review" review ON review.id = assessment.egcs_cn_review
+        SELECT item.egcs_cn_state INTO runtime_state FROM "Common_Review" review
           JOIN "Common_Runtime_Item" item ON item.id = review.egcs_cn_runtimeitem
-          WHERE assessment.id = evidence_row.egcs_cn_assessment;
+          WHERE review.id = evidence_row.egcs_cn_assessment;
       ELSIF TG_TABLE_NAME = 'Common_Checklist_Response' THEN
         SELECT item.egcs_cn_state INTO runtime_state FROM "Common_Checklist" checklist
           JOIN "Common_Review" review ON review.id = checklist.egcs_cn_review

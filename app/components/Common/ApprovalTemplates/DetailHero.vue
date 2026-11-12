@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { ActionContext } from '~/composables/useActionContext'
 import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 
 const {
+  actionContext,
   name = '',
   description = '',
   isCollapsed = false,
@@ -15,6 +17,7 @@ const {
   stepCount = 0,
   certificationCount = 0
 } = defineProps<{
+  actionContext: ActionContext
   name?: string
   description?: string
   stepCount?: number
@@ -34,6 +37,7 @@ const emit = defineEmits<{ publish: [], retire: [] }>()
 <template>
   <div class="space-y-3">
     <CommonPublicationDetailHero
+      :action-context="actionContext"
       :name="name"
       :description="description"
       icon="i-lucide-clipboard-list"

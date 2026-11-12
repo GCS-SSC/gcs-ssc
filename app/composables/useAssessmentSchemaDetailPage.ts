@@ -27,6 +27,7 @@ import {
 import type { AssessmentEntityHelperDefinition } from '~~/shared/utils/assessment-helpers'
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useActionContext } from '~/composables/useActionContext'
 
 type AssessmentSchemaDetail = {
   id: string
@@ -89,8 +90,8 @@ export const useAssessmentSchemaDetailPage = async () => {
   const assessmentDefinitionState: Ref<AssessmentDefinitionEditorState | null> = ref(null)
   const overallScoringMatrixState: Ref<AssessmentBandRow[]> = ref([])
   const profileScope = computed<Scope>(() => ({ type: 'agency', agencyId: agencyId.value }))
-  const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', profileScope.value))
-  const canEdit = computed(() => canManagePublication.value && schema.value?.publicationState !== 'retired')
+  const canManagePublication = computed(() => can('agency', 'update', profileScope.value))
+  const canEdit = computed(() => canManagePublication.value && !!schema.value && schema.value.publicationState !== 'retired')
 
   const breadcrumbItems = computed(() => [
     { label: t('agency.title'), to: localePath(appRouteLocations.agencies()) },
@@ -192,7 +193,12 @@ export const useAssessmentSchemaDetailPage = async () => {
         }
       : null
   })
-  const mutation = useEditorMutationCoordinator({ getDraft })
+  const writeContext = useActionContext({
+    identity: [agencyId, schemaId],
+    authority: canManagePublication,
+    eligible: () => Boolean(agency.value) && !!schema.value && schema.value.publicationState !== 'retired'
+  })
+  const mutation = useEditorMutationCoordinator({ getDraft, context: writeContext })
   const isSavingGeneral = computed(() => mutation.isActionPending('save-general') || mutation.isActionPending('save-all'))
   const isSavingSchema = computed(() => mutation.isActionPending('save-schema') || mutation.isActionPending('save-all'))
   const isPublishing = computed(() => mutation.isActionPending('publish'))
@@ -213,7 +219,7 @@ export const useAssessmentSchemaDetailPage = async () => {
     overallScoringMatrixState.value = normalizeBandRows(value.egcs_cn_scoringmatrix)
   }
   watch(schema, value => {
-    if (value && !mutation.isDirty.value) mutation.replaceSessionDraft(() => applySchemaDraft(value))
+    if (value && !mutation.isDirty.value && !mutation.isPending.value) mutation.replaceSessionDraft(() => applySchemaDraft(value))
   }, { immediate: true })
   watch([agencyId, schemaId], () => {
     selectedSection.value = 'schema-general'
@@ -229,6 +235,22 @@ export const useAssessmentSchemaDetailPage = async () => {
     description: toast.localized('common.newer_changes_preserved'),
     color: 'warning'
   })
+  const showSynchronizationWarning = () => toast.add({
+    title: toast.localized('common.warning'),
+    description: toast.localized('common.saved_refresh_failed'),
+    color: 'warning'
+  })
+  const mergePublicationMetadata = (value: AssessmentSchemaDetail) => {
+    if (!schema.value) return
+    schema.value = {
+      ...schema.value,
+      publicationId: value.publicationId,
+      publicationState: value.publicationState,
+      publicationVersionId: value.publicationVersionId,
+      publicationVersion: value.publicationVersion,
+      hasUnpublishedChanges: value.hasUnpublishedChanges
+    }
+  }
   const blockDirtyAction = () => {
     if (!mutation.isDirty.value) return false
     toast.add({
@@ -239,7 +261,13 @@ export const useAssessmentSchemaDetailPage = async () => {
     return true
   }
   const refreshForMutation = async (token: EditorMutationToken) => {
+    if (!mutation.isTokenCurrent(token)) return false
+    const acceptedSchema = schema.value
     await refreshSchemaRequest()
+    if (schemaRequest.error.value) {
+      if (mutation.isTokenCurrent(token)) schema.value = acceptedSchema
+      throw schemaRequest.error.value
+    }
     const refreshedSchema = schema.value
     if (!refreshedSchema) return false
     return mutation.applyMutationRefresh(token, {
@@ -250,9 +278,12 @@ export const useAssessmentSchemaDetailPage = async () => {
   const persistPayload = async (
     token: EditorMutationToken,
     payload: Record<string, unknown>,
-    showSuccess: boolean
+    showSuccess: boolean,
+    endpoint: string
   ) => {
-    await saveJson(schemaEndpoint.value, 'PATCH', payload)
+    if (!mutation.canContinue(token)) return false
+    await saveJson(endpoint, 'PATCH', payload)
+    mutation.acceptCommittedDraft(token)
     if (!await refreshForMutation(token)) {
       if (mutation.isTokenCurrent(token)) showPreservedDraft()
       return false
@@ -321,11 +352,12 @@ export const useAssessmentSchemaDetailPage = async () => {
     const payloads = validateSaveAllPayloads()
     if (!payloads) return
 
+    const endpoint = schemaEndpoint.value
     await mutation.run('save-all', async token => {
       try {
-        await persistPayload(token, combineSaveAllPayloads(payloads.generalResult, payloads.schemaResult), true)
+        await persistPayload(token, combineSaveAllPayloads(payloads.generalResult, payloads.schemaResult), true, endpoint)
       } catch (error) {
-        showError(error)
+        if (mutation.isTokenCurrent(token)) showError(error)
       }
     })
   }
@@ -339,6 +371,7 @@ export const useAssessmentSchemaDetailPage = async () => {
     }
     if (action === 'retire' && blockDirtyAction()) return
 
+    const endpoint = schemaEndpoint.value
     await mutation.run(action, async token => {
       try {
         if (action === 'publish' && mutation.isDirty.value) {
@@ -347,18 +380,27 @@ export const useAssessmentSchemaDetailPage = async () => {
           const saved = await persistPayload(
             token,
             combineSaveAllPayloads(payloads.generalResult, payloads.schemaResult),
-            false
+            false,
+            endpoint
           )
           if (!saved) return
         }
-        await sendJson(`${schemaEndpoint.value}/${action}`, 'POST')
-        if (!await refreshForMutation(token)) {
-          if (mutation.isTokenCurrent(token)) showPreservedDraft()
-          return
+        if (!mutation.canContinue(token)) return
+        const committedSchema = await sendJson<AssessmentSchemaDetail>(`${endpoint}/${action}`, 'POST')
+        if (!mutation.isTokenCurrent(token)) return
+        mergePublicationMetadata(committedSchema)
+        try {
+          if (!await refreshForMutation(token)) {
+            if (mutation.isTokenCurrent(token)) showPreservedDraft()
+            return
+          }
+        } catch {
+          if (!mutation.isTokenCurrent(token)) return
+          showSynchronizationWarning()
         }
         toast.add({ title: toast.localized('common.success'), description: toast.localized(successKey), color: 'success' })
       } catch (error) {
-        showError(error)
+        if (mutation.isTokenCurrent(token)) showError(error)
       }
     })
   }
@@ -372,6 +414,7 @@ export const useAssessmentSchemaDetailPage = async () => {
   }
 
   return {
+    writeContext,
     schema,
     loadError,
     loadStatus,

@@ -2,9 +2,10 @@
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useActionContext } from '~/composables/useActionContext'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, shallowReactive, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { useRouteTabMap } from '~/composables/useRouteTabMap'
@@ -64,6 +65,10 @@ provideBilingualFieldScope(() => ({ subject: 'agency', agencyId: id, permissionA
 const agencyScope = { type: 'agency' as const, agencyId: id }
 const canUpdateAgency = computed(() => can('agency', 'update', agencyScope))
 const canDeleteAgency = computed(() => can('agency', 'delete', agencyScope))
+const agencyActionContext = useActionContext({
+  identity: [() => id],
+  authority: canUpdateAgency
+})
 /**
  * Returns the Agency-owned configuration capabilities for the active detail route.
  *
@@ -76,10 +81,12 @@ const agencyResourceCapabilities = () => ({
   canDelete: canDeleteAgency.value
 })
 
+const reconciliationPendingRequests = shallowReactive(new Map<string, symbol>())
+
 const tabMap: TabMap = new Map([
   ['fieldHelp', { key: 'field_tooltips.title', value: 'field-help', icon: 'i-lucide-message-circle-question-mark', component: AgencyFieldHelp, getProps: () => ({ agencyId: id }) }],
   ['general', { key: 'agency.tabs.general', icon: 'i-lucide-info', component: AgencyDetailGeneralTab, getProps: () => ({ agency: agency.value }) }],
-  ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: () => ({ ...agencyResourceCapabilities(), showHeader: false }) }],
+  ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: () => ({ ...agencyResourceCapabilities(), showHeader: false, reconciliationPendingRequests }) }],
   ['customFields', { key: 'custom_fields.title', icon: 'i-lucide-list-filter', component: AgencyCustomFields, getProps: () => ({
     agencyId: id, showHeader: false, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value
   }) }],
@@ -134,8 +141,12 @@ onBeforeUnmount(() => {
   isAgencyPageDisposed = true
   agencyLoadGeneration += 1
 })
-/** Refreshes the profile while accepting only the latest mounted-page request. */
-const refresh = async () => {
+/**
+ * Refreshes the profile while accepting only the latest mounted-page request.
+ *
+ * @param ownsFeedback - Whether the initiating interaction still owns error feedback.
+ */
+const refresh = async (ownsFeedback: () => boolean = () => true) => {
   if (isAgencyPageDisposed) return
   const generation = ++agencyLoadGeneration
   isLoadingAgency.value = true
@@ -148,7 +159,7 @@ const refresh = async () => {
   } catch (error: unknown) {
     if (generation !== agencyLoadGeneration) return
     agencyLoadError.value = error
-    showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
     if (generation === agencyLoadGeneration) isLoadingAgency.value = false
   }
@@ -162,10 +173,15 @@ const {
   selected: selectedAgency,
   openUpdate: openAgencyUpdate,
   captureSession: captureAgencySession,
+  isCurrentSession: isCurrentAgencySession,
   closeSession: closeAgencySession
 } = useCrudModal<AgencyProfileItem, AgencyProfileItem>({
   updateState: agencyItem => ({ ...agencyItem })
 })
+let agencyEditorGeneration = 0
+watch(captureAgencySession, () => {
+  agencyEditorGeneration += 1
+}, { flush: 'sync' })
 const agencyPending = useCrudModalPending(captureAgencySession)
 const isSavingAgency = agencyPending.isPending
 
@@ -174,7 +190,7 @@ const isSavingAgency = agencyPending.isPending
  * Pre-populates the modal state with the current agency data.
  */
 const openUpdateModal = () => {
-  if (!agency.value || !canUpdateAgency.value) return
+  if (isAgencyPageDisposed || !agency.value || !canUpdateAgency.value) return
   openAgencyUpdate(agency.value)
 }
 
@@ -183,8 +199,14 @@ const openUpdateModal = () => {
  * Closes the modal, refreshes the agency data, and provides success feedback.
  */
 const updateAgency = async () => {
-  if (!selectedAgency.value || !canUpdateAgency.value) return
+  const operation = agencyActionContext.capture()
+  if (isAgencyPageDisposed || !selectedAgency.value || !operation?.canDispatch()) return
   const session = captureAgencySession()
+  const generation = agencyEditorGeneration
+  const ownsEditor = () => !isAgencyPageDisposed
+    && operation.isCurrent()
+    && generation === agencyEditorGeneration
+    && isCurrentAgencySession(session)
   if (!agencyPending.begin(session)) return
   try {
     const response = await fetch(getClientRequestUrl(`/api/agency/${id}`), {
@@ -193,19 +215,19 @@ const updateAgency = async () => {
       body: JSON.stringify(selectedAgency.value)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    closeAgencySession(session)
-    toast.add({
-      title: toast.localized('common.success'),
-      description: toast.localized('common.updated_success'),
-      color: 'success'
-    })
-    try {
-      await refresh()
-    } catch (refreshError) {
-      showError(refreshError)
+    if (isAgencyPageDisposed || !operation.isCurrent()) return
+    const closed = ownsEditor() && closeAgencySession(session)
+    const feedbackGeneration = agencyEditorGeneration
+    if (closed) {
+      toast.add({
+        title: toast.localized('common.success'),
+        description: toast.localized('common.updated_success'),
+        color: 'success'
+      })
     }
+    await refresh(() => operation.isCurrent() && closed && feedbackGeneration === agencyEditorGeneration)
   } catch (error: unknown) {
-    showError(error)
+    if (ownsEditor()) showError(error)
   } finally {
     agencyPending.end(session)
   }
@@ -266,6 +288,7 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
         :title="t('agency.update_title')"
         :submit-label="t('common.update')"
         :pending="isSavingAgency"
+        :action-context="agencyActionContext"
         @submit="updateAgency" />
     </template>
   </CommonDetailPage>

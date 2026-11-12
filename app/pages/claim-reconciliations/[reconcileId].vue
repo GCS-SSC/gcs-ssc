@@ -453,6 +453,7 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
                 hide-when-unconfigured
                 :can-edit="canUpdateRole && data.is_assigned && status === 'success'"
                 :action-role-allowed="canUpdateRole"
+                :mutation-role-allowed="canUpdateRole"
                 :action-prerequisite-warning="workflowPrerequisiteWarning"
                 :refresh-key="approvalsRefreshKey"
                 @changed="handleRuntimeChanged" />
@@ -474,6 +475,7 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
               purpose="standard"
               :can-edit="canUpdateRole && data.is_assigned && status === 'success'"
               :action-role-allowed="canUpdateRole"
+              :mutation-role-allowed="canUpdateRole"
               :action-prerequisite-warning="workflowPrerequisiteWarning"
               :refresh-key="approvalsRefreshKey"
               @changed="handleRuntimeChanged" />

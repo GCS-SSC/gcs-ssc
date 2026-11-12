@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useActionContext } from '~/composables/useActionContext'
+import { copyQuestionnaireResponses, QuestionnaireMutationResultSchema } from '~/utils/questionnaire-runtime'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch, h, useId } from 'vue'
+import { computed, ref, shallowRef, watch, onBeforeUnmount, h, useId } from 'vue'
 import type { Ref } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
@@ -138,6 +142,7 @@ type WorkflowDisplayStep = {
 const {
   entityType,
   entityId,
+  mutationRoleAllowed,
   actionRoleAllowed = undefined,
   actionPrerequisiteWarning,
   purpose = 'standard',
@@ -155,6 +160,7 @@ const {
 } = defineProps<{
   entityType: Workflow_Target_Entity_Type
   entityId: string
+  mutationRoleAllowed: boolean
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
@@ -181,25 +187,56 @@ const helpRoot = ref<HTMLElement | null>(null)
 const helpVisitId = useId()
 const captureJourneyInvalidation = () => guidedHelpActions.begin({ kind: 'invalidated', binding: { resourceType: entityType, resourceId: entityId } })
 const { showError } = useApiErrorToast()
-const isSaving: Ref<boolean> = ref(false)
-const isStarting: Ref<boolean> = ref(false)
-const isRetrying: Ref<boolean> = ref(false)
+type RuntimeMutationAction = 'save' | 'start' | 'retry' | 'cancel' | 'resume'
+type RuntimeMutationState =
+  | { kind: 'idle' }
+  | { kind: 'pending', action: RuntimeMutationAction, generation: number }
+  | { kind: 'disposed' }
+const mutation: Ref<RuntimeMutationState> = shallowRef({ kind: 'idle' })
+const isMutationPending = computed(() => mutation.value.kind === 'pending')
+const isSaving = computed(() => mutation.value.kind === 'pending' && mutation.value.action === 'save')
+const isStarting = computed(() => mutation.value.kind === 'pending' && mutation.value.action === 'start')
+const isRetrying = computed(() => mutation.value.kind === 'pending' && mutation.value.action === 'retry')
 const toast = useLocalizedToast()
-const isCancelling: Ref<boolean> = ref(false)
+const isCancelling = computed(() => mutation.value.kind === 'pending' && mutation.value.action === 'cancel')
 const responses: Ref<RecommendationResponse[]> = ref([])
+type RecommendationDraftRevision = { kind: 'absent' } | { kind: 'current'; revision: number } | { kind: 'conflicted'; revision: number }
+const recommendationDraftRevision = shallowRef<RecommendationDraftRevision>({ kind: 'absent' })
+const hasRecommendationConflict = computed(() => recommendationDraftRevision.value.kind === 'conflicted')
 const validationIssues: Ref<Array<{ questionKey: string, message: string }>> = ref([])
 const replacementOwners: Ref<Record<string, string>> = ref({})
 const resumeAttempted: Ref<boolean> = ref(false)
-const isResuming: Ref<boolean> = ref(false)
+const isResuming = computed(() => mutation.value.kind === 'pending' && mutation.value.action === 'resume')
 const selectedStepId: Ref<string | null> = ref(null)
 const activeWorkflowTab: Ref<string> = ref('current')
 const selectedAttemptId: Ref<string | null> = ref(null)
 const isChooserOpen: Ref<boolean> = ref(false)
 const selectedWorkflowSetupId: Ref<string | null> = ref(null)
-const availableWorkflows: Ref<AvailableStandardWorkflow[]> = ref([])
-const isLoadingAvailable: Ref<boolean> = ref(false)
-const availableWorkflowsStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
-let availableWorkflowsRequestGeneration = 0
+const availableRequest = useResourceRequest<AvailableStandardWorkflow[]>({
+  identity: () => `${entityType}:${entityId}:${purpose}:${approvalOnly}`,
+  enabled: () => purpose === 'standard',
+  trigger: 'refresh',
+  refreshData: 'clear',
+  failureData: 'clear',
+  load: async signal => {
+    try {
+      const requestUrl = getClientRequestUrl('/api/workflows/available')
+      requestUrl.searchParams.set('entityType', entityType)
+      requestUrl.searchParams.set('entityId', entityId)
+      const response = await fetch(requestUrl, { signal })
+      if (!response.ok) await throwFetchResponseError(response)
+      const payload = await response.json() as { items?: AvailableStandardWorkflow[] } | AvailableStandardWorkflow[]
+      return Array.isArray(payload) ? payload : payload.items ?? []
+    } catch (failure) {
+      if (!signal.aborted) showError(failure)
+      throw failure
+    }
+  }
+})
+const availableWorkflows = computed(() => availableRequest.data.value ?? [])
+const availableWorkflowsStatus = computed(() => availableRequest.state.value.kind === 'disposed' ? 'idle' : availableRequest.status.value)
+const isLoadingAvailable = computed(() => availableWorkflowsStatus.value === 'pending')
+const clearAvailable = availableRequest.reset
 const endpoint = computed(() => `/api/workflows/${approvalOnly ? 'approval-runtime' : 'runtime'}?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}${selectedAttemptId.value ? `&runtimeId=${selectedAttemptId.value}` : ''}`)
 const { data, refresh, status, error = ref(undefined) } = await useFetch<RuntimeResponse, Error, string>(endpoint)
 const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}:${approvalOnly}`)
@@ -232,8 +269,7 @@ const helpContext = computed<GuideObservedContext>(() => {
 let runtimeIdentityGeneration = 0
 watch(runtimeIdentity, () => {
   runtimeIdentityGeneration += 1
-  availableWorkflowsRequestGeneration += 1
-  isLoadingAvailable.value = false
+  clearAvailable()
   data.value = undefined
   responses.value = []
   validationIssues.value = []
@@ -244,16 +280,18 @@ watch(runtimeIdentity, () => {
   activeWorkflowTab.value = 'current'
   isChooserOpen.value = false
   selectedWorkflowSetupId.value = null
-  availableWorkflows.value = []
-  availableWorkflowsStatus.value = 'idle'
-  isRetrying.value = false
-  isStarting.value = false
-  isCancelling.value = false
-  isResuming.value = false
-  isSaving.value = false
+  if (mutation.value.kind !== 'disposed') mutation.value = { kind: 'idle' }
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  runtimeIdentityGeneration += 1
+  clearAvailable()
+  mutation.value = { kind: 'disposed' }
 })
 const captureRuntimeIdentity = () => runtimeIdentityGeneration
-const isCurrentRuntimeIdentity = (generation: number) => generation === runtimeIdentityGeneration
+const isCurrentRuntimeIdentity = (generation: number) => mutation.value.kind !== 'disposed' && generation === runtimeIdentityGeneration
+const settleMutation = (generation: number) => {
+  if (mutation.value.kind === 'pending' && mutation.value.generation === generation) mutation.value = { kind: 'idle' }
+}
 const runtimeLoadFailed = computed(() => status.value === 'error' || error.value != null)
 const hasActiveWorkflow = computed(() => data.value?.current
   ? ['pending', 'active', 'awaiting_action', 'paused'].includes(data.value.current.runtimeState)
@@ -327,30 +365,8 @@ const preActionDescription = computed(() => applicableWorkflow.value
   : preActionDescriptionKey ? t(preActionDescriptionKey) : '')
 const selectedAvailableWorkflow = computed(() => availableWorkflows.value.find(item => item.workflowSetupId === selectedWorkflowSetupId.value) ?? null)
 const loadAvailableWorkflows = async () => {
-  if (purpose !== 'standard') return
-  const requestGeneration = ++availableWorkflowsRequestGeneration
   selectedWorkflowSetupId.value = null
-  availableWorkflows.value = []
-  availableWorkflowsStatus.value = 'pending'
-  isLoadingAvailable.value = true
-  try {
-    const requestUrl = getClientRequestUrl('/api/workflows/available')
-    requestUrl.searchParams.set('entityType', entityType)
-    requestUrl.searchParams.set('entityId', entityId)
-    const response = await fetch(requestUrl)
-    if (!response.ok) await throwFetchResponseError(response)
-    const payload = await response.json() as { items?: AvailableStandardWorkflow[] } | AvailableStandardWorkflow[]
-    if (requestGeneration !== availableWorkflowsRequestGeneration) return
-    availableWorkflows.value = Array.isArray(payload) ? payload : payload.items ?? []
-    availableWorkflowsStatus.value = 'success'
-  } catch (error) {
-    if (requestGeneration !== availableWorkflowsRequestGeneration) return
-    availableWorkflows.value = []
-    availableWorkflowsStatus.value = 'error'
-    showError(error)
-  } finally {
-    if (requestGeneration === availableWorkflowsRequestGeneration) isLoadingAvailable.value = false
-  }
+  await availableRequest.refresh()
 }
 const roleVisibleActions = computed(() => actionRoleAllowed !== undefined)
 const canShowParentAction = computed(() => actionRoleAllowed ?? canEdit)
@@ -499,7 +515,7 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
           name: (locale.value === 'fr' ? member.approval?.nameFr : member.approval?.nameEn) ?? t('workflow.final_approval'),
           status: member.runtimeItem?.runtimeState ?? unmaterializedStepStatus(runStatus),
           outcome: null, hasApproval: false, kind: 'final_approval' as const,
-          routingSlipId: data.value?.sourceApprovalStage?.routingSlipId ?? undefined
+          routingSlipId: member.approvalStage?.routingSlipId
         })
       }
     }
@@ -549,6 +565,12 @@ const selectedRecommendation = computed(() => data.value?.recommendations?.find(
 const selectedDataCollection = computed(() => data.value?.dataCollections?.find(item => `data-collection-${item.workflowMemberId}` === selectedStepId.value) ?? null)
 const dataCollectionEditorKey = computed(() => `${runtimeIdentity.value}:${data.value?.current?.runtimeId}:${selectedDataCollection.value?.id}`)
 const canEditSelectedRecommendation = computed(() => canEdit && selectedRecommendation.value?.canUpdate === true)
+const recommendationActionContext = useActionContext({
+  identity: [runtimeIdentity, () => data.value?.current?.runtimeId, selectedAttemptId, selectedStepId, () => selectedRecommendation.value?.id],
+  authority: () => mutationRoleAllowed,
+  eligible: () => canEditSelectedRecommendation.value && selectedRecommendation.value?.runtimeState === 'active'
+})
+const recommendationEditor = useEditorMutationCoordinator({ getDraft: () => responses.value, context: recommendationActionContext })
 const selectedStep = computed(() => workflowSteps.value.find(step => step.id === selectedStepId.value) ?? null)
 const isStepViewable = (step: WorkflowDisplayStep): boolean =>
   step.status !== 'upcoming' && step.status !== 'not_reached' && step.status !== 'skipped'
@@ -595,12 +617,21 @@ watch([currentRecommendation, () => data.value?.current?.runtimeState,
     }
   }
 }, { immediate: true })
-watch(selectedRecommendation, item => {
-  responses.value = item?.egcs_cn_response.responses ? structuredClone(item.egcs_cn_response.responses) : []
-  validationIssues.value = []
-}, { immediate: true })
+const replaceRecommendationDraft = () => {
+  recommendationEditor.replaceSessionDraft(() => {
+    responses.value = copyQuestionnaireResponses(selectedRecommendation.value?.egcs_cn_response.responses ?? [])
+    validationIssues.value = []
+    recommendationDraftRevision.value = selectedRecommendation.value
+      ? { kind: 'current', revision: selectedRecommendation.value.egcs_cn_revision }
+      : { kind: 'absent' }
+  })
+}
+watch([() => data.value?.current?.runtimeId, () => selectedRecommendation.value?.id], replaceRecommendationDraft, { immediate: true, flush: 'sync' })
+watch(selectedRecommendation, () => {
+  if (!recommendationEditor.isPending.value && !recommendationEditor.isDirty.value && !hasRecommendationConflict.value) replaceRecommendationDraft()
+})
 const start = async () => {
-  if (isStarting.value || !guardParentAction('start')) return
+  if (mutation.value.kind !== 'idle' || !guardParentAction('start')) return
   if (purpose === 'standard' && (
     availableWorkflowsStatus.value !== 'success'
     || selectedAvailableWorkflow.value?.eligible !== true
@@ -609,7 +640,7 @@ const start = async () => {
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
-    isStarting.value = true
+    mutation.value = { kind: 'pending', action: 'start', generation }
     const response = await fetch(getClientRequestUrl('/api/workflows/start'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -631,15 +662,15 @@ const start = async () => {
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
   } finally {
-    if (isCurrentRuntimeIdentity(generation)) isStarting.value = false
+    settleMutation(generation)
   }
 }
 const retry = async () => {
-  if (!data.value?.current || isRetrying.value || !guardParentAction('retry')) return
+  if (!data.value?.current || mutation.value.kind !== 'idle' || !guardParentAction('retry')) return
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
-    isRetrying.value = true
+    mutation.value = { kind: 'pending', action: 'retry', generation }
     const response = await fetch(getClientRequestUrl('/api/workflows/retry'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -655,15 +686,15 @@ const retry = async () => {
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
   } finally {
-    if (isCurrentRuntimeIdentity(generation)) isRetrying.value = false
+    settleMutation(generation)
   }
 }
 const cancel = async () => {
-  if (!data.value?.current || isCancelling.value || !guardParentAction('cancel') || !window.confirm(t('workflow.cancel_confirmation'))) return
+  if (!data.value?.current || mutation.value.kind !== 'idle' || !guardParentAction('cancel') || !window.confirm(t('workflow.cancel_confirmation'))) return
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
-    isCancelling.value = true
+    mutation.value = { kind: 'pending', action: 'cancel', generation }
     const response = await fetch(getClientRequestUrl('/api/workflows/cancel'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -678,17 +709,18 @@ const cancel = async () => {
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
   } finally {
-    if (isCurrentRuntimeIdentity(generation)) isCancelling.value = false
+    settleMutation(generation)
   }
 }
 const resume = async () => {
+  if (mutation.value.kind !== 'idle') return
   const blockers = data.value?.ownerBlockers?.filter(blocker => !blocker.egcs_cn_resolvedat) ?? []
   resumeAttempted.value = true
   if (!data.value?.current || blockers.some(blocker => !replacementOwners.value[blocker.id])) return
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
-    isResuming.value = true
+    mutation.value = { kind: 'pending', action: 'resume', generation }
     const response = await fetch(getClientRequestUrl('/api/workflows/resume'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -705,40 +737,81 @@ const resume = async () => {
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
   } finally {
-    if (isCurrentRuntimeIdentity(generation)) isResuming.value = false
+    settleMutation(generation)
   }
 }
 const persist = async (submit: boolean) => {
-  if (isSaving.value || !canEditSelectedRecommendation.value || selectedRecommendation.value?.runtimeState !== 'active') return
+  if (mutation.value.kind !== 'idle' || !canEditSelectedRecommendation.value || selectedRecommendation.value?.runtimeState !== 'active') return
+  if (hasRecommendationConflict.value) {
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('questionnaire.revision_conflict_description'), color: 'warning' })
+    return
+  }
+  if (recommendationDraftRevision.value.kind !== 'current') return
   if (submit && selectedRecommendation.value) {
     validationIssues.value = validateRecommendationResponses(selectedRecommendation.value.egcs_cn_definition, responses.value)
     if (validationIssues.value.length > 0) return
   }
+  const recommendationId = selectedRecommendation.value.id
+  const payload = { revision: recommendationDraftRevision.value.revision, responses: copyQuestionnaireResponses(responses.value) }
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
-  try {
-    isSaving.value = true
-    const response = await fetch(getClientRequestUrl(`/api/workflows/recommendation${submit ? '/submit' : ''}?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}`), {
-      method: submit ? 'POST' : 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-        revision: selectedRecommendation.value.egcs_cn_revision,
-        responses: responses.value
+  await recommendationEditor.run(submit ? 'submit' : 'save', async token => {
+    try {
+      mutation.value = { kind: 'pending', action: 'save', generation }
+      const response = await fetch(getClientRequestUrl(`/api/recommendations/${recommendationId}?submit=${submit}`), {
+        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload)
       })
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    if (!isCurrentRuntimeIdentity(generation)) return
-    await refresh()
-    if (!isCurrentRuntimeIdentity(generation)) return
-    invalidate()
-    emit('changed')
-  } catch (error) {
-    if (isCurrentRuntimeIdentity(generation)) {
-      if (error instanceof AppFetchResponseError && error.response.status === 409) await refresh()
+      if (!response.ok) await throwFetchResponseError(response)
+      const result: unknown = await response.json()
       if (!isCurrentRuntimeIdentity(generation)) return
-      showError(error)
+      if (!recommendationEditor.isTokenCurrent(token)) return
+      const committed = QuestionnaireMutationResultSchema.parse(result)
+      if (committed.id !== recommendationId) throw new Error(t('common.unknown_error'))
+      recommendationEditor.acceptCommittedDraft(token, committed.egcs_cn_response.responses)
+      recommendationDraftRevision.value = { kind: 'current', revision: committed.egcs_cn_revision }
+      if (data.value) data.value = {
+        ...data.value,
+        recommendations: data.value.recommendations.map(item => item.id === recommendationId
+          ? {
+              ...item,
+              runtimeState: committed.runtimeState,
+              egcs_cn_response: committed.egcs_cn_response,
+              egcs_cn_revision: committed.egcs_cn_revision
+            }
+          : item)
+      }
+      await refresh()
+      if (!isCurrentRuntimeIdentity(generation)) return
+      recommendationEditor.applyMutationRefresh(token, { apply: () => {
+        responses.value = copyQuestionnaireResponses(selectedRecommendation.value?.egcs_cn_response.responses ?? [])
+        validationIssues.value = []
+        recommendationDraftRevision.value = selectedRecommendation.value
+          ? { kind: 'current', revision: selectedRecommendation.value.egcs_cn_revision }
+          : { kind: 'absent' }
+      } })
+      invalidate()
+      emit('changed')
+    } catch (error) {
+      if (isCurrentRuntimeIdentity(generation) && recommendationEditor.isTokenCurrent(token)) {
+        if (error instanceof AppFetchResponseError && error.response.status === 409) {
+          recommendationDraftRevision.value = { kind: 'conflicted', revision: payload.revision }
+          await refresh()
+        }
+        if (!isCurrentRuntimeIdentity(generation)) return
+        showError(error)
+      }
+    } finally {
+      settleMutation(generation)
     }
-  } finally {
-    if (isCurrentRuntimeIdentity(generation)) isSaving.value = false
-  }
+  })
+}
+const reloadRecommendationResponses = async () => {
+  if (isMutationPending.value) return
+  const generation = captureRuntimeIdentity()
+  const recommendationId = selectedRecommendation.value?.id
+  await refresh()
+  if (!isCurrentRuntimeIdentity(generation) || selectedRecommendation.value?.id !== recommendationId || status.value !== 'success') return
+  replaceRecommendationDraft()
 }
 const handleApprovalChanged = async () => {
   const invalidate = captureJourneyInvalidation()
@@ -765,8 +838,8 @@ const handleApprovalChanged = async () => {
       icon="i-lucide-lock-keyhole"
       :title="t('workflow.active_target_blocker')" />
     <div v-if="roleVisibleActions && canShowParentAction && data?.current && activeWorkflowTab !== 'previous'" class="flex justify-end gap-2">
-      <UButton icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" :loading="isRetrying" :disabled="status === 'pending' || isRetrying" @click="retry" />
-      <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="status === 'pending' || isCancelling" @click="cancel" />
+      <UButton icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" :loading="isRetrying" :disabled="status === 'pending' || isMutationPending" @click="retry" />
+      <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="status === 'pending' || isMutationPending" @click="cancel" />
     </div>
     <CommonWorkflowPacket v-if="data?.routing && (data.routing.fields.length || data.routing.decisions.some(decision => decision.conditions?.length))" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
       <dl class="space-y-3">
@@ -875,7 +948,7 @@ const handleApprovalChanged = async () => {
           :icon="workflowStartIcon"
           :label="workflowStartLabel"
           :loading="isStarting"
-          :disabled="isStarting"
+          :disabled="isMutationPending"
           class="cursor-default"
           @click="start" />
       </template>
@@ -914,7 +987,7 @@ const handleApprovalChanged = async () => {
         <UButton v-if="!roleVisibleActions && canEdit && data.canRetry" icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" class="cursor-default" @click="retry" />
       </div>
       <div v-else-if="!roleVisibleActions && canEdit && data.canCancel" class="flex justify-end">
-        <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="isCancelling" @click="cancel" />
+        <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="isMutationPending" @click="cancel" />
       </div>
       <div v-if="data.current.runtimeState === 'paused'" class="space-y-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
         <UAlert color="warning" icon="i-lucide-pause-circle" :title="t('workflow.owner_pause_title')" :description="t(data.canResumeOwners ? 'workflow.owner_pause_help' : 'workflow.owner_pause_readonly_help')" />
@@ -927,7 +1000,7 @@ const handleApprovalChanged = async () => {
               :show-value-in-label="false" />
           </UFormField>
           <div class="flex justify-end">
-            <UButton :label="t('workflow.resume')" icon="i-lucide-play" :loading="isResuming" :disabled="isResuming" @click="resume" />
+            <UButton :label="t('workflow.resume')" icon="i-lucide-play" :loading="isResuming" :disabled="isMutationPending" @click="resume" />
           </div>
         </template>
       </div>
@@ -1002,6 +1075,11 @@ const handleApprovalChanged = async () => {
         </CommonSelectableTable>
       </div>
       <div v-if="selectedRecommendation" class="space-y-6">
+        <UAlert v-if="hasRecommendationConflict" color="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
+          <template #actions>
+            <UButton color="warning" variant="soft" :label="t('questionnaire.reload_responses')" :disabled="isMutationPending || status === 'pending'" @click="reloadRecommendationResponses" />
+          </template>
+        </UAlert>
         <UAlert
           v-if="validationIssues.length > 0"
           color="error"
@@ -1012,9 +1090,9 @@ const handleApprovalChanged = async () => {
           v-model:responses="responses"
           :definition="selectedRecommendation.egcs_cn_definition"
           :issues="validationIssues"
-          :readonly="!canEditSelectedRecommendation || selectedRecommendation.runtimeState !== 'active'" />
+          :readonly="!canEditSelectedRecommendation || selectedRecommendation.runtimeState !== 'active' || recommendationEditor.isActionPending('submit')" />
         <div v-if="canEditSelectedRecommendation && selectedRecommendation.runtimeState === 'active'" class="flex justify-end gap-2">
-          <CommonSaveButton :label="t('common.save')" :loading="isSaving" :disabled="isSaving" variant="outline" @click="persist(false)" />
+          <CommonSaveButton :label="t('common.save')" :loading="isSaving" :disabled="isMutationPending" variant="outline" @click="persist(false)" />
           <UButton icon="i-lucide-send" :label="t('workflow.submit_recommendation')" :loading="isSaving" class="cursor-default" @click="persist(true)" />
         </div>
         <AssessmentApprovalsSection
@@ -1151,7 +1229,7 @@ const handleApprovalChanged = async () => {
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="outline" :label="t('common.cancel')" @click="isChooserOpen = false" />
-          <UButton icon="i-lucide-play" :label="t('workflow.start')" :loading="isStarting" :disabled="availableWorkflowsStatus !== 'success' || !selectedAvailableWorkflow?.eligible || isStarting" @click="start" />
+          <UButton icon="i-lucide-play" :label="t('workflow.start')" :loading="isStarting" :disabled="availableWorkflowsStatus !== 'success' || !selectedAvailableWorkflow?.eligible || isMutationPending" @click="start" />
         </div>
       </template>
     </UModal>
