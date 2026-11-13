@@ -1126,6 +1126,7 @@ export const generateWebContainerPreview = async (
                         NITRO_HOST: '0.0.0.0',
                         BETTER_AUTH_SECRET: 'a_very_secret_string_for_demo_purposes',
                         GCS_RUNTIME_MIGRATION_MODE: 'webcontainer-demo',
+                        GCS_WEBCONTAINER_FRAME_ORIGIN: window.location.origin,
                         GCS_DEMO_MIGRATION_SUFFIX: 'seed',
                         NODE_ENV: 'production',
                         // BETTER_AUTH_URL left unset to allow auto-detection from request origin
