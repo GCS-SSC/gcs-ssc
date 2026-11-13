@@ -5035,9 +5035,12 @@
     "journey_template_generic": "Instructions générales de la tâche"
   },
   "field_tooltips": {
+    "all_agencies": "Tous les organismes",
+    "agencies": "{count} organisme | {count} organismes",
+    "add_in": "Ajouter une aide aux champs dans {name}",
     "all_screens": "Tous les écrans",
     "title": "Aide aux champs",
-    "description": "Configurez les infobulles des champs pour cet organisme. La liste des champs se met à jour automatiquement lorsque l’application change. Les entrées indisponibles sont conservées pour que vous puissiez les réaffecter ou les supprimer.",
+    "description": "Configurez les infobulles des champs des organismes. La liste des champs se met à jour automatiquement lorsque l’application change. Les entrées indisponibles sont conservées pour que vous puissiez les réaffecter ou les supprimer.",
     "field": "Champ",
     "screen": "Écran",
     "add": "Ajouter une aide de champ",

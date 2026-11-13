@@ -5035,9 +5035,12 @@
     "journey_template_generic": "General task instructions"
   },
   "field_tooltips": {
+    "all_agencies": "All agencies",
+    "agencies": "{count} agency | {count} agencies",
+    "add_in": "Add field help in {name}",
     "all_screens": "All screens",
     "title": "Field help",
-    "description": "Configure field tooltips for this agency. The field list updates automatically when the app changes. Unavailable entries are preserved so you can retarget or delete them.",
+    "description": "Configure agency field tooltips. The field list updates automatically when the app changes. Unavailable entries are preserved so you can retarget or delete them.",
     "field": "Field",
     "screen": "Screen",
     "add": "Add field help",

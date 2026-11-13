@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { useGuidedHelpRequestOwner } from '~/composables/useGuidedHelpRequestOwner'
 import { useModalSession } from '~/composables/useModalSession'
 import { useActionContext } from '~/composables/useActionContext'
 import { useFormSession } from '~/composables/useFormSession'
@@ -10,7 +11,8 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { fieldTooltipRefreshKey } from '~/utils/field-tooltip-context'
 
-const { agencyId } = defineProps<{ agencyId: string }>()
+const { agencyId, editorOnly = false, initialCatalog } = defineProps<{ agencyId: string; editorOnly?: boolean; initialCatalog?: FieldTooltipList }>()
+const emit = defineEmits<{ loaded: [catalog: FieldTooltipList]; loadFailed: [] }>()
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -37,8 +39,9 @@ const deleteActionContext = useActionContext({
 const draft: Ref<FieldTooltipSave | null> = ref(null)
 const modal = useModalSession()
 const open = modal.isOpen
-const loading = ref(false)
-const failed = ref(false)
+const catalogRequest = useGuidedHelpRequestOwner<'load'>()
+const loading = catalogRequest.pending
+const failed = computed(() => catalogRequest.status.value === 'error')
 const modalPending = useCrudModalPending(modal.captureSession)
 const saving = modalPending.isPending
 const search = ref('')
@@ -46,7 +49,6 @@ const screenFilter = ref('all')
 const statusFilter = ref('all')
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
 const url = computed(() => `/api/agency/${agencyId}/tooltips`)
-let generation = 0
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (context: number) => !disposed && context === contextGeneration
@@ -100,22 +102,22 @@ const columns = [
  */
 const reload = async (ownsFeedback: () => boolean = () => true) => {
   if (disposed) return
-  const request = ++generation
+  const request = catalogRequest.begin('load')
+  if (!request) return
   const endpoint = url.value
-  loading.value = true
-  failed.value = false
   try {
     const response = await fetch(getClientRequestUrl(endpoint))
     if (!response.ok) await throwFetchResponseError(response)
     const result: FieldTooltipList = await response.json()
-    if (!disposed && request === generation) catalog.value = result
+    if (catalogRequest.succeed(request)) {
+      catalog.value = result
+      emit('loaded', result)
+    }
   } catch (error) {
-    if (!disposed && request === generation) {
-      failed.value = true
+    if (catalogRequest.fail(request, error)) {
+      emit('loadFailed')
       if (ownsFeedback()) showError(error)
     }
-  } finally {
-    if (!disposed && request === generation) loading.value = false
   }
 }
 
@@ -204,6 +206,7 @@ watch(() => [filtered.value.length, pagination.value.pageSize], () => {
 })
 watch(url, () => {
   contextGeneration += 1
+  catalogRequest.reset()
   catalog.value = null
   selected.value = null
   draft.value = null
@@ -212,26 +215,34 @@ watch(url, () => {
   screenFilter.value = 'all'
   statusFilter.value = 'all'
   pagination.value.pageIndex = 0
-  void reload()
+  if (!editorOnly) void reload()
 }, { immediate: true, flush: 'sync' })
+watch(() => initialCatalog, value => {
+  if (editorOnly) catalog.value = value ?? null
+}, { immediate: true, flush: 'sync' })
+defineExpose({
+  edit, remove,
+  agencyId: computed(() => agencyId)
+})
 onScopeDispose(() => {
   disposed = true
   contextGeneration += 1
-  generation += 1
+  catalogRequest.reset()
 })
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden">
-    <p class="text-muted">
+  <div :class="editorOnly ? undefined : 'flex min-w-0 flex-1 flex-col gap-4 overflow-hidden'">
+    <p v-if="!editorOnly" class="text-muted">
       {{ t('field_tooltips.description') }}
     </p>
-    <UAlert v-if="failed" color="error" :title="t('common.load_failed')">
+    <UAlert v-if="!editorOnly && failed" color="error" :title="t('common.load_failed')">
       <template #actions>
         <UButton :label="t('common.retry')" @click="reload()" />
       </template>
     </UAlert>
     <CommonResourceLayout
+      v-if="!editorOnly"
       v-model:search="search" v-model:pagination="pagination" layout="page" :data="rows" :columns="columns"
       :total-records="filtered.length" :loading="loading" :show-button="Boolean(catalog?.capabilities.canCreate)"
       :button-label="t('field_tooltips.add')" :request-status="loading ? 'pending' : failed ? 'error' : 'success'"
