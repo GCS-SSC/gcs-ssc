@@ -61,6 +61,7 @@ const getInitialApplicantRecipientIds = () => {
  * @returns Default agreement create form values.
  */
 const createForm = (): FundingCaseAgreementProfileForm => ({
+  egcs_fc_currency: 'cad',
   egcs_fc_furtherdistribution: false,
   egcs_fc_holdback: 10,
   egcs_fc_applicantrecipients: getInitialApplicantRecipientIds().map(id => ({ egcs_fc_applicantrecipient: id }))
