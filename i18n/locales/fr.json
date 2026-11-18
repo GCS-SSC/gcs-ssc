@@ -161,6 +161,10 @@
     "invalid_json": "Saisissez un JSON valide."
   },
   "custom_fields": {
+    "minimum": "Minimum",
+    "maximum": "Maximum",
+    "minimum_hint": "Minimum : {minimum}",
+    "maximum_hint": "Maximum : {maximum}",
     "activity_title": "Champs personnalisés des activités",
     "assign_field": "Associer un champ de l’organisme",
     "agency_field": "Champ de l’organisme",
@@ -2270,6 +2274,9 @@
     "custom_field_display_order_max": "L'ordre d'affichage ne doit pas dépasser {max}.",
     "custom_field_inactive": "Les champs inactifs peuvent uniquement être effacés.",
     "custom_field_single_selection": "Sélectionnez une seule option pour ce champ.",
+    "custom_field_range_order": "Le maximum doit être supérieur ou égal au minimum.",
+    "custom_field_minimum": "Saisissez un nombre supérieur ou égal à {minimum}.",
+    "custom_field_maximum": "Saisissez un nombre inférieur ou égal à {maximum}.",
     "custom_field_number": "Saisissez un nombre valide.",
     "activity_custom_field_required": "Saisissez une valeur pour {field} dans l’activité {activity}.",
     "activity_custom_field_invalid": "Corrigez la valeur de {field} dans l’activité {activity}.",

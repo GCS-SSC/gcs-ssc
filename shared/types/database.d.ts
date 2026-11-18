@@ -2601,6 +2601,8 @@ export interface AgencyCustomFieldTable {
   egcs_ay_multiple: Generated<boolean>
   egcs_ay_presentation: Generated<'single_line' | 'multiline'>
   egcs_ay_discriminator: Generated<boolean>
+  egcs_ay_minimum: Generated<number | null>
+  egcs_ay_maximum: Generated<number | null>
   _deleted: Generated<boolean>
 }
 export interface AgencyCustomFieldOptionTable {

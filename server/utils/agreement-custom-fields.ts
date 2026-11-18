@@ -28,7 +28,8 @@ export const readAssignedAgencyCustomFieldDefinitions = async (
       'assignment.id as assignmentId', 'assignment.egcs_tp_section', 'assignment.egcs_tp_required',
       'assignment.egcs_tp_active', 'assignment.egcs_tp_displayorder', 'field.id',
       'field.egcs_ay_name_en', 'field.egcs_ay_name_fr', 'field.egcs_ay_kind',
-      'field.egcs_ay_multiple', 'field.egcs_ay_presentation', 'field.egcs_ay_discriminator'
+      'field.egcs_ay_multiple', 'field.egcs_ay_presentation', 'field.egcs_ay_discriminator',
+      'field.egcs_ay_minimum', 'field.egcs_ay_maximum'
     ])
     .where('assignment.egcs_tp_transferpaymentstream', '=', streamId)
     .where('assignment.egcs_tp_target', '=', target)

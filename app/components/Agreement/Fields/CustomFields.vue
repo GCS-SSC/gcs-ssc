@@ -82,6 +82,19 @@ const sections = computed(() => {
 const sectionLabel = (value: { egcs_tp_name_en: string, egcs_tp_name_fr: string }) => locale.value === 'fr' ? value.egcs_tp_name_fr : value.egcs_tp_name_en
 const label = (value: { egcs_ay_name_en: string, egcs_ay_name_fr: string }) => locale.value === 'fr' ? value.egcs_ay_name_fr : value.egcs_ay_name_en
 /**
+ * Describes the configured limits for an editable numeric answer.
+ * @param field - Assigned Agency field with its configured bounds.
+ * @returns Localized description when a numeric limit applies.
+ */
+const numberDescription = (field: AssignedAgencyCustomFieldDefinition) => {
+  if (field.egcs_ay_kind !== 'number' || !field.egcs_tp_active) return undefined
+  const { egcs_ay_minimum: minimum, egcs_ay_maximum: maximum } = field
+  return [
+    minimum == null ? '' : t('custom_fields.minimum_hint', { minimum: n(minimum, { maximumSignificantDigits: 21 }) }),
+    maximum == null ? '' : t('custom_fields.maximum_hint', { maximum: n(maximum, { maximumSignificantDigits: 21 }) })
+  ].filter(Boolean).join(' ') || undefined
+}
+/**
  * Formats a custom-field value for read-only display.
  * @param field - The definition of the field to format.
  * @returns The localized display value.
@@ -125,7 +138,7 @@ const update = (id: string, value: unknown) => {
     <CommonSection v-for="(section, index) in sections" :key="section.id" :title="sectionLabel(section)" :badge="activity ? undefined : String(index + 4).padStart(2, '0')" :grid-cols="2">
       <div v-for="field in section.fields" :key="field.id" class="space-y-2">
         <CommonValueCard v-if="readonly" :label="label(field)" :value="valueLabel(field) || t('common.not_available')" :sub-value="field.egcs_tp_active ? undefined : t('custom_fields.inactive')" class="whitespace-pre-wrap" />
-        <UFormField v-else :label="label(field)" :name="`egcs_fc_customfields.${field.id}`" :required="field.egcs_tp_active && field.egcs_tp_required" :ui="field.egcs_ay_kind === 'relational' ? { labelWrapper: 'justify-start gap-2 mb-1.5', label: 'mb-0', hint: 'flex items-center' } : undefined">
+        <UFormField v-else :label="label(field)" :name="`egcs_fc_customfields.${field.id}`" :description="numberDescription(field)" :required="field.egcs_tp_active && field.egcs_tp_required" :ui="field.egcs_ay_kind === 'relational' ? { labelWrapper: 'justify-start gap-2 mb-1.5', label: 'mb-0', hint: 'flex items-center' } : undefined">
           <template v-if="field.egcs_ay_kind === 'relational' && customFieldHasValue(model[field.id])" #hint>
             <UButton type="button" size="xs" variant="soft" color="warning" class="bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-300 hover:bg-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/30 dark:hover:bg-amber-400/20" icon="i-lucide-x" :disabled="status === 'pending'" :label="t('custom_fields.clear')" @click="update(field.id, null)" />
           </template>
@@ -137,7 +150,7 @@ const update = (id: string, value: unknown) => {
           </div>
           <UTextarea v-else-if="field.egcs_ay_kind === 'text' && field.egcs_ay_presentation === 'multiline'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
           <UInput v-else-if="field.egcs_ay_kind === 'text'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
-          <UInput v-else-if="field.egcs_ay_kind === 'number'" type="number" step="any" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event === '' ? null : Number($event))" />
+          <UInput v-else-if="field.egcs_ay_kind === 'number'" type="number" step="any" :min="field.egcs_ay_minimum ?? undefined" :max="field.egcs_ay_maximum ?? undefined" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event === '' ? null : Number($event))" />
           <CommonBilingualSelectMenu v-else-if="!field.egcs_ay_multiple" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :model-value="customFieldOptionIds(model[field.id])[0] ?? null" :items="options(field)" category-en-key="egcs_ay_category_en" category-fr-key="egcs_ay_category_fr" :aria-label="label(field)" :disabled="checkingCatalog || catalogCheckFailed" class="w-full" @update:open="(open: boolean) => open && checkCatalogVersions()" @update:model-value="update(field.id, $event ? [$event] : null)" />
           <CommonBilingualMultiSelectMenu v-else label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :model-value="customFieldOptionIds(model[field.id])" :items="options(field)" category-en-key="egcs_ay_category_en" category-fr-key="egcs_ay_category_fr" :aria-label="label(field)" :disabled="checkingCatalog || catalogCheckFailed" class="w-full" @update:open="(open: boolean) => open && checkCatalogVersions()" @update:model-value="update(field.id, $event)" />
         </UFormField>

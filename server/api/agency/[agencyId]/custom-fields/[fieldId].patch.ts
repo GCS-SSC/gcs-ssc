@@ -42,6 +42,8 @@ export default defineEventHandler(async event => {
       egcs_ay_multiple: current.egcs_ay_multiple,
       egcs_ay_presentation: current.egcs_ay_presentation,
       egcs_ay_discriminator: current.egcs_ay_discriminator,
+      egcs_ay_minimum: current.egcs_ay_minimum,
+      egcs_ay_maximum: current.egcs_ay_maximum,
       ...patch
     })
     return await trx.updateTable('Agency_Custom_Field')

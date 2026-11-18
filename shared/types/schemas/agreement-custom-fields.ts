@@ -28,7 +28,9 @@ export const AgencyCustomFieldBaseSchema = z.object({
   egcs_ay_kind: z.enum(['text', 'number', 'relational']),
   egcs_ay_multiple: z.boolean().default(false),
   egcs_ay_presentation: z.enum(['single_line', 'multiline']).default('single_line'),
-  egcs_ay_discriminator: z.boolean().default(false)
+  egcs_ay_discriminator: z.boolean().default(false),
+  egcs_ay_minimum: z.number({ error: 'validation.custom_field_number' }).nullish(),
+  egcs_ay_maximum: z.number({ error: 'validation.custom_field_number' }).nullish()
 }).strict()
 
 /**
@@ -37,6 +39,14 @@ export const AgencyCustomFieldBaseSchema = z.object({
  * @param ctx - Validation issue collector.
  */
 const validateAgencyCustomField = (value: z.infer<typeof AgencyCustomFieldBaseSchema>, ctx: z.RefinementCtx) => {
+  const { egcs_ay_minimum: minimum, egcs_ay_maximum: maximum } = value
+  if (value.egcs_ay_kind !== 'number') {
+    for (const path of ['egcs_ay_minimum', 'egcs_ay_maximum'] as const) {
+      if (value[path] != null) ctx.addIssue({ code: 'custom', path: [path], message: 'validation.invalid_selection' })
+    }
+  } else if (minimum != null && maximum != null && minimum > maximum) {
+    ctx.addIssue({ code: 'custom', path: ['egcs_ay_maximum'], message: 'validation.custom_field_range_order' })
+  }
   if (value.egcs_ay_multiple && value.egcs_ay_kind !== 'relational') {
     ctx.addIssue({ code: 'custom', path: ['egcs_ay_multiple'], message: 'validation.invalid_selection' })
   }
@@ -173,7 +183,11 @@ export const agreementCustomFieldMergeSchema = (
       else merged[id] = supplied
     } else if (kind === 'number') {
       if (typeof supplied !== 'number' || !Number.isFinite(supplied)) issue(id, 'validation.custom_field_number')
-      else merged[id] = supplied
+      else if (field.egcs_ay_minimum != null && supplied < field.egcs_ay_minimum) {
+        ctx.addIssue({ code: 'custom', path: [id], message: 'validation.custom_field_minimum', params: { minimum: field.egcs_ay_minimum } })
+      } else if (field.egcs_ay_maximum != null && supplied > field.egcs_ay_maximum) {
+        ctx.addIssue({ code: 'custom', path: [id], message: 'validation.custom_field_maximum', params: { maximum: field.egcs_ay_maximum } })
+      } else merged[id] = supplied
     } else {
       const parsed = z.array(PositivePostgresBigintIdSchema).safeParse(supplied)
       if (parsed.success && !field.egcs_ay_multiple && parsed.data.length > 1) {

@@ -161,6 +161,10 @@
     "invalid_json": "Enter valid JSON."
   },
   "custom_fields": {
+    "minimum": "Minimum",
+    "maximum": "Maximum",
+    "minimum_hint": "Minimum: {minimum}",
+    "maximum_hint": "Maximum: {maximum}",
     "activity_title": "Activity custom fields",
     "assign_field": "Assign agency field",
     "agency_field": "Agency field",
@@ -2270,6 +2274,9 @@
     "custom_field_display_order_max": "Display order must not exceed {max}.",
     "custom_field_inactive": "Inactive fields can only be cleared.",
     "custom_field_single_selection": "Select only one option for this field.",
+    "custom_field_range_order": "The maximum must be greater than or equal to the minimum.",
+    "custom_field_minimum": "Enter a number greater than or equal to {minimum}.",
+    "custom_field_maximum": "Enter a number less than or equal to {maximum}.",
     "custom_field_number": "Enter a valid number.",
     "activity_custom_field_required": "Enter a value for {field} on the activity {activity}.",
     "activity_custom_field_invalid": "Correct the value for {field} on the activity {activity}.",
