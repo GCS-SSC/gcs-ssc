@@ -34,7 +34,7 @@ const created = async (id: string) => await navigateTo(localePath(appRouteLocati
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-book-open-check" :title="t('journal_voucher.title')" :description="t('journal_voucher.description')" />
       <section data-help-target="journal-vouchers.list.records">
-        <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" help-add-target="journal-vouchers.list.add" help-search-target="journal-vouchers.list.search" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :loading="status === 'pending'" :button-label="t('journal_voucher.create')" :show-button="canAny('journal_voucher', 'create') && canAny('agreement', 'read')" @add="open = true" @retry="retry">
+        <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" table-id="journal-vouchers.list" help-add-target="journal-vouchers.list.add" help-search-target="journal-vouchers.list.search" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :loading="status === 'pending'" :button-label="t('journal_voucher.create')" :show-button="canAny('journal_voucher', 'create') && canAny('agreement', 'read')" @add="open = true" @retry="retry">
           <template #requesteddate-cell="{ row }">
             <span class="whitespace-nowrap">{{ formatDate(row.original.egcs_fc_requesteddate) }}</span>
           </template>

@@ -190,6 +190,7 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
 <template>
   <section data-help-target="proponent.agency-financial-ids.content" data-help-kind="section" data-help-view="proponent.agency-financial-ids" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      table-id="applicant-recipient.agency-financial-ids"
       :action="resourceAction"
       help-search-target="proponent.agency-financial-ids.search" help-save-target="proponent.agency-financial-ids.save" help-add-target="proponent.agency-financial-ids.add"
       class="w-full"

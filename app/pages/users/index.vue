@@ -275,6 +275,7 @@ const columns: TableColumnInput<UserListItem>[] = [
         <CommonResourceLayout
           v-model:search="search"
           v-model:pagination="pagination"
+          table-id="users.list"
           layout="page"
           :columns="columns"
           :data="items"

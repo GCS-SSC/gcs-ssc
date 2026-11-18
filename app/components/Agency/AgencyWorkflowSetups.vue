@@ -117,7 +117,8 @@ const remove = async (item: WorkflowSetupItem) => {
 <template>
   <div>
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination" :data="items" :columns="columns"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="agency.workflow-setups" :data="items" :columns="columns"
       :bilingual-columns="[{ id: 'name', accessorKey: { en: 'egcs_cn_name_en', fr: 'egcs_cn_name_fr' } }]"
       :total-records="totalRecords" :loading="status === 'pending'" :show-button="canUpdateChild"
       :request-status="status" :button-label="t('workflow.add_setup')" @add="add" @retry="refresh">

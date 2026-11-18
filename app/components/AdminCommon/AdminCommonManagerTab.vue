@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { useActionContext } from '~/composables/useActionContext'
 import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { useAdminCommonManagerTab } from '~/composables/useAdminCommonManagerTab'
@@ -61,11 +62,14 @@ const resourceAction = computed<ResourceCrudAction>(() => readOnly
   ? { kind: 'read-only' }
   : { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext })
 const canCreateResource = computed(() => !readOnly)
+const preferenceFilters = { status: tableFilter(deletedFilter, 'all', statusFilterItems) }
 </script>
 
 <template>
   <CommonResourceCrud
     v-model:status-filter="deletedFilter"
+    :table-id="`admin.reference.${resource}`"
+    :preference-filters="preferenceFilters"
     :action="resourceAction"
     :data-testid="`${resource}-panel`"
     :title="title"

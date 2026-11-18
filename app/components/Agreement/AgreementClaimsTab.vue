@@ -435,6 +435,7 @@ const formSession = useFormSession({
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.claims"
       :data="tableRows"
       :columns="columns"
       :grouping="grouping"

@@ -191,6 +191,7 @@ const formSession = useFormSession({ owner: budgetModal, action: { kind: 'remote
     <CommonResourceLayout
       v-model:search="budgetSearch"
       v-model:pagination="budgetPagination"
+      table-id="transfer-payment.budgets"
       :data="budgets"
       :columns="budgetColumns"
       :total-records="budgetTotal"

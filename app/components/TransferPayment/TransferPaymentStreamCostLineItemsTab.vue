@@ -184,6 +184,7 @@ const formSession = useFormSession({ owner: costCategoryModal, action: { kind: '
   <CommonResourceLayout
     v-model:search="costLineSearch"
     v-model:pagination="costLinePagination"
+    table-id="transfer-payment.stream-cost-line-items"
     :data="costLines"
     :columns="costLineColumns"
     :bilingual-columns="costLineBilingualColumns"

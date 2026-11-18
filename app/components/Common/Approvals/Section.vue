@@ -1089,6 +1089,7 @@ const submitReassign = async () => {
       <CommonResourceLayout
         v-model:search="search"
         v-model:pagination="pagination"
+        :table-id="`approvals.${entityType}`"
         :data="filteredRows"
         :columns="columns"
         :bilingual-columns="bilingualColumns"

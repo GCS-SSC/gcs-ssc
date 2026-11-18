@@ -82,6 +82,7 @@ const {
 
 const emit = defineEmits<{
   'resolved-items': [items: AdminCommonLookupResponseItem[]]
+  'unavailable-values': [values: string[]]
 }>()
 
 const singleModel = defineModel<string | undefined>()
@@ -608,6 +609,7 @@ const resolvedSelectedItems = computed(() => normalizedValues.value.flatMap(valu
   return item ? [item] : []
 }))
 watch(resolvedSelectedItems, items => emit('resolved-items', items), { immediate: true, flush: 'sync' })
+watch(unavailableSelectedValues, values => emit('unavailable-values', [...values]))
 const hasUnavailableSelection = computed(() => unavailableSelectedValues.value.size > 0)
 const isCollectionError = computed(() => catalogCheckFailed.value || status.value === 'error' || Boolean(collectionError.value))
 const showEmptyState = computed(() =>

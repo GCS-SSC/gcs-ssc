@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { upperFirst } from 'scule'
 import type { EnumKey } from '~/types/enums'
-import type { ToolbarTableLike } from '~~/shared/types/ui'
+import type { ColumnVisibilityItem, ToolbarTableLike } from '~~/shared/types/ui'
 
 const {
   statusEnumName,
   statusFilterLabel,
+  orderedColumnIds,
+  preferencesEditable,
+  preferenceError,
+  preferencesLoading,
   buttonLabel,
   helpAddTarget,
   searchPlaceholder,
@@ -19,6 +23,10 @@ const {
 } = defineProps<{
   statusEnumName?: EnumKey
   statusFilterLabel?: string
+  orderedColumnIds?: string[]
+  preferencesEditable?: boolean
+  preferenceError?: string
+  preferencesLoading?: boolean
   helpAddTarget?: string
   buttonLabel?: string
   helpSearchTarget?: string
@@ -35,8 +43,28 @@ const search = defineModel<string>('search')
 const statusFilter = defineModel<string>('statusFilter')
 
 const { t } = useI18n()
+const chooserContent = computed(() => ({ 'align': 'end' as const, 'aria-label': t('common.choose_columns') }))
 
-defineEmits(['add'])
+const emit = defineEmits<{
+  add: []
+  moveColumn: [id: string, direction: -1 | 1]
+  resetPreferences: []
+  retryPreferences: []
+}>()
+const chooserColumns = computed(() => (table?.tableApi?.getAllLeafColumns() ?? []).filter(column => column.getCanHide()))
+const columnLabel = (column: ColumnVisibilityItem) => {
+  if (column.id === 'select') return t('common.select')
+  return typeof column.columnDef.header === 'string' ? column.columnDef.header : upperFirst(column.id)
+}
+const canToggle = computed(() => orderedColumnIds === undefined || preferencesEditable)
+const setVisibility = (id: string, visible: unknown) => table?.tableApi?.getColumn(id)?.toggleVisibility(visible === true)
+const canMove = (id: string, direction: -1 | 1) => {
+  const index = orderedColumnIds?.indexOf(id) ?? -1
+  return preferencesEditable && index >= 0 && orderedColumnIds?.[index + direction] !== undefined
+}
+const move = (id: string, direction: -1 | 1) => {
+  if (canMove(id, direction)) emit('moveColumn', id, direction)
+}
 </script>
 
 <template>
@@ -74,31 +102,51 @@ defineEmits(['add'])
 
     <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
       <slot name="actions" />
-      <UDropdownMenu
-        v-if="showColumnToggle && table?.tableApi"
-        :items="
-          table.tableApi
-            .getAllColumns()
-            .filter(column => column.getCanHide())
-            .map(column => ({
-              label: column.id === 'select' ? t('common.select') : typeof column.columnDef.header === 'string' ? column.columnDef.header : upperFirst(column.id),
-              type: 'checkbox' as const,
-              checked: column.getIsVisible(),
-              onUpdateChecked(checked: boolean) {
-                table?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-              },
-              onSelect(e?: Event) {
-                e?.preventDefault()
-              }
-            }))
-        "
-        :content="{ align: 'end' }">
+      <UPopover v-if="showColumnToggle && table?.tableApi" :content="chooserContent">
         <CommonActionButton
           icon="i-lucide-columns-3"
           :aria-label="t('common.choose_columns')"
           color="neutral"
           variant="outline" />
-      </UDropdownMenu>
+        <template #content>
+          <div data-testid="table-column-preferences" class="w-72 max-w-[calc(100vw-2rem)]">
+            <ul class="max-h-[min(55dvh,22rem)] space-y-1 overflow-y-auto p-2">
+              <li v-for="column in chooserColumns" :key="column.id" class="flex items-center justify-between gap-2 px-1 py-0.5">
+                <UCheckbox
+                  :label="columnLabel(column)"
+                  :model-value="column.getIsVisible()"
+                  :disabled="!canToggle"
+                  @update:model-value="value => setVisibility(column.id, value)" />
+                <div v-if="orderedColumnIds?.includes(column.id)" class="flex shrink-0">
+                  <CommonActionButton
+                    icon="i-lucide-arrow-up"
+                    color="neutral" variant="ghost" size="xs"
+                    :aria-label="t('common.move_column_up', { column: columnLabel(column) })"
+                    :aria-disabled="!canMove(column.id, -1)"
+                    :class="{ 'opacity-40': !canMove(column.id, -1) }"
+                    @click="move(column.id, -1)" />
+                  <CommonActionButton
+                    icon="i-lucide-arrow-down"
+                    color="neutral" variant="ghost" size="xs"
+                    :aria-label="t('common.move_column_down', { column: columnLabel(column) })"
+                    :aria-disabled="!canMove(column.id, 1)"
+                    :class="{ 'opacity-40': !canMove(column.id, 1) }"
+                    @click="move(column.id, 1)" />
+                </div>
+              </li>
+            </ul>
+            <div v-if="orderedColumnIds !== undefined" class="border-default flex justify-end border-t p-2">
+              <UButton
+                :label="t('common.reset_table_preferences')"
+                icon="i-lucide-rotate-ccw"
+                color="neutral" variant="ghost" size="sm"
+                :loading="preferencesLoading"
+                :disabled="!preferencesEditable"
+                @click="emit('resetPreferences')" />
+            </div>
+          </div>
+        </template>
+      </UPopover>
 
       <UButton
         v-if="showButton"
@@ -109,6 +157,17 @@ defineEmits(['add'])
         class="shadow-primary/20 shadow-lg"
         @click="$emit('add')" />
       <slot name="trailing-actions" />
+    </div>
+    <div v-if="preferenceError" data-testid="table-preferences-sync-error" class="flex w-full items-center gap-2 text-sm text-error" role="status">
+      <UIcon name="i-lucide-circle-alert" aria-hidden="true" />
+      {{ preferenceError }}
+      <UButton
+        :label="t('common.retry')"
+        icon="i-lucide-rotate-cw"
+        color="error"
+        variant="outline"
+        size="sm"
+        @click="emit('retryPreferences')" />
     </div>
   </div>
 </template>

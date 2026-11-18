@@ -292,6 +292,7 @@ const createAmendment = async () => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.amendments"
       :data="amendments"
       :columns="columns"
       :total-records="response.total"

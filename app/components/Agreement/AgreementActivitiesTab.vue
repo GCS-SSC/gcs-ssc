@@ -191,6 +191,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
 <template>
   <!-- @vue-generic {AgreementActivityCrudRow} -->
   <CommonResourceCrud
+    table-id="agreement.activities"
     :action="resourceAction"
     class="w-full"
     :title="t('agreement.activities.title')"

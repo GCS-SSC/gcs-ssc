@@ -111,6 +111,7 @@ onScopeDispose(() => {
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.monitor-types"
     :data="items"
     :columns="columns"
     :bilingual-columns="bilingualColumns"

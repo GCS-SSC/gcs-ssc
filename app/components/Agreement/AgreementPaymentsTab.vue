@@ -692,6 +692,7 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.payments"
       :data="tableRows"
       :columns="columns"
       :total-records="tableRows.length"

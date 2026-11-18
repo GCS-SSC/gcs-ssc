@@ -455,6 +455,7 @@ const deleteLineItem = async (lineItemId: string) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agency.cost-categories"
       :data="tableRows"
       :columns="columns"
       :grouping="grouping"

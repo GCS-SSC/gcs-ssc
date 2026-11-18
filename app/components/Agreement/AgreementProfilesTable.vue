@@ -69,7 +69,8 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
   <section data-help-view="agreements.list" data-help-target="agreements.list.records" data-help-kind="section" class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <CommonResourceLayout
       v-model:search="search"
-      v-model:pagination="pagination" layout="page"
+      v-model:pagination="pagination"
+      table-id="agreements.list" layout="page"
       :data="agreements"
       :columns="columns"
       :bilingual-columns="bilingualColumns"
@@ -86,6 +87,9 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
       @add="emit('add')" @retry="emit('retry')">
       <template #filters>
         <slot name="filters" />
+      </template>
+      <template #actions>
+        <slot name="actions" />
       </template>
       <template #trailing-actions>
         <slot name="trailing-actions" />

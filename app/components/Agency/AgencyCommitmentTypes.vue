@@ -29,6 +29,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.commitment-types"
     :action="action"
     :title="t('agency.tabs.commitment_types')"
     icon="i-lucide-tags"

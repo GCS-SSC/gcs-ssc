@@ -16,6 +16,7 @@ import {
 import { ASSIGNABLE_ENTITY_TYPE_ENUM, WORKFLOW_TARGET_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { creditMemoQueueAuthority } from '~~/server/utils/credit-memo-queue-authority'
+import { recentRecordRank, readRecentRecordIds } from '~~/server/utils/recent-record-order'
 
 type AssignedWorkRow = {
   entity_id: string
@@ -143,6 +144,16 @@ export const queryAssignedWorkDashboard = async (
   // These sources have an explicit owner; a missing parent must not change their subject.
   const typedOwnerSources = [...ASSIGNABLE_ENTITY_TYPE_ENUM, 'transferpaymentstream']
   const qualifiedBindings = await buildAssignedWorkExtensionSources()
+  const [recentAgreementIds, recentProponentIds] = await Promise.all([
+    readRecentRecordIds(event, 'agreement'),
+    readRecentRecordIds(event, 'proponent')
+  ])
+  const recentOrder = recentAgreementIds.length > 0 || recentProponentIds.length > 0
+    ? sql`CASE work.entity_type
+        WHEN 'fundingcaseagreement' THEN ${recentRecordRank(sql`work.id`, recentAgreementIds)}
+        WHEN 'applicantrecipient' THEN ${recentRecordRank(sql`work.id`, recentProponentIds)}
+      END ASC NULLS LAST,`
+    : sql``
   const offset = (query.page - 1) * query.limit
   /**
      * Executes one authorized queue page.
@@ -493,7 +504,7 @@ export const queryAssignedWorkDashboard = async (
       OR commitment_type.egcs_ay_name_fr ILIKE ${search}
       OR ${localizedLabelPredicate}
     )
-  ORDER BY assignment.egcs_cn_isprimary DESC, work.entity_type, work.id
+  ORDER BY ${recentOrder} assignment.egcs_cn_isprimary DESC, work.entity_type, work.id
   LIMIT ${limit} OFFSET ${pageOffset}
     `.execute(trx)
   const result = await executePage(query.limit, offset)

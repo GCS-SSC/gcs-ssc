@@ -6,6 +6,7 @@ import type { AssignedWorkItem, GroupWorkItem } from '~~/shared/types/assigned-w
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { dataCollectionRuntimeConfiguration } from '~/utils/data-collection-runtime'
+import { useRecentRecords } from '~/composables/useRecentRecords'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 type AssignedItem = AssignedWorkItem
@@ -39,8 +40,16 @@ let assignedGeneration: object | null = {}
 onScopeDispose(() => {
   assignedGeneration = null
 })
+const { actorId: recentsActorId, headers: recentHeaders } = useRecentRecords(['agreement', 'proponent'])
+watch([recentsActorId, recentHeaders], () => {
+  assignedGeneration = null
+  loadedAssigned.value = []
+  loadingAssignedBatch.value = false
+}, { flush: 'sync' })
 const { items, totalRecords, status, error, refresh } = useResourceTable<AssignedItem>({
   fetchUrl: '/api/assigned-work',
+  contextKey: computed(() => recentsActorId.value ?? ''),
+  headers: recentHeaders,
   initialPageSize: assignedBatchSize
 })
 watch([items, status, totalRecords], ([nextItems, nextStatus, nextTotal]) => {
@@ -107,7 +116,7 @@ const loadNextAssignedBatch = async () => {
     const url = getClientRequestUrl('/api/assigned-work')
     url.searchParams.set('page', String(batchPage))
     url.searchParams.set('limit', String(assignedBatchSize))
-    const response = await fetch(url)
+    const response = await fetch(url, { headers: recentHeaders.value })
     if (!response.ok) await throwFetchResponseError(response)
     const batch = await response.json() as { items: AssignedItem[], total: number }
     if (assignedGeneration !== generation) return

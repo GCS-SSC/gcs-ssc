@@ -44,6 +44,7 @@ const bilingualColumns: BilingualColumnConfig<CollectionRow>[] = [
 
 <template>
   <CommonResourceCrud
+    table-id="agency.data-collections"
     :action="{ kind: 'remote', create: actionContext, update: actionContext, delete: actionContext }"
     :title="t('data_collection.catalog_title')" icon="i-lucide-clipboard-list" :fetch-url="endpoint" :post-url="endpoint"
     :schema="DataCollectionSetupCreateSchema" :initial-new-item="initialNewItem" :columns="columns" :bilingual-columns="bilingualColumns"

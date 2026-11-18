@@ -423,6 +423,7 @@ const formSession = useFormSession({ owner: commitmentModal, action: { kind: 're
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.commitments"
       :data="tableRows"
       :columns="columns"
       :total-records="tableRows.length"

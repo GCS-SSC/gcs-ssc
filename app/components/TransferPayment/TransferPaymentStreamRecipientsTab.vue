@@ -227,6 +227,7 @@ const formSession = useFormSession({ owner: recipientModal, action: { kind: 'rem
   <CommonResourceLayout
     v-model:search="recipientSearch"
     v-model:pagination="recipientPagination"
+    table-id="transfer-payment.stream-recipients"
     :data="recipients"
     :columns="recipientColumns"
     :bilingual-columns="recipientBilingualColumns"

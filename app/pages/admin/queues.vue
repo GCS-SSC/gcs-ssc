@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -183,6 +184,7 @@ watch(permissionRevision, () => {
   if (canRead.value) void refresh()
 }, { immediate: true, flush: 'sync' })
 onBeforeUnmount(clear)
+const preferenceFilters = { owner: tableFilter(owner, 'all', ownerItems), state: tableFilter(state, 'all', stateItems), level: tableFilter(level, 'all', levelItems) }
 </script>
 
 <template>
@@ -216,7 +218,9 @@ onBeforeUnmount(clear)
           <CommonResourceLayout
             v-if="!accessDenied"
             v-model:search="search"
-            v-model:pagination="pagination" layout="page"
+            v-model:pagination="pagination"
+            table-id="admin.queues"
+            :preference-filters="preferenceFilters" layout="page"
             :data="snapshot ? pagedHandlers : []"
             :columns="columns"
             :total-records="filteredHandlers.length"

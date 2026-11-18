@@ -127,6 +127,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
 
 <template>
   <CommonResourceCrud
+    table-id="agreement.applicant-recipients"
     :action="resourceAction"
     class="w-full"
     :title="t('agreement.applicant_recipients.title')"

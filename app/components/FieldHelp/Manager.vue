@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { useActionContext } from '~/composables/useActionContext'
 import { useGuidedHelpRequestOwner } from '~/composables/useGuidedHelpRequestOwner'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -223,11 +224,14 @@ onBeforeUnmount(() => {
   groupRequests.clear()
   catalogRequests.clear()
 })
+const preferenceFilters = { agency: tableFilter(agencyFilter, 'all', agencyOptions), screen: tableFilter(screenFilter, 'all', screenOptions), status: tableFilter(statusFilter, 'all', statusOptions) }
 </script>
 
 <template>
   <CommonResourceLayout
-    v-model:search="search" v-model:pagination="pagination" v-model:expanded="expanded" layout="page"
+    v-model:search="search"
+    v-model:pagination="pagination"
+    v-model:expanded="expanded" table-id="field-help.manager" :preference-filters="preferenceFilters" layout="page"
     :data="rows" :columns="columns" :total-records="filteredGroups.length" :loading="loading" :show-button="false"
     :request-status="loading ? 'pending' : failed ? 'error' : 'success'" :grouping="['agency']" :grouping-options="{ getGroupedRowModel: getGroupedRowModel() }"
     :column-visibility="{ agency: false }" :get-row-id="(row: FieldRow) => row.id" :expanded-options="{ autoResetExpanded: false }" @retry="initialize">

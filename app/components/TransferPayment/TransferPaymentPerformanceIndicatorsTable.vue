@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import type { ResourceTableStatus } from '~~/shared/types/resource-table'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { TransferPaymentPerformanceIndicatorRow, TransferPaymentOutcomeRow } from '~~/shared/types/transfer-payment-ui'
@@ -73,12 +74,15 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
 
   return base
 })
+const preferenceFilters = { outcome: tableFilter(selectedOutcomeId, 'all', () => outcomes.map(outcome => outcome.id)) }
 </script>
 
 <template>
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.performance-indicators"
+    :preference-filters="preferenceFilters"
     :data="indicators"
     :columns="indicatorColumns"
     :bilingual-columns="indicatorBilingualColumns"

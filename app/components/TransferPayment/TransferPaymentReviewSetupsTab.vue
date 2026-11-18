@@ -157,6 +157,7 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="transfer-payment.review-setups"
       :data="pageItems"
       :columns="columns"
       :bilingual-columns="[{ id: 'name', accessorKey: { en: 'egcs_cn_name_en', fr: 'egcs_cn_name_fr' } }]"

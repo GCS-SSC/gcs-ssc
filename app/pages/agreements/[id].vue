@@ -2,6 +2,7 @@
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useActionContext } from '~/composables/useActionContext'
 import { useResourceRequest } from '~/composables/useResourceRequest'
+import { useTrackRecentRecord } from '~/composables/useRecentRecords'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
@@ -99,11 +100,12 @@ const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
 const { formatDate, toDateInput } = useDateHelpers()
 const { isRecordLocked } = useBusinessStatusState()
+const { user: currentActor, permissionRevision } = useAuth()
 const id = route.params.id as string
 const isChildDetailRoute = computed(() => isAgreementChildRoute(route))
 
 const { data: profile, error, status, refresh: refreshProfile } = useResourceRequest<AgreementDetailProfile>({
-  identity: id,
+  identity: () => JSON.stringify([id, currentActor.value?.id]),
   enabled: computed(() => !isChildDetailRoute.value),
   /**
    * Reads the authorized Agreement while its page owns the request.
@@ -116,6 +118,10 @@ const { data: profile, error, status, refresh: refreshProfile } = useResourceReq
     return await response.json() as AgreementDetailProfile
   }
 })
+useTrackRecentRecord('agreement', () => !isChildDetailRoute.value && status.value === 'success'
+  && String(profile.value?.id) === id
+  ? id
+  : undefined)
 const { label: riskSourceLabel, workflowLabel: riskSourceWorkflowLabel, completedAt: riskSourceCompletedAt } = useAgreementRiskSource(() => profile.value?.risk_source)
 usePageResourceError({
   identity: () => route.path,
@@ -137,7 +143,6 @@ const {
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
 const profileFormSession = ref(0)
 const { can, canAny, permissionsReady } = useCan()
-const { user: currentActor, permissionRevision } = useAuth()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)

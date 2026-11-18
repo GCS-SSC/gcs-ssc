@@ -177,6 +177,7 @@ const remove = async (row: AmendmentSubtypeRow) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="transfer-payment.amendment-subtypes"
       :data="items"
       :columns="columns"
       :bilingual-columns="bilingualColumns"

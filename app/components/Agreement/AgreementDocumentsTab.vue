@@ -328,6 +328,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.documents"
       :data="items"
       :columns="columns"
       :total-records="totalRecords"

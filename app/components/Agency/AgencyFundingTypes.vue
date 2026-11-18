@@ -342,7 +342,8 @@ const deleteSubtype = async (typeId: string, id: string) => {
 <template>
   <div class="w-full" data-field-scope="agency.funding-types">
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="agency.funding-types"
       :data="rows" :columns="columns" :grouping="grouping" :grouping-options="groupingOptions"
       :expanded-options="expandedOptions" :column-visibility="columnVisibility" :expanded="expandedRows"
       :total-records="rows.length" :request-status="status" :loading="status === 'pending'"

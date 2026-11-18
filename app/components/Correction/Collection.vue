@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
+import { CORRECTION_OUTCOME_ENUM } from '~~/shared/constants/enums'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useActionContext } from '~/composables/useActionContext'
 import type { Ref } from 'vue'
@@ -63,8 +65,6 @@ watch(() => agreementId, () => {
   exportGeneration += 1
   exporting.value = false
   createOpen.value = false
-  outcome.value = 'all'
-  fiscalYear.value = undefined
 }, { flush: 'sync' })
 watch([outcome, fiscalYear], () => {
   pagination.value.pageIndex = 0
@@ -104,6 +104,7 @@ const exportCorrections = async () => {
     if (generation === exportGeneration) exporting.value = false
   }
 }
+const preferenceFilters = { outcome: tableFilter(outcome, 'all', () => CORRECTION_OUTCOME_ENUM), fiscalYear: tableFilter(fiscalYear, undefined, () => fiscalYears.value.map(year => year.id)) }
 </script>
 
 <template>
@@ -113,7 +114,9 @@ const exportCorrections = async () => {
     </p>
     <section data-help-target="casework.correction.collection.records">
       <CommonResourceLayout
-        v-model:search="search" v-model:pagination="pagination"
+        v-model:search="search"
+        v-model:pagination="pagination"
+        table-id="correction.collection" :preference-filters="preferenceFilters"
         help-add-target="casework.correction.collection.add"
         help-search-target="casework.correction.collection.search"
         :data="items"

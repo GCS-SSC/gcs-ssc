@@ -128,6 +128,7 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.document-templates"
     :title="t('transfer_payment.document_templates.title')"
     :data="items"
     :columns="columns"

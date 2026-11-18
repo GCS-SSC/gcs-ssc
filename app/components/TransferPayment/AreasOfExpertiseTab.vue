@@ -210,6 +210,7 @@ const formSession = useFormSession({ owner: { captureSession, isCurrentSession }
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.areas-of-expertise-tab"
     :data="items"
     :columns="columns"
     :total-records="totalRecords"

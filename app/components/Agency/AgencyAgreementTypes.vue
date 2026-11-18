@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AGREEMENT_TYPE_ENUM } from '~~/shared/constants/enums'
 import { useActionContext } from '~/composables/useActionContext'
 import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyAgreementTypeSchema, AgencyAgreementTypeInitial, type AgencyAgreementTypeItem } from '~~/shared/types/schemas'
@@ -27,6 +28,7 @@ const action: ResourceCrudAction = {
 <template>
   <section data-help-view="agency.agreement-types" data-field-scope="agency.agreement-types">
     <CommonResourceCrud
+      table-id="agency.agreement-types"
       :action="action"
       help-add-target="agency.agreement-types.add"
       help-save-target="agency.agreement-types.save"
@@ -42,6 +44,7 @@ const action: ResourceCrudAction = {
       :schema="AgencyAgreementTypeSchema"
       :initial-new-item="initialNewItem"
       :columns="columns"
+      :preference-status-options="AGREEMENT_TYPE_ENUM"
       status-enum-name="agreement_type"
       :status-filter-label="t('common.all_types')">
       <template #name-cell="{ row }">

@@ -23,6 +23,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.attachment-types"
     :action="action"
     :title="t('agency.tabs.attachment_types')"
     icon="i-lucide-paperclip"

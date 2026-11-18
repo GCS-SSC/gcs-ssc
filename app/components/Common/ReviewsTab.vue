@@ -362,6 +362,7 @@ const expandedOptions = { autoResetExpanded: false }
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      :table-id="`reviews.${entityType}`"
       :title="t('reviews.title')"
       :data="tableRows"
       :columns="columns"

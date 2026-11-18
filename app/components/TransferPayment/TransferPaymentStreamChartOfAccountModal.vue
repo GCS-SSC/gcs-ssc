@@ -32,10 +32,6 @@ watch([
 }, { immediate: true, flush: 'sync' })
 const pending = useCrudModalPending(() => captureSession ? captureSession() : modalSession.captureSession())
 const state = ref<{ egcs_tp_agencychartofaccount?: string }>({})
-const submitChartLink: (url: string, options: {
-  method: 'POST'
-  body: z.infer<typeof TransferPaymentStreamChartOfAccountSchema>
-}) => Promise<unknown> = $fetch
 watch(isOpen, open => {
   if (open) state.value = {}
 }, { immediate: true })
@@ -56,7 +52,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
   if (modalSession.isDisposed() || !pending.begin(session)) return
   try {
     if (!operation.canDispatch()) return
-    await submitChartLink(`/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts`, {
+    await $fetch<unknown, string>(`/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts`, {
       method: 'POST', body: event.data
     })
     if (!operation.isCurrent()) return

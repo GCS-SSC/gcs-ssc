@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import type { EnumKey } from '~/types/enums'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import { tableFilter, useTablePreferences, type TableFilterBindings } from '~/composables/useTablePreferences'
+import type { ToolbarTableLike } from '~~/shared/types/ui'
 import type { CursorPagination, ResourceTableStatus } from '~~/shared/types/resource-table'
 
 const {
@@ -11,6 +13,9 @@ const {
   bilingualColumns,
   totalRecords,
   cursor,
+  tableId,
+  preferenceFilters,
+  preferenceStatusOptions,
   loading = false,
   requestStatus,
   statusEnumName,
@@ -35,6 +40,9 @@ const {
   bilingualColumns?: BilingualColumnConfig<T>[]
   totalRecords?: number
   cursor?: CursorPagination
+  tableId?: string
+  preferenceFilters?: TableFilterBindings
+  preferenceStatusOptions?: readonly string[]
   loading?: boolean
   requestStatus?: ResourceTableStatus
   statusEnumName?: EnumKey
@@ -63,7 +71,88 @@ const pagination = defineModel<{ pageIndex: number; pageSize: number }>('paginat
 })
 
 const { t } = useI18n()
-const table = ref()
+const table = ref<ToolbarTableLike & { tableApi?: { getFilteredSelectedRowModel: () => { rows: unknown[] } } }>()
+const columnVisibility = defineModel<Record<string, boolean>>('columnVisibility')
+const filters = computed(() => preferenceStatusOptions
+  ? { ...preferenceFilters, status: tableFilter(statusFilter, 'all', () => preferenceStatusOptions) }
+  : preferenceFilters)
+const resetPage = () => {
+  if (pagination.value.pageIndex > 0) pagination.value = { ...pagination.value, pageIndex: 0 }
+}
+const preferences = useTablePreferences({
+  tableId: () => showToolbar && showColumnToggle ? tableId : undefined,
+  filters,
+  resetPage
+})
+const preferencesActive = computed(() => Boolean(tableId && showToolbar && showColumnToggle && preferences.state.value))
+const defaultColumns = computed(() => table.value?.tableApi?.getAllFlatColumns().filter(column => !column.columns.length) ?? [])
+const defaultIds = computed(() => defaultColumns.value.map(column => column.id))
+const reorderableIds = computed(() => defaultColumns.value
+  .filter(column => column.getCanHide() && column.id !== 'select' && column.id !== 'actions')
+  .map(column => column.id))
+const orderedIds = computed(() => {
+  const saved = (preferences.entry.value?.order ?? []).filter(id => reorderableIds.value.includes(id))
+  return [...new Set([...saved, ...reorderableIds.value])]
+})
+const orderedColumns = computed(() => {
+  if (!preferencesActive.value) return undefined
+  const order = orderedIds.value.values()
+  return defaultIds.value.map(id => reorderableIds.value.includes(id) ? order.next().value ?? id : id)
+})
+const visibility = computed({
+  /**
+   * @returns Caller visibility defaults with valid user overrides applied.
+   */
+  get: () => {
+    if (!preferencesActive.value) return columnVisibility.value
+    return {
+      ...columnVisibility.value,
+      ...Object.fromEntries(defaultColumns.value.flatMap(column => {
+        const saved = preferences.entry.value?.visibility?.[column.id]
+        return column.getCanHide() && saved !== undefined ? [[column.id, saved]] : []
+      }))
+    }
+  },
+  /**
+   * Stores only visibility changes relative to current caller defaults.
+   * @param value The TanStack visibility model after a toggle.
+   */
+  set: value => {
+    if (preferencesActive.value) {
+      if (value) {
+        const overrides = Object.fromEntries(defaultColumns.value.flatMap(column => {
+          const selected = value[column.id] ?? true
+          const baseline = columnVisibility.value?.[column.id] ?? true
+          return column.getCanHide() && selected !== baseline ? [[column.id, selected]] : []
+        }))
+        preferences.update({ visibility: overrides })
+      }
+    } else {
+      columnVisibility.value = value
+    }
+  }
+})
+
+/**
+ * Moves a user-reorderable column one position in the chosen direction.
+ * @param id Stable ID of the column being moved.
+ * @param direction One position backward or forward.
+ */
+const moveColumn = (id: string, direction: -1 | 1) => {
+  const order = [...orderedIds.value]
+  const index = order.indexOf(id)
+  const target = index + direction
+  const displaced = order[target]
+  if (index < 0 || displaced === undefined) return
+  order[index] = displaced
+  order[target] = id
+  preferences.update({ order })
+}
+const preferenceError = computed(() => {
+  if (preferences.state.value?.sync === 'save-error') return t('common.table_preferences_save_error')
+  if (preferences.state.value?.sync === 'load-error') return t('common.table_preferences_load_error')
+  return undefined
+})
 const resolvedColumns = useTableColumns<T>(() => columns, () => bilingualColumns)
 const hasStaleRows = computed(() => requestStatus === 'error' && data.length > 0)
 const isInitialLoading = computed(() => requestStatus === 'pending' && data.length === 0)
@@ -88,6 +177,10 @@ defineExpose({
       v-model:status-filter="statusFilter"
       :status-enum-name="statusEnumName"
       :status-filter-label="statusFilterLabel"
+      :ordered-column-ids="preferencesActive ? orderedIds : undefined"
+      :preferences-editable="preferences.editable.value"
+      :preference-error="preferenceError"
+      :preferences-loading="preferences.state.value?.sync === 'loading'"
       :button-label="buttonLabel"
       :help-add-target="helpAddTarget"
       :help-search-target="helpSearchTarget"
@@ -98,7 +191,10 @@ defineExpose({
       :search-placeholder="searchPlaceholder"
       :table="table"
       :sticky="layout === 'page'"
-      @add="$emit('add')">
+      @add="$emit('add')"
+      @move-column="moveColumn"
+      @reset-preferences="preferences.reset"
+      @retry-preferences="preferences.retry">
       <template v-for="(_, name) in $slots" #[name]="slotData">
         <slot :name="name" v-bind="slotData" />
       </template>
@@ -140,6 +236,8 @@ defineExpose({
             <UTable
               ref="table"
               v-model:pagination="pagination"
+              v-model:column-visibility="visibility"
+              :column-order="orderedColumns"
               :data="data"
               :columns="resolvedColumns"
               :loading="loading"

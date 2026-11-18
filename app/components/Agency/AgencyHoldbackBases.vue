@@ -28,6 +28,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.holdback-bases"
     :action="action"
     :title="t('agency.tabs.holdback_bases')"
     icon="i-lucide-percent"

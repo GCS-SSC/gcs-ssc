@@ -52,9 +52,13 @@ export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
  * @param id - Applicant recipient profile id.
  * @param options - Parent workspace request controls.
  * @param options.enabled - Whether the parent profile and tabs own the current route.
+ * @param options.actorId - Signed-in actor owning this detail request.
  * @returns Fetched profile state plus tab metadata for the detail view.
  */
-export const useApplicantRecipientDetailState = (id: string, options: { enabled?: MaybeRefOrGetter<boolean> } = {}) => {
+export const useApplicantRecipientDetailState = (id: string, options: {
+  enabled?: MaybeRefOrGetter<boolean>
+  actorId?: MaybeRefOrGetter<string | undefined>
+} = {}) => {
   const { t, locale } = useI18n()
   const localePath = useLocalePath()
   const { getHeroCollapsed } = useDashboard()
@@ -63,7 +67,7 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
 
   const isEnabled = computed(() => options.enabled === undefined ? true : toValue(options.enabled))
   const { data: profile, error, status, refresh } = useResourceRequest<ApplicantRecipientDetailProfile>({
-    identity: id,
+    identity: () => JSON.stringify([id, toValue(options.actorId)]),
     enabled: isEnabled,
     initial: 'deferred',
     failureData: 'clear',

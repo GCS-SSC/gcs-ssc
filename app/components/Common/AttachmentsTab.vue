@@ -528,6 +528,7 @@ const retryAttachmentList = async () => {
       v-else-if="!agencyRequired || selectedAgencyId"
       v-model:search="search"
       v-model:pagination="pagination"
+      :table-id="`attachments.${entityType}`"
       :data="items"
       :columns="columns"
       :total-records="totalRecords"

@@ -30,6 +30,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.fiscal-years"
     :action="action"
     :title="t('agency.tabs.fiscal_years')"
     icon="i-lucide-calendar"

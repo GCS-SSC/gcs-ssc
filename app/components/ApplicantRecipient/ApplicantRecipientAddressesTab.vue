@@ -71,6 +71,7 @@ const updateNumericFieldValue = (state: ApplicantRecipientAddressForm, key: Nume
 <template>
   <section data-help-target="proponent.addresses.content" data-help-kind="section" data-help-view="proponent.addresses" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      table-id="applicant-recipient.addresses"
       :action="resourceAction"
       help-search-target="proponent.addresses.search" help-save-target="proponent.addresses.save" help-add-target="proponent.addresses.add"
       class="w-full"

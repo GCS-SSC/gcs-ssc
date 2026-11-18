@@ -51,6 +51,7 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
 <template>
   <section data-help-target="proponent.notes.content" data-help-kind="section" data-help-view="proponent.notes" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      table-id="applicant-recipient.notes"
       :action="resourceAction"
       help-search-target="proponent.notes.search" help-save-target="proponent.notes.save" help-add-target="proponent.notes.add"
       class="w-full"

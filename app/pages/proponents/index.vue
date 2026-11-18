@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useActionContext } from '~/composables/useActionContext'
+import { useRecentRecords } from '~/composables/useRecentRecords'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -29,6 +30,8 @@ const deletingId = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const listView = ref('all')
 const listViewQuery = computed(() => ({ list_view: listView.value }))
+const recentFirst = ref(false)
+const { actorId: recentsActorId, headers: recentHeaders } = useRecentRecords(['proponent'], recentFirst)
 
 const {
   search,
@@ -44,6 +47,8 @@ const {
   status
 } = useResourceTable<ApplicantRecipientProfileRow>({
   query: listViewQuery,
+  headers: recentHeaders,
+  contextKey: computed(() => recentsActorId.value ?? ''),
   fetchUrl: '/api/applicant-recipients'
 })
 
@@ -53,7 +58,7 @@ const deleteContext = useActionContext({
   eligible: () => profiles.value.some(item => String(item.id) === deletingId.value && item.can_delete_role === true && item.can_delete === true)
 })
 
-watch(listView, () => {
+watch([listView, recentFirst, recentHeaders], () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
 
@@ -194,7 +199,17 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
           @retry="retry"
           @add="openCreateProfile"
           @edit="openUpdateProfile"
-          @delete="deleteProfile" />
+          @delete="deleteProfile">
+          <template #actions>
+            <CommonActionButton
+              icon="i-lucide-history"
+              :aria-label="t('common.recently_accessed')"
+              :aria-pressed="recentFirst"
+              :color="recentFirst ? 'primary' : 'neutral'"
+              :variant="recentFirst ? 'soft' : 'outline'"
+              @click="recentFirst = !recentFirst" />
+          </template>
+        </ApplicantRecipientProfilesTable>
       </div>
     </template>
   </CommonDetailPage>

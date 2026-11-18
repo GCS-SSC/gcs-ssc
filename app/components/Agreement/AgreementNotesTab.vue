@@ -76,6 +76,7 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
 
 <template>
   <CommonResourceCrud
+    table-id="agreement.notes"
     :action="resourceAction"
     class="w-full" :title="t('notes.title')" icon="i-lucide-sticky-note"
     :fetch-url="`/api/agreements/${agreementId}/notes`"

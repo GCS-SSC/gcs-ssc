@@ -1073,6 +1073,7 @@ const formatSignedBudgetDifference = (value: Money) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.budget"
       :embedded="embedded"
       :data="tableRows"
       :columns="columns"

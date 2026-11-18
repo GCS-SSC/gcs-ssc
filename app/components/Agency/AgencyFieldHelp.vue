@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { computed, inject, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useGuidedHelpRequestOwner } from '~/composables/useGuidedHelpRequestOwner'
 import { useModalSession } from '~/composables/useModalSession'
@@ -212,8 +213,6 @@ watch(url, () => {
   draft.value = null
   open.value = false
   search.value = ''
-  screenFilter.value = 'all'
-  statusFilter.value = 'all'
   pagination.value.pageIndex = 0
   if (!editorOnly) void reload()
 }, { immediate: true, flush: 'sync' })
@@ -229,6 +228,7 @@ onScopeDispose(() => {
   contextGeneration += 1
   catalogRequest.reset()
 })
+const preferenceFilters = { screen: tableFilter(screenFilter, 'all', screenOptions), status: tableFilter(statusFilter, 'all', statusOptions) }
 </script>
 
 <template>
@@ -243,7 +243,9 @@ onScopeDispose(() => {
     </UAlert>
     <CommonResourceLayout
       v-if="!editorOnly"
-      v-model:search="search" v-model:pagination="pagination" layout="page" :data="rows" :columns="columns"
+      v-model:search="search"
+      v-model:pagination="pagination"
+      table-id="agency.field-help" :preference-filters="preferenceFilters" layout="page" :data="rows" :columns="columns"
       :total-records="filtered.length" :loading="loading" :show-button="Boolean(catalog?.capabilities.canCreate)"
       :button-label="t('field_tooltips.add')" :request-status="loading ? 'pending' : failed ? 'error' : 'success'"
       @add="edit(null)" @retry="reload()">

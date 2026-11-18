@@ -26,6 +26,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.approval-behalf-types"
     :action="action"
     :title="t('agency.tabs.approval_behalf')"
     icon="i-lucide-check-square"

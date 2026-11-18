@@ -40,6 +40,7 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
 <template>
   <section data-help-target="proponent.other-names.content" data-help-kind="section" data-help-view="proponent.other-names" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      table-id="applicant-recipient.other-names"
       :action="resourceAction"
       help-search-target="proponent.other-names.search" help-save-target="proponent.other-names.save" help-add-target="proponent.other-names.add"
       class="w-full"

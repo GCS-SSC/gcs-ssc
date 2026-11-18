@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import GuidedHelpLauncher from '~/components/GuidedHelp/Launcher.vue'
 import { useActionContext } from '~/composables/useActionContext'
+import { useRecentRecords } from '~/composables/useRecentRecords'
+import { tableFilter } from '~/composables/useTablePreferences'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 
 definePageMeta({
   i18n: {
@@ -40,7 +43,10 @@ const selectGuidedAgreement = (agreement: FundingCaseAgreementProfileRow) => {
 }
 
 const listView = ref('all')
+const preferenceFilters = { scope: tableFilter(listView, 'all', undefined, value => AssignedListViewSchema.safeParse(value).success) }
 const listViewQuery = computed(() => ({ list_view: listView.value }))
+const recentFirst = ref(false)
+const { actorId: recentsActorId, headers: recentHeaders } = useRecentRecords(['agreement'], recentFirst)
 
 const {
   search,
@@ -53,10 +59,12 @@ const {
   status
 } = useResourceTable<FundingCaseAgreementProfileRow>({
   query: listViewQuery,
+  headers: recentHeaders,
+  contextKey: computed(() => recentsActorId.value ?? ''),
   fetchUrl: '/api/agreements'
 })
 
-watch(listView, () => {
+watch([listView, recentFirst, recentHeaders], () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
 
@@ -193,6 +201,7 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
             :can-create="canCreateAgreement"
             :can-update="canUpdateAgreement"
             :can-delete="canDeleteAgreement"
+            :preference-filters="preferenceFilters"
             @retry="retry"
             @add="openCreateAgreement"
             @select="selectGuidedAgreement"
@@ -203,6 +212,15 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
             </template>
             <template #filters>
               <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" data-ui-target="agreements.list-view" resource="agreement" />
+            </template>
+            <template #actions>
+              <CommonActionButton
+                icon="i-lucide-history"
+                :aria-label="t('common.recently_accessed')"
+                :aria-pressed="recentFirst"
+                :color="recentFirst ? 'primary' : 'neutral'"
+                :variant="recentFirst ? 'soft' : 'outline'"
+                @click="recentFirst = !recentFirst" />
             </template>
           </AgreementProfilesTable>
         </section>

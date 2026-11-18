@@ -144,7 +144,7 @@ const submit = async () => {
 
 <template>
   <div class="space-y-5">
-    <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" :layout="opportunityId ? 'card' : 'page'" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t(opportunityId ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" @add="openCreate" @retry="retry">
+    <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" :table-id="opportunityId ? 'opportunity.applications' : 'applications.list'" :layout="opportunityId ? 'card' : 'page'" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t(opportunityId ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" @add="openCreate" @retry="retry">
       <template #id-cell="{ row }">
         <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
           {{ row.original.id }}

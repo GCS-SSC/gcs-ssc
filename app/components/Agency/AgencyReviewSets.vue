@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
+import { TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM } from '~~/shared/types/schemas/transfer-payment'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { getGroupedRowModel } from '@tanstack/vue-table'
@@ -495,6 +497,7 @@ const getGroupedRowCount = (row: GroupedReviewSetupRow) => row.leafRows?.length 
 const updateExpandedRows = (value: ExpandedState) => {
   expandedRows.value = value
 }
+const preferenceFilters = { entityType: tableFilter(entityTypeFilter, 'all', () => TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM) }
 </script>
 
 <template>
@@ -502,6 +505,8 @@ const updateExpandedRows = (value: ExpandedState) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agency.review-sets"
+      :preference-filters="preferenceFilters"
       :data="tableRows"
       :columns="columns"
       :bilingual-columns="bilingualColumns"

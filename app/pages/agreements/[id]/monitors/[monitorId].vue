@@ -658,7 +658,8 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
               <div class="space-y-6">
                 <section data-help-target="casework.monitors.planning.records">
                   <CommonResourceLayout
-                    v-model:search="planningSearch" v-model:pagination="planningPagination"
+                    v-model:search="planningSearch"
+                    v-model:pagination="planningPagination" table-id="agreement.monitor.planning"
                     help-add-target="casework.monitors.planning.add"
                     help-search-target="casework.monitors.planning.search"
                     :data="planningRows"
@@ -691,6 +692,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                   <CommonResourceLayout
                     v-model:search="itemSearch"
                     v-model:pagination="itemPagination"
+                    table-id="agreement.monitor.items"
                     help-search-target="casework.monitors.items.search"
                     :data="itemRows"
                     :columns="[
@@ -733,6 +735,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                   <CommonResourceLayout
                     v-model:search="findingSearch"
                     v-model:pagination="findingPagination"
+                    table-id="agreement.monitor.findings"
                     help-search-target="casework.monitors.findings.search"
                     :data="findingRows"
                     :columns="[
@@ -771,6 +774,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
                   <CommonResourceLayout
                     v-model:search="followupSearch"
                     v-model:pagination="followupPagination"
+                    table-id="agreement.monitor.follow-ups"
                     help-search-target="casework.monitors.followups.search"
                     :data="followupRows"
                     :columns="[
@@ -817,7 +821,8 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
               <div class="space-y-3">
                 <section data-help-target="casework.monitors.promising-practices.records">
                   <CommonResourceLayout
-                    v-model:search="practiceSearch" v-model:pagination="practicePagination"
+                    v-model:search="practiceSearch"
+                    v-model:pagination="practicePagination" table-id="agreement.monitor.promising-practices"
                     help-add-target="casework.monitors.promising-practices.add"
                     help-search-target="casework.monitors.promising-practices.search"
                     :data="practiceRows"

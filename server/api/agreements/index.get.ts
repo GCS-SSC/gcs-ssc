@@ -10,6 +10,7 @@ import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { isCanonicalPostgresBigintText } from '~~/shared/utils/database-id'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { recentRecordRank, readRecentRecordIds } from '~~/server/utils/recent-record-order'
 
 const AgencyFilterSchema = z.coerce.string().transform((value, ctx) => {
   if (value === '') return value
@@ -48,6 +49,7 @@ export default defineEventHandler(async event => {
     })
 
     const query = await getValidatedQueryI18n(event, AgreementsPaginationSchema)
+    const recentIds = await readRecentRecordIds(event, 'agreement')
     const { page, limit, search, agency_id, list_view } = query
     const offset = (page - 1) * limit
     const escapedSearch = search ? escapeLikePattern(search) : ''
@@ -177,6 +179,7 @@ export default defineEventHandler(async event => {
           'Transfer_Payment_Stream_Risk_Rating.egcs_tp_name_en as risk_rating_name_en',
           'Transfer_Payment_Stream_Risk_Rating.egcs_tp_name_fr as risk_rating_name_fr'
         ])
+        .$if(recentIds.length > 0, query => query.orderBy(eb => recentRecordRank(eb.ref('Funding_Case_Agreement_Profile.id'), recentIds), 'asc'))
         .orderBy('Funding_Case_Agreement_Profile.id', 'asc')
         .limit(limit)
         .offset(offset)

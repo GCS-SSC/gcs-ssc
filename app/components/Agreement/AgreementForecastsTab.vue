@@ -386,6 +386,7 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.forecasts"
       :data="versionRows"
       :columns="columns"
       :grouping="grouping"

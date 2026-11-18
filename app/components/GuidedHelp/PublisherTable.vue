@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { computed, ref, watch } from 'vue'
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
@@ -87,11 +88,14 @@ watch(search, value => {
     expanded.value = Object.fromEntries(ownerGroups.value.map(group => [`context:${group.id}`, true]))
   }
 })
+const preferenceFilters = { owner: tableFilter(ownerFilter, 'all', ownerOptions) }
 </script>
 
 <template>
   <CommonResourceLayout
-    v-model:search="search" v-model:pagination="pagination" v-model:expanded="expanded" layout="page"
+    v-model:search="search"
+    v-model:pagination="pagination"
+    v-model:expanded="expanded" table-id="guided-help.publisher-table" :preference-filters="preferenceFilters" layout="page"
     :data="filtered" :columns="columns" :total-records="searchedGroups.length" :show-button="false"
     :grouping="['context']" :grouping-options="{ getGroupedRowModel: getGroupedRowModel() }"
     :column-visibility="{ context: false }" :get-row-id="(row: GuideRow) => row.id"

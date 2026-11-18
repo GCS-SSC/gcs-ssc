@@ -186,6 +186,7 @@ const formSession = useFormSession({ owner: streamBudgetModal, action: { kind: '
   <CommonResourceLayout
     v-model:search="streamBudgetSearch"
     v-model:pagination="streamBudgetPagination"
+    table-id="transfer-payment.stream-budgets"
     :data="streamBudgets"
     :columns="streamBudgetColumns"
     :total-records="streamBudgetTotal"

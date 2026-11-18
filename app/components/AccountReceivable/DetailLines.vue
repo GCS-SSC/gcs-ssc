@@ -217,7 +217,8 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
 <template>
   <div class="min-w-0 space-y-4" data-testid="account-receivable-lines" data-field-tooltip-context="agreement" data-field-scope="account-receivable.detail-lines" data-scope-label-en="Agreements > Receivables > Lines" data-scope-label-fr="Ententes > Créances > Lignes">
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination" :data="filtered" :columns="columns"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="account-receivable.detail-lines" :data="filtered" :columns="columns"
       :total-records="filtered.length" :pagination-options="{ manualPagination: false }"
       :show-button="canEdit" :button-label="t('account_receivable.add_line')"
       :search-placeholder="t('account_receivable.lines_search')" @add="openCreate">

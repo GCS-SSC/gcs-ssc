@@ -225,6 +225,7 @@ const formSession = useFormSession({ owner: templateModal, action: { kind: 'remo
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agency.document-templates"
       :data="items"
       :columns="columns"
       :bilingual-columns="[{ id: 'name', accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' } }]"

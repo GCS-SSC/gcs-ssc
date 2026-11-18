@@ -224,6 +224,7 @@ const remove = async (id: string): Promise<void> => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="funding-opportunity.attachment-types-tab"
       :data="pageRows"
       :columns="columns"
       :total-records="filteredRows.length"

@@ -180,6 +180,7 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="transfer-payment.stream-amendment-types"
       :data="items"
       :columns="columns"
       :bilingual-columns="[{ id: 'name', accessorKey: { en: 'egcs_tp_name_en', fr: 'egcs_tp_name_fr' } }]"

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
+import type { TableFilterBindings } from '~/composables/useTablePreferences'
 import { AuditAccessListResponseSchema } from '~~/shared/types/schemas/audit'
 import type { AuditAccessListResponse, AuditSummary } from '~~/shared/types/schemas/audit'
 
-const { query, contextKey } = defineProps<{ query: Record<string, string>; contextKey: unknown }>()
+const { query, contextKey, preferenceFilters } = defineProps<{ query: Record<string, string>; contextKey: unknown; preferenceFilters?: TableFilterBindings }>()
 const emit = defineEmits<{ select: [row: AuditSummary] }>()
 const { t } = useI18n()
 const data: Ref<AuditAccessListResponse | null> = ref(null)
@@ -68,7 +69,9 @@ const columns = computed(() => [
 
 <template>
   <CommonResourceLayout
-    v-model:pagination="pagination" layout="page"
+    v-model:pagination="pagination"
+    table-id="admin.audit-access"
+    :preference-filters="preferenceFilters" layout="page"
     :data="data?.items ?? []"
     :columns="columns"
     :request-status="status"

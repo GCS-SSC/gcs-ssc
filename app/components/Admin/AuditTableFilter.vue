@@ -4,9 +4,9 @@ const model = defineModel<string>({ default: '' })
 const { t } = useI18n()
 const { data, error, refresh } = useFetch<{ events: string[]; access: string[] }, Error, string>('/api/admin/audit/tables' as string)
 const items = computed(() => data.value?.[kind].map(value => ({ value, label: value })) ?? [])
-watch([() => kind, data], () => {
+watch([() => kind, data, model], () => {
   if (data.value && model.value && !items.value.some(item => item.value === model.value)) model.value = ''
-})
+}, { immediate: true })
 </script>
 
 <template>

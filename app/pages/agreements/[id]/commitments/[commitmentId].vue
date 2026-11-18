@@ -374,7 +374,8 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
                   :description="t('agreement.commitments.allocation_total_help', { total: formatMoney(commitment.egcs_fc_totalamount), allocated: formatMoney(totalAmount) })" />
                 <section data-help-target="casework.commitments.lines.records">
                   <CommonResourceLayout
-                    v-model:search="search" v-model:pagination="pagination"
+                    v-model:search="search"
+                    v-model:pagination="pagination" table-id="agreement.commitment.lines"
                     help-add-target="casework.commitments.lines.add"
                     help-search-target="casework.commitments.lines.search"
                     :data="lines"

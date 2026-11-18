@@ -155,7 +155,8 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
         {{ t('account_receivable.credit_memos_description') }}
       </p>
       <CommonResourceLayout
-        v-model:search="search" v-model:pagination="pagination"
+        v-model:search="search"
+        v-model:pagination="pagination" table-id="applicant-recipient.credit-memos"
         help-add-target="proponent.credit-memos.add" help-search-target="proponent.credit-memos.search"
         :data="items" :columns="columns" :total-records="totalRecords"
         :loading="status === 'pending'" :request-status="status" :show-button="canCreate"

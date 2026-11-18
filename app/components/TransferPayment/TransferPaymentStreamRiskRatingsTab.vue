@@ -108,6 +108,7 @@ onScopeDispose(() => {
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.stream-risk-ratings"
     :data="items"
     :columns="columns"
     :bilingual-columns="bilingualColumns"

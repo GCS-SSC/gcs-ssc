@@ -4,8 +4,10 @@ import { getPaginationRowModel } from '@tanstack/table-core'
 import { computed, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import { tableFilter } from '~/composables/useTablePreferences'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 
 const { applicantRecipientId } = defineProps<{
   applicantRecipientId: string
@@ -17,9 +19,7 @@ const permissions = useCan()
 const { getBilingualValue } = useBilingualValue()
 
 const listView = ref('all')
-watch(() => applicantRecipientId, () => {
-  listView.value = 'all'
-})
+const preferenceFilters = { listView: tableFilter(listView, 'all', undefined, value => AssignedListViewSchema.safeParse(value).success) }
 const listViewQuery = computed(() => ({ list_view: listView.value }))
 
 const {
@@ -34,7 +34,7 @@ const {
   fetchUrl: computed(() => `/api/applicant-recipients/${applicantRecipientId}/agreements`)
 })
 
-watch(listView, () => {
+watch([listView, () => applicantRecipientId], () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
 
@@ -80,11 +80,13 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
 <template>
   <section data-help-target="proponent.agreements.content" data-help-kind="section" data-help-view="proponent.agreements" class="flex w-full min-w-0 flex-col">
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination" help-add-target="proponent.agreements.add" help-search-target="proponent.agreements.search"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="applicant-recipient.agreements" help-add-target="proponent.agreements.add" help-search-target="proponent.agreements.search"
 
       class="w-full"
       :data="agreements"
       :columns="columns"
+      :preference-filters="preferenceFilters"
       :total-records="totalRecords"
       :loading="status === 'pending'"
       :request-status="status"

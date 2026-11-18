@@ -224,7 +224,8 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
       <UButton icon="i-lucide-plus" color="neutral" variant="outline" :label="t('custom_fields.assign_field')" @click="openAssignment(null)" />
     </div>
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="transfer-payment.custom-fields-tab" :data="tableRows" :columns="columns"
       :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
       :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="tableGroups.length"
       :loading="status === 'pending'" :request-status="status" :button-label="t(hasSections ? 'custom_fields.add_section' : 'custom_fields.assign_field')"

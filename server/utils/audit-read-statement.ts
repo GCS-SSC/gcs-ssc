@@ -8,7 +8,7 @@ import type { AuditStatementMetadata } from './audit-statement-metadata'
 type Node = Record<string, unknown>
 const node = (value: unknown): Node | undefined => value && typeof value === 'object' && !Array.isArray(value) ? value as Node : undefined
 const name = (value: unknown): string | undefined => typeof node(value)?.name === 'string' ? node(value)!.name as string : undefined
-const pureFunctions = new Set(['count', 'sum', 'avg', 'min', 'max', 'coalesce', 'nullif', 'lower'])
+const pureFunctions = new Set(['count', 'sum', 'avg', 'min', 'max', 'coalesce', 'nullif', 'lower', 'array_position'])
 const expressionWords = new Set([...pureFunctions, 'cast', 'as', 'text', 'numeric', 'decimal', 'bigint', 'integer',
   'distinct', 'null', 'true', 'false', 'case', 'when', 'then', 'else', 'end', 'is', 'not', 'and', 'or'])
 /** Recognize only built-in arithmetic/aggregate templates; identifiers remain structured children. */

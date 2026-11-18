@@ -6,6 +6,14 @@ const options = computed(() => [
   { value: 'all', label: t(`${resource}.list_views.all`) },
   { value: 'mine', label: t(`${resource}.list_views.mine`) }
 ])
+
+/**
+ * Clears a selected agency once the authorized lookup confirms it is unavailable.
+ * @param values Confirmed unavailable option IDs.
+ */
+const clearUnavailable = (values: string[]) => {
+  if (values.includes(model.value)) model.value = 'all'
+}
 </script>
 
 <template>
@@ -19,5 +27,6 @@ const options = computed(() => [
     :show-value-in-label="false"
     :prepend-items="options"
     :aria-label="t(`${resource}.list_views.label`)"
-    class="min-w-56" data-field-exclude="Composite control internals; configurable help belongs to the owning business field." />
+    class="min-w-56" data-field-exclude="Composite control internals; configurable help belongs to the owning business field."
+    @unavailable-values="clearUnavailable" />
 </template>

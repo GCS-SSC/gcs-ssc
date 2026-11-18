@@ -179,6 +179,7 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.stream-holdback-bases"
     :data="items"
     :columns="columns"
     :bilingual-columns="bilingualColumns"

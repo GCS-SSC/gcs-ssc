@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { APPLICANT_RECIPIENT_TYPE_ENUM } from '~~/shared/constants/enums'
 import { useActionContext } from '~/composables/useActionContext'
 import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { AgencyApplicantRecipientSubtypeSchema, type AgencyApplicantRecipientSubtypeItem } from '~~/shared/types/schemas'
@@ -24,6 +25,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.applicant-recipient-subtypes"
     :action="action"
     :title="t('agency.tabs.applicant_recipient_subtypes')"
     icon="i-lucide-users"
@@ -36,6 +38,7 @@ const action: ResourceCrudAction = {
     :can-delete="canDelete"
     :schema="AgencyApplicantRecipientSubtypeSchema"
     :columns="columns"
+    :preference-status-options="APPLICANT_RECIPIENT_TYPE_ENUM"
     status-enum-name="applicant_recipient_type"
     :status-filter-label="t('common.all_subtypes')" data-field-scope="agency.applicant-recipient-subtypes">
     <template #name-cell="{ row }">

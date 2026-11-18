@@ -68,7 +68,8 @@ const columns: TableColumnInput<Agency>[] = [
           :title="title" :description="t('extensions.workspace_agencies_description')"
           :stats="[{ label: t('nav.agencies'), value: workspace?.agencies.length ?? 0 }]" />
         <CommonResourceLayout
-          v-if="workspace" v-model:search="search" v-model:pagination="pagination" layout="page"
+          v-if="workspace"
+          v-model:search="search" v-model:pagination="pagination" table-id="extensions.agencies" layout="page"
           :data="agencies" :columns="columns" :total-records="agencies.length"
           :loading="status === 'pending'" :request-status="status"
           :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"

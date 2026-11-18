@@ -241,7 +241,8 @@ const optionFormSession = useFormSession({ owner: optionModal, action: { kind: '
       {{ t('custom_fields.title') }}
     </h2>
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="agency.custom-fields" :data="tableRows" :columns="columns"
       :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
       :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="filteredFields.length"
       :loading="status === 'pending'" :request-status="status" :show-button="canCreate"

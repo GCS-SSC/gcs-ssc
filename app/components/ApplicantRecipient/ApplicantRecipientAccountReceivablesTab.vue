@@ -34,7 +34,8 @@ const amount = (value: Money) =>
       </p>
       <CommonResourceLayout
         v-model:search="search"
-        v-model:pagination="pagination" help-search-target="proponent.account-receivables.search"
+        v-model:pagination="pagination"
+        table-id="applicant-recipient.account-receivables" help-search-target="proponent.account-receivables.search"
         :data="items" :columns="columns" :total-records="totalRecords"
         :loading="status === 'pending'" :request-status="status" :show-button="false"
         :search-placeholder="t('account_receivable.search')" @retry="retry">

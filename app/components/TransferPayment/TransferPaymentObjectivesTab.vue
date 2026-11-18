@@ -185,6 +185,7 @@ const deleteObjective = async (item: TransferPaymentObjectiveRow) => {
     <CommonResourceLayout
       v-model:search="objectiveSearch"
       v-model:pagination="objectivePagination"
+      table-id="transfer-payment.objectives"
       :data="objectives"
       :columns="objectiveColumns"
       :bilingual-columns="objectiveBilingualColumns"

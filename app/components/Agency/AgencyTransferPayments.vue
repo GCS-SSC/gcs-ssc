@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { onScopeDispose, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -141,6 +142,7 @@ const saveProfile = async () => {
     profilePending.end(session)
   }
 }
+const preferenceFilters = { status: tableFilter(statusFilter, 'all', availabilityItems) }
 </script>
 
 <template>
@@ -149,6 +151,8 @@ const saveProfile = async () => {
       v-model:search="search"
       v-model:status-filter="statusFilter"
       v-model:pagination="pagination"
+      table-id="agency.transfer-payments"
+      :preference-filters="preferenceFilters"
       :data="items"
       :columns="columns"
       :total-records="totalRecords"

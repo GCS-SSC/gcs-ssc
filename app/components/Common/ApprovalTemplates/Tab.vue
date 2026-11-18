@@ -160,6 +160,7 @@ const deleteTemplate = async (templateId: string) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="common.approval-templates.tab"
       :data="tableRows"
       :columns="columns"
       :total-records="totalRecords"

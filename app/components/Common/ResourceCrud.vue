@@ -9,12 +9,16 @@ import { useId, useSlots, watch, type Ref } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import type { TableFilterBindings } from '~/composables/useTablePreferences'
 import type { EnumKey } from '~/types/enums'
 
 const {
   action,
   deleteEligible,
   title,
+  tableId,
+  preferenceFilters,
+  preferenceStatusOptions,
   fetchUrl,
   staticItems,
   staticMode = false,
@@ -52,6 +56,9 @@ const {
   action: ResourceCrudAction
   deleteEligible?: (row: T) => boolean
   title: string
+  tableId?: string
+  preferenceFilters?: TableFilterBindings
+  preferenceStatusOptions?: readonly string[]
   icon: string
   fetchUrl: string
   staticItems?: T[]
@@ -206,6 +213,9 @@ defineExpose({
       v-model:search="search"
       v-model:status-filter="statusFilter"
       v-model:pagination="pagination"
+      :table-id="tableId"
+      :preference-filters="preferenceFilters"
+      :preference-status-options="preferenceStatusOptions"
       :status-enum-name="statusEnumName"
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"

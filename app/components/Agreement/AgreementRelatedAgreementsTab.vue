@@ -91,6 +91,7 @@ const bilingualColumns: BilingualColumnConfig<RelatedAgreement>[] = [
 
 <template>
   <CommonResourceCrud
+    table-id="agreement.related-agreements"
     :action="resourceAction"
     class="w-full"
     data-field-scope="agreement.related-agreements"

@@ -89,7 +89,8 @@ const created = async (id: string) => {
     </p>
     <section data-help-target="casework.account-receivable.collection.records">
       <CommonResourceLayout
-        v-model:search="search" v-model:pagination="pagination"
+        v-model:search="search"
+        v-model:pagination="pagination" table-id="account-receivable.collection"
         help-add-target="casework.account-receivable.collection.add" help-search-target="casework.account-receivable.collection.search"
         :data="tableRows" :columns="columns" :total-records="totalRecords"
         :request-status="status" :loading="status === 'pending'"

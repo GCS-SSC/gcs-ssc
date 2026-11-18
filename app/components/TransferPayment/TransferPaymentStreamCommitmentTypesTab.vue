@@ -91,6 +91,7 @@ onScopeDispose(() => {
   <CommonResourceLayout
     v-model:search="search"
     v-model:pagination="pagination"
+    table-id="transfer-payment.stream-commitment-types"
     :title="t('transfer_payment.commitment_types.title')"
     :data="items"
     :columns="columns"

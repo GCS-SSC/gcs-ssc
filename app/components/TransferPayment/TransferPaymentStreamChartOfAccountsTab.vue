@@ -85,6 +85,7 @@ const onDelete = async (id: string) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="transfer-payment.stream-chart-of-accounts"
       :title="t('transfer_payment.chart_of_accounts.title')"
       :data="items"
       :total-records="totalRecords"

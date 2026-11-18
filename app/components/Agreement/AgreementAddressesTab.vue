@@ -134,6 +134,7 @@ const getAddressTypeLookupUrl = (state: FundingCaseAgreementAddressForm) => {
 
 <template>
   <CommonResourceCrud
+    table-id="agreement.addresses"
     :action="resourceAction"
     class="w-full"
     :title="t('agreement.addresses.title')"

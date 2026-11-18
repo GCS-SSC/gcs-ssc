@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
+import { tableFilter } from '~/composables/useTablePreferences'
+import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
+import { AUDIT_OPERATION_VALUES, ACCESS_OUTCOME_VALUES } from '~~/shared/types/audit-filter-options'
 import type { AuditLogFilters } from '~/components/Admin/AuditLogFilters.vue'
 import type { AuditDetail, AuditSummary } from '~~/shared/types/schemas/audit'
 
@@ -9,6 +12,18 @@ const title = computed(() => t(kind === 'events' ? 'audit.title' : 'audit.access
 const description = computed(() => t(kind === 'events' ? 'audit.description' : 'audit.accessDescription'))
 const panelId = computed(() => kind === 'events' ? 'admin-audit' : 'admin-access')
 const filters: Ref<AuditLogFilters> = ref({ actor: '', table: '', recordId: '', operation: '', requestId: '', from: '', to: '' })
+const filterModel = (key: keyof AuditLogFilters) => computed({
+  get: () => filters.value[key],
+  set: value => { filters.value[key] = value }
+})
+const isAuditDate = (value: string) => value === '' || (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(value) && Number.isFinite(Date.parse(value)))
+const preferenceFilters = {
+  actor: tableFilter(filterModel('actor'), '', undefined, value => value === '' || PositivePostgresBigintIdSchema.safeParse(value).success),
+  table: tableFilter(filterModel('table'), ''),
+  operation: tableFilter(filterModel('operation'), '', () => kind === 'access' ? ACCESS_OUTCOME_VALUES : AUDIT_OPERATION_VALUES),
+  from: tableFilter(filterModel('from'), '', undefined, isAuditDate),
+  to: tableFilter(filterModel('to'), '', undefined, isAuditDate)
+}
 const query = computed(() => ({
   ...Object.fromEntries(Object.entries(filters.value).filter(([, value]) => value !== '').map(([key, value]) =>
     [key, key === 'from' || key === 'to' ? new Date(value).toISOString() : value]))
@@ -110,14 +125,16 @@ const isHeroCollapsed = getHeroCollapsed(panelId.value)
           :description="kind === 'access' ? t('audit.accessWindow') : undefined" />
         <UButton v-if="retentionError" :label="t('audit.retry')" @click="refreshRetention()" />
       </div>
-      <AdminAuditAccessHistory v-if="kind === 'access'" :query="query" :context-key="permissionRevision" @select="openDetail">
+      <AdminAuditAccessHistory v-if="kind === 'access'" :query="query" :context-key="permissionRevision" :preference-filters="preferenceFilters" @select="openDetail">
         <template #filters>
           <AdminAuditLogFilters v-model="filters" data-field-container="Composite editor; its individual field declarations own their identities." :kind="kind" />
         </template>
       </AdminAuditAccessHistory>
       <CommonResourceLayout
         v-else
-        v-model:pagination="pagination" layout="page"
+        v-model:pagination="pagination"
+        table-id="admin.audit-events"
+        :preference-filters="preferenceFilters" layout="page"
         :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-search="false" :show-button="false" @retry="refresh()">
         <template #filters>
           <AdminAuditLogFilters v-model="filters" data-field-container="Composite editor; its individual field declarations own their identities." :kind="kind" />

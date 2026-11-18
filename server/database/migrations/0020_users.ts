@@ -49,6 +49,7 @@ CREATE TABLE "user" (
   "createdAt" timestamp without time zone NOT NULL,
   "updatedAt" timestamp without time zone NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
+  "tablePreferences" jsonb DEFAULT '{}'::jsonb NOT NULL,
   CONSTRAINT "user_email_key" UNIQUE (email),
   CONSTRAINT "user_pkey" PRIMARY KEY (id)
 );

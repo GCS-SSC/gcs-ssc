@@ -183,6 +183,7 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
   <CommonResourceLayout
     v-model:search="linkedSearch"
     v-model:pagination="linkedPagination"
+    table-id="funding-opportunity.setup-relationships-tab"
     :data="linkedPage"
     :columns="columns"
     :bilingual-columns="[...bilingualColumns]"

@@ -280,7 +280,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await installForeignKeys(db)
   await installTriggers(db)
   await sql`INSERT INTO audit.capture_policy(table_schema, table_name, excluded_columns, enabled)
-    VALUES ('audit', 'capture_policy', '{}', true), ('audit', 'security_audit_event', '{}', true)`.execute(db)
+    VALUES ('audit', 'capture_policy', '{}', true), ('audit', 'security_audit_event', '{}', true),
+           ('public', 'user', ARRAY['tablePreferences'], true)`.execute(db)
   await sql`DO $reconcile$ DECLARE previous text := current_setting('app.audit_maintenance', true); BEGIN
     PERFORM set_config('app.audit_maintenance', 'on', true);
     PERFORM audit.reconcile_capture();

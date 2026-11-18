@@ -2,9 +2,11 @@
 /* eslint-disable jsdoc/require-jsdoc -- local table helpers are self-documenting and not public APIs */
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import { tableFilter } from '~/composables/useTablePreferences'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 import type { ResourceTableStatus } from '~~/shared/types/resource-table'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 
 const {
   profiles,
@@ -42,6 +44,10 @@ const availabilityItems = computed(() => [
   { label: t('common.active'), value: 'active' },
   { label: t('common.inactive'), value: 'inactive' }
 ])
+const preferenceFilters = {
+  scope: tableFilter(listView, 'all', undefined, value => AssignedListViewSchema.safeParse(value).success),
+  status: tableFilter(statusFilter, 'all', availabilityItems)
+}
 
 const columns: TableColumnInput<ApplicantRecipientProfileRow>[] = [
   { accessorKey: 'id', headerKey: 'common.id' },
@@ -80,7 +86,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
 <template>
   <section data-help-view="proponents.list" data-help-target="proponents.list.records" data-help-kind="section" class="flex w-full min-w-0 flex-col">
     <CommonResourceLayout
-      v-model:search="search" v-model:status-filter="statusFilter" v-model:pagination="pagination" layout="page" help-search-target="proponents.list.search"
+      v-model:search="search" v-model:status-filter="statusFilter" v-model:pagination="pagination" table-id="proponents.list" layout="page" help-search-target="proponents.list.search"
       help-add-target="proponents.list.add"
 
       :data="profiles"
@@ -90,14 +96,17 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
       :loading="loading"
       :request-status="requestStatus"
       :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+      :preference-filters="preferenceFilters"
       :button-label="t('applicant_recipient.new')"
       :show-button="canCreate"
       data-field-scope="applicant-recipient.profiles-table"
       @add="emit('add')" @retry="emit('retry')">
       <template #filters>
-        <slot name="filters" />
         <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" data-ui-target="proponents.list-view" resource="applicant_recipient" />
         <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="applicant-recipient.profiles-table.statusFilter" />
+      </template>
+      <template #actions>
+        <slot name="actions" />
       </template>
       <template #id-cell="{ row }">
         <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">

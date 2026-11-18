@@ -275,6 +275,7 @@ const deleteMonitor = async (monitorId: string) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agreement.monitors"
       :data="monitors"
       :columns="columns"
       :total-records="monitors.length"

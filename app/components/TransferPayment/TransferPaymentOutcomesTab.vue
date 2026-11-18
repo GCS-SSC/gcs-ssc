@@ -186,6 +186,7 @@ const deleteOutcome = async (item: TransferPaymentOutcomeRow) => {
     <CommonResourceLayout
       v-model:search="outcomeSearch"
       v-model:pagination="outcomePagination"
+      table-id="transfer-payment.outcomes"
       :data="outcomes"
       :columns="outcomeColumns"
       :bilingual-columns="outcomeBilingualColumns"

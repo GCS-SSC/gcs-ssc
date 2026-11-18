@@ -35,6 +35,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.cost-category-line-items"
     :action="action"
     :title="t('agency.tabs.budget_line_items')"
     icon="i-lucide-list-checks"

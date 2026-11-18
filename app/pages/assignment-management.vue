@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import type { ComputedRef, Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { AssignableEntityType } from '~~/shared/types/database'
@@ -61,6 +62,7 @@ const columns: TableColumnInput<Row>[] = [
   { id: 'count', accessorKey: 'assignee_count', headerKey: 'assignment_management.assignee_count' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
+const preferenceFilters = { entityType: tableFilter(entityType, 'all', () => ASSIGNABLE_ENTITY_TYPE_ENUM) }
 </script>
 
 <template>
@@ -92,7 +94,9 @@ const columns: TableColumnInput<Row>[] = [
           :stats="heroStats" />
         <CommonResourceLayout
           v-model:search="search"
-          v-model:pagination="pagination" layout="page"
+          v-model:pagination="pagination"
+          table-id="assignment-management"
+          :preference-filters="preferenceFilters" layout="page"
           :columns="columns"
           :data="items"
           :total-records="totalRecords"

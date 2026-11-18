@@ -203,6 +203,7 @@ const onDelete = async (id: string) => {
   <div class="space-y-4">
     <CommonResourceLayout
       v-model:pagination="pagination"
+      table-id="transfer-payment.financial-limits"
       :title="t('transfer_payment.financial_limits')"
       :data="items"
       :total-records="totalRecords"

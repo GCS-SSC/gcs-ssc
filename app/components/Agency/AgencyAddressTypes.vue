@@ -26,6 +26,7 @@ const action: ResourceCrudAction = {
 <template>
   <section data-help-view="agency.address-types" data-field-scope="agency.address-types">
     <CommonResourceCrud
+      table-id="agency.address-types"
       :action="action"
       help-add-target="agency.address-types.add"
       help-save-target="agency.address-types.save"

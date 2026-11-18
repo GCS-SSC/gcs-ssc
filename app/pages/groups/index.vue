@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- Page-local request and form handlers are clear from their names. */
+import { tableFilter } from '~/composables/useTablePreferences'
 import type { Ref } from 'vue'
 import { nextTick, onBeforeUnmount } from 'vue'
 import { useActionContext } from '~/composables/useActionContext'
@@ -306,6 +307,7 @@ const removeMember = async (group: Group, member: Member) => {
     if (!disposed) removingMemberIds.value = removingMemberIds.value.filter(id => id !== rowId)
   }
 }
+const preferenceFilters = { agency: tableFilter(selectedAgency, 'all', agencyOptions) }
 </script>
 
 <template>
@@ -313,7 +315,9 @@ const removeMember = async (group: Group, member: Member) => {
     <template #body>
       <div class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-users" :title="t('groups.title')" :description="t('groups.description')" :stats="heroStats" />
-        <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" layout="page" :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('common.add')" :get-row-id="(row: GroupRow) => row.id" @add="openCreate" @retry="refreshGroups">
+        <CommonResourceLayout
+          v-model:search="search"
+          v-model:pagination="pagination" table-id="groups.list" :preference-filters="preferenceFilters" layout="page" :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('common.add')" :get-row-id="(row: GroupRow) => row.id" @add="openCreate" @retry="refreshGroups">
           <template #filters>
             <USelect v-model="selectedAgency" data-ui-target="groups.selected-agency" :items="agencyOptions" :aria-label="t('groups.agency_filter')" class="min-w-48" />
           </template>

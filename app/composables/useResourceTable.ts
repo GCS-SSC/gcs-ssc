@@ -77,7 +77,7 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
     return fetchUrl.value.length > 0
   })
   const resourceIdentity = computed(() =>
-    `${fetchUrl.value}\u0000${stableSerialize(staticQuery.value)}\u0000${unref(options.contextKey) ?? ''}`
+    `${fetchUrl.value}\u0000${stableSerialize(staticQuery.value)}\u0000${unref(options.contextKey) ?? ''}\u0000${stableSerialize(options.headers?.value)}`
   )
 
   const query = computed(() => ({
@@ -107,6 +107,7 @@ export const useResourceTable = <T>(options: UseResourceTableOptions): ResourceT
   } = useFetch<ListResponse<T>, FetchError, string>(fetchUrl, {
     key: fetchKey,
     query,
+    headers: options.headers,
     immediate: initialRequest.canFetch,
     watch: false
   })

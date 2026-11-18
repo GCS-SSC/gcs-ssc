@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -53,13 +54,16 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
     accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' }
   }
 ]
+const preferenceFilters = { status: tableFilter(statusFilter, 'all', availabilityItems) }
 </script>
 
 <template>
   <CommonResourceLayout
     v-model:search="search"
     v-model:status-filter="statusFilter"
-    v-model:pagination="pagination" layout="page"
+    v-model:pagination="pagination"
+    table-id="agencies.list"
+    :preference-filters="preferenceFilters" layout="page"
     :data="agencies"
     :columns="columns"
     :bilingual-columns="bilingualColumns"

@@ -26,6 +26,7 @@ const action: ResourceCrudAction = {
 <template>
   <section data-field-scope="agency.agreement-relationship-types">
     <CommonResourceCrud
+      table-id="agency.agreement-relationship-types"
       :action="action"
       :title="t('agency.tabs.agreement_relationship_types')"
       icon="i-lucide-link"

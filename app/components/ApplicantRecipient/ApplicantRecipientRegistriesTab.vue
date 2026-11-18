@@ -42,6 +42,7 @@ const columns: TableColumnInput<ApplicantRecipientRegistryRow>[] = [
 <template>
   <section data-help-target="proponent.registries.content" data-help-kind="section" data-help-view="proponent.registries" class="flex w-full min-w-0 flex-col">
     <CommonResourceCrud
+      table-id="applicant-recipient.registries"
       :action="resourceAction"
       help-search-target="proponent.registries.search" help-save-target="proponent.registries.save" help-add-target="proponent.registries.add"
       class="w-full"

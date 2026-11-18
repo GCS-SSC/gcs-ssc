@@ -48,6 +48,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.account-receivable-types"
     :action="action"
     :title="t('agency.tabs.account_receivable_types')" icon="i-lucide-tags"
     :fetch-url="`/api/agency/${agencyId}/account-receivable-types`"

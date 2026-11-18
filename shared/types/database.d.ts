@@ -10,6 +10,7 @@ import type {
   RuntimeState
 } from '../constants/system-lifecycle'
 import type { TransferPaymentBudgetFundingMode } from './schemas/transfer-payment'
+import type { TablePreferences } from './schemas/table-preferences'
 import type { StatusId } from './status'
 import type { PaymentEvidence } from './payment-evidence'
 
@@ -610,6 +611,7 @@ export interface UserTable {
   createdAt: Date
   updatedAt: Date
   _deleted: Generated<boolean>
+  tablePreferences: Generated<TablePreferences>
 }
 
 export interface SessionTable {

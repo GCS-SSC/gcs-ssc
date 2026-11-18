@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { useActionContext } from '~/composables/useActionContext'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -224,6 +225,7 @@ onBeforeUnmount(() => {
   disposed = true
   contextGeneration += 1
 })
+const preferenceFilters = { status: tableFilter(streamStatus, 'all', availabilityItems) }
 </script>
 
 <template>
@@ -232,6 +234,8 @@ onBeforeUnmount(() => {
       v-model:search="streamSearch"
       v-model:status-filter="streamStatus"
       v-model:pagination="streamPagination"
+      table-id="transfer-payment.streams"
+      :preference-filters="preferenceFilters"
       :data="streams"
       :columns="streamColumns"
       :bilingual-columns="streamBilingualColumns"

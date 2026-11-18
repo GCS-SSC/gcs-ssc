@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { tableFilter } from '~/composables/useTablePreferences'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -50,13 +51,16 @@ const columns: TableColumnInput<TransferPaymentProfileRow>[] = [
   { accessorKey: 'egcs_tp_active', headerKey: 'transfer_payment.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
+const preferenceFilters = { status: tableFilter(statusFilter, 'all', availabilityItems) }
 </script>
 
 <template>
   <CommonResourceLayout
     v-model:search="search"
     v-model:status-filter="statusFilter"
-    v-model:pagination="pagination" layout="page"
+    v-model:pagination="pagination"
+    table-id="transfer-payments.list"
+    :preference-filters="preferenceFilters" layout="page"
     :data="profiles"
     :columns="columns"
     :total-records="totalRecords"

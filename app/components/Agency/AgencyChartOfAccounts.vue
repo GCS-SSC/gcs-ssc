@@ -42,6 +42,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.chart-of-accounts"
     :action="action"
     :title="t('agency.tabs.chart_of_accounts')"
     icon="i-lucide-table-properties"

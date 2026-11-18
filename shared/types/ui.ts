@@ -23,13 +23,15 @@ export interface ConfirmDialogOptions {
 
 export interface ColumnVisibilityItem {
   id: string
-  columnDef: { header?: string | unknown }
+  columnDef: { header?: unknown }
+  columns: ColumnVisibilityItem[]
   getCanHide: () => boolean
   getIsVisible: () => boolean
 }
 
 export interface TableApiLike {
-  getAllColumns: () => ColumnVisibilityItem[]
+  getAllFlatColumns: () => ColumnVisibilityItem[]
+  getAllLeafColumns: () => ColumnVisibilityItem[]
   getColumn: (id: string) => { toggleVisibility: (visible: boolean) => void } | undefined
 }
 

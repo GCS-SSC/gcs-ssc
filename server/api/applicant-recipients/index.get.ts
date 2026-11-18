@@ -8,6 +8,7 @@ import { resolveApplicantRecipientMutationPermissions, resolveApplicantRecipient
 import { forbidden } from '~~/server/utils/api-errors'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
+import { recentRecordRank, readRecentRecordIds } from '~~/server/utils/recent-record-order'
 
 const ApplicantRecipientPaginationSchema = PaginationSchema.extend({
   list_view: AssignedListViewSchema,
@@ -35,6 +36,7 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
   }
 
   const { page, limit, search, status, agency_id, list_view } = await getValidatedQueryI18n(event, ApplicantRecipientPaginationSchema)
+  const recentIds = await readRecentRecordIds(event, 'proponent')
   const offset = (page - 1) * limit
 
   let baseQuery = db
@@ -101,6 +103,7 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
         'Agency_Profile.egcs_ay_name_en as lead_agency_name_en',
         'Agency_Profile.egcs_ay_name_fr as lead_agency_name_fr'
       ])
+      .$if(recentIds.length > 0, query => query.orderBy(eb => recentRecordRank(eb.ref('Applicant_Recipient_Profile.id'), recentIds), 'asc'))
       .orderBy('Applicant_Recipient_Profile.id', 'asc')
       .limit(limit)
       .offset(offset)

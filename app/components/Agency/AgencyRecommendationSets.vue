@@ -315,6 +315,7 @@ const onDeleteMember = async (row: RecommendationRow) => {
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="agency.recommendation-sets"
       :data="tableRows"
       :columns="columns"
       :bilingual-columns="bilingualColumns"

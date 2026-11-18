@@ -7,8 +7,10 @@ import { getPaginationRowModel } from '@tanstack/table-core'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import { tableFilter } from '~/composables/useTablePreferences'
 import type { FundingHistoryRow, VisibleFundingHistoryRow } from '~/types/funding-history'
 import { appRouteLocations } from '~/utils/route-locations'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const {
@@ -40,13 +42,11 @@ onBeforeUnmount(() => {
   disposed = true
 })
 const listView = ref('all')
+const preferenceFilters = { listView: tableFilter(listView, 'all', undefined, value => AssignedListViewSchema.safeParse(value).success) }
 watch(canFilterAgreements, (allowed, previouslyAllowed) => {
   if (previouslyAllowed && !allowed && listView.value !== 'all') listView.value = 'all'
 }, { flush: 'sync' })
-watch(() => applicantRecipientId, () => {
-  listView.value = 'all'
-})
-const listViewQuery = computed(() => ({ list_view: listView.value }))
+const listViewQuery = computed(() => ({ list_view: canFilterAgreements.value ? listView.value : 'all' }))
 
 const {
   search,
@@ -60,7 +60,7 @@ const {
   fetchUrl: fundingHistoryUrl
 })
 
-watch(listView, () => {
+watch([listViewQuery, () => applicantRecipientId], () => {
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
 
@@ -244,11 +244,13 @@ const visibleRows = computed(() => items.value)
     </div>
 
     <CommonResourceLayout
-      v-model:search="search" v-model:pagination="pagination"
+      v-model:search="search"
+      v-model:pagination="pagination" table-id="applicant-recipient.funding-history"
       help-add-target="proponent.funding-history.add"
       help-search-target="proponent.funding-history.search"
       :data="visibleRows"
       :columns="columns"
+      :preference-filters="preferenceFilters"
       :total-records="totalRecords"
       :loading="status === 'pending'"
       :request-status="status"

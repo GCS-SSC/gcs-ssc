@@ -89,7 +89,8 @@ const buttonLabel: ComputedRef<string | undefined> = computed(() => (canCreate ?
 <template>
   <CommonResourceLayout
     v-model:search="search"
-    v-model:pagination="pagination" layout="page"
+    v-model:pagination="pagination"
+    table-id="role.table" layout="page"
     :columns="columns"
     :data="visibleRoles"
     :bilingual-columns="bilingualColumns"

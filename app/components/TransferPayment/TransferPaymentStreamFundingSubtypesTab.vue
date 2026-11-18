@@ -168,6 +168,7 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
+      table-id="transfer-payment.stream-funding-subtypes"
       :data="pageItems"
       :columns="columns"
       :total-records="filteredItems.length"

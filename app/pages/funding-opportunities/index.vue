@@ -93,7 +93,7 @@ const submit = async () => {
   <CommonDetailPage id="funding-opportunities" v-model:collapsed="isHeroCollapsed" :title="t('funding_opportunity.title')">
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="t('funding_opportunity.title')" :description="t('funding_opportunity.description')" />
-      <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" layout="page" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('funding_opportunity.create')" @add="openCreate" @retry="retry">
+      <CommonResourceLayout v-model:search="search" v-model:pagination="pagination" table-id="funding-opportunities.list" layout="page" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('funding_opportunity.create')" @add="openCreate" @retry="retry">
         <template #egcs_fo_name_en-cell="{ row }">
           <CommonBilingualName :name-en="row.original.egcs_fo_name_en" :name-fr="row.original.egcs_fo_name_fr" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
         </template>

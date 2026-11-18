@@ -404,6 +404,7 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
                   <CommonResourceLayout
                     v-model:search="search"
                     v-model:pagination="pagination"
+                    table-id="agreement.payment.lines"
                     help-search-target="casework.payments.lines.search"
                     :data="lines"
                     :columns="columns"

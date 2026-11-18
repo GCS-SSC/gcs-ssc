@@ -30,6 +30,7 @@ const action: ResourceCrudAction = {
 
 <template>
   <CommonResourceCrud
+    table-id="agency.monitor-types"
     :action="action"
     :title="t('agency.tabs.monitor_types')"
     icon="i-lucide-clipboard-check"

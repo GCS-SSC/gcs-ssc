@@ -2,6 +2,7 @@
 import { useActionContext } from '~/composables/useActionContext'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { usePageResourceError } from '~/composables/usePageResourceError'
+import { useTrackRecentRecord } from '~/composables/useRecentRecords'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, onBeforeUnmount, ref, toRaw, watch } from 'vue'
@@ -50,7 +51,14 @@ const {
   activeTabProps,
   breadcrumbItems,
   isHeroCollapsed
-} = useApplicantRecipientDetailState(id, { enabled: computed(() => !isChildDetailRoute.value) })
+} = useApplicantRecipientDetailState(id, {
+  enabled: computed(() => !isChildDetailRoute.value),
+  actorId: () => user.value?.id
+})
+useTrackRecentRecord('proponent', () => !isChildDetailRoute.value && status.value === 'success'
+  && String(profile.value?.id) === id
+  ? id
+  : undefined)
 
 usePageResourceError({
   identity: () => route.path,
