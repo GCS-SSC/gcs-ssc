@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import CommonSection from '~/components/Common/Section.vue'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { customFieldHasValue, customFieldOptionIds } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgreementCustomFieldSection, AssignedAgencyCustomFieldDefinition, AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
 
-const { streamId, agreementId, activity, readonly = false, permissionAction = 'create' } = defineProps<{
+const { streamId, agreementId, activity, placement = 'all', readonly = false, permissionAction = 'create' } = defineProps<{
   streamId?: string
   agreementId?: string
   activity?: { agreementId: string; amendmentId?: string }
+  placement?: 'all' | 'profile' | 'configured'
   readonly?: boolean
   permissionAction?: 'create' | 'update' | 'read'
 }>()
@@ -76,8 +78,8 @@ const sections = computed(() => {
   const sectionDefinitions = [...new Map([...historicalSections.value, ...(data.value?.sections ?? [])].map(section => [section.id, section])).values()]
   const grouped = sectionDefinitions.map(section => ({ ...section, fields: fields.value.filter(field => field.egcs_tp_section === section.id) }))
   const unsectioned = fields.value.filter(field => field.egcs_tp_section === null)
-  if (unsectioned.length) grouped.push({ id: 'unsectioned', egcs_tp_name_en: t('custom_fields.title'), egcs_tp_name_fr: t('custom_fields.title'), egcs_tp_displayorder: 0, fields: unsectioned })
-  return grouped.filter(section => section.fields.length)
+  if (placement !== 'configured' && unsectioned.length) grouped.push({ id: 'unsectioned', egcs_tp_name_en: t('custom_fields.title'), egcs_tp_name_fr: t('custom_fields.title'), egcs_tp_displayorder: 0, fields: unsectioned })
+  return grouped.filter(section => section.fields.length && (placement !== 'profile' || section.id === 'unsectioned'))
 })
 const sectionLabel = (value: { egcs_tp_name_en: string, egcs_tp_name_fr: string }) => locale.value === 'fr' ? value.egcs_tp_name_fr : value.egcs_tp_name_en
 const label = (value: { egcs_ay_name_en: string, egcs_ay_name_fr: string }) => locale.value === 'fr' ? value.egcs_ay_name_fr : value.egcs_ay_name_en
@@ -127,8 +129,8 @@ const update = (id: string, value: unknown) => {
 </script>
 
 <template>
-  <div class="space-y-8" data-field-exclude="Agency-defined custom inputs have separate configuration; outside static field help." @focusin="checkCatalogVersions">
-    <UAlert v-if="error || catalogCheckFailed" color="error" :title="t('common.error')">
+  <div v-if="sections.length || (placement !== 'configured' && (error || catalogCheckFailed || (activity && readonly && status === 'success')))" :class="placement === 'profile' ? 'contents' : 'space-y-8'" data-field-exclude="Agency-defined custom inputs have separate configuration; outside static field help." @focusin="checkCatalogVersions">
+    <UAlert v-if="placement !== 'configured' && (error || catalogCheckFailed)" color="error" :class="{ 'col-span-full': placement === 'profile' }" :title="t('common.error')">
       <template #actions>
         <UButton :label="t('common.retry')" @click="retryFields" />
       </template>
@@ -136,7 +138,7 @@ const update = (id: string, value: unknown) => {
     <p v-else-if="activity && readonly && status === 'success' && sections.length === 0" class="text-sm text-muted">
       {{ t('common.not_available') }}
     </p>
-    <CommonSection v-for="(section, index) in sections" :key="section.id" :title="sectionLabel(section)" :badge="activity ? undefined : String(index + 4).padStart(2, '0')" :grid-cols="2">
+    <component :is="placement === 'profile' ? 'div' : CommonSection" v-for="(section, index) in sections" :key="section.id" :title="placement === 'profile' ? undefined : sectionLabel(section)" :badge="activity || placement === 'profile' ? undefined : String(index + 4).padStart(2, '0')" :grid-cols="placement === 'profile' ? undefined : 2" :class="{ contents: placement === 'profile' }" data-field-container="Layout wrapper for Agency-defined custom fields.">
       <div v-for="field in section.fields" :key="field.id" class="space-y-2">
         <CommonValueCard v-if="readonly" :label="label(field)" :value="valueLabel(field) || t('common.not_available')" :sub-value="field.egcs_tp_active ? undefined : t('custom_fields.inactive')" class="whitespace-pre-wrap" />
         <UFormField v-else :label="label(field)" :name="`egcs_fc_customfields.${field.id}`" :description="numberDescription(field)" :required="field.egcs_tp_active && field.egcs_tp_required" :ui="field.egcs_ay_kind === 'relational' ? { labelWrapper: 'justify-start gap-2 mb-1.5', label: 'mb-0', hint: 'flex items-center' } : undefined">
@@ -157,6 +159,6 @@ const update = (id: string, value: unknown) => {
         </UFormField>
         <UButton v-if="!readonly && field.egcs_ay_kind !== 'relational' && customFieldHasValue(model[field.id])" variant="link" color="neutral" :disabled="status === 'pending'" :label="t('custom_fields.clear')" @click="update(field.id, null)" />
       </div>
-    </CommonSection>
+    </component>
   </div>
 </template>

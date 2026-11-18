@@ -512,6 +512,16 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
           :extension-context="agreementDescriptionFrExtensionContext" />
       </UFormField>
 
+      <AgreementFieldsCustomFields
+        v-if="selectedStreamId"
+        :key="`${agreementId ?? 'new'}:${selectedStreamId}`"
+        v-model="model.egcs_fc_customfields"
+        placement="profile"
+        data-field-container="Composite editor; its individual field declarations own their identities."
+        :stream-id="selectedStreamId"
+        :agreement-id="agreementId"
+        :permission-action="permissionAction" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.profile-fields" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général" />
+
       <div class="md:col-span-2">
         <ExtensionSlotHost
           v-if="selectedStreamId"
@@ -635,6 +645,7 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
     v-if="selectedStreamId"
     :key="`${agreementId ?? 'new'}:${selectedStreamId}`"
     v-model="model.egcs_fc_customfields"
+    placement="configured"
     data-field-container="Composite editor; its individual field declarations own their identities."
     :stream-id="selectedStreamId"
     :agreement-id="agreementId"
