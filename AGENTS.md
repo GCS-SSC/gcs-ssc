@@ -10,4 +10,4 @@ The canonical guide owns engineering rules; keep detailed contracts there and in
 
 Author host tests and architecture docs under `tooling/gcs-ssc/`; extension tests belong to the owning extension. Root `tests/`, `architecture/`, and `.agents/skills/gcs-ssc` are generated local links and must never be committed. The `$gcs-ssc` skill is explicit-only; this bootstrap does not invoke its stateful workflows.
 
-Preserve unrelated work. Do not commit unless explicitly authorized. When authorized, commit private tooling changes first, then update the host repository's pinned gitlink.
+Preserve unrelated work. Do not commit unless explicitly authorized. When authorized, follow the canonical [commit workflow](tooling/gcs-ssc/AGENTS.md#commits).
