@@ -75,7 +75,8 @@ export const cloneTaskDefinition = (definition: TaskDefinition, image: string): 
 
 // Command override only: database credentials remain ECS-injected secrets.
 export const databaseTaskScript = `
-import pg from 'pg';
+import { createRequire } from 'node:module';
+const pg = createRequire('/app/.output/server/index.mjs')('pg');
 import { readFileSync } from 'node:fs';
 if (process.env.ENVIRONMENT_TYPE !== 'demo' || process.env.AWS_DB_USER !== 'gcs_ssc') throw new Error('Not the GCS demo database');
 for (const target of [{prefix:'AWS_DB',database:'gcs_ssc',role:'gcs_ssc'}, {prefix:'AWS_ACCESS_DB',database:'gcs_access',role:'gcs_access'}]) {
