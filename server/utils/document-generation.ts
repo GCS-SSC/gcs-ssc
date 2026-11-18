@@ -180,6 +180,8 @@ const buildGeneratedDocumentBaseFilename = (
   return `${agreementNumber}-${templateFilenamePart}-${language}`.replace(/[^a-zA-Z0-9._-]/g, '-')
 }
 
+const agreementActivityTextPath = /^(?:amendment\.)?activities\.\d+\.(?:name|description|expectedResults)$/
+
 export const renderGeneratedAgreementDocument = async (
   event: H3Event,
   template: TemplateRow,
@@ -194,7 +196,10 @@ export const renderGeneratedAgreementDocument = async (
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
   try {
-    return await renderDocument(template.egcs_ay_templatekind, templateBytes, context, language, outputFormat, baseFilename, options)
+    return await renderDocument(template.egcs_ay_templatekind, templateBytes, context, language, outputFormat, baseFilename, {
+      ...options,
+      preserveEmptyValueAt: path => agreementActivityTextPath.test(path)
+    })
   } catch (error) {
     if (error instanceof DocumentRenderBudgetError) {
       return await badRequest(event, 'DOCUMENT_RENDER_LIMIT_EXCEEDED', 'apiErrors.document_generation.render_limit_exceeded')
@@ -357,6 +362,10 @@ export const buildAgreementDocumentContext = async (
 ): Promise<Record<string, unknown>> => {
   const localized = <T extends { en: unknown, fr: unknown }>(value: T): unknown => language === 'fra' ? value.fr : value.en
   const localizedValue = (value: unknown): string => valueOrFallback(value, language)
+  const localizedActivityText = ({ en, fr }: { en: string, fr: string }): string => {
+    const text = language === 'fra' ? fr : en
+    return text.trim() ? text : ''
+  }
   const localizedAddress = (address: Parameters<typeof formatAddress>[0]): string => formatAddress(address, language)
 
   const agreement = await db
@@ -817,9 +826,9 @@ export const buildAgreementDocumentContext = async (
 
       return {
         id: String(activity.id),
-        name: localizedValue(localized({ en: activity.nameEn, fr: activity.nameFr })),
-        description: localizedValue(localized({ en: activity.descriptionEn, fr: activity.descriptionFr })),
-        expectedResults: localizedValue(localized({ en: activity.expectedResultsEn, fr: activity.expectedResultsFr })),
+        name: localizedActivityText({ en: activity.nameEn, fr: activity.nameFr }),
+        description: localizedActivityText({ en: activity.descriptionEn, fr: activity.descriptionFr }),
+        expectedResults: localizedActivityText({ en: activity.expectedResultsEn, fr: activity.expectedResultsFr }),
         startDate: localizedValue(activity.startDate),
         endDate: localizedValue(activity.endDate),
         responsibleParties,

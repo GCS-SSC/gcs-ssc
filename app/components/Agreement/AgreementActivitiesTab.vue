@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { useActionContext } from '~/composables/useActionContext'
 import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
-import { computed, onUnmounted, watch } from 'vue'
+import { computed, onUnmounted, useId, watch } from 'vue'
 import { useAgreementChildActionPrerequisites, type AgreementChildActionTarget } from '~/composables/useAgreementChildActionPrerequisites'
 import type { FundingCaseAgreementActivityForm, FundingCaseAgreementActivityRow } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementActivityCreateSchema } from '~~/shared/types/schemas'
 import { createAgreementActivitySchema } from '~~/shared/types/schemas/agreement-activity'
 import { parseDate } from '@internationalized/date'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import CommonEitherLanguage from '~/components/Common/EitherLanguage.vue'
+import ActivityBilingualText from './ActivityBilingualText.vue'
 import AgreementActivityOutcomesField from './Fields/AgreementActivityOutcomesField.vue'
 import AgreementActivityResponsiblePartiesField from './Fields/AgreementActivityResponsiblePartiesField.vue'
 
@@ -27,6 +29,7 @@ const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, ac
 }>()
 
 const { t } = useI18n()
+const languageInstructionId = useId()
 const dateValue = (date: string | Date) => typeof date === 'string' ? new Date(date) : date
 const activitySchema = computed(() => dateRange
   ? createAgreementActivitySchema({
@@ -154,13 +157,15 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     :modal-ui="{ content: 'rounded-none shadow-none ring-0' }"
     :search-placeholder="t('agreement.activities.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.activities-tab" data-scope-label-en="Agreements > Activities" data-scope-label-fr="Ententes > Activités" data-help-view="agreement.activities" data-help-label-en="Agreements — Activities" data-help-label-fr="Ententes — Activités" data-help-target="agreement.activities.content" data-help-kind="section" help-save-target="agreement.activities.save" help-add-target="agreement.activities.add" help-search-target="agreement.activities.search">
     <template #name-cell="{ row }">
-      <div class="space-y-1 py-1">
-        <CommonBilingualName
-          :name-en="toActivityRow(row.original).egcs_fc_name_en"
-          :name-fr="toActivityRow(row.original).egcs_fc_name_fr" />
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">
-          {{ getBilingualValue(toActivityRow(row.original), 'egcs_fc_description', '') }}
-        </p>
+      <div class="flex min-w-0 flex-col gap-1">
+        <ActivityBilingualText
+          class="text-sm font-bold text-zinc-900 dark:text-white"
+          :english="row.original.egcs_fc_name_en"
+          :french="row.original.egcs_fc_name_fr" />
+        <ActivityBilingualText
+          class="text-xs text-muted"
+          :english="row.original.egcs_fc_description_en"
+          :french="row.original.egcs_fc_description_fr" />
       </div>
     </template>
 
@@ -173,9 +178,10 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     </template>
 
     <template #expected_results-cell="{ row }">
-      <span class="text-sm text-zinc-500 dark:text-zinc-400">
-        {{ getBilingualValue(toActivityRow(row.original), 'egcs_fc_expectedresults', '') }}
-      </span>
+      <ActivityBilingualText
+        class="text-sm text-zinc-500 dark:text-zinc-400"
+        :english="row.original.egcs_fc_expectedresults_en"
+        :french="row.original.egcs_fc_expectedresults_fr" />
     </template>
 
     <template #flags-cell="{ row }">
@@ -201,54 +207,98 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     </template>
 
     <template #form="{ state }">
-      <div class="grid gap-4 lg:grid-cols-2">
-        <UFormField :label="t('agreement.activities.name_en')" name="egcs_fc_name_en">
-          <UInput v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_name_en" />
-        </UFormField>
+      <div class="space-y-6">
+        <div class="grid gap-4 lg:grid-cols-2">
+          <UFormField :label="t('agreement.activities.start_date')" name="egcs_fc_startdate">
+            <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_startdate" :min-value="minDate" :max-value="maxDate" />
+          </UFormField>
 
-        <UFormField :label="t('agreement.activities.name_fr')" name="egcs_fc_name_fr">
-          <UInput v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_name_fr" />
-        </UFormField>
+          <UFormField :label="t('agreement.activities.end_date')" name="egcs_fc_enddate">
+            <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_enddate" :min-value="minDate" :max-value="maxDate" />
+          </UFormField>
 
-        <UFormField :label="t('agreement.activities.start_date')" name="egcs_fc_startdate">
-          <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_startdate" :min-value="minDate" :max-value="maxDate" />
-        </UFormField>
+          <div>
+            <AgreementActivityResponsiblePartiesField
+              v-model:model="(state as FundingCaseAgreementActivityForm).responsible_party_ids"
+              :agreement-id="agreementId"
+              :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
+              :permission-action="state.id ? 'update' : 'create'" />
+          </div>
 
-        <UFormField :label="t('agreement.activities.end_date')" name="egcs_fc_enddate">
-          <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_enddate" :min-value="minDate" :max-value="maxDate" />
-        </UFormField>
-
-        <div>
-          <AgreementActivityResponsiblePartiesField
-            v-model:model="(state as FundingCaseAgreementActivityForm).responsible_party_ids"
-            :agreement-id="agreementId"
-            :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
-            :permission-action="state.id ? 'update' : 'create'" />
+          <div>
+            <AgreementActivityOutcomesField
+              v-model:model="(state as FundingCaseAgreementActivityForm).outcome_ids"
+              :agreement-id="agreementId"
+              :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
+              :permission-action="state.id ? 'update' : 'create'" />
+          </div>
         </div>
 
-        <div>
-          <AgreementActivityOutcomesField
-            v-model:model="(state as FundingCaseAgreementActivityForm).outcome_ids"
-            :agreement-id="agreementId"
-            :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
-            :permission-action="state.id ? 'update' : 'create'" />
+        <p :id="languageInstructionId" class="text-sm text-muted">
+          {{ t('agreement.activities.language_instruction') }}
+        </p>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+          <fieldset class="min-w-0 space-y-4">
+            <legend class="mb-2 font-semibold">
+              {{ t('agreement.activities.english') }}
+            </legend>
+
+            <UFormField :label="t('agreement.activities.name_en')" name="egcs_fc_name_en">
+              <template #label>
+                {{ t('agreement.activities.name_en') }}
+                <CommonEitherLanguage fields="egcs_fc_name_en egcs_fc_name_fr" />
+              </template>
+              <UInput v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_name_en" :aria-describedby="languageInstructionId" class="w-full" />
+            </UFormField>
+
+            <UFormField :label="t('agreement.activities.description_en')" name="egcs_fc_description_en">
+              <template #label>
+                {{ t('agreement.activities.description_en') }}
+                <CommonEitherLanguage fields="egcs_fc_description_en egcs_fc_description_fr" />
+              </template>
+              <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_description_en" :aria-describedby="languageInstructionId" class="w-full" :rows="4" />
+            </UFormField>
+
+            <UFormField :label="t('agreement.activities.expected_results_en')" name="egcs_fc_expectedresults_en">
+              <template #label>
+                {{ t('agreement.activities.expected_results_en') }}
+                <CommonEitherLanguage fields="egcs_fc_expectedresults_en egcs_fc_expectedresults_fr" />
+              </template>
+              <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_expectedresults_en" :aria-describedby="languageInstructionId" class="w-full" :rows="4" />
+            </UFormField>
+          </fieldset>
+
+          <fieldset class="min-w-0 space-y-4">
+            <legend class="mb-2 font-semibold">
+              {{ t('agreement.activities.french') }}
+            </legend>
+
+            <UFormField :label="t('agreement.activities.name_fr')" name="egcs_fc_name_fr">
+              <template #label>
+                {{ t('agreement.activities.name_fr') }}
+                <CommonEitherLanguage fields="egcs_fc_name_en egcs_fc_name_fr" />
+              </template>
+              <UInput v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_name_fr" :aria-describedby="languageInstructionId" class="w-full" />
+            </UFormField>
+
+            <UFormField :label="t('agreement.activities.description_fr')" name="egcs_fc_description_fr">
+              <template #label>
+                {{ t('agreement.activities.description_fr') }}
+                <CommonEitherLanguage fields="egcs_fc_description_en egcs_fc_description_fr" />
+              </template>
+              <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_description_fr" :aria-describedby="languageInstructionId" class="w-full" :rows="4" />
+            </UFormField>
+
+            <UFormField :label="t('agreement.activities.expected_results_fr')" name="egcs_fc_expectedresults_fr">
+              <template #label>
+                {{ t('agreement.activities.expected_results_fr') }}
+                <CommonEitherLanguage fields="egcs_fc_expectedresults_en egcs_fc_expectedresults_fr" />
+              </template>
+              <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_expectedresults_fr" :aria-describedby="languageInstructionId" class="w-full" :rows="4" />
+            </UFormField>
+          </fieldset>
         </div>
-
-        <UFormField :label="t('agreement.activities.description_en')" name="egcs_fc_description_en">
-          <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_description_en" :rows="4" />
-        </UFormField>
-
-        <UFormField :label="t('agreement.activities.description_fr')" name="egcs_fc_description_fr">
-          <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_description_fr" :rows="4" />
-        </UFormField>
-
-        <UFormField :label="t('agreement.activities.expected_results_en')" name="egcs_fc_expectedresults_en">
-          <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_expectedresults_en" :rows="4" />
-        </UFormField>
-
-        <UFormField :label="t('agreement.activities.expected_results_fr')" name="egcs_fc_expectedresults_fr">
-          <CommonTextarea v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_expectedresults_fr" :rows="4" />
-        </UFormField>
       </div>
     </template>
   </CommonResourceCrud>

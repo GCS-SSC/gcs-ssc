@@ -27,6 +27,7 @@ let pdfBrowserPromise: Promise<Browser> | null = null
 const pdfBrowserWaiters = new Map<Promise<Browser>, number>()
 
 export interface DocumentRenderingOptions {
+  preserveEmptyValueAt?: (path: string) => boolean
   chromiumCleanupTimeoutMs?: number
   chromiumRenderBudgetMs?: number
   libreOfficeConversionTimeoutMs?: number
@@ -145,10 +146,15 @@ const renderHtmlTemplate = (
   template: string,
   context: Record<string, unknown>,
   language: Language_Preference = 'eng',
+  preserveEmptyValueAt?: DocumentRenderingOptions['preserveEmptyValueAt'],
   budget = createHtmlRenderBudget(),
-  depth = 1
+  depth = 1,
+  loopItemPath?: string
 ): string => {
   budget.inspectTemplate(template, depth)
+  const absolutePath = (key: string): string =>
+    loopItemPath && key.startsWith('this.') ? `${loopItemPath}.${key.slice(5)}` : key
+
   const withLoops = template.replace(/\{\{\s*#\s*([\w.]+)\s*}}([\s\S]*?)\{\{\s*\/\s*\1\s*}}/g, (_match, key: string, body: string) => {
     const values = getPathValue(context, key)
     if (!Array.isArray(values) || values.length === 0) {
@@ -156,11 +162,14 @@ const renderHtmlTemplate = (
     }
 
     budget.inspectSection(values.length)
-    return values.map(item => renderHtmlTemplate(body, { ...context, this: item }, language, budget, depth + 1)).join('')
+    return values.map((item, index) =>
+      renderHtmlTemplate(body, { ...context, this: item }, language, preserveEmptyValueAt, budget, depth + 1, `${absolutePath(key)}.${index}`)
+    ).join('')
   })
 
   return withLoops.replace(/\{\{\s*([\w.]+)\s*}}/g, (_match, key: string) => {
-    const text = valueOrFallback(getPathValue(context, key), language)
+    const value = getPathValue(context, key)
+    const text = value === '' && preserveEmptyValueAt?.(absolutePath(key)) ? '' : valueOrFallback(value, language)
     budget.inspectValue(text)
     return escapeHtml(text)
   })
@@ -401,7 +410,7 @@ export const renderDocument = async (
   }
 
   if (templateKind === 'html') {
-    const html = renderHtmlTemplate(templateBytes.toString('utf-8'), context, language)
+    const html = renderHtmlTemplate(templateBytes.toString('utf-8'), context, language, options.preserveEmptyValueAt)
     return outputFormat === 'pdf'
       ? {
           bytes: await renderPdfFromHtml(html, options),

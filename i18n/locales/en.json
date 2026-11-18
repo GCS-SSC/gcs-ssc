@@ -397,6 +397,7 @@
   },
   "common": {
     "field_required": "required",
+    "field_either": "Either",
     "wizard_step_progress": "Step {current} of {total}",
     "general": "General",
     "actions": "Actions",
@@ -3275,6 +3276,9 @@
       "search_proponents": "Search proponents",
       "related_outcomes": "Related outcomes",
       "search_outcomes": "Search outcomes",
+      "english": "English",
+      "french": "French",
+      "language_instruction": "Provide the name, description and expected results each in at least one language.",
       "name_en": "Activity name (EN)",
       "name_fr": "Activity name (FR)",
       "description_en": "Description (EN)",

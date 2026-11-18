@@ -15,6 +15,23 @@ import type { CatalogField } from './form-field-inventory'
 type Candidate = { schema: z.ZodType, evidence: string }
 type Scope = { file: string, source: ts.SourceFile }
 type Usage = { file: string, tag: string, attrs: Record<string, string>, formExpression: string | null }
+type EitherLanguagePair = [string, string]
+type EitherLanguageScope = {
+  file: string
+  line: number
+  startOffset: number
+  endOffset: number
+  expression: string | null
+  kind: 'component' | 'form' | 'declaration'
+  declaredPairs?: string
+  markers: Array<{ fields?: string, line: number }>
+}
+const eitherLanguagePair = (fields: unknown): EitherLanguagePair | undefined => {
+  if (!Array.isArray(fields) || fields.length !== 2) return undefined
+  const [english, french] = fields
+  if (typeof english !== 'string' || typeof french !== 'string' || !/^[\w.]+[_.]en$/.test(english)) return undefined
+  return french === english.replace(/en$/, 'fr') ? [english, french] : undefined
+}
 export interface FieldContractAudit {
   id: string
   fingerprint: string
@@ -85,6 +102,7 @@ export const auditFieldContracts = async (root: string): Promise<FieldContractAu
   const fields: CatalogField[] = []
   const scopes = new Map<string, Scope>()
   const usages: Usage[] = []
+  const eitherLanguageScopes: EitherLanguageScope[] = []
   const aliases = new Map<string, string[]>()
   const imports = new Map<string, Promise<Record<string, unknown>>>()
   const readScope = async (file: string): Promise<Scope | undefined> => {
@@ -213,17 +231,35 @@ export const auditFieldContracts = async (root: string): Promise<FieldContractAu
     }
     const { descriptor } = parse(content)
     if (!descriptor.template) continue
-    const visit = (node: RootNode | TemplateChildNode, formExpression: string | null): void => {
+    const lineOffset = descriptor.template.loc.start.line - 1
+    const rootPairScope: EitherLanguageScope = { file, line: 1, kind: 'component', startOffset: 0, endOffset: descriptor.template.content.length, expression: null, markers: [] }
+    eitherLanguageScopes.push(rootPairScope)
+    const visit = (node: RootNode | TemplateChildNode, formScope: EitherLanguageScope, declaredScope?: EitherLanguageScope): void => {
       if (node.type !== NodeTypes.ROOT && node.type !== NodeTypes.ELEMENT) return
-      let current = formExpression
       if (node.type === NodeTypes.ELEMENT) {
         const attrs = attrsOf(node)
-        if (['UForm', 'CommonResourceCrud', 'CommonFormDialog'].includes(node.tag)) current = attrs[':validate'] ?? attrs[':schema'] ?? null
-        usages.push({ file: path, tag: node.tag, attrs, formExpression: current })
+        const line = lineOffset + node.loc.start.line
+        const startOffset = node.loc.start.offset
+        const endOffset = node.loc.end.offset
+        if (['UForm', 'CommonResourceCrud', 'CommonFormDialog'].includes(node.tag)) {
+          formScope = { file, line, kind: 'form', startOffset, endOffset, expression: attrs[':validate'] ?? attrs[':schema'] ?? null, markers: [] }
+          eitherLanguageScopes.push(formScope)
+          declaredScope = undefined
+        }
+        if (attrs['data-either-language-pairs'] !== undefined) {
+          declaredScope = { file, line, kind: 'declaration', startOffset, endOffset, expression: formScope.expression, declaredPairs: attrs['data-either-language-pairs'], markers: [] }
+          eitherLanguageScopes.push(declaredScope)
+        }
+        if (node.tag === 'CommonEitherLanguage') {
+          const marker = { fields: attrs.fields, line }
+          formScope.markers.push(marker)
+          declaredScope?.markers.push(marker)
+        }
+        usages.push({ file: path, tag: node.tag, attrs, formExpression: formScope.expression })
       }
-      for (const child of node.children) visit(child, current)
+      for (const child of node.children) visit(child, formScope, declaredScope)
     }
-    visit(parseTemplate(descriptor.template.content), null)
+    visit(parseTemplate(descriptor.template.content), rootPairScope)
   }
   const contexts = new Map<string, Candidate[]>()
   for (let iteration = 0; iteration < 12; iteration++) {
@@ -370,6 +406,85 @@ export const auditFieldContracts = async (root: string): Promise<FieldContractAu
         match.requirement = decision.requirement
         match.evidence = [decision.reason, ...decision.evidence.map(evidence => `${evidence.file}#sha256:${evidence.sha256}`)]
       }
+    }
+  }
+  const fieldsByFile = new Map<string, CatalogField[]>()
+  for (const field of fields) {
+    const existing = fieldsByFile.get(field.file) ?? []
+    existing.push(field)
+    fieldsByFile.set(field.file, existing)
+  }
+  const validMarkers = new Set<EitherLanguageScope['markers'][number]>()
+  const allMarkers = new Map<EitherLanguageScope['markers'][number], string>()
+  const reportEitherLanguage = (file: string, line: number, pair: string, error?: string): void => {
+    results.push({
+      id: `${file}:${line}:either-language:${pair}`,
+      fingerprint: digest(`${file}:${line}:either-language:${pair}`),
+      file, line, name: pair, kind: 'field', controls: [],
+      strategy: error ? 'unresolved' : 'group-instruction',
+      requirement: error ? 'unknown' : 'conditional',
+      evidence: [error ?? 'CommonEitherLanguage marker for a required bilingual pair']
+    })
+  }
+  const fieldsById = new Map(results.map(result => [result.id, result]))
+  const formScopesByFile = new Map<string, EitherLanguageScope[]>()
+  for (const scope of eitherLanguageScopes) {
+    if (scope.kind !== 'form') continue
+    const existing = formScopesByFile.get(scope.file) ?? []
+    existing.push(scope)
+    formScopesByFile.set(scope.file, existing)
+  }
+  for (const scope of eitherLanguageScopes) {
+    const file = resolve(root, scope.file)
+    const local = await fromText(file, scope.expression)
+    const candidates = local.length ? local : contexts.get(file) ?? []
+    const candidatePairs = candidates.flatMap(({ schema }) => {
+      const metadata = schema.meta()?.formEitherLanguagePairs
+      return Array.isArray(metadata)
+        ? metadata.flatMap(fields => {
+            const pair = eitherLanguagePair(fields)
+            return pair ? [pair] : []
+          })
+        : []
+    })
+    const declaredPairs = scope.declaredPairs?.split(';').map(pair => pair.trim().split(/\s+/)) ?? []
+    if (!candidatePairs.length && !declaredPairs.length && !scope.markers.length) continue
+    const nestedForms = (formScopesByFile.get(scope.file) ?? []).filter(form =>
+      form !== scope && form.startOffset >= scope.startOffset && form.endOffset <= scope.endOffset
+      && (scope.kind === 'component' || form.startOffset !== scope.startOffset || form.endOffset !== scope.endOffset))
+    const containsField = (region: EitherLanguageScope, field: CatalogField) =>
+      field.templateOffset >= region.startOffset && field.templateOffset < region.endOffset
+    const scopeFields = (fieldsByFile.get(scope.file) ?? []).filter(field =>
+      containsField(scope, field) && !nestedForms.some(form => containsField(form, field)))
+    const findFields = (name: string) => scopeFields.filter(field =>
+      field.controls.length && (field.name === name || field.controls.some(control => control.model?.split('.').at(-1) === name)))
+    const schemaPairs = candidatePairs.filter(pair => pair.some(name => findFields(name).length))
+    const expected = new Map<string, EitherLanguagePair>()
+    for (const pair of [...schemaPairs, ...declaredPairs]) {
+      const validPair = eitherLanguagePair(pair)
+      if (validPair) expected.set(validPair.join(' '), validPair)
+      else reportEitherLanguage(scope.file, scope.line, pair.join(' '), 'Expected two static English and French paths in data-either-language-pairs')
+    }
+    for (const marker of scope.markers) allMarkers.set(marker, scope.file)
+    for (const [key, pair] of expected) {
+      const matches = scope.markers.filter(marker => marker.fields?.trim().split(/\s+/).join(' ') === key)
+      for (const marker of matches) validMarkers.add(marker)
+      const controls = pair.flatMap(findFields)
+      const required = candidates.some(({ schema }) => pair.some(name => resolveFormFieldRequirement(schema, name) === 'required'))
+        || controls.some(field => fieldsById.get(field.id)?.requirement === 'required'
+          || field.controls.some(control => ['required', 'aria-required'].some(attribute =>
+            control.attributes[attribute] === 'true' || control.attributes[`:${attribute}`] === 'true')))
+      const error = !pair.every(name => findFields(name).length)
+        ? 'Either-language declaration must refer to two controls in its scope'
+        : required
+          ? 'Neither language control may be individually required'
+          : !matches.length ? 'Missing CommonEitherLanguage marker for the required bilingual pair' : undefined
+      reportEitherLanguage(scope.file, matches[0]?.line ?? scope.line, key, error)
+    }
+  }
+  for (const [marker, file] of allMarkers) {
+    if (!validMarkers.has(marker)) {
+      reportEitherLanguage(file, marker.line, marker.fields ?? '', 'CommonEitherLanguage marker must name a declared English and French pair in its form or group')
     }
   }
   return results

@@ -8,7 +8,7 @@ import {
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
-import { FundingCaseAgreementActivityPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementActivityPatchSchema, FundingCaseAgreementActivityTextSchema } from '~~/shared/types/schemas'
 import type { Database, FundingCaseAgreementActivityTable } from '~~/shared/types/database'
 import type { FundingCaseAgreementActivityPatch } from '~~/shared/types/schemas'
 import { createAgreementActivityDateRangeSchema } from '~~/shared/types/schemas/agreement-activity'
@@ -436,6 +436,12 @@ const assertAgreementActivityExists = async (
     .where('Funding_Case_Agreement_Activity_Version._deleted', '=', false)
     .select([
       'Funding_Case_Agreement_Activity.id as id',
+      'Funding_Case_Agreement_Activity.egcs_fc_name_en as egcs_fc_name_en',
+      'Funding_Case_Agreement_Activity.egcs_fc_name_fr as egcs_fc_name_fr',
+      'Funding_Case_Agreement_Activity.egcs_fc_description_en as egcs_fc_description_en',
+      'Funding_Case_Agreement_Activity.egcs_fc_description_fr as egcs_fc_description_fr',
+      'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_en as egcs_fc_expectedresults_en',
+      'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_fr as egcs_fc_expectedresults_fr',
       'Funding_Case_Agreement_Activity.egcs_fc_startdate as egcs_fc_startdate',
       'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate'
     ])
@@ -517,6 +523,8 @@ export const patchAgreementActivity = async (
       egcs_fc_enddate: validated.egcs_fc_enddate ?? existing.egcs_fc_enddate
     })
   }
+
+  await parseI18n(event, FundingCaseAgreementActivityTextSchema, { ...existing, ...validated })
 
   const selectionError = await validateAgreementActivityPatchSelections(
     event,

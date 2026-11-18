@@ -362,17 +362,18 @@ const createAmendment = async () => {
       :title="t('agreement.amendments.add')"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <form class="space-y-4" data-help-view="agreement.amendments.create-dialog" data-help-label-en="Agreements — Create amendment" data-help-label-fr="Ententes — Créer une modification" @submit.prevent="createAmendment">
+        <form class="space-y-4" data-either-language-pairs="egcs_fc_name_en egcs_fc_name_fr" data-help-view="agreement.amendments.create-dialog" data-help-label-en="Agreements — Create amendment" data-help-label-fr="Ententes — Créer une modification" @submit.prevent="createAmendment">
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="t('agreement.amendments.name_en')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_en">
+            <UFormField name="egcs_fc_name_en" :label="t('agreement.amendments.name_en')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_en">
               <UInput v-model="amendmentNameEn" :disabled="isSaving" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
-            <UFormField :label="t('agreement.amendments.name_fr')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_fr">
+            <UFormField name="egcs_fc_name_fr" :label="t('agreement.amendments.name_fr')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_fr">
               <UInput v-model="amendmentNameFr" :disabled="isSaving" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
           </div>
           <p :id="nameRequirementId" class="text-sm text-zinc-500 dark:text-zinc-400">
             {{ t('agreement.amendments.name_help') }}
+            <CommonEitherLanguage fields="egcs_fc_name_en egcs_fc_name_fr" />
           </p>
           <p class="text-sm text-zinc-600 dark:text-zinc-300">
             {{ t('agreement.amendments.type_help') }}

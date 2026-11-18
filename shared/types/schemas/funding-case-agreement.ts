@@ -312,26 +312,55 @@ export type FundingCaseAgreementAmendmentItem = WithId<{
   amendment_subtype_ids: string[]
 }>
 
+const ActivityText = () => z.string({ error: 'validation.required' }).trim()
+const activityTextFields = {
+  egcs_fc_name_en: ActivityText().max(255, { error: 'validation.max_length' }),
+  egcs_fc_name_fr: ActivityText().max(255, { error: 'validation.max_length' }),
+  egcs_fc_description_en: ActivityText(),
+  egcs_fc_description_fr: ActivityText(),
+  egcs_fc_expectedresults_en: ActivityText(),
+  egcs_fc_expectedresults_fr: ActivityText()
+}
+
+const activityTextPairs = [
+  ['egcs_fc_name_en', 'egcs_fc_name_fr'],
+  ['egcs_fc_description_en', 'egcs_fc_description_fr'],
+  ['egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr']
+] as const
+
+const validateActivityText = (data: Record<keyof typeof activityTextFields, string>, ctx: z.RefinementCtx) => {
+  for (const [english, french] of activityTextPairs) {
+    if (data[english] || data[french]) continue
+    for (const field of [english, french]) {
+      ctx.addIssue({ code: 'custom', message: 'validation.bilingual_value_required', path: [field] })
+    }
+  }
+}
+
+export const FundingCaseAgreementActivityTextSchema = z.object(activityTextFields).superRefine(validateActivityText)
+
 export const FundingCaseAgreementActivityBaseSchema = z.object({
-  egcs_fc_description_en: RequiredString(),
-  egcs_fc_description_fr: RequiredString(),
+  ...activityTextFields,
   egcs_fc_startdate: RequiredDateSchema,
   egcs_fc_enddate: RequiredDateSchema,
-  egcs_fc_expectedresults_en: RequiredString(),
-  egcs_fc_expectedresults_fr: RequiredString(),
-  egcs_fc_name_en: RequiredString().max(255, { error: 'validation.max_length' }),
-  egcs_fc_name_fr: RequiredString().max(255, { error: 'validation.max_length' }),
   outcome_ids: RequiredUniqueBigintSelectionIdsSchema(),
   responsible_party_ids: RequiredUniqueBigintSelectionIdsSchema()
 })
 
-export const FundingCaseAgreementActivityCreateSchema = FundingCaseAgreementActivityBaseSchema.refine(
+export const FundingCaseAgreementActivityCreateSchema = FundingCaseAgreementActivityBaseSchema.extend({
+  egcs_fc_name_en: activityTextFields.egcs_fc_name_en.default(''),
+  egcs_fc_name_fr: activityTextFields.egcs_fc_name_fr.default(''),
+  egcs_fc_description_en: activityTextFields.egcs_fc_description_en.default(''),
+  egcs_fc_description_fr: activityTextFields.egcs_fc_description_fr.default(''),
+  egcs_fc_expectedresults_en: activityTextFields.egcs_fc_expectedresults_en.default(''),
+  egcs_fc_expectedresults_fr: activityTextFields.egcs_fc_expectedresults_fr.default('')
+}).superRefine(validateActivityText).refine(
   data => data.egcs_fc_startdate <= data.egcs_fc_enddate,
   {
     message: 'validation.date_range',
     path: ['egcs_fc_enddate']
   }
-)
+).meta({ formEitherLanguagePairs: activityTextPairs })
 export const FundingCaseAgreementActivityPatchSchema = FundingCaseAgreementActivityBaseSchema.partial().superRefine((data, ctx) => {
   if (
     data.egcs_fc_startdate

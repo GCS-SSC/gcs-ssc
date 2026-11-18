@@ -103,9 +103,9 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
       {{ formatDate(row.original.egcs_fc_updatedat) }}
     </template>
     <template #form="{ state }">
-      <fieldset class="space-y-4" aria-describedby="agreement-note-subject-instruction">
+      <fieldset class="space-y-4" data-either-language-pairs="egcs_fc_subject_en egcs_fc_subject_fr" aria-describedby="agreement-note-subject-instruction">
         <legend class="font-medium">
-          {{ t('notes.subject') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+          {{ t('notes.subject') }} <CommonEitherLanguage fields="egcs_fc_subject_en egcs_fc_subject_fr" />
         </legend>
         <p id="agreement-note-subject-instruction" class="text-sm text-muted">
           {{ t('notes.subject_instruction') }}
@@ -117,9 +117,9 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
           <UInput v-model="state.egcs_fc_subject_fr" aria-describedby="agreement-note-subject-instruction" />
         </UFormField>
       </fieldset>
-      <fieldset class="space-y-4" aria-describedby="agreement-note-body-instruction">
+      <fieldset class="space-y-4" data-either-language-pairs="egcs_fc_body_en egcs_fc_body_fr" aria-describedby="agreement-note-body-instruction">
         <legend class="font-medium">
-          {{ t('notes.body') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+          {{ t('notes.body') }} <CommonEitherLanguage fields="egcs_fc_body_en egcs_fc_body_fr" />
         </legend>
         <p id="agreement-note-body-instruction" class="text-sm text-muted">
           {{ t('notes.body_instruction') }}

@@ -20,6 +20,7 @@ export interface CatalogField {
   line: number
   kind: 'field' | 'standalone-control'
   tag: string
+  templateOffset: number
   name: string | null
   label: string | null
   attributes: Record<string, string>
@@ -88,7 +89,7 @@ export const catalogVueFields = (file: string, source: string): CatalogField[] =
       if (formTag(node.tag)) currentForm = { component: node.tag, ...attributes }
       const makeRecord = (kind: CatalogField['kind']): CatalogField => ({
         id: `${file}:${line}:${node.tag}:${records.length + 1}`,
-        file, line, kind, tag: node.tag,
+        file, line, kind, tag: node.tag, templateOffset: node.loc.start.offset,
         name: value(attributes, 'name'),
         label: value(attributes, 'label') ?? value(attributes, 'aria-label'),
         attributes, conditions: currentConditions, form: currentForm,

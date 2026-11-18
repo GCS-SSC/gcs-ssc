@@ -397,6 +397,7 @@
   },
   "common": {
     "field_required": "obligatoire",
+    "field_either": "Au choix",
     "wizard_step_progress": "Étape {current} sur {total}",
     "general": "Général",
     "actions": "Actions",
@@ -3275,6 +3276,9 @@
       "search_proponents": "Rechercher des promoteurs",
       "related_outcomes": "Résultats liés",
       "search_outcomes": "Rechercher des résultats",
+      "english": "Anglais",
+      "french": "Français",
+      "language_instruction": "Indiquez le nom, la description et les résultats attendus, chacun dans au moins une langue.",
       "name_en": "Nom de l'activité (AN)",
       "name_fr": "Nom de l'activité (FR)",
       "description_en": "Description (AN)",

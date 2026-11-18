@@ -553,9 +553,10 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
             </div>
 
             <div v-if="slotProps.currentStep === 'agency'" class="mx-auto max-w-3xl space-y-6">
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-either-language-pairs="egcs_ar_agencyname_en egcs_ar_agencyname_fr">
                 <p :id="`${requirementId}-agencyname`" class="text-sm text-muted md:col-span-2">
                   {{ t('applicant_recipient.funding_history.validation.bilingual_agency') }}
+                  <CommonEitherLanguage fields="egcs_ar_agencyname_en egcs_ar_agencyname_fr" />
                 </p>
                 <UFormField :label="t('applicant_recipient.funding_history.fields.agency_name_en')" name="egcs_ar_agencyname_en">
                   <UInput v-model="state.egcs_ar_agencyname_en" :aria-describedby="`${requirementId}-agencyname`" @update:model-value="invalidateConfirmations" />
@@ -567,9 +568,10 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
             </div>
 
             <div v-if="slotProps.currentStep === 'program'" class="mx-auto max-w-3xl space-y-6">
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-either-language-pairs="egcs_ar_programname_en egcs_ar_programname_fr">
                 <p :id="`${requirementId}-programname`" class="text-sm text-muted md:col-span-2">
                   {{ t('applicant_recipient.funding_history.validation.bilingual_program') }}
+                  <CommonEitherLanguage fields="egcs_ar_programname_en egcs_ar_programname_fr" />
                 </p>
                 <UFormField :label="t('applicant_recipient.funding_history.fields.program_name_en')" name="egcs_ar_programname_en">
                   <UInput v-model="state.egcs_ar_programname_en" :aria-describedby="`${requirementId}-programname`" @update:model-value="invalidateConfirmations" />
@@ -580,12 +582,13 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
               </div>
             </div>
 
-            <div v-if="slotProps.currentStep === 'agreement'" class="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
+            <div v-if="slotProps.currentStep === 'agreement'" class="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2" data-either-language-pairs="egcs_ar_title_en egcs_ar_title_fr; egcs_ar_description_en egcs_ar_description_fr">
               <UFormField class="md:col-span-2" :label="t('applicant_recipient.funding_history.fields.agreement_number')" name="egcs_ar_agreementnumber" required>
                 <UInput v-model="state.egcs_ar_agreementnumber" @update:model-value="invalidateConfirmations" />
               </UFormField>
               <p :id="`${requirementId}-title`" class="text-sm text-muted md:col-span-2">
                 {{ t('applicant_recipient.funding_history.validation.bilingual_title') }}
+                <CommonEitherLanguage fields="egcs_ar_title_en egcs_ar_title_fr" />
               </p>
               <UFormField :label="t('applicant_recipient.funding_history.fields.title_en')" name="egcs_ar_title_en">
                 <UInput v-model="state.egcs_ar_title_en" :aria-describedby="`${requirementId}-title`" />
@@ -595,6 +598,7 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
               </UFormField>
               <p :id="`${requirementId}-description`" class="text-sm text-muted md:col-span-2">
                 {{ t('applicant_recipient.funding_history.validation.bilingual_description') }}
+                <CommonEitherLanguage fields="egcs_ar_description_en egcs_ar_description_fr" />
               </p>
               <UFormField :label="t('applicant_recipient.funding_history.fields.description_en')" name="egcs_ar_description_en">
                 <UTextarea v-model="state.egcs_ar_description_en" :aria-describedby="`${requirementId}-description`" autoresize />

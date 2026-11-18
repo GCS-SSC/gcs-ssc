@@ -25,9 +25,9 @@ const lookupUrl = computed(() => `/api/applicant-recipients/${applicantRecipient
     <p v-else class="text-sm text-muted">
       {{ t('notes.agency_immutable') }}
     </p>
-    <fieldset class="space-y-4" aria-describedby="proponent-note-subject-instruction">
+    <fieldset class="space-y-4" data-either-language-pairs="egcs_ar_subject_en egcs_ar_subject_fr" aria-describedby="proponent-note-subject-instruction">
       <legend class="font-medium">
-        {{ t('notes.subject') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+        {{ t('notes.subject') }} <CommonEitherLanguage fields="egcs_ar_subject_en egcs_ar_subject_fr" />
       </legend>
       <p id="proponent-note-subject-instruction" class="text-sm text-muted">
         {{ t('notes.subject_instruction') }}
@@ -39,9 +39,9 @@ const lookupUrl = computed(() => `/api/applicant-recipients/${applicantRecipient
         <UInput v-model="state.egcs_ar_subject_fr" aria-describedby="proponent-note-subject-instruction" />
       </UFormField>
     </fieldset>
-    <fieldset class="space-y-4" aria-describedby="proponent-note-body-instruction">
+    <fieldset class="space-y-4" data-either-language-pairs="egcs_ar_body_en egcs_ar_body_fr" aria-describedby="proponent-note-body-instruction">
       <legend class="font-medium">
-        {{ t('notes.body') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+        {{ t('notes.body') }} <CommonEitherLanguage fields="egcs_ar_body_en egcs_ar_body_fr" />
       </legend>
       <p id="proponent-note-body-instruction" class="text-sm text-muted">
         {{ t('notes.body_instruction') }}

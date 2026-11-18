@@ -127,12 +127,13 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
   </CommonSection>
 
   <CommonSection :title="t('applicant_recipient.sections.identity')" badge="02" :grid-cols="1" data-field-scope="applicant-recipient.fields.profile-fields">
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12" data-either-language-pairs="egcs_ar_legalname_en egcs_ar_legalname_fr; egcs_ar_operatingname_en egcs_ar_operatingname_fr; egcs_ar_description_en egcs_ar_description_fr">
       <p
         :id="`${requirementId}-legal-name`"
         class="text-sm text-zinc-600 md:col-span-2 xl:col-span-12 dark:text-zinc-400"
         data-testid="legal-name-language-requirement">
         {{ t('applicant_recipient.requirements.legal_name') }}
+        <CommonEitherLanguage fields="egcs_ar_legalname_en egcs_ar_legalname_fr" />
       </p>
       <UFormField
         data-field-label-en="Legal name (English)" data-field-label-fr="Dénomination légale (anglais)"
@@ -164,6 +165,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         class="text-sm text-zinc-600 md:col-span-2 xl:col-span-12 dark:text-zinc-400"
         data-testid="operating-name-language-requirement">
         {{ t('applicant_recipient.requirements.operating_name') }}
+        <CommonEitherLanguage fields="egcs_ar_operatingname_en egcs_ar_operatingname_fr" />
       </p>
       <UFormField
         data-field-label-en="Operating name (English)" data-field-label-fr="Nom usuel (anglais)"
@@ -217,6 +219,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         class="text-sm text-zinc-600 md:col-span-2 xl:col-span-12 dark:text-zinc-400"
         data-testid="description-language-requirement">
         {{ t('applicant_recipient.requirements.description') }}
+        <CommonEitherLanguage fields="egcs_ar_description_en egcs_ar_description_fr" />
       </p>
       <UFormField
         data-field-label-en="Description (English)" data-field-label-fr="Description (anglais)"

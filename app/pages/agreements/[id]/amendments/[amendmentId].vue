@@ -600,17 +600,18 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.amendments.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-amendment-detail-content">
           <section v-if="selectedTab === 'general'" data-help-target="casework.amendments.general.content" data-help-kind="section" data-help-view="casework.amendments.general" class="space-y-8">
             <CommonSection :title="t('agreement.amendments.sections.details')" badge="01" :grid-cols="1">
-              <div class="space-y-4">
+              <div class="space-y-4" data-either-language-pairs="egcs_fc_name_en egcs_fc_name_fr">
                 <div class="grid gap-4 md:grid-cols-2">
-                  <UFormField data-ui-target="agreements.amendments.amendments.name_en" :label="t('agreement.amendments.name_en')">
+                  <UFormField name="egcs_fc_name_en" data-ui-target="agreements.amendments.amendments.name_en" :label="t('agreement.amendments.name_en')">
                     <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" :disabled="!canEditAmendmentScope" />
                   </UFormField>
-                  <UFormField data-ui-target="agreements.amendments.amendments.name_fr" :label="t('agreement.amendments.name_fr')">
+                  <UFormField name="egcs_fc_name_fr" data-ui-target="agreements.amendments.amendments.name_fr" :label="t('agreement.amendments.name_fr')">
                     <UInput v-model="amendmentNameFr" :aria-describedby="nameRequirementId" class="w-full" :disabled="!canEditAmendmentScope" />
                   </UFormField>
                 </div>
                 <p :id="nameRequirementId" class="text-sm text-zinc-500 dark:text-zinc-400">
                   {{ t('agreement.amendments.name_help') }}
+                  <CommonEitherLanguage fields="egcs_fc_name_en egcs_fc_name_fr" />
                 </p>
               </div>
             </CommonSection>
