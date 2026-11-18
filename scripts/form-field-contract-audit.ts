@@ -29,8 +29,9 @@ type EitherLanguageScope = {
 const eitherLanguagePair = (fields: unknown): EitherLanguagePair | undefined => {
   if (!Array.isArray(fields) || fields.length !== 2) return undefined
   const [english, french] = fields
-  if (typeof english !== 'string' || typeof french !== 'string' || !/^[\w.]+[_.]en$/.test(english)) return undefined
-  return french === english.replace(/en$/, 'fr') ? [english, french] : undefined
+  if (typeof english !== 'string' || typeof french !== 'string' || !/^[\w.]+$/.test(english)) return undefined
+  const expectedFrench = /[_.]en$/.test(english) ? english.replace(/en$/, 'fr') : `${english}_fr`
+  return french === expectedFrench ? [english, french] : undefined
 }
 export interface FieldContractAudit {
   id: string

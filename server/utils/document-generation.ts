@@ -17,6 +17,7 @@ import { resolveBusinessStatusProtection } from './business-status-runtime'
 import type { CloseoutDocumentPersistence } from '~~/shared/types/agreement-closeout'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
+import { budgetLineDisplayText } from './agreement-budget-lineage'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 import { formatMoneyText, parseDecimalText, zeroMoney, isCanonicalMoney, majorMoneyText, percentageMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { getAgreementPaidAccountingProjection, summarizePaidAccountingByCurrency } from './agreement-accounting-projection'
@@ -552,8 +553,8 @@ export const buildAgreementDocumentContext = async (
         'Funding_Case_Agreement_Budget_Line_Item.id as rowId',
         'Funding_Case_Agreement_Budget_Fiscal_Year.id as fiscalYearId',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscalYear',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as subsection',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as description',
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('subsection'),
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description').as('description'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('totalAmount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('programFunding'),
         'Agency_Cost_Category.egcs_ay_name_en as costCategoryEn',

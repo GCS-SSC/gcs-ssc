@@ -312,14 +312,14 @@ export type FundingCaseAgreementAmendmentItem = WithId<{
   amendment_subtype_ids: string[]
 }>
 
-const ActivityText = () => z.string({ error: 'validation.required' }).trim()
+const BilingualText = () => z.string({ error: 'validation.required' }).trim()
 const activityTextFields = {
-  egcs_fc_name_en: ActivityText().max(255, { error: 'validation.max_length' }),
-  egcs_fc_name_fr: ActivityText().max(255, { error: 'validation.max_length' }),
-  egcs_fc_description_en: ActivityText(),
-  egcs_fc_description_fr: ActivityText(),
-  egcs_fc_expectedresults_en: ActivityText(),
-  egcs_fc_expectedresults_fr: ActivityText()
+  egcs_fc_name_en: BilingualText().max(255, { error: 'validation.max_length' }),
+  egcs_fc_name_fr: BilingualText().max(255, { error: 'validation.max_length' }),
+  egcs_fc_description_en: BilingualText(),
+  egcs_fc_description_fr: BilingualText(),
+  egcs_fc_expectedresults_en: BilingualText(),
+  egcs_fc_expectedresults_fr: BilingualText()
 }
 
 const activityTextPairs = [
@@ -328,8 +328,12 @@ const activityTextPairs = [
   ['egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr']
 ] as const
 
-const validateActivityText = (data: Record<keyof typeof activityTextFields, string>, ctx: z.RefinementCtx) => {
-  for (const [english, french] of activityTextPairs) {
+const validateEitherLanguage = <Field extends string>(
+  data: Record<Field, string>,
+  ctx: z.RefinementCtx,
+  pairs: readonly (readonly [Field, Field])[]
+) => {
+  for (const [english, french] of pairs) {
     if (data[english] || data[french]) continue
     for (const field of [english, french]) {
       ctx.addIssue({ code: 'custom', message: 'validation.bilingual_value_required', path: [field] })
@@ -337,7 +341,7 @@ const validateActivityText = (data: Record<keyof typeof activityTextFields, stri
   }
 }
 
-export const FundingCaseAgreementActivityTextSchema = z.object(activityTextFields).superRefine(validateActivityText)
+export const FundingCaseAgreementActivityTextSchema = z.object(activityTextFields).superRefine((data, ctx) => validateEitherLanguage(data, ctx, activityTextPairs))
 
 export const FundingCaseAgreementActivityBaseSchema = z.object({
   ...activityTextFields,
@@ -354,7 +358,7 @@ export const FundingCaseAgreementActivityCreateSchema = FundingCaseAgreementActi
   egcs_fc_description_fr: activityTextFields.egcs_fc_description_fr.default(''),
   egcs_fc_expectedresults_en: activityTextFields.egcs_fc_expectedresults_en.default(''),
   egcs_fc_expectedresults_fr: activityTextFields.egcs_fc_expectedresults_fr.default('')
-}).superRefine(validateActivityText).refine(
+}).superRefine((data, ctx) => validateEitherLanguage(data, ctx, activityTextPairs)).refine(
   data => data.egcs_fc_startdate <= data.egcs_fc_enddate,
   {
     message: 'validation.date_range',
@@ -483,12 +487,26 @@ export const FundingCaseAgreementLineFundingAmountSchema = z.object({
 })
 export type FundingCaseAgreementLineFundingAmount = z.infer<typeof FundingCaseAgreementLineFundingAmountSchema>
 
+const budgetLineTextFields = {
+  egcs_fc_costsubsection: BilingualText().max(255, { error: 'validation.max_length' }),
+  egcs_fc_costsubsection_fr: BilingualText().max(255, { error: 'validation.max_length' }),
+  egcs_fc_description: BilingualText(),
+  egcs_fc_description_fr: BilingualText()
+}
+
+export const budgetLineTextPairs = [
+  ['egcs_fc_costsubsection', 'egcs_fc_costsubsection_fr'],
+  ['egcs_fc_description', 'egcs_fc_description_fr']
+] as const
+
+export const FundingCaseAgreementBudgetLineTextSchema = z.object(budgetLineTextFields)
+  .superRefine((data, ctx) => validateEitherLanguage(data, ctx, budgetLineTextPairs))
+
 export const FundingCaseAgreementBudgetLineItemBaseSchema = z.object({
   egcs_fc_applicantrecipient: RequiredBigintSelectionId().optional(),
   egcs_fc_fundingagreementbudgetfiscalyear: RequiredBigintSelectionId(),
   egcs_fc_organizationcostcategory: RequiredBigintSelectionId(),
-  egcs_fc_costsubsection: RequiredString().max(255, { error: 'validation.max_length' }),
-  egcs_fc_description: RequiredString(),
+  ...budgetLineTextFields,
   egcs_fc_totalamount: NonNegativeMoneySchema,
   egcs_fc_programfunding: NonNegativeMoneySchema.optional(),
   egcs_fc_percentage: BudgetPercentageSchema.optional(),
@@ -502,10 +520,16 @@ export const FundingCaseAgreementBudgetLineItemFundingTotalsSchema = FundingCase
   egcs_fc_fundingsources: true
 }).superRefine(validateBudgetLineItemFundingTotals)
 
-export const FundingCaseAgreementBudgetLineItemCreateSchema = FundingCaseAgreementBudgetLineItemBaseSchema.superRefine((data, ctx) => {
+export const FundingCaseAgreementBudgetLineItemCreateSchema = FundingCaseAgreementBudgetLineItemBaseSchema.extend({
+  egcs_fc_costsubsection: budgetLineTextFields.egcs_fc_costsubsection.default(''),
+  egcs_fc_costsubsection_fr: budgetLineTextFields.egcs_fc_costsubsection_fr.default(''),
+  egcs_fc_description: budgetLineTextFields.egcs_fc_description.default(''),
+  egcs_fc_description_fr: budgetLineTextFields.egcs_fc_description_fr.default('')
+}).superRefine((data, ctx) => {
+  validateEitherLanguage(data, ctx, budgetLineTextPairs)
   validateBudgetLineItemFundingTotals(data, ctx)
   validateFinancialInputCurrencies(data, ctx)
-})
+}).meta({ formEitherLanguagePairs: budgetLineTextPairs })
 export const FundingCaseAgreementBudgetLineItemPatchSchema = FundingCaseAgreementBudgetLineItemBaseSchema.partial().superRefine((data, ctx) => {
   if (Object.keys(data).length === 0) {
     ctx.addIssue({ code: 'custom', message: 'validation.required' })

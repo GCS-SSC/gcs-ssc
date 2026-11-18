@@ -3,7 +3,7 @@ import { sql } from 'kysely'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertAgreementExists } from '~~/server/utils/agreement-child-resources'
-import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
+import { budgetLineDisplayText, budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { buildAgreementFinancialSummary, type SummaryBudgetLine, type SummaryClaimLine, type SummaryFiscalYear, type SummaryForecast, type SummaryForecastLine, type SummaryPayment, type SummaryReconciliation } from '~~/server/utils/agreement-financial-summary'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -49,10 +49,10 @@ export default defineEventHandler(async event => {
           budgetLineItemStableId.as('id'), budgetFiscalYearStableId.as('fiscalYearId'),
           'Agency_Cost_Category.egcs_ay_name_en as categoryNameEn',
           'Agency_Cost_Category.egcs_ay_name_fr as categoryNameFr',
-          'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as costSubsection',
+          budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('costSubsection'),
           'Agency_Cost_Category_Line_Item.egcs_ay_name_en as nameEn',
           'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as nameFr',
-          'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as description',
+          budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description').as('description'),
           databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('budget'),
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as currency'
         ])
@@ -93,7 +93,7 @@ export default defineEventHandler(async event => {
           sql<string>`COALESCE(${sql.ref('Source_Budget_Year.egcs_fc_originalbudgetfiscalyear')}, ${sql.ref('Source_Budget_Year.id')}, ${sql.ref('Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear')})`.as('fiscalYearId'),
           sql<string>`COALESCE(${sql.ref('Source_Budget_Line.egcs_fc_originalbudgetlineitem')}, ${sql.ref('Source_Budget_Line.id')}, ${sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem')})`.as('budgetLineId'),
           'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month as month',
-          'Source_Budget_Line.egcs_fc_description as description',
+          budgetLineDisplayText('Source_Budget_Line.egcs_fc_description').as('description'),
           databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('amount'),
           'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_currency as currency'
         ])

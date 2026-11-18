@@ -1518,7 +1518,9 @@ export interface FundingCaseAgreementBudgetLineItemTable {
   egcs_fc_fundingagreementbudgetfiscalyear: string
   egcs_fc_organizationcostcategory: string
   egcs_fc_costsubsection: string
+  egcs_fc_costsubsection_fr: Generated<string>
   egcs_fc_description: string
+  egcs_fc_description_fr: Generated<string>
   egcs_fc_totalamount: string
   egcs_fc_programfunding: string
   egcs_fc_currency: Currency_Codes

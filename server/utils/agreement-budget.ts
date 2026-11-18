@@ -481,7 +481,7 @@ export const createAgreementBudgetLineItem = async (
         'egcs_fc_applicantrecipient',
         'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
         'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_fundingagreementbudgetfiscalyear',
-        'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_description',
+        'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_costsubsection_fr', 'egcs_fc_description', 'egcs_fc_description_fr',
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('egcs_fc_programfunding')).as('egcs_fc_programfunding'),
         'egcs_fc_currency'

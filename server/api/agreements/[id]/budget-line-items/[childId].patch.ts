@@ -18,7 +18,7 @@ import {
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
-import { validateMergedBudgetLineItemFundingPatch } from '~~/server/utils/agreement-financial-patch-validation'
+import { validateMergedBudgetLineItemFundingPatch, validateMergedBudgetLineTextPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -99,6 +99,10 @@ const getExistingBudgetLineItem = async (
       budgetLineItemStableId.as('egcs_fc_budgetlineitemidentity'),
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory',
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection',
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection_fr',
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description',
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description_fr',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear as egcs_fc_fundingagreementbudgetfiscalyear',
       budgetFiscalYearStableId.as('egcs_fc_budgetfiscalyearidentity'),
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -218,7 +222,9 @@ const fetchBudgetLineItemResponse = async (
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_allowpercentageoverride',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection_fr as egcs_fc_costsubsection_fr',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description_fr as egcs_fc_description_fr',
     databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
     databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as egcs_fc_currency',
@@ -299,6 +305,7 @@ const resolveBudgetLinePatchInput = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemPatchSchema)
+  await validateMergedBudgetLineTextPatch(event, existing, patchValues)
   patchValues.egcs_fc_applicantrecipient = await resolveAgreementBudgetProponent(event, db, { agreementId, proponentId: patchValues.egcs_fc_applicantrecipient, savedProponentId: existing.egcs_fc_applicantrecipient })
   if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, db, agreementId, patchValues.egcs_fc_currency)
   const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues, String(existing.egcs_fc_organizationcostcategory))

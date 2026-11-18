@@ -12,7 +12,7 @@ import { resolveAssignedItemGrant } from '~~/server/utils/rbac'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { isBusinessStatusLineageLocked, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { sql } from 'kysely'
-import { budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
+import { budgetLineDisplayText, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { isDecimalDatabaseId } from '~~/server/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -54,7 +54,7 @@ export default defineEventHandler(async event => {
       .select([
         budgetLineItemStableId.as('stable_id'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection'
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('egcs_fc_costsubsection')
       ])
       .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', String(reconciliation.agreement_id))
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)

@@ -10,7 +10,7 @@ import { assertDraftAgreementAmendmentCapability, resolveDraftAgreementAmendment
 import { FundingCaseAgreementBudgetLineItemPatchSchema } from '~~/shared/types/schemas'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
-import { validateMergedBudgetLineItemFundingPatch } from '~~/server/utils/agreement-financial-patch-validation'
+import { validateMergedBudgetLineItemFundingPatch, validateMergedBudgetLineTextPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { sql } from 'kysely'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -39,6 +39,10 @@ export default defineEventHandler(async event => {
         budgetLineItemStableId.as('stable_id'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection_fr',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description_fr',
         budgetFiscalYearStableId.as('stable_fiscal_year_id'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
@@ -49,6 +53,7 @@ export default defineEventHandler(async event => {
       .forUpdate('Funding_Case_Agreement_Budget_Line_Item')
       .executeTakeFirst()
     if (!existing) return await notFound(event, 'AGREEMENT_BUDGET_LINE_ITEM_NOT_FOUND', 'apiErrors.agreement.budget_line_item_not_found')
+    await validateMergedBudgetLineTextPatch(event, existing, body)
     body.egcs_fc_applicantrecipient = await resolveAgreementBudgetProponent(event, trx, { agreementId, proponentId: body.egcs_fc_applicantrecipient, savedProponentId: existing.egcs_fc_applicantrecipient })
     let targetFiscalYearRowId: string | undefined
     if (body.egcs_fc_fundingagreementbudgetfiscalyear) {
@@ -108,6 +113,7 @@ export default defineEventHandler(async event => {
       'egcs_fc_applicantrecipient',
       'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
       'id', 'egcs_fc_originalbudgetlineitem',
+      'egcs_fc_costsubsection', 'egcs_fc_costsubsection_fr', 'egcs_fc_description', 'egcs_fc_description_fr',
       databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
       databaseMoneyText(sql.ref('egcs_fc_programfunding')).as('egcs_fc_programfunding'),
       'egcs_fc_currency'

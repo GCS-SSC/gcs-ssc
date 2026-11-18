@@ -4,7 +4,7 @@ import { addMoney, compareMoney, maxMoney, subtractMoney, sumMoney, zeroMoney } 
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { AccountReceivableClaimReductionChoice } from '~~/shared/types/account-receivable'
-import { budgetLineItemStableId } from './agreement-budget-lineage'
+import { budgetLineDisplayText, budgetLineItemStableId } from './agreement-budget-lineage'
 import type { Database } from '~~/shared/types/database'
 import type { AccountReceivableClaimReductionInput } from '~~/shared/types/schemas/account-receivable'
 import { authorizeAccountReceivable, assertAccountReceivableEditable } from './account-receivable'
@@ -78,7 +78,7 @@ export const readAccountReceivableClaimReductionChoices = async (event: H3Event,
     .leftJoin('Transfer_Payment_Stream_Cost_Category_Line_Item as streamcost', 'streamcost.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory')
     .leftJoin('Agency_Cost_Category_Line_Item as costline', 'costline.id', 'streamcost.egcs_tp_organizationcostcategory')
     .leftJoin('Agency_Cost_Category as category', 'category.id', 'costline.egcs_ay_organizationcostcategory')
-    .select([budgetLineItemStableId.as('id'), 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection',
+    .select([budgetLineItemStableId.as('id'), budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('egcs_fc_costsubsection'),
       'category.egcs_ay_name_en as organization_cost_category_name_en', 'category.egcs_ay_name_fr as organization_cost_category_name_fr',
       'costline.egcs_ay_name_en as line_item_name_en', 'costline.egcs_ay_name_fr as line_item_name_fr'])
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false).where('year._deleted', '=', false)

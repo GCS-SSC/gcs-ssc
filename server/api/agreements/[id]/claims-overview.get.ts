@@ -1,7 +1,7 @@
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { defineEventHandler, type H3Event } from 'h3'
-import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
+import { budgetLineDisplayText, budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { prepareAgreementClaimRoute } from '~~/server/utils/agreement-claim'
 import { canReadEntityAssignments } from '~~/server/utils/entity-assignment'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
@@ -135,8 +135,8 @@ const readRoute = async (event: H3Event, claimId?: string) => {
         'Funding_Case_Agreement_Budget_Line_Item.id as budget_row_id',
         budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('egcs_fc_costsubsection'),
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description').as('egcs_fc_description'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as egcs_fc_currency',
@@ -188,7 +188,7 @@ const readRoute = async (event: H3Event, claimId?: string) => {
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as budget_fiscal_year_display',
         'Agency_Cost_Category.egcs_ay_name_en as organization_cost_category_name_en',
         'Agency_Cost_Category.egcs_ay_name_fr as organization_cost_category_name_fr',
-        'Claim_Source_Line.egcs_fc_costsubsection as egcs_fc_costsubsection',
+        budgetLineDisplayText('Claim_Source_Line.egcs_fc_costsubsection').as('egcs_fc_costsubsection'),
         'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
         'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr',
         databaseMoneyText(sql.ref('Claim_Source_Line.egcs_fc_totalamount')).as('budget_line_total_amount'),

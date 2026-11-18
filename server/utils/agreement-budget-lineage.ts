@@ -15,6 +15,14 @@ export const budgetLineItemStableId = sql<string>`COALESCE(
 )`
 
 /**
+ * Resolves one display value for projections that expose a single budget label.
+ * @param column Qualified reference to the original English budget column.
+ * @returns English text when present, otherwise the French translation.
+ */
+export const budgetLineDisplayText = (column: `${string}.egcs_fc_${'costsubsection' | 'description'}`) =>
+  sql<string | null>`COALESCE(NULLIF(BTRIM(${sql.ref(column)}), ''), ${sql.ref(`${column}_fr`)})`
+
+/**
  * Resolves retained physical identities but always validates a live current counterpart.
  * @param db Agreement write database.
  * @param agreementId Owning Agreement.

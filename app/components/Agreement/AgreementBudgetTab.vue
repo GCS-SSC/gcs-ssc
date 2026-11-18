@@ -9,7 +9,9 @@ import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
 import { useActionContext } from '~/composables/useActionContext'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
-import { computed, onUnmounted, ref, shallowReactive, watch } from 'vue'
+import { computed, onUnmounted, ref, shallowReactive, useId, watch } from 'vue'
+import ActivityBilingualText from './ActivityBilingualText.vue'
+import CommonEitherLanguage from '~/components/Common/EitherLanguage.vue'
 import type { ExpandedState, Updater } from '@tanstack/vue-table'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -51,6 +53,8 @@ type JsonFetch = (
   }
 ) => Promise<unknown>
 
+type BilingualBudgetText = { english: string, french: string }
+
 type BudgetLeafRow = {
   id: string
   fiscalYearGroup: string
@@ -63,13 +67,14 @@ type BudgetLeafRow = {
   costCategoryNameEn: string
   costCategoryNameFr: string
   costCategoryLabel: string
-  costSubsectionLabel: string
+  costSubsection: BilingualBudgetText
   lineItemId?: string
   lineItemNameEn: string
   lineItemNameFr: string
   proponentNameEn?: string | null
   proponentNameFr?: string | null
   description: string
+  descriptionFr?: string
   totalAmount?: Money
   programFunding?: Money
   fundingSources?: FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources']
@@ -166,8 +171,8 @@ const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, Fundin
       id: lineItem.id,
       egcs_fc_fundingagreementbudgetfiscalyear: lineItem.egcs_fc_fundingagreementbudgetfiscalyear,
       egcs_fc_organizationcostcategory: lineItem.egcs_fc_organizationcostcategory,
-      egcs_fc_costsubsection: lineItem.egcs_fc_costsubsection,
-      egcs_fc_description: lineItem.egcs_fc_description,
+      egcs_fc_costsubsection_fr: lineItem.egcs_fc_costsubsection_fr ?? '',
+      egcs_fc_description_fr: lineItem.egcs_fc_description_fr ?? '',
       egcs_fc_totalamount: lineItem.egcs_fc_totalamount,
       egcs_fc_programfunding: lineItem.egcs_fc_programfunding,
       egcs_fc_fundingsources: lineItem.egcs_fc_fundingsources.map(source => ({ ...source })),
@@ -219,6 +224,7 @@ const lineItemPending = useCrudModalPending(lineItemModal.captureSession)
 const isSavingFiscalYear = fiscalYearPending.isPending
 const isSavingLineItem = lineItemPending.isPending
 const isLineItemCostCategoryLocked: Ref<boolean> = ref(false)
+const budgetLanguageInstructionId = useId()
 const isLineItemCostSubsectionLocked: Ref<boolean> = ref(false)
 const resourceBase = computed<string>(() => apiBase ?? `/api/agreements/${agreementId}`)
 const overviewEndpoint = computed<string>(() => `${resourceBase.value}/budget-overview`)
@@ -400,11 +406,13 @@ const filteredLineItems = computed(() => {
       lineItem.organization_cost_category_name_en,
       lineItem.organization_cost_category_name_fr,
       lineItem.egcs_fc_costsubsection,
+      lineItem.egcs_fc_costsubsection_fr,
       lineItem.line_item_name_en,
       lineItem.line_item_name_fr,
       lineItem.applicant_recipient_name_en,
       lineItem.applicant_recipient_name_fr,
-      lineItem.egcs_fc_description
+      lineItem.egcs_fc_description,
+      lineItem.egcs_fc_description_fr
     ]
 
     return searchableValues.some(value => String(value ?? '').toLowerCase().includes(normalizedSearch.value))
@@ -446,7 +454,7 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
       costCategoryNameEn: t('common.all'),
       costCategoryNameFr: t('common.all'),
       costCategoryLabel: t('common.all'),
-      costSubsectionLabel: t('common.all'),
+      costSubsection: { english: '', french: '' },
       lineItemNameEn: '',
       lineItemNameFr: '',
       description: '',
@@ -454,35 +462,40 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
     }]
   }
 
-  return rowsForFiscalYear.map((lineItem: FundingCaseAgreementBudgetLineItemRow) => ({
-    id: lineItem.id,
-    fiscalYearGroup: fiscalYear.id,
-    costCategoryGroup: lineItem.egcs_fc_organizationcostcategory,
-    costSubsectionGroup: lineItem.egcs_fc_costsubsection.trim().length > 0
-      ? lineItem.egcs_fc_costsubsection.trim()
-      : '__all__',
-    fiscalYearId: fiscalYear.id,
-    fiscalYearDisplay: getFiscalYearDisplay(fiscalYear.egcs_fc_fiscalyear, fiscalYear.fiscal_year_display),
-    costCategoryId: lineItem.egcs_fc_organizationcostcategory,
-    costCategoryAvailable: lineItem.cost_category_available,
-    costCategoryNameEn: lineItem.organization_cost_category_name_en ?? '',
-    costCategoryNameFr: lineItem.organization_cost_category_name_fr ?? '',
-    costCategoryLabel: getCostCategoryDisplay(lineItem),
-    costSubsectionLabel: lineItem.egcs_fc_costsubsection.trim().length > 0
-      ? lineItem.egcs_fc_costsubsection.trim()
-      : t('common.all'),
-    lineItemId: lineItem.id,
-    lineItemNameEn: lineItem.line_item_name_en ?? '',
-    lineItemNameFr: lineItem.line_item_name_fr ?? '',
-    proponentNameEn: lineItem.applicant_recipient_name_en,
-    proponentNameFr: lineItem.applicant_recipient_name_fr,
-    description: lineItem.egcs_fc_description,
-    totalAmount: lineItem.egcs_fc_totalamount,
-    programFunding: lineItem.egcs_fc_programfunding,
-    fundingSources: lineItem.egcs_fc_fundingsources,
-    currency: lineItem.egcs_fc_currency,
-    isPlaceholder: false
-  }))
+  return rowsForFiscalYear.map((lineItem: FundingCaseAgreementBudgetLineItemRow) => {
+    const costSubsection = {
+      english: lineItem.egcs_fc_costsubsection.trim(),
+      french: lineItem.egcs_fc_costsubsection_fr?.trim() ?? ''
+    }
+    return {
+      id: lineItem.id,
+      fiscalYearGroup: fiscalYear.id,
+      costCategoryGroup: lineItem.egcs_fc_organizationcostcategory,
+      costSubsectionGroup: costSubsection.english || costSubsection.french
+        ? encodeURIComponent(JSON.stringify([costSubsection.english, costSubsection.french]))
+        : '__all__',
+      fiscalYearId: fiscalYear.id,
+      fiscalYearDisplay: getFiscalYearDisplay(fiscalYear.egcs_fc_fiscalyear, fiscalYear.fiscal_year_display),
+      costCategoryId: lineItem.egcs_fc_organizationcostcategory,
+      costCategoryAvailable: lineItem.cost_category_available,
+      costCategoryNameEn: lineItem.organization_cost_category_name_en ?? '',
+      costCategoryNameFr: lineItem.organization_cost_category_name_fr ?? '',
+      costCategoryLabel: getCostCategoryDisplay(lineItem),
+      costSubsection,
+      lineItemId: lineItem.id,
+      lineItemNameEn: lineItem.line_item_name_en ?? '',
+      lineItemNameFr: lineItem.line_item_name_fr ?? '',
+      proponentNameEn: lineItem.applicant_recipient_name_en,
+      proponentNameFr: lineItem.applicant_recipient_name_fr,
+      description: lineItem.egcs_fc_description,
+      descriptionFr: lineItem.egcs_fc_description_fr,
+      totalAmount: lineItem.egcs_fc_totalamount,
+      programFunding: lineItem.egcs_fc_programfunding,
+      fundingSources: lineItem.egcs_fc_fundingsources,
+      currency: lineItem.egcs_fc_currency,
+      isPlaceholder: false
+    }
+  })
 }))
 
 const totalRecords = computed(() => tableRows.value.length)
@@ -672,7 +685,7 @@ const openCreateFiscalYear = () => openBudgetAction('create', 'budget-year', () 
 const openUpdateFiscalYear = (fiscalYear: FundingCaseAgreementBudgetFiscalYearRow) =>
   openBudgetAction('update', 'budget-year', () => fiscalYearModal.openUpdate(fiscalYear))
 
-const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: string, costSubsection?: string) => openBudgetAction('create', 'budget-line', async current => {
+const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: string, costSubsection?: BilingualBudgetText) => openBudgetAction('create', 'budget-line', async current => {
   if (organizationCostCategoryId) {
     let items = lineItems.value
     if (actionTarget) {
@@ -708,8 +721,9 @@ const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: 
     isLineItemCostCategoryLocked.value = true
   }
 
-  if (costSubsection !== undefined && costSubsection.length > 0) {
-    selectedLineItem.value.egcs_fc_costsubsection = costSubsection
+  if (costSubsection && (costSubsection.english || costSubsection.french)) {
+    selectedLineItem.value.egcs_fc_costsubsection = costSubsection.english
+    selectedLineItem.value.egcs_fc_costsubsection_fr = costSubsection.french
     isLineItemCostSubsectionLocked.value = true
   }
 })
@@ -1073,20 +1087,24 @@ const formatSignedBudgetDifference = (value: Money) => {
               class="group flex min-w-0 cursor-default items-center gap-3 text-left"
               :expanded="row.getIsExpanded?.() === true"
               :controls="getGroupedDisclosureControlsId(row.id)"
-              :label="row.original.costSubsectionLabel"
+              :label="[row.original.costSubsection.english, row.original.costSubsection.french].filter(Boolean).join(' / ') || t('common.all')"
               @toggle="row.toggleExpanded?.()">
               <UIcon
                 :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                 class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
-              <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                {{ row.original.costSubsectionLabel }}
-              </span>
+              <ActivityBilingualText
+                v-if="row.original.costSubsectionGroup !== '__all__'"
+                v-bind="row.original.costSubsection"
+                class="whitespace-normal break-words text-sm font-medium text-zinc-700 dark:text-zinc-200" />
+              <span v-else class="text-sm font-medium text-zinc-700 dark:text-zinc-200">{{ t('common.all') }}</span>
               <CommonStatusBadge variant="count" size="sm" :label="String(getGroupedRowCount(row as GroupedBudgetRow))" />
             </CommonGroupedDisclosureButton>
             <div v-else class="flex min-w-0 items-center gap-3">
-              <span class="ml-7 text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                {{ row.original.costSubsectionLabel }}
-              </span>
+              <ActivityBilingualText
+                v-if="row.original.costSubsectionGroup !== '__all__'"
+                v-bind="row.original.costSubsection"
+                class="ml-7 whitespace-normal break-words text-sm font-medium text-zinc-700 dark:text-zinc-200" />
+              <span v-else class="ml-7 text-sm font-medium text-zinc-700 dark:text-zinc-200">{{ t('common.all') }}</span>
               <CommonStatusBadge variant="count" size="sm" :label="String(getGroupedRowCount(row as GroupedBudgetRow))" />
             </div>
           </div>
@@ -1123,9 +1141,10 @@ const formatSignedBudgetDifference = (value: Money) => {
               <p :lang="locale" class="leading-tight font-bold text-zinc-900 dark:text-white">
                 {{ getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
               </p>
-              <p class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
-                {{ row.original.description }}
-              </p>
+              <ActivityBilingualText
+                :english="row.original.description"
+                :french="row.original.descriptionFr"
+                class="min-w-0 max-w-full whitespace-normal break-words text-xs text-muted" />
               <p v-if="hasMultipleProponents && (row.original.proponentNameEn || row.original.proponentNameFr)" :lang="locale" class="text-xs text-muted">
                 {{ getBilingualValue({ name_en: row.original.proponentNameEn, name_fr: row.original.proponentNameFr }, 'name', '') }}
               </p>
@@ -1223,7 +1242,7 @@ const formatSignedBudgetDifference = (value: Money) => {
             size="sm"
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
-            @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId, row.original.costSubsectionGroup === '__all__' ? '' : row.original.costSubsectionLabel)" />
+            @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId, row.original.costSubsection)" />
         </div>
 
         <div v-else-if="row.original.fundingKind === 'other'" class="flex items-center gap-2">
@@ -1380,13 +1399,6 @@ const formatSignedBudgetDifference = (value: Money) => {
                 @resolved-items="hydrateCalculation" />
             </UFormField>
 
-            <UFormField :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection">
-              <UInput
-                v-model="selectedLineItem.egcs_fc_costsubsection"
-                :placeholder="t('agreement.budget.cost_subsection_placeholder')"
-                :readonly="isLineItemCostSubsectionLocked" />
-            </UFormField>
-
             <UFormField :label="t('agreement.budget.currency')" name="egcs_fc_currency" required>
               <CommonEnumSelect
                 v-model="selectedLineItem.egcs_fc_currency"
@@ -1421,13 +1433,76 @@ const formatSignedBudgetDifference = (value: Money) => {
               allow-description
               class="lg:col-span-2"
               @update:model-value="selectedLineItem.egcs_fc_fundingsources = $event" />
+          </div>
 
-            <UFormField :label="t('common.description')" name="egcs_fc_description" class="lg:col-span-2">
-              <CommonTextarea
-                v-model="selectedLineItem.egcs_fc_description"
-                :rows="5"
-                :placeholder="t('agreement.budget.description_placeholder')" />
-            </UFormField>
+          <p :id="budgetLanguageInstructionId" class="text-sm text-muted">
+            {{ t('agreement.budget.language_instruction') }}
+          </p>
+
+          <div class="grid gap-6 lg:grid-cols-2">
+            <fieldset class="min-w-0 space-y-4">
+              <legend class="mb-2 font-semibold">
+                {{ t('agreement.budget.english') }}
+              </legend>
+
+              <UFormField :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection">
+                <template #label>
+                  {{ t('agreement.budget.cost_subsection') }}
+                  <CommonEitherLanguage fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
+                </template>
+                <UInput
+                  v-model="selectedLineItem.egcs_fc_costsubsection"
+                  :aria-describedby="budgetLanguageInstructionId"
+                  :placeholder="t('agreement.budget.cost_subsection_placeholder')"
+                  :readonly="isLineItemCostSubsectionLocked"
+                  class="w-full" />
+              </UFormField>
+
+              <UFormField :label="t('common.description')" name="egcs_fc_description">
+                <template #label>
+                  {{ t('common.description') }}
+                  <CommonEitherLanguage fields="egcs_fc_description egcs_fc_description_fr" />
+                </template>
+                <CommonTextarea
+                  v-model="selectedLineItem.egcs_fc_description"
+                  :aria-describedby="budgetLanguageInstructionId"
+                  :rows="5"
+                  :placeholder="t('agreement.budget.description_placeholder')"
+                  class="w-full" />
+              </UFormField>
+            </fieldset>
+
+            <fieldset class="min-w-0 space-y-4">
+              <legend class="mb-2 font-semibold">
+                {{ t('agreement.budget.french') }}
+              </legend>
+
+              <UFormField :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection_fr">
+                <template #label>
+                  {{ t('agreement.budget.cost_subsection') }}
+                  <CommonEitherLanguage fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
+                </template>
+                <UInput
+                  v-model="selectedLineItem.egcs_fc_costsubsection_fr"
+                  :aria-describedby="budgetLanguageInstructionId"
+                  :placeholder="t('agreement.budget.cost_subsection_placeholder')"
+                  :readonly="isLineItemCostSubsectionLocked"
+                  class="w-full" />
+              </UFormField>
+
+              <UFormField :label="t('common.description')" name="egcs_fc_description_fr" data-ui-target="agreement.budget-tab.line_item_description_fr">
+                <template #label>
+                  {{ t('common.description') }}
+                  <CommonEitherLanguage fields="egcs_fc_description egcs_fc_description_fr" />
+                </template>
+                <CommonTextarea
+                  v-model="selectedLineItem.egcs_fc_description_fr"
+                  :aria-describedby="budgetLanguageInstructionId"
+                  :rows="5"
+                  :placeholder="t('agreement.budget.description_placeholder')"
+                  class="w-full" />
+              </UFormField>
+            </fieldset>
           </div>
 
           <div class="flex justify-end gap-2 pt-4">

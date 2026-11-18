@@ -2,7 +2,10 @@ import type { H3Event } from 'h3'
 import { parseI18n } from './api-validate'
 import {
   FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
+  FundingCaseAgreementBudgetLineTextSchema,
+  budgetLineTextPairs,
   FundingCaseAgreementPeriodRangeSchema,
+  type FundingCaseAgreementBudgetLineItem,
   type FundingCaseAgreementBudgetLineItemPatch,
   type FundingCaseAgreementClaimPatch,
   type FundingCaseAgreementPaymentPatch
@@ -37,6 +40,23 @@ export const validateMergedBudgetLineItemFundingPatch = async (
   egcs_fc_programfunding: patch.egcs_fc_programfunding ?? existing.egcs_fc_programfunding,
   egcs_fc_fundingsources: patch.egcs_fc_fundingsources ?? existing.egcs_fc_fundingsources
 })
+
+/**
+ * Validates effective bilingual text when a locked Budget line patch changes a translation.
+ *
+ * @param event - Request event used for localized validation errors.
+ * @param existing - Persisted text read under the write lock.
+ * @param patch - Validated sparse request body.
+ */
+export const validateMergedBudgetLineTextPatch = async (
+  event: H3Event,
+  existing: Pick<FundingCaseAgreementBudgetLineItem, typeof budgetLineTextPairs[number][number]>,
+  patch: FundingCaseAgreementBudgetLineItemPatch
+) => {
+  if (budgetLineTextPairs.some(pair => pair.some(field => Object.hasOwn(patch, field)))) {
+    await parseI18n(event, FundingCaseAgreementBudgetLineTextSchema, { ...existing, ...patch })
+  }
+}
 
 /**
  * Validates a sparse Claim or Payment patch against its complete locked period.

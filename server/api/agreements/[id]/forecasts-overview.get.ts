@@ -3,7 +3,7 @@ import { getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-
 import { sql } from 'kysely'
 import { defineEventHandler, type H3Event } from 'h3'
 import { prepareAgreementForecastRoute } from '~~/server/utils/agreement-forecast'
-import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
+import { budgetLineDisplayText, budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -110,8 +110,8 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         'Funding_Case_Agreement_Budget_Line_Item.id as budget_row_id',
         budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('egcs_fc_costsubsection'),
+        budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description').as('egcs_fc_description'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as egcs_fc_currency',
@@ -195,11 +195,15 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         sql<string>`COALESCE("Source_Budget".stable_year_id, "Funding_Case_Agreement_Forecast".egcs_fc_fiscalyear)`.as('budget_fiscal_year_id'),
         sql<string>`COALESCE("Source_Budget".stable_line_id, "Funding_Case_Agreement_Forecast_Line_Item".egcs_fc_fundingagreementbudgetlineitem)`.as('budget_line_stable_id'),
         sql<boolean>`"Current_Budget".id IS NOT NULL`.as('budget_line_available'),
-        sql<string | null>`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_description ELSE "Source_Budget".egcs_fc_description END`.as('budget_line_description'),
+        sql<string | null>`CASE WHEN "Current_Budget".id IS NOT NULL
+          THEN ${budgetLineDisplayText('Current_Budget.egcs_fc_description')}
+          ELSE ${budgetLineDisplayText('Source_Budget.egcs_fc_description')} END`.as('budget_line_description'),
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as budget_fiscal_year_display',
         'Agency_Cost_Category.egcs_ay_name_en as organization_cost_category_name_en',
         'Agency_Cost_Category.egcs_ay_name_fr as organization_cost_category_name_fr',
-        sql<string | null>`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_costsubsection ELSE "Source_Budget".egcs_fc_costsubsection END`.as('egcs_fc_costsubsection'),
+        sql<string | null>`CASE WHEN "Current_Budget".id IS NOT NULL
+          THEN ${budgetLineDisplayText('Current_Budget.egcs_fc_costsubsection')}
+          ELSE ${budgetLineDisplayText('Source_Budget.egcs_fc_costsubsection')} END`.as('egcs_fc_costsubsection'),
         'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
         'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr',
         databaseMoneyText(sql`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_totalamount ELSE "Source_Budget".egcs_fc_totalamount END`).as('budget_line_total_amount'),

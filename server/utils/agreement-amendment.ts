@@ -320,7 +320,7 @@ const cloneBudgetVersionRows = async (
       .selectFrom('Funding_Case_Agreement_Budget_Line_Item')
       .select([
         'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_organizationcostcategory', 'egcs_fc_applicantrecipient',
-        'egcs_fc_costsubsection', 'egcs_fc_description',
+        'egcs_fc_costsubsection', 'egcs_fc_costsubsection_fr', 'egcs_fc_description', 'egcs_fc_description_fr',
         'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('egcs_fc_programfunding')).as('egcs_fc_programfunding'),
@@ -343,7 +343,9 @@ const cloneBudgetVersionRows = async (
         egcs_fc_percentage: line.egcs_fc_percentage,
         egcs_fc_allowpercentageoverride: line.egcs_fc_allowpercentageoverride,
         egcs_fc_costsubsection: line.egcs_fc_costsubsection,
+        egcs_fc_costsubsection_fr: line.egcs_fc_costsubsection_fr,
         egcs_fc_description: line.egcs_fc_description,
+        egcs_fc_description_fr: line.egcs_fc_description_fr,
         egcs_fc_totalamount: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)),
         egcs_fc_programfunding: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_programfunding, line.egcs_fc_currency)),
         egcs_fc_currency: line.egcs_fc_currency,
