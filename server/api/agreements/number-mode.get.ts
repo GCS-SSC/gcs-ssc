@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { authorize } from '~~/server/utils/authorize'
 import { canAccessAgreementStream, resolveAgreementStreamScopeContext } from '~~/server/utils/agreement'
+import { resolveAgreementFinancialNumberPolicy } from '~~/server/utils/agreement-financial-number-provider'
 import { resolveAgreementNumberProvider } from '~~/server/utils/agreement-number-provider'
 
 /** Resolves numbering presentation without allocating a number or exposing configuration. */
@@ -15,5 +16,10 @@ export default defineEventHandler(async event => {
     if (await canAccessAgreementStream(context, 'create', owner.scope, db)) return { bypass: true }
     return { scope: owner.scope }
   })
-  return { mode: await resolveAgreementNumberProvider(event, db, owner.agencyId, streamId) ? 'generated' : 'manual' }
+  return {
+    mode: await resolveAgreementNumberProvider(event, db, owner.agencyId, streamId) ? 'generated' : 'manual',
+    financialNumberPolicy: await resolveAgreementFinancialNumberPolicy(event, db, {
+      operation: 'create', agencyId: owner.agencyId, streamId, agreementId: null, currentValue: null
+    })
+  }
 })

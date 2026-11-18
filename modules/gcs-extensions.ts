@@ -71,6 +71,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'extension-lifecycle-hooks',
   'lifecycle-entities',
   'agreement-number-provider',
+  'agreement-financial-number-provider',
   'coding-allocator',
   'configuration-access',
   'scheduled-agreement-import',
@@ -346,6 +347,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.nitroPlugin), 'extension-lifecycle-hooks')
   addImpliedCapability(capabilities, (definition.entities ?? []).length > 0, 'lifecycle-entities')
   addImpliedCapability(capabilities, Boolean(definition.agreementNumberProvider), 'agreement-number-provider')
+  addImpliedCapability(capabilities, Boolean(definition.agreementFinancialNumberProvider), 'agreement-financial-number-provider')
   addImpliedCapability(capabilities, Boolean(definition.codingAllocator), 'coding-allocator')
   addImpliedCapability(capabilities, definition.configurationAccess !== undefined, 'configuration-access')
   addImpliedCapability(capabilities, Boolean(definition.auditOwnership?.length), 'audit-ownership')
@@ -540,6 +542,9 @@ export const validateExtensionDefinition = (definition: GcsExtensionDefinition, 
     if (!declaredCapabilities.has(capability)) {
       throw new Error(`Extension ${definition.key} must declare required host capability "${capability}"`)
     }
+  }
+  if (declaredCapabilities.has('agreement-financial-number-provider') && !definition.agreementFinancialNumberProvider?.path) {
+    throw new Error(`Extension ${definition.key} field "agreementFinancialNumberProvider.path" is required`)
   }
   const serverHandlers = definition.serverHandlers ?? []
   validateExtensionServerHandlerRoutes(definition.key, serverHandlers)
@@ -1146,6 +1151,9 @@ const resolveExtensionDirectory = async (
   const agreementNumberProvider = definition.agreementNumberProvider
     ? { path: await assertContainedPath(canonicalExtensionDir, definition.agreementNumberProvider.path, 'agreementNumberProvider.path') }
     : undefined
+  const agreementFinancialNumberProvider = definition.agreementFinancialNumberProvider
+    ? { path: await assertContainedPath(canonicalExtensionDir, definition.agreementFinancialNumberProvider.path, 'agreementFinancialNumberProvider.path') }
+    : undefined
   const notificationProvider = await resolveNotificationProvider(canonicalExtensionDir, definition)
   const fileStorageProvider = await resolveFileStorageProvider(canonicalExtensionDir, definition)
   const codingAllocator = definition.codingAllocator
@@ -1173,6 +1181,7 @@ const resolveExtensionDirectory = async (
     runtime,
     nitroPlugin,
     agreementNumberProvider,
+    agreementFinancialNumberProvider,
     codingAllocator,
     notificationProvider,
     fileStorageProvider
@@ -1308,7 +1317,7 @@ const serializeClientExtension = (extension: GcsResolvedExtension): string =>
   JSON.stringify(buildClientExtensionMetadata(extension))
 
 const registryContributionId = (
-  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number' | 'coding_allocator' | 'notification_adapter',
+  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number' | 'agreement_financial_number' | 'coding_allocator' | 'notification_adapter',
   extension: GcsResolvedExtension,
   identityParts: string[]
 ): string => {
@@ -1424,6 +1433,13 @@ export const buildExtensionServerRegistry = (
     if (agreementNumberProvider && extension.agreementNumberProvider) {
       registerContributionLoader(agreementNumberProvider.id, extension.agreementNumberProvider.path)
     }
+    const financialProvider = extension.agreementFinancialNumberProvider
+    const agreementFinancialNumberProvider = financialProvider
+      ? { id: registryContributionId('agreement_financial_number', extension, [extensionRelativePath(extension, financialProvider.path)]) }
+      : undefined
+    if (agreementFinancialNumberProvider && financialProvider) {
+      registerContributionLoader(agreementFinancialNumberProvider.id, financialProvider.path)
+    }
     const codingAllocator = extension.codingAllocator
       ? { id: registryContributionId('coding_allocator', extension, [extensionRelativePath(extension, extension.codingAllocator.path)]) }
       : undefined
@@ -1475,6 +1491,7 @@ export const buildExtensionServerRegistry = (
       fileStorageProvider,
       notificationProvider,
       agreementNumberProvider,
+      agreementFinancialNumberProvider,
       codingAllocator,
       runtime,
       nitroPlugin

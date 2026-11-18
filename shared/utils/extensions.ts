@@ -59,6 +59,7 @@ export interface GcsRegisteredExtensionRuntime {
 export interface GcsRegisteredExtension extends Omit<GcsClientExtensionManifest, 'notificationProvider'> {
   auditOwnership?: GcsAuditTableOwnership[]
   agreementNumberProvider?: { id: string }
+  agreementFinancialNumberProvider?: { id: string }
   codingAllocator?: { id: string }
   packageName: string
   requiredHostCapabilities: GcsExtensionHostCapability[]

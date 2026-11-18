@@ -33,6 +33,12 @@ import type {
   FundingCaseAgreementProfileItem
 } from './schemas'
 
+export interface AgreementFinancialNumberPolicy {
+  required: boolean
+  readOnly: boolean
+  value?: string | null
+}
+
 export interface FundingCaseAgreementProfileRow extends FundingCaseAgreementProfileItem, BusinessRecordStateFields {
   egcs_fc_status: StatusId
   agency_id: string

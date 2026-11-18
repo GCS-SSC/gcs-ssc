@@ -56,6 +56,7 @@ const RequiredBigintLike = () =>
     .transform(value => value.trim())
     .refine(value => value.length > 0, { error: 'validation.required' })
     .refine(isCanonicalNonNegativePostgresBigintText, { error: 'validation.invalid_number' }).meta({ formRequired: true })
+export const AgreementFinancialSystemNumberSchema = RequiredBigintLike().nullable()
 const OptionalDecimal = (precision: number, scale: number) => z.preprocess(
   value => value === '' || value === null || value === undefined ? undefined : value,
   z.coerce.number()
@@ -108,7 +109,7 @@ export const FundingCaseAgreementProfileBaseSchema = z.object({
   egcs_fc_agreementnumber: AgreementProfileText(15),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_fc_transferpaymentstream: RequiredBigintSelectionId(),
-  egcs_fc_financialsystemnumber: RequiredBigintLike(),
+  egcs_fc_financialsystemnumber: AgreementFinancialSystemNumberSchema.optional().meta({ formRequired: false }),
   egcs_fc_title_en: AgreementProfileText(255),
   egcs_fc_title_fr: AgreementProfileText(255),
   egcs_fc_description_en: AgreementProfileText(),

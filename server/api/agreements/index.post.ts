@@ -5,6 +5,7 @@ import { isGcsExtensionUserError } from '@gcs-ssc/extensions/server'
 import { assertAgreementFinancialId } from '~~/server/utils/agreement-financial-ids'
 import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
 import { resolveAgreementNumberProvider, generateAgreementNumber } from '~~/server/utils/agreement-number-provider'
+import { applyAgreementFinancialNumberPolicy } from '~~/server/utils/agreement-financial-number-provider'
 import { mergeAgreementCustomFields } from '~~/server/utils/agreement-custom-fields'
 import type { Insertable } from 'kysely'
 import { parseI18n } from '~~/server/utils/api-validate'
@@ -118,6 +119,10 @@ export default defineEventHandler(async event => {
           })
 
           const validated = { ...requested }
+          validated.egcs_fc_financialsystemnumber = await applyAgreementFinancialNumberPolicy(event, trx, {
+            operation: 'create', agreementId: null, currentValue: null, streamId,
+            agencyId: currentStreamContext.agencyId, submittedValue: requested.egcs_fc_financialsystemnumber
+          })
           const provider = await resolveAgreementNumberProvider(event, trx, currentStreamContext.agencyId, streamId)
           if (provider && validated.egcs_fc_agreementnumber !== undefined) {
             return await badRequest(event, 'AGREEMENT_NUMBER_MANAGED', 'apiErrors.agreement.number_managed')
@@ -202,7 +207,7 @@ export default defineEventHandler(async event => {
                     'agreement.title_en': validated.egcs_fc_title_en, 'agreement.title_fr': validated.egcs_fc_title_fr,
                     'agreement.startDate': validated.egcs_fc_authorizedassistancestartdate.toISOString().split('T')[0]!,
                     'agreement.endDate': validated.egcs_fc_authorizedassistanceenddate.toISOString().split('T')[0]!,
-                    'agreement.financialSystemNumber': String(validated.egcs_fc_financialsystemnumber),
+                    'agreement.financialSystemNumber': validated.egcs_fc_financialsystemnumber ?? '',
                     'agency.id': currentStreamContext.agencyId,
                     'agency.name_en': currentStreamContext.agencyNameEn, 'agency.name_fr': currentStreamContext.agencyNameFr,
                     'program.id': currentStreamContext.profileId,

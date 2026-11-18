@@ -142,6 +142,25 @@ export default defineEventHandler(async event => {
     await authorizeWithFreshAuthContext(event, authContext, 'agency', configurationAction, scope)
 
     if (body.enabled) {
+      if (extension.agreementFinancialNumberProvider) {
+        const otherProviderKeys = extensions
+          .filter(item => item.key !== extension.key && item.agreementFinancialNumberProvider)
+          .map(item => item.key)
+        const conflict = otherProviderKeys.length > 0 && await trx.selectFrom('extensions.agency_enablement')
+          .select('id')
+          .where('agency_id', '=', agencyId)
+          .where('extension_key', 'in', otherProviderKeys)
+          .where('enabled', '=', true)
+          .where('_deleted', '=', false)
+          .executeTakeFirst()
+        if (conflict) {
+          return await throwApiError(event, {
+            statusCode: 409,
+            code: 'AGREEMENT_FINANCIAL_NUMBER_PROVIDER_CONFLICT',
+            key: 'apiErrors.extensions.agreement_financial_number_provider_conflict'
+          })
+        }
+      }
       try {
         await runExtensionMigrations(trx, extension)
       } catch {

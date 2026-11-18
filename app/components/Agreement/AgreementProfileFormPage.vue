@@ -4,12 +4,14 @@ import type { ActionContext } from '~/composables/useActionContext'
 import { computed, ref, shallowRef, unref, watch } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import type { Form, FormSchema } from '@nuxt/ui'
+import type { z } from 'zod'
 import {
   FundingCaseAgreementCreateSchema,
   FundingCaseAgreementGeneratedCreateSchema,
   FundingCaseAgreementProfileSchema
 } from '~~/shared/types/schemas'
-import type { FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
+import type { AgreementFinancialNumberPolicy, FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 
 const {
   submitLabel,
@@ -20,7 +22,8 @@ const {
   agreementId,
   compact = false,
   pending = false,
-  numberMode = 'manual'
+  numberMode = 'manual',
+  financialNumberPolicy
 } = defineProps<{
   submitLabel: string
   editorSession: number
@@ -31,6 +34,7 @@ const {
   compact?: boolean
   pending?: boolean
   numberMode?: 'manual' | 'generated' | null
+  financialNumberPolicy?: AgreementFinancialNumberPolicy
 }>()
 
 const model = defineModel<FundingCaseAgreementProfileForm>('model', { required: true })
@@ -40,9 +44,21 @@ const emit = defineEmits<{
 }>()
 
 const { createValidator } = useZodI18n()
-const validate = computed(() => createValidator(permissionAction === 'create'
+const profileSchema = (): z.ZodType<Pick<FundingCaseAgreementProfileForm, 'egcs_fc_financialsystemnumber'>> => permissionAction === 'create'
   ? numberMode === 'generated' ? FundingCaseAgreementGeneratedCreateSchema : FundingCaseAgreementCreateSchema
-  : FundingCaseAgreementProfileSchema))
+  : FundingCaseAgreementProfileSchema
+const validate = withFormRequirements((state: unknown) => {
+  const schema = profileSchema()
+  return createValidator(financialNumberPolicy?.required
+    ? schema.refine(data => data.egcs_fc_financialsystemnumber != null, {
+        error: 'validation.required',
+        path: ['egcs_fc_financialsystemnumber']
+      })
+    : schema)(state)
+}, profileSchema)
+const validationState = computed(() => financialNumberPolicy?.value === undefined
+  ? model.value
+  : { ...model.value, egcs_fc_financialsystemnumber: financialNumberPolicy.value })
 
 const formSession = ref(0)
 watch(() => [editorSession, permissionAction, agreementId], () => {
@@ -90,7 +106,7 @@ const renderedFormBinding = computed(() => {
     <UForm
       v-bind="renderedFormBinding"
       ref="form"
-      :state="model"
+      :state="validationState"
       :validate="validate"
       :validate-on="[]"
       :disabled="permissionAction === 'create' && pending"
@@ -100,6 +116,7 @@ const renderedFormBinding = computed(() => {
           v-model:model="model"
           :agreement-id="agreementId"
           :permission-action="permissionAction"
+          :financial-number-policy="financialNumberPolicy"
           :number-generated="permissionAction === 'create' && numberMode === 'generated'" />
 
         <AgreementFieldsAgreementApplicantRecipientsField

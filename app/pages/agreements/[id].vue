@@ -13,7 +13,7 @@ import { useAgreementChildActionPrerequisites } from '~/composables/useAgreement
 import type { Ref } from 'vue'
 import type { RouteParamsGeneric } from 'vue-router'
 import { appRouteLocations } from '~/utils/route-locations'
-import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
+import type { AgreementFinancialNumberPolicy, FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
@@ -70,6 +70,8 @@ type AgreementDetailForm = FundingCaseAgreementProfileForm & {
 }
 
 type AgreementDetailProfile = FundingCaseAgreementProfileRow & {
+  financialNumberPolicy?: AgreementFinancialNumberPolicy
+  financialNumberPolicyUnavailable?: boolean
   risk_workflow_managed?: boolean
   has_risk_rating_runs?: boolean
   latest_risk_rating_run?: {
@@ -139,13 +141,14 @@ const { user: currentActor, permissionRevision } = useAuth()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)
+const canEditProfile = computed(() => canUpdateBusinessRecord.value && !profile.value?.financialNumberPolicyUnavailable)
 const canCreateFinancialChildRole = computed(() => profile.value?.can_create_child_records_role === true)
 const canUpdateFinancialChildRole = computed(() => profile.value?.can_update_child_records_role === true)
 const canDeleteFinancialChildRole = computed(() => profile.value?.can_delete_child_records_role === true)
 const actionContext = useActionContext({
   identity: [() => id, () => profile.value?.agency_id, () => profile.value?.program_id],
   authority: canUpdateFinancialChildRole,
-  eligible: canUpdateBusinessRecord
+  eligible: canEditProfile
 })
 const mutations = useEditorMutationCoordinator({ getDraft: () => selectedProfile.value, context: actionContext })
 const isSaving = mutations.isPending
@@ -331,8 +334,13 @@ const hydrateProfile = (value: AgreementDetailProfile | null) => {
     return
   }
 
+  const {
+    financialNumberPolicy: _financialNumberPolicy,
+    financialNumberPolicyUnavailable: _financialNumberPolicyUnavailable,
+    ...profileFields
+  } = value
   selectedProfile.value = {
-    ...value,
+    ...profileFields,
     egcs_fc_authorizedassistancestartdate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistancestartdate)),
     egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistanceenddate))
   }
@@ -375,6 +383,8 @@ const submit = async () => {
       const currentFields = profile.value?.egcs_fc_customfields ?? {}
       const changedFields = Object.fromEntries(Object.entries(body.egcs_fc_customfields ?? {}).filter(([key, value]) => value !== currentFields[key]))
       body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
+      const policy = profile.value?.financialNumberPolicy
+      if (policy?.readOnly || policy?.value !== undefined) delete body.egcs_fc_financialsystemnumber
 
       stage = 'writing'
       const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
@@ -443,7 +453,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               </UAlert>
             </template>
             <AgreementProfileFormPage
-              v-if="selectedTab === 'general' && selectedProfile && canUpdateBusinessRecord"
+              v-if="selectedTab === 'general' && selectedProfile && canEditProfile"
               v-model:model="selectedProfile"
               :action-context="actionContext"
               :editor-session="profileFormSession"
@@ -451,11 +461,21 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               :cancel-label="t('common.cancel')"
               permission-action="update"
               :agreement-id="id"
+              :financial-number-policy="profile.financialNumberPolicy"
               :pending="isSaving"
               @submit="submit"
               @cancel="cancel" />
 
             <div v-else-if="selectedTab === 'general'" class="space-y-4">
+              <UAlert
+                v-if="profile.financialNumberPolicyUnavailable && canUpdateFinancialChildRole"
+                color="error"
+                icon="i-lucide-circle-alert"
+                :title="t('apiErrors.agreement.financial_number_provider_invalid')">
+                <template #actions>
+                  <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshProfile" />
+                </template>
+              </UAlert>
               <div v-if="canUpdateFinancialChildRole" class="flex justify-end">
                 <UButton data-help-target="agreement.detail.edit-profile" data-help-kind="button" :label="t('common.edit')" :loading="isCheckingProfileEdit" :disabled="isCheckingProfileEdit || isSaving" @click="requestProfileEdit" />
               </div>

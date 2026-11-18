@@ -5,6 +5,7 @@ import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/util
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { hasAgreementRiskRatingRuns, isAgreementRiskRatingWorkflowManaged, resolveLatestAgreementRiskRating, resolveAgreementRiskSource } from '~~/server/utils/agreement-risk-rating'
 import { readAssignedAgencyCustomFieldDefinitions, validatePersistedAgreementCustomFieldSelections } from '~~/server/utils/agreement-custom-fields'
+import { isAgreementFinancialNumberProviderError, resolveAgreementFinancialNumberPolicy } from '~~/server/utils/agreement-financial-number-provider'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 // eslint-disable-next-line local/require-authorize -- executeFreshReadSnapshot rebuilds auth before the in-snapshot authorization.
@@ -133,6 +134,16 @@ export default defineEventHandler(async event => {
       canAccessAgreement(context, 'delete', agreementContext.scope, db)
     ])
 
+    const financialNumber = canUpdate
+      ? await resolveAgreementFinancialNumberPolicy(event, db, {
+          operation: 'edit', agencyId: agreementContext.agencyId, streamId: agreementContext.streamId,
+          agreementId: id, currentValue: agreement.egcs_fc_financialsystemnumber
+        }).then(financialNumberPolicy => ({ financialNumberPolicy })).catch((error: unknown) => {
+          if (!isAgreementFinancialNumberProviderError(error)) throw error
+          return { financialNumberPolicyUnavailable: true }
+        })
+      : {}
+
     return {
       ...agreementWithState,
       egcs_fc_holdback: parseSafeDecimal(String(agreementWithState.egcs_fc_holdback)),
@@ -144,6 +155,7 @@ export default defineEventHandler(async event => {
       can_create_child_records_role: context.userAbilities.authorize('agreement', 'create', agreementContext.scope),
       can_update_child_records_role: context.userAbilities.authorize('agreement', 'update', agreementContext.scope),
       can_delete_child_records_role: context.userAbilities.authorize('agreement', 'delete', agreementContext.scope),
+      ...financialNumber,
       can_update: canUpdate,
       can_delete: canDelete,
       can_create_child_records: canCreateChildRecords,

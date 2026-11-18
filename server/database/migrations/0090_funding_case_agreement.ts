@@ -1137,7 +1137,7 @@ CREATE TABLE "Funding_Case_Agreement_Profile" (
   "egcs_fc_currency" currency_codes NOT NULL,
   "egcs_fc_transferpaymentstream" bigint NOT NULL,
   "egcs_fc_customfields" jsonb DEFAULT '{}'::jsonb NOT NULL,
-  "egcs_fc_financialsystemnumber" bigint NOT NULL,
+  "egcs_fc_financialsystemnumber" bigint,
   "egcs_fc_title_en" character varying(255) NOT NULL,
   "egcs_fc_title_fr" character varying(255) NOT NULL,
   "egcs_fc_description_en" text NOT NULL,

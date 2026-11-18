@@ -1319,7 +1319,7 @@ export interface FundingCaseAgreementProfileTable {
   id: Generated<string>
   egcs_fc_agreementnumber: string
   egcs_fc_transferpaymentstream: string
-  egcs_fc_financialsystemnumber: string
+  egcs_fc_financialsystemnumber: string | null
   egcs_fc_title_en: string
   egcs_fc_title_fr: string
   egcs_fc_description_en: string

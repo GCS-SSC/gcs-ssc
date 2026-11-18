@@ -8,6 +8,7 @@ import type { Ref } from 'vue'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { GcsAgreementDescriptionsExtensionContext, GcsAgreementProfileExtensionContext } from '~~/shared/utils/extensions'
 import type {
+  AgreementFinancialNumberPolicy,
   FundingCaseAgreementProfileForm,
   FundingCaseAgreementSubtypeLookupItem
 } from '~~/shared/types/funding-case-agreement-ui'
@@ -16,12 +17,14 @@ const {
   permissionAction,
   agreementId,
   namePrefix = '',
-  numberGenerated = false
+  numberGenerated = false,
+  financialNumberPolicy
 } = defineProps<{
   permissionAction: 'create' | 'update'
   agreementId?: string
   namePrefix?: string
   numberGenerated?: boolean
+  financialNumberPolicy?: AgreementFinancialNumberPolicy
 }>()
 
 const model = defineModel<FundingCaseAgreementProfileForm>('model', {
@@ -37,6 +40,20 @@ provideBilingualFieldScope(() => model.value.egcs_fc_transferpaymentstream
 
 const { t } = useI18n()
 const field = useFormFieldPath(() => namePrefix)
+const financialNumberReadOnly = computed(() => financialNumberPolicy?.readOnly || financialNumberPolicy?.value !== undefined)
+const financialNumberValue = computed(() => financialNumberPolicy?.value !== undefined
+  ? financialNumberPolicy.value
+  : model.value.egcs_fc_financialsystemnumber)
+
+/**
+ * Preserves an explicit clear for PATCH and leaves provider-owned values to the host.
+ * @param value - Financial number input text.
+ */
+const setFinancialNumber = (value: string | null | undefined) => {
+  if (!financialNumberReadOnly.value) {
+    model.value = { ...model.value, egcs_fc_financialsystemnumber: value?.trim() ? value : null }
+  }
+}
 
 const selectedProgramId: Ref<string | undefined> = ref(undefined)
 
@@ -426,11 +443,16 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
         <CommonEnumSelect v-model="model.egcs_fc_currency" name="currency_codes" :disabled="permissionAction === 'update'" />
       </UFormField>
 
-      <UFormField :label="t('agreement.financial_system_number')" :name="field('egcs_fc_financialsystemnumber')">
+      <UFormField
+        :label="t('agreement.financial_system_number')"
+        :name="field('egcs_fc_financialsystemnumber')"
+        :required="financialNumberPolicy?.required ?? false">
         <UInput
-          v-model="model.egcs_fc_financialsystemnumber"
+          :model-value="financialNumberValue ?? ''"
           :placeholder="t('agreement.financial_system_number_placeholder')"
-          inputmode="numeric" />
+          :readonly="financialNumberReadOnly"
+          inputmode="numeric"
+          @update:model-value="setFinancialNumber" />
       </UFormField>
 
       <UFormField :label="t('agreement.authorized_assistance_start_date')" :name="field('egcs_fc_authorizedassistancestartdate')">

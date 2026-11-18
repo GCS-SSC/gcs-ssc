@@ -1,3 +1,4 @@
+import { applyAgreementApprovalFinancialNumber } from './agreement-financial-number-provider'
 import { canAdmitWorkflowForTarget } from './workflow-terminalization-admission'
 import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { assertAgreementPaymentCommitmentCurrent } from './agreement-payment-commitment-controls'
@@ -502,6 +503,7 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
   const agreementId = String(submission.egcs_fc_fundingagreement)
   await assertAgreementCorrectionFinancialUnlocked(trx, agreementId)
   const amendmentId = submission.egcs_fc_amendment === null ? null : String(submission.egcs_fc_amendment)
+  if (!amendmentId) await applyAgreementApprovalFinancialNumber(trx, agreementId, String(run.id))
   if (!amendmentId && packet.sourceVersions.budget) {
     const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
       .select('egcs_fc_transferpaymentstream').where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()

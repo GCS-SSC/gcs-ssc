@@ -1373,6 +1373,7 @@
       "agency_disabled": "Enable this extension for the agency before configuring it on a stream.",
       "stream_config_required": "Enable at least one extension target before enabling this extension for the stream.",
       "migration_failed": "Extension database migrations failed.",
+      "agreement_financial_number_provider_conflict": "An extension already controls the Agreement Financial System Number for this agency.",
       "create_operation_conflict": "More than one extension is configured to replace this create action.",
       "stream_disabled": "This extension is disabled for this program stream.",
       "entity_disabled": "This extension is disabled for this record."
@@ -1437,6 +1438,9 @@
       "forecast_revision_required": "Payments for this fiscal year are on hold. Activate a revised forecast within the current annual program funding budget before approving or processing payments. The active forecast cannot be deleted while this hold applies.",
       "number_provider_conflict": "More than one agreement number provider is enabled for this stream.",
       "invalid_generated_number": "The generated agreement number must contain 1–15 characters without surrounding spaces.",
+      "financial_number_provider_invalid": "The extension returned an invalid policy or value for the Financial System Number.",
+      "financial_number_required": "A Financial System Number is required for this operation.",
+      "financial_number_read_only": "An extension manages the Financial System Number. Remove the supplied value and try again.",
       "number_managed": "The agreement number is assigned automatically. Remove the supplied number and try again.",
       "number_exhausted": "An available agreement number could not be generated. Ask a manager to review the numbering configuration.",
       "invalid_budget_calculation": "Invalid calculation configuration or duplicate all-other-items charge.",

@@ -433,7 +433,7 @@ export const mapAgreementWriteValues = (
     values.egcs_fc_transferpaymentstream = String(input.egcs_fc_transferpaymentstream)
   }
   if (Object.hasOwn(input, 'egcs_fc_financialsystemnumber')) {
-    values.egcs_fc_financialsystemnumber = String(input.egcs_fc_financialsystemnumber)
+    values.egcs_fc_financialsystemnumber = input.egcs_fc_financialsystemnumber ?? null
   }
   if (Object.hasOwn(input, 'egcs_fc_title_en')) {
     values.egcs_fc_title_en = input.egcs_fc_title_en

@@ -3,6 +3,7 @@ import { useNitroApp } from 'nitropack/runtime'
 import { assertAgreementFinancialId } from './agreement-financial-ids'
 import { assertAgreementProponentType } from './agreement-proponent-type'
 import { captureParsedAuditRequestBody } from './audit-request'
+import { applyAgreementFinancialNumberPolicy } from '~~/server/utils/agreement-financial-number-provider'
 import { mergeAgreementCustomFields } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement profile helpers receive complete documentation. */
 import type { H3Event } from 'h3'
@@ -236,6 +237,7 @@ const patchValidatedAgreementProfile = async (
   db: Kysely<Database>,
   agreementId: string,
   nextStreamId: string,
+  agencyId: string,
   rawBody: Record<string, unknown>,
   validated: FundingCaseAgreementProfilePatch
 ) => {
@@ -245,7 +247,7 @@ const patchValidatedAgreementProfile = async (
   }
 
   const current = await db.selectFrom('Funding_Case_Agreement_Profile')
-    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_agreementsubtype', 'egcs_fc_agreementtype', 'egcs_fc_currency'])
+    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_agreementsubtype', 'egcs_fc_agreementtype', 'egcs_fc_currency', 'egcs_fc_financialsystemnumber'])
     .where('id', '=', agreementId).executeTakeFirstOrThrow()
   const streamChanged = String(current.egcs_fc_transferpaymentstream) !== nextStreamId
   if (validated.egcs_fc_currency !== undefined && validated.egcs_fc_currency !== current.egcs_fc_currency) {
@@ -276,6 +278,13 @@ const patchValidatedAgreementProfile = async (
     return await badRequest(event, 'AGREEMENT_RISK_SCORE_WORKFLOW_MANAGED', 'apiErrors.agreement.risk_score_workflow_managed')
   }
   const sanitized = { ...validated }
+  const financialNumber = await applyAgreementFinancialNumberPolicy(event, db, {
+    operation: 'edit', agencyId, streamId: nextStreamId, agreementId,
+    currentValue: current.egcs_fc_financialsystemnumber,
+    submittedValue: validated.egcs_fc_financialsystemnumber
+  })
+  if (financialNumber !== current.egcs_fc_financialsystemnumber) sanitized.egcs_fc_financialsystemnumber = financialNumber
+  else delete sanitized.egcs_fc_financialsystemnumber
   if (riskWorkflowManaged) delete sanitized.egcs_fc_riskscore
   if (streamChanged) sanitized.egcs_fc_riskscore = null
   if (includesRiskScore && !echoesCurrentRiskScore) {
@@ -456,6 +465,7 @@ export const patchAgreementProfile = async (
           trx,
           agreementId,
           nextStreamId,
+          existingContext.agencyId,
           rawBody,
           validated
         )

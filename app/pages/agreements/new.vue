@@ -8,7 +8,7 @@ import { appRouteLocations } from '~/utils/route-locations'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useActionContext } from '~/composables/useActionContext'
 import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
-import type { FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
+import type { AgreementFinancialNumberPolicy, FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
 
 definePageMeta({
   i18n: {
@@ -80,12 +80,14 @@ const actionContext = useActionContext({
 const mutations = useEditorMutationCoordinator({ getDraft: () => form.value, context: actionContext })
 const isSaving = mutations.isPending
 const numberMode: Ref<'manual' | 'generated' | null> = ref(null)
+const financialNumberPolicy: Ref<AgreementFinancialNumberPolicy | undefined> = ref()
 const numberModeFailed: Ref<boolean> = ref(false)
 let numberModeGeneration = 0
 /** Refreshes presentation only; the create transaction resolves the authoritative mode again. */
 const loadNumberMode = async () => {
   const generation = ++numberModeGeneration
   numberMode.value = null
+  financialNumberPolicy.value = undefined
   numberModeFailed.value = false
   const streamId = form.value?.egcs_fc_transferpaymentstream
   if (!streamId) return
@@ -94,8 +96,9 @@ const loadNumberMode = async () => {
     url.searchParams.set('streamId', streamId)
     const response = await fetch(url)
     if (!response.ok) await throwFetchResponseError(response)
-    const result = await response.json() as { mode: 'manual' | 'generated' }
+    const result = await response.json() as { mode: 'manual' | 'generated'; financialNumberPolicy?: AgreementFinancialNumberPolicy }
     if (generation !== numberModeGeneration) return
+    financialNumberPolicy.value = result.financialNumberPolicy
     numberMode.value = result.mode
     if (result.mode === 'generated' && form.value) delete form.value.egcs_fc_agreementnumber
   } catch {
@@ -150,6 +153,9 @@ const submit = async () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           ...draft,
+          ...(financialNumberPolicy.value?.readOnly || financialNumberPolicy.value?.value !== undefined
+            ? { egcs_fc_financialsystemnumber: undefined }
+            : {}),
           confirmations: getSimilarityConfirmations()
         })
       })
@@ -248,6 +254,7 @@ onMounted(() => {
             permission-action="create"
             :pending="isSaving"
             :number-mode="numberMode"
+            :financial-number-policy="financialNumberPolicy"
             @submit="submit"
             @cancel="cancel" />
         </CommonEntityEditorWorkspace>
