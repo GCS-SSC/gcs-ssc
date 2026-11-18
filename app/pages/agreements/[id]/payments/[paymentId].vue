@@ -107,7 +107,8 @@ const isCurrentPage = () => !disposed && String(route.params.id) === agreementId
 const selectedLine = lineModal.selected
 const savedCodingOptions = computed(() => (payment.value?.lines ?? []).filter(line => line.id === selectedLine.value?.id).map(line => ({
   value: String(line.egcs_fc_fundingagreementcommitmentline),
-  label: `${t('agreement.payments.commitment_line_prefix')} ${line.commitment_line_number} - ${formatAccountingDimensions(line.accounting_dimensions, locale.value === 'fr' ? 'fr' : 'en', ' - ')}`
+  raw: { accounting_dimensions: line.accounting_dimensions },
+  label: `${t('agreement.payments.commitment_line_prefix')} ${line.commitment_line_number}\n${formatAccountingDimensions(line.accounting_dimensions, locale.value === 'fr' ? 'fr' : 'en', '\n')}`
 })))
 const isLineModalOpen = lineModal.isOpen
 const validateLine = createValidator(FundingCaseAgreementPaymentLineCreateSchema)
@@ -495,12 +496,20 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
       </template>
     </CommonDetailPage>
 
-    <UModal v-if="selectedLine" v-model:open="isLineModalOpen" data-help-view="casework.payments.detail.is-line-modal-open" :title="selectedLine.id ? t('agreement.payments.edit_line') : t('agreement.payments.add_line')" :description="t('common.form_dialog_description')">
+    <UModal
+      v-if="selectedLine"
+      v-model:open="isLineModalOpen"
+      data-help-view="casework.payments.detail.is-line-modal-open"
+      :title="selectedLine.id ? t('agreement.payments.edit_line') : t('agreement.payments.add_line')"
+      :description="t('common.form_dialog_description')">
       <template #body>
         <UForm v-bind="formSession" :state="selectedLine" :validate="validateLine" :validate-on="[]" class="space-y-4">
           <UFormField :label="t('agreement.payments.commitment_line')" name="egcs_fc_fundingagreementcommitmentline">
             <CommonServerLookupSelect
               v-model="selectedLine.egcs_fc_fundingagreementcommitmentline"
+              class="w-full"
+              :ui="{ itemLabel: 'overflow-visible text-clip whitespace-normal' }"
+              :show-value-in-label="false"
               :fetch-url="`/api/agreements/${agreementId}/payment-lines/lookups/commitment-lines`"
               selected-values-query-key="selected_ids"
               :prepend-items="savedCodingOptions"
@@ -508,7 +517,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
               label-en-key="label_en"
               label-fr-key="label_fr"
               :limit="100"
-              :query="{ paymentId, permission_action: selectedLine.id ? 'update' : 'create' }" />
+              :query="{ paymentId, permission_action: selectedLine.id ? 'update' : 'create' }">
+              <template #option-label="{ option }">
+                <AgreementCodingOptionLabel :label="option.label" :dimensions="option.raw?.accounting_dimensions" />
+              </template>
+            </CommonServerLookupSelect>
           </UFormField>
 
           <UFormField :label="t('agreement.payments.amount')" name="egcs_fc_amount">

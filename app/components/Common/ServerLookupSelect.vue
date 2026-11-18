@@ -19,6 +19,7 @@ type LookupQuery = Record<string, LookupQueryValue>
 type LookupRequestQuery = Record<string, LookupQueryValue | string[]>
 type LookupModelValue = string | string[] | undefined
 type LookupResponse = AdminCommonLookupResponse & { total?: number }
+type LookupOption = AdminCommonSelectOption & { raw?: Record<string, unknown>; disabled?: boolean }
 
 type HydrationRequest = {
   signature: string
@@ -69,7 +70,7 @@ const {
   includeDeletedQuery?: boolean
   limit?: number
   query?: Record<string, string | number | boolean>
-  prependItems?: AdminCommonSelectOption[]
+  prependItems?: LookupOption[]
   excludeValues?: Array<string | number>
   disabledValues?: Array<string | number>
   selectedFetchUrl?: string
@@ -78,6 +79,10 @@ const {
   closeOnSelect?: boolean
   autoSelectSingle?: boolean
   disabled?: boolean
+}>()
+
+defineSlots<{
+  'option-label'?: (props: { option: LookupOption }) => unknown
 }>()
 
 const emit = defineEmits<{
@@ -549,14 +554,14 @@ watch(selectedHydrationSignature, () => {
   void hydrateSelectedItems(normalizedValues.value)
 }, { immediate: true })
 
-const selectItems = computed<Array<AdminCommonSelectOption & { disabled?: boolean }>>(() => {
+const selectItems = computed<LookupOption[]>(() => {
   const excludedValueSet = new Set(excludeValues.map(value => String(value)))
-  const dedupedItems = new Map<string, AdminCommonSelectOption>()
+  const dedupedItems = new Map<string, LookupOption>()
 
   for (const item of prependItems) {
     const value = String(item.value)
     if (!excludedValueSet.has(value) && !dedupedItems.has(value)) {
-      dedupedItems.set(value, { label: item.label, value })
+      dedupedItems.set(value, { ...item, value })
     }
   }
 
@@ -653,7 +658,16 @@ const removeSelectedValue = (value: string) => {
         :search-input="{ placeholder: t('common.search') }"
         v-bind="$attrs"
         @update:model-value="onModelUpdate"
-        @update:open="value => menuOpen = value" />
+        @update:open="value => menuOpen = value">
+        <template v-if="$slots['option-label']" #item-label="{ item }">
+          <slot name="option-label" :option="item" />
+        </template>
+        <template v-if="$slots['option-label'] && !multiple && selectedOptions[0]" #default>
+          <span data-slot="value" class="min-w-0 text-left">
+            <slot name="option-label" :option="selectedOptions[0]" />
+          </span>
+        </template>
+      </USelectMenu>
     </div>
 
     <div v-if="isCollectionError || hasUnavailableSelection" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">

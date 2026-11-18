@@ -109,8 +109,9 @@ export default defineEventHandler(async event => {
       return {
         id: String(row.id),
         commitment_line_amount: parseDatabaseMoney(row.commitment_line_amount, payment.egcs_fc_currency),
-        label_en: `${linePrefixEn} ${row.commitment_line_number} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
-        label_fr: `${linePrefixFr} ${row.commitment_line_number} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+        accounting_dimensions: dimensions,
+        label_en: `${linePrefixEn} ${row.commitment_line_number}\n${formatAccountingDimensions(dimensions, 'en', '\n')}`,
+        label_fr: `${linePrefixFr} ${row.commitment_line_number}\n${formatAccountingDimensions(dimensions, 'fr', '\n')}`
       }
     })
     const total = Number(countResult?.total ?? 0)

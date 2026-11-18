@@ -96,7 +96,8 @@ const isCurrentPage = () => !disposed && String(route.params.id) === agreementId
 const selectedLine = lineModal.selected
 const savedCodingOptions = computed(() => (commitment.value?.lines ?? []).filter(line => line.id === selectedLine.value?.id).map(line => ({
   value: String(line.egcs_fc_transferpaymentstreamchartofaccount),
-  label: `${line.fiscal_year_display} - ${formatAccountingDimensions(line.accounting_dimensions, locale.value === 'fr' ? 'fr' : 'en', ' - ')}`
+  raw: { accounting_dimensions: line.accounting_dimensions },
+  label: `${line.fiscal_year_display}\n${formatAccountingDimensions(line.accounting_dimensions, locale.value === 'fr' ? 'fr' : 'en', '\n')}`
 })))
 const isLineModalOpen = lineModal.isOpen
 const validateLine = createValidator(FundingCaseAgreementCommitmentLineCreateSchema)
@@ -501,6 +502,9 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
           <UFormField :label="t('agreement.commitments.stream_commitment')" name="egcs_fc_transferpaymentstreamchartofaccount">
             <CommonServerLookupSelect
               v-model="selectedLine.egcs_fc_transferpaymentstreamchartofaccount"
+              class="w-full"
+              :ui="{ itemLabel: 'overflow-visible text-clip whitespace-normal' }"
+              :show-value-in-label="false"
               :fetch-url="`/api/agreements/${agreementId}/commitment-lines/lookups/chart-of-accounts`"
               :query="{ permission_action: 'update', commitmentId, ...(commitment ? { currency: commitment.egcs_fc_currency } : {}) }"
               selected-values-query-key="selected_ids"
@@ -508,7 +512,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"
-              :limit="100" />
+              :limit="100">
+              <template #option-label="{ option }">
+                <AgreementCodingOptionLabel :label="option.label" :dimensions="option.raw?.accounting_dimensions" />
+              </template>
+            </CommonServerLookupSelect>
           </UFormField>
 
           <UFormField :label="t('agreement.commitments.amount')" name="egcs_fc_amount">

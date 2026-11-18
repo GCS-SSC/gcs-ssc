@@ -82,8 +82,9 @@ export default defineEventHandler(async event => {
       return {
         id: String(row.id),
         fiscal_year_display: row.fiscal_year_display,
-        label_en: `${row.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
-        label_fr: `${row.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+        accounting_dimensions: dimensions,
+        label_en: `${row.fiscal_year_display}\n${formatAccountingDimensions(dimensions, 'en', '\n')}`,
+        label_fr: `${row.fiscal_year_display}\n${formatAccountingDimensions(dimensions, 'fr', '\n')}`
       }
     })
     const total = Number(countResult?.total ?? 0)
