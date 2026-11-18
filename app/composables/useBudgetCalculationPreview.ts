@@ -16,7 +16,7 @@ export const useBudgetCalculationPreview = (
   if (!draft || !draft.egcs_fc_calculationmode || draft.egcs_fc_calculationmode === 'manual') return null
   try {
     const id = draft.id ?? '__preview__'
-    const candidates = [...rows.value.filter(row => row.id !== id), { ...draft, id }]
+    const candidates = [...rows.value.filter(row => row.id !== id && !row.egcs_fc_pendingfunding), { ...draft, id }]
     const amounts = calculateBudgetPercentages(candidates.map(row => ({
       id: row.id!, versionId: 'preview', fiscalYearId: row.egcs_fc_fundingagreementbudgetfiscalyear!,
       currency: row.egcs_fc_currency!, categoryId: row.calculation_category_id!,

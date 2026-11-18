@@ -4,7 +4,7 @@ import { watch } from 'vue'
 import { useModalSession } from '~/composables/useModalSession'
 import { useFormSession } from '~/composables/useFormSession'
 import type { TransferPaymentStreamRow } from '~~/shared/types/transfer-payment-ui'
-import { TransferPaymentStreamSchema, type TransferPaymentStreamItem } from '~~/shared/types/schemas'
+import { TransferPaymentStreamGeneralSchema, type TransferPaymentStreamItem } from '~~/shared/types/schemas'
 
 const { title, submitLabel, programId, persistedStream, persistedProgramId, pending = false, actionContext } = defineProps<{
   actionContext: ActionContext
@@ -23,7 +23,7 @@ const emit = defineEmits(['submit'])
 
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
-const validate = createValidator(TransferPaymentStreamSchema)
+const validate = createValidator(TransferPaymentStreamGeneralSchema)
 
 const onSubmit = () => {
   emit('submit')

@@ -2,6 +2,7 @@ import { defineEventHandler, getRouterParam } from 'h3'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Route-local validation helpers are self-descriptive and not public API. */
 import { sql, type Kysely } from 'kysely'
+import { compareMoney } from '~~/shared/utils/money'
 import type { Database } from '~~/shared/types/database'
 import { resolveAgreementScopeContext, type AgreementScopeContext } from '~~/server/utils/agreement'
 import { authorize } from '~~/server/utils/authorize'
@@ -17,7 +18,7 @@ import {
   prepareAgreementForecastRoute
 } from '~~/server/utils/agreement-forecast'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 type ForecastLineItemExisting = {
@@ -26,6 +27,8 @@ type ForecastLineItemExisting = {
   egcs_fc_fundingagreementbudgetlineitem: string
   egcs_fc_month: number
   forecast_fiscalyear: string
+  egcs_fc_amount: string
+  egcs_fc_totalamount: string
 }
 
 const loadForecastLineItemForPatch = async (
@@ -49,7 +52,9 @@ const loadForecastLineItemForPatch = async (
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month as egcs_fc_month',
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast as egcs_fc_agreementforecast',
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem as egcs_fc_fundingagreementbudgetlineitem',
-      'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as forecast_fiscalyear'
+      'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as forecast_fiscalyear',
+      databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('egcs_fc_amount'),
+      databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount')
     ])
     .executeTakeFirst()
 
@@ -149,25 +154,30 @@ const patchForecastLineItemForRoute = async (
     }
 
     const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency)
-    await assertCurrencyMoneyValues(event, currency, [patchValues.egcs_fc_amount, patchValues.egcs_fc_totalamount].filter(value => value !== undefined))
+    await assertCurrencyMoneyValues(event, currency, [patchValues.egcs_fc_amount, patchValues.egcs_fc_totalamount, ...(patchValues.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)].filter(value => value !== undefined))
     await assertAgreementForecastCellAvailable(
       event, trx, String(patchValues.egcs_fc_agreementforecast ?? existing.egcs_fc_agreementforecast),
       String(budgetLineItem.id), patchValues.egcs_fc_month ?? existing.egcs_fc_month, lineId
     )
     const { egcs_fc_amount: patchAmount, egcs_fc_totalamount: patchTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
+    const existingTotal = parseDatabaseMoney(existing.egcs_fc_totalamount, currency)
+    const total = await resolveAgreementLineFundingTotal(event, trx, agreementId, {
+      amount: patchAmount ?? parseDatabaseMoney(existing.egcs_fc_amount, currency),
+      total: patchTotalAmount,
+      sources: fundingSources
+    }, { kind: 'forecast', lineId, total: existingTotal })
     const databasePatchValues = {
       ...nonMoneyPatchValues,
       ...(patchAmount === undefined
         ? {}
         : { egcs_fc_amount: databaseMoneyValue(patchAmount) }),
-      ...(patchTotalAmount === undefined
-        ? {}
-        : { egcs_fc_totalamount: databaseMoneyValue(patchTotalAmount) })
+      ...(patchTotalAmount !== undefined || compareMoney(total, existingTotal) !== 0
+        ? { egcs_fc_totalamount: databaseMoneyValue(total) }
+        : {})
     }
 
     const lineQuery = Object.keys(databasePatchValues).length > 0
-      ? trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item')
-          .set(databasePatchValues)
+      ? trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item').set(databasePatchValues)
           .where('id', '=', lineId)
           .where('egcs_fc_agreementforecast', '=', existing.egcs_fc_agreementforecast)
           .where('_deleted', '=', false)

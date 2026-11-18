@@ -81,6 +81,7 @@ export const readAccountReceivableClaimReductionChoices = async (event: H3Event,
     .select([budgetLineItemStableId.as('id'), budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('egcs_fc_costsubsection'),
       'category.egcs_ay_name_en as organization_cost_category_name_en', 'category.egcs_ay_name_fr as organization_cost_category_name_fr',
       'costline.egcs_ay_name_en as line_item_name_en', 'costline.egcs_ay_name_fr as line_item_name_fr'])
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false).where('year._deleted', '=', false)
     .where('version._deleted', '=', false).where('version.egcs_fc_iscurrent', '=', true)
   const rows = await event.context.$db.selectFrom('Funding_Case_Agreement_Claim_Line_Item as line')

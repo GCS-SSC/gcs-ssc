@@ -24,7 +24,7 @@ export default defineEventHandler(async event => {
     if (typeof versionId !== 'string') return versionId
     const existing = await trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
       .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
-      .select(['Funding_Case_Agreement_Budget_Line_Item.id as id', budgetLineItemStableId.as('stable_id')]).where(budgetLineItemStableId, '=', childId)
+      .select(['Funding_Case_Agreement_Budget_Line_Item.id as id', 'egcs_fc_pendingfunding', budgetLineItemStableId.as('stable_id')]).where(budgetLineItemStableId, '=', childId)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion', '=', versionId).where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false).executeTakeFirst()
     if (!existing) return await notFound(event, 'AGREEMENT_BUDGET_LINE_ITEM_NOT_FOUND', 'apiErrors.agreement.budget_line_item_not_found')
     const activeClaimLine = await trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
@@ -39,7 +39,7 @@ export default defineEventHandler(async event => {
       .executeTakeFirst()
     if (activeClaimLine) return await badRequest(event, 'AGREEMENT_BUDGET_LINE_ITEM_CLAIM_IN_USE', 'apiErrors.agreement.budget_line_item_claim_in_use')
     await trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set({ _deleted: true }).where('id', '=', String(existing.id)).where('_deleted', '=', false).execute()
-    await recalculateAgreementBudget(event, trx, String(existing.id), currentContext.streamId)
+    if (!existing.egcs_fc_pendingfunding) await recalculateAgreementBudget(event, trx, String(existing.id), currentContext.streamId)
     return { success: true }
   }, {
     action: 'delete',

@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
+import type { TransferPaymentBudgetFundingMode } from '~~/shared/types/schemas/transfer-payment'
 import { addMoney, compareMoney, compareScaledMoney, parseCurrencyMoney, parseDecimalText, zeroMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
@@ -52,10 +53,11 @@ const checkedRatio = (ratio: string) => {
 export const findAgreementBudgetFinancialLimitViolation = (
   limits: BudgetFinancialLimits,
   lines: BudgetFinancialLimitLine[],
-  currency: string
+  currency: string,
+  fundingMode: TransferPaymentBudgetFundingMode = 'manual'
 ): AgreementBudgetFinancialLimitViolation | null => {
-  const supportRatio = checkedRatio(limits.supportRatio)
-  const stackingRatio = checkedRatio(limits.stackingRatio)
+  const supportRatio = fundingMode === 'program_only' ? null : checkedRatio(limits.supportRatio)
+  const stackingRatio = fundingMode === 'program_only' ? null : checkedRatio(limits.stackingRatio)
   const one = parseDecimalText('1')
   const zero = zeroMoney(currency)
   let maxPerProponent: Money
@@ -69,15 +71,19 @@ export const findAgreementBudgetFinancialLimitViolation = (
   let totalCost = zero
   for (const line of lines) {
     const program = line.programFunding
-    const costSharing = sumMoney(line.costSharingFunding, currency)
-    if (compareScaledMoney(program, one, addMoney(program, costSharing), supportRatio) > 0) return { kind: 'support', lineId: line.id }
+    if (supportRatio !== null) {
+      const costSharing = sumMoney(line.costSharingFunding, currency)
+      if (compareScaledMoney(program, one, addMoney(program, costSharing), supportRatio) > 0) return { kind: 'support', lineId: line.id }
+    }
     const proponentFunding = addMoney(perProponent.get(line.proponentId) ?? zero, program)
     perProponent.set(line.proponentId, proponentFunding)
     if (compareMoney(proponentFunding, maxPerProponent) > 0) return { kind: 'proponent', proponentId: line.proponentId, lineId: line.id }
-    stacking = sumMoney([stacking, program, ...line.stackingFunding], currency)
-    totalCost = addMoney(totalCost, line.totalAmount)
+    if (stackingRatio !== null) {
+      stacking = sumMoney([stacking, program, ...line.stackingFunding], currency)
+      totalCost = addMoney(totalCost, line.totalAmount)
+    }
   }
-  return compareScaledMoney(stacking, one, totalCost, stackingRatio) > 0 ? { kind: 'stacking' } : null
+  return stackingRatio !== null && compareScaledMoney(stacking, one, totalCost, stackingRatio) > 0 ? { kind: 'stacking' } : null
 }
 
 /**
@@ -87,20 +93,27 @@ export const findAgreementBudgetFinancialLimitViolation = (
  * @param target.agreementId - Owning Agreement.
  * @param target.versionId - Complete proposed budget version.
  * @param target.streamId - Current authoritative Stream.
+ * @param proposed - Exact calculated amounts and the pending candidate being evaluated, when applicable.
+ * @param proposed.amounts - Proposed Program Funding by physical budget line ID.
+ * @param proposed.totals - Proposed Total Cost by physical budget line ID.
+ * @param proposed.pendingLineId - Pending row participating in this activation attempt.
  */
 export const assertAgreementBudgetFinancialLimits = async (
   db: Db,
-  target: { agreementId: string, versionId: string, streamId: string }
+  target: { agreementId: string, versionId: string, streamId: string },
+  proposed?: { amounts: ReadonlyMap<string, Money>, totals: ReadonlyMap<string, Money>, pendingLineId?: string }
 ): Promise<void> => {
   const { agreementId, versionId, streamId } = target
   const limits = await db.selectFrom('Transfer_Payment_Financial_Limits')
+    .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Financial_Limits.egcs_tp_transferpaymentstream')
     .select([
+      'Transfer_Payment_Stream.egcs_tp_budgetfundingmode',
       databaseMoneyText(sql.ref('egcs_tp_maxallowableperrecipient')).as('maxPerProponent'),
       sql<string>`egcs_tp_maxpercentofsupportavailableperrecipient::text`.as('supportRatio'),
       sql<string>`egcs_tp_stackinglimit::text`.as('stackingRatio')
     ])
     .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('egcs_tp_active', '=', true).where('_deleted', '=', false)
+    .where('Transfer_Payment_Financial_Limits.egcs_tp_active', '=', true).where('Transfer_Payment_Financial_Limits._deleted', '=', false)
     .executeTakeFirst()
   if (!limits) return
   const rows = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item as line')
@@ -110,21 +123,27 @@ export const assertAgreementBudgetFinancialLimits = async (
       databaseMoneyText(sql.ref('line.egcs_fc_programfunding')).as('programFunding')])
     .where('line.egcs_fc_fundingagreement', '=', agreementId)
     .where('line.egcs_fc_budgetversion', '=', versionId)
+    .where(eb => eb.or([
+      eb('line.egcs_fc_pendingfunding', '=', false),
+      ...(proposed?.pendingLineId !== undefined ? [eb('line.id', '=', proposed.pendingLineId)] : [])
+    ]))
     .where('year.egcs_fc_budgetversion', '=', versionId)
     .where('line._deleted', '=', false).where('year._deleted', '=', false)
     .orderBy('line.id').execute()
   const agreement = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_currency')
     .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
-  const funding = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, rows.map(row => String(row.id))))
+  const funding = budgetFundingSourcesByLine(limits.egcs_tp_budgetfundingmode === 'program_only'
+    ? []
+    : await loadBudgetFundingSources(db, rows.map(row => String(row.id))))
   const violation = findAgreementBudgetFinancialLimitViolation({ ...limits, maxPerProponent: limits.maxPerProponent }, rows.map(row => {
     const sources = funding.get(String(row.id)) ?? []
     return {
       ...row,
-      totalAmount: parseDatabaseMoney(row.totalAmount, row.currency),
-      programFunding: parseDatabaseMoney(row.programFunding, row.currency),
+      totalAmount: proposed?.totals.get(row.id) ?? parseDatabaseMoney(row.totalAmount, row.currency),
+      programFunding: proposed?.amounts.get(row.id) ?? parseDatabaseMoney(row.programFunding, row.currency),
       stackingFunding: sources.filter(source => source.funding_type_instacking).map(source => source.egcs_fc_amount),
       costSharingFunding: sources.filter(source => source.funding_type_incostsharing).map(source => source.egcs_fc_amount)
     }
-  }), agreement.egcs_fc_currency)
+  }), agreement.egcs_fc_currency, limits.egcs_tp_budgetfundingmode)
   if (violation) throw new AgreementBudgetFinancialLimitError(violation)
 }

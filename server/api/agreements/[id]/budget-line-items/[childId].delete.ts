@@ -66,6 +66,7 @@ export default defineEventHandler(async event => {
           .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
           .select([
             'Funding_Case_Agreement_Budget_Line_Item.id as id',
+            'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding',
             budgetLineItemStableId.as('stable_id')
           ])
           .forUpdate('Funding_Case_Agreement_Budget_Line_Item')
@@ -111,7 +112,7 @@ export default defineEventHandler(async event => {
         .where('_deleted', '=', false)
         .execute()
 
-      await recalculateAgreementBudget(event, trx, String(existing.id), currentContext.streamId)
+      if (!existing.egcs_fc_pendingfunding) await recalculateAgreementBudget(event, trx, String(existing.id), currentContext.streamId)
       return { success: true }
     }, { action: 'delete', blocksApprovalSubmission: true, correctionFinancialMutation: true })
   } catch (error: unknown) {

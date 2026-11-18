@@ -2,7 +2,8 @@ import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { resolveAgreementBudgetProponent } from '~~/server/utils/agreement-budget-proponent'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
-import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
+import { prepareBudgetCalculation, recalculateBudgetAfterLineWrite, validateBudgetLinePatch } from '~~/server/utils/agreement-budget-calculation'
+import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 /* eslint-disable jsdoc/require-jsdoc -- Budget line-item route behavior is covered by focused route tests. */
 import { defineEventHandler, getRouterParam, type H3Event } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
@@ -18,7 +19,6 @@ import {
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
-import { validateMergedBudgetLineItemFundingPatch, validateMergedBudgetLineTextPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -103,6 +103,7 @@ const getExistingBudgetLineItem = async (
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection_fr',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description_fr',
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear as egcs_fc_fundingagreementbudgetfiscalyear',
       budgetFiscalYearStableId.as('egcs_fc_budgetfiscalyearidentity'),
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -221,6 +222,7 @@ const fetchBudgetLineItemResponse = async (
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_sourcecategory',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_allowpercentageoverride',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection_fr as egcs_fc_costsubsection_fr',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
@@ -305,7 +307,6 @@ const resolveBudgetLinePatchInput = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemPatchSchema)
-  await validateMergedBudgetLineTextPatch(event, existing, patchValues)
   patchValues.egcs_fc_applicantrecipient = await resolveAgreementBudgetProponent(event, db, { agreementId, proponentId: patchValues.egcs_fc_applicantrecipient, savedProponentId: existing.egcs_fc_applicantrecipient })
   if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, db, agreementId, patchValues.egcs_fc_currency)
   const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues, String(existing.egcs_fc_organizationcostcategory))
@@ -325,8 +326,9 @@ const resolveBudgetLinePatchInput = async (
     ...(patchValues.egcs_fc_programfunding === undefined ? [] : [patchValues.egcs_fc_programfunding]),
     ...(patchValues.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)
   ])
-  const existingSources = await loadBudgetFundingSources(db, [String(existing.id)])
-  await validateMergedBudgetLineItemFundingPatch(event, { ...existing, egcs_fc_totalamount: parseDatabaseMoney(existing.egcs_fc_totalamount, existing.egcs_fc_currency), egcs_fc_programfunding: parseDatabaseMoney(existing.egcs_fc_programfunding, existing.egcs_fc_currency), egcs_fc_fundingsources: existingSources }, patchValues)
+  const settings = await loadAgreementBudgetManagement(db, agreementId)
+  const existingSources = settings.egcs_tp_budgetfundingmode === 'manual' ? await loadBudgetFundingSources(db, [String(existing.id)]) : []
+  await validateBudgetLinePatch(event, settings, { ...existing, egcs_fc_totalamount: parseDatabaseMoney(existing.egcs_fc_totalamount, existing.egcs_fc_currency), egcs_fc_programfunding: parseDatabaseMoney(existing.egcs_fc_programfunding, existing.egcs_fc_currency), egcs_fc_fundingsources: existingSources }, patchValues)
   if (patchValues.egcs_fc_fundingsources !== undefined) {
     await validateBudgetFundingSources(event, db, streamId, patchValues.egcs_fc_fundingsources, String(existing.id))
   }
@@ -338,16 +340,18 @@ const resolveBudgetLinePatchInput = async (
 
   return {
     childRowId: String(existing.id),
+    pendingFunding: existing.egcs_fc_pendingfunding,
     patchValues: persistedPatchValues
   }
 }
 
 const applyBudgetLinePatch = async (
   event: H3Event,
-  db: AgreementBudgetLineDb,
+  db: Transaction<Database>,
   streamId: string,
   input: {
     childRowId: string
+    pendingFunding: boolean
     patchValues: FundingCaseAgreementBudgetLineItemPatch
   }
 ) => {
@@ -360,7 +364,11 @@ const applyBudgetLinePatch = async (
   if (isEntityResponse(updated) && input.patchValues.egcs_fc_fundingsources !== undefined) {
     await replaceBudgetFundingSources(db, String(updated.id), input.patchValues.egcs_fc_fundingsources)
   }
-  if (isEntityResponse(updated)) await recalculateAgreementBudget(event, db, String(updated.id), streamId)
+  if (isEntityResponse(updated)) {
+    await recalculateBudgetAfterLineWrite(event, db, {
+      lineId: String(updated.id), streamId, state: input.pendingFunding ? 'pending' : 'active'
+    })
+  }
   return isEntityResponse(updated)
     ? await fetchBudgetLineItemResponse(db, String(updated.id))
     : updated

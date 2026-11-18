@@ -1,3 +1,4 @@
+import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { defineEventHandler, type H3Event } from 'h3'
@@ -90,6 +91,7 @@ const readRoute = async (event: H3Event, claimId?: string) => {
       'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory'
     )
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
@@ -341,6 +343,7 @@ const readRoute = async (event: H3Event, claimId?: string) => {
   const budgetFundingSources = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, budgetLineItems.map(line => String(line.budget_row_id))))
 
   return {
+    budgetManagement: await loadAgreementBudgetManagement(db, agreementId),
     claims: claimsWithState,
     budgetLineItems: budgetLineItems.map(line => ({
       ...line,

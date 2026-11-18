@@ -366,7 +366,25 @@ export const buildAgreementApprovalSnapshot = async (
       key: 'apiErrors.agreement.amendment_budget_snapshot_not_found'
     })
   }
-  if (budgetVersion) await assertAgreementBudgetFinancialLimits(trx, { agreementId, versionId: String(budgetVersion.id), streamId: String(agreement.egcs_fc_transferpaymentstream) })
+  if (budgetVersion) {
+    const pendingLine = await trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item as line')
+      .innerJoin('Funding_Case_Agreement_Budget_Version as version', 'version.id', 'line.egcs_fc_budgetversion')
+      .select('line.id')
+      .where('version.egcs_fc_fundingagreement', '=', agreementId)
+      .where(eb => eb.or([eb('version.id', '=', budgetVersion.id), eb('version.egcs_fc_iscurrent', '=', true)]))
+      .where('version._deleted', '=', false)
+      .where('line._deleted', '=', false)
+      .where('line.egcs_fc_pendingfunding', '=', true)
+      .executeTakeFirst()
+    if (pendingLine) {
+      return await throwApiError(event, {
+        statusCode: 409,
+        code: 'AGREEMENT_BUDGET_PENDING_FUNDING',
+        key: 'apiErrors.agreement.budget_pending_funding'
+      })
+    }
+    await assertAgreementBudgetFinancialLimits(trx, { agreementId, versionId: String(budgetVersion.id), streamId: String(agreement.egcs_fc_transferpaymentstream) })
+  }
   const activityVersion = includesActivities
     ? amendment
       ? await trx.selectFrom('Funding_Case_Agreement_Activity_Version').selectAll()
@@ -435,6 +453,7 @@ export const buildAgreementApprovalSnapshot = async (
       ])
       .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_budgetversion', '=', String(budgetVersion.id))
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+      .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .orderBy('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear').orderBy('Funding_Case_Agreement_Budget_Line_Item.id').execute() : [],
     activityVersion ? trx.selectFrom('Funding_Case_Agreement_Activity').select(['id', 'egcs_fc_name_en', 'egcs_fc_name_fr', 'egcs_fc_description_en', 'egcs_fc_description_fr', 'egcs_fc_startdate', 'egcs_fc_enddate', 'egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr', 'egcs_fc_customfields']).where('egcs_fc_activityversion', '=', String(activityVersion.id)).where('_deleted', '=', false).orderBy('egcs_fc_startdate').orderBy('id').execute() : [],

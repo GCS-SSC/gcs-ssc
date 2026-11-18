@@ -1,5 +1,6 @@
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
+import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
 
 /**
  * Allocates the next header version under the caller's Agreement write lock, retaining deleted history.
@@ -26,18 +27,19 @@ export const nextAgreementForecastVersion = async (
 }
 
 /**
- * Copies the active Forecast's live breakdown exactly into an independently assigned draft.
+ * Copies the active Forecast's breakdown into a draft under the current Stream mode.
  * @param trx - Authorized transaction holding the Agreement write lock.
  * @param agreementId - Owning Agreement identifier.
  * @param fiscalYearId - Stable budget fiscal-year identity.
  * @param forecastId - Newly inserted inactive draft Forecast.
+ * @returns Whether source rows were omitted from the new draft.
  */
 export const copyActiveAgreementForecastLines = async (
   trx: Transaction<Database>,
   agreementId: string,
   fiscalYearId: string,
   forecastId: string
-): Promise<void> => {
+): Promise<boolean> => {
   const active = (await sql<{ id: string }>`
     SELECT forecast.id::text AS id FROM "Funding_Case_Agreement_Forecast" forecast
     JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" year ON year.id = forecast.egcs_fc_fiscalyear
@@ -47,21 +49,39 @@ export const copyActiveAgreementForecastLines = async (
       AND forecast.egcs_fc_active AND NOT forecast._deleted
     ORDER BY forecast.id DESC LIMIT 1
   `.execute(trx)).rows[0]
-  if (!active) return
+  if (!active) return false
+  const { egcs_tp_budgetfundingmode: mode } = await loadAgreementBudgetManagement(trx, agreementId)
   const sourceLines = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
     .select('id').where('egcs_fc_agreementforecast', '=', active.id).where('_deleted', '=', false)
     .orderBy('id', 'asc').execute()
+  const otherFundingOmitted = mode === 'program_only' && sourceLines.length > 0 && Boolean(await trx
+    .selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
+    .select('id')
+    .where('egcs_fc_forecastlineitem', 'in', sourceLines.map(line => String(line.id)))
+    .where('_deleted', '=', false)
+    .executeTakeFirst())
   for (const source of sourceLines) {
     const copied = (await sql<{ id: string }>`
       INSERT INTO "Funding_Case_Agreement_Forecast_Line_Item"
         (egcs_fc_agreementforecast, egcs_fc_fundingagreement, egcs_fc_fundingagreementbudgetlineitem,
           egcs_fc_month, egcs_fc_amount, egcs_fc_totalamount, egcs_fc_currency)
       SELECT ${forecastId}::bigint, ${agreementId}::bigint, egcs_fc_fundingagreementbudgetlineitem,
-        egcs_fc_month, egcs_fc_amount, egcs_fc_totalamount, egcs_fc_currency
+        egcs_fc_month, egcs_fc_amount,
+        CASE ${mode}::text
+          WHEN 'program_only' THEN egcs_fc_amount
+          WHEN 'automatic' THEN egcs_fc_amount + COALESCE((
+            SELECT SUM(funding.egcs_fc_amount)
+            FROM "Funding_Case_Agreement_Forecast_Line_Item_Funding" funding
+            WHERE funding.egcs_fc_forecastlineitem = ${source.id}::bigint AND NOT funding._deleted
+          ), 0)
+          ELSE egcs_fc_totalamount
+        END,
+        egcs_fc_currency
       FROM "Funding_Case_Agreement_Forecast_Line_Item" WHERE id = ${source.id}::bigint
       RETURNING id::text AS id
     `.execute(trx)).rows[0]
     if (!copied) throw new Error('Forecast line copy failed.')
+    if (mode === 'program_only') continue
     await sql`
       INSERT INTO "Funding_Case_Agreement_Forecast_Line_Item_Funding"
         (egcs_fc_forecastlineitem, egcs_fc_fundingsubtype, egcs_fc_amount)
@@ -70,6 +90,7 @@ export const copyActiveAgreementForecastLines = async (
       WHERE egcs_fc_forecastlineitem = ${source.id}::bigint AND NOT _deleted
     `.execute(trx)
   }
+  return otherFundingOmitted
 }
 
 /**

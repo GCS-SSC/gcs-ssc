@@ -1,6 +1,9 @@
+import TransferPaymentStreamBudgetManagementTab from '~/components/TransferPayment/TransferPaymentStreamBudgetManagementTab.vue'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+import { throwFetchResponseError } from '~/utils/fetch-error'
 import CustomFieldsTab from '~/components/TransferPayment/CustomFieldsTab.vue'
 import type { FetchError } from 'ofetch'
-import type { TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
+import type { TransferPaymentStreamBudgetManagement, TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
 import type { TabMap } from '~~/shared/types/ui'
 import type { Scope } from '~~/shared/utils/scopes'
 import TransferPaymentAmendmentSubtypesTab from '~/components/TransferPayment/TransferPaymentAmendmentSubtypesTab.vue'
@@ -31,6 +34,7 @@ export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   general: 'agency.tabs.general',
   holdbackBases: 'transfer_payment.holdback_bases',
   budgets: 'transfer_payment.budgets',
+  budgetManagement: 'transfer_payment.budget_management.title',
   recipients: 'transfer_payment.eligible_recipients',
   costItems: 'transfer_payment.cost_category_line_items',
   amendmentTypes: 'transfer_payment.amendment_types',
@@ -105,6 +109,36 @@ export const useTransferPaymentStreamDetailState = (
     return String(profile.value.egcs_tp_agency)
   })
 
+  const budgetManagementContext = useActionContext({
+    identity: [() => id, () => streamId, () => profile.value?.egcs_tp_agency],
+    authority: canUpdateChild,
+    eligible: () => profile.value?.id === id && stream.value?.id === streamId
+  })
+  const budgetManagementPending = ref(false)
+  /**
+   * Persists settings and accepts the acknowledged draft even if the section closes.
+   * @param draft - Settings captured by the currently mounted editor.
+   * @returns Whether the response still belongs to the current Stream context.
+   */
+  const saveBudgetManagement = async (draft: TransferPaymentStreamBudgetManagement): Promise<boolean> => {
+    const operation = budgetManagementContext.capture()
+    if (!operation?.canDispatch() || budgetManagementPending.value) return false
+    budgetManagementPending.value = true
+    try {
+      const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${id}/streams/${streamId}`), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(draft)
+      })
+      if (!response.ok) await throwFetchResponseError(response)
+      if (!operation.isCurrent() || !stream.value) return false
+      stream.value = { ...stream.value, ...draft }
+      return true
+    } finally {
+      budgetManagementPending.value = false
+    }
+  }
+
   const tabMap: TabMap = new Map([
     [
       'general',
@@ -122,6 +156,23 @@ export const useTransferPaymentStreamDetailState = (
     [
       'budgets',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.budgets, icon: 'i-lucide-wallet', component: TransferPaymentStreamBudgetsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+    ],
+    [
+      'budget-management',
+      {
+        key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.budgetManagement,
+        value: 'budget-management',
+        icon: 'i-lucide-settings-2',
+        component: TransferPaymentStreamBudgetManagementTab,
+        /** @returns The parent-owned write and current persisted Stream. */
+        getProps: () => ({
+          stream: stream.value,
+          actionContext: budgetManagementContext,
+          canUpdateChild: canUpdateChild.value,
+          pending: budgetManagementPending.value,
+          saveBudgetManagement
+        })
+      }
     ],
     [
       'recipients',

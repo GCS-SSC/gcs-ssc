@@ -49,7 +49,7 @@ export default defineEventHandler(async event => {
     .where('Agency_Fiscal_Year._deleted', '=', false)
     .where(sql<boolean>`EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Budget_Line_Item" native_line
       WHERE native_line.egcs_fc_fundingagreementbudgetfiscalyear = "Funding_Case_Agreement_Budget_Fiscal_Year".id
-        AND native_line.egcs_fc_currency = ${currency} AND NOT native_line._deleted)`)
+        AND native_line.egcs_fc_currency = ${currency} AND NOT native_line._deleted AND NOT native_line.egcs_fc_pendingfunding)`)
 
   if (selectedIds?.length) {
     baseQuery = baseQuery.where(budgetFiscalYearStableId, 'in', selectedIds)

@@ -10,7 +10,7 @@ import {
   prepareAgreementForecastRoute
 } from '~~/server/utils/agreement-forecast'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
@@ -49,12 +49,13 @@ export default defineEventHandler(async event => {
       }
 
       const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
-      await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount])
+      await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount, ...(validated.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)].filter(value => value !== undefined))
       await assertAgreementForecastCellAvailable(
         event, trx, validated.egcs_fc_agreementforecast,
         validated.egcs_fc_fundingagreementbudgetlineitem, validated.egcs_fc_month
       )
-      const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: totalAmount, ...lineValues } = validated
+      const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: authoredTotal, ...lineValues } = validated
+      const totalAmount = await resolveAgreementLineFundingTotal(event, trx, agreementId, { amount, total: authoredTotal, sources: fundingSources })
       const lineItem = await trx
         .insertInto('Funding_Case_Agreement_Forecast_Line_Item')
         .values({

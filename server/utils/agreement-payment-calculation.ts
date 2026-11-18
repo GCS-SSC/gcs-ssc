@@ -288,6 +288,7 @@ const getBudgetSources = async (
     ])
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
     .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency', '=', currency)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)

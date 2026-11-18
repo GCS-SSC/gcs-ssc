@@ -40,7 +40,7 @@ export const getAgreementPaymentCommitmentViolation = async (db: Db, paymentId: 
           ON version.id = year.egcs_fc_budgetversion
           AND version.egcs_fc_fundingagreement = payment.egcs_fc_fundingagreement
           AND version.egcs_fc_iscurrent AND NOT version._deleted
-        WHERE line.egcs_fc_currency = payment.egcs_fc_currency AND NOT line._deleted), 0)::text AS budget
+        WHERE line.egcs_fc_currency = payment.egcs_fc_currency AND NOT line._deleted AND NOT line.egcs_fc_pendingfunding), 0)::text AS budget
     FROM "Funding_Case_Agreement_Payment" payment
     JOIN "Funding_Case_Agreement_Commitment" commitment
       ON commitment.id = payment.egcs_fc_fundingagreementcommitment

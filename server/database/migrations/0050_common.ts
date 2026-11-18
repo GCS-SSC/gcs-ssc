@@ -1456,7 +1456,7 @@ AS $function$
           AND budget_version.egcs_fc_fundingagreement = budget_year.egcs_fc_fundingagreement
         WHERE budget_year.egcs_fc_fundingagreement = target_agreement_id
           AND line_item.egcs_fc_currency = commitment.egcs_fc_currency
-          AND line_item._deleted = false AND budget_year._deleted = false
+          AND line_item._deleted = false AND NOT line_item.egcs_fc_pendingfunding AND budget_year._deleted = false
           AND budget_version.egcs_fc_iscurrent = true AND budget_version._deleted = false
       ), 0)
       LIMIT 1;

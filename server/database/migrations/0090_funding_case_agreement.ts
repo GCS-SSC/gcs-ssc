@@ -523,6 +523,7 @@ CREATE TABLE "Funding_Case_Agreement_Budget_Line_Item" (
   "egcs_fc_description_fr" text DEFAULT '' NOT NULL,
   "egcs_fc_totalamount" numeric NOT NULL,
   "egcs_fc_programfunding" numeric NOT NULL,
+  "egcs_fc_pendingfunding" boolean DEFAULT false NOT NULL,
   "egcs_fc_currency" currency_codes NOT NULL,
   "egcs_fc_calculationmode" character varying(16) DEFAULT 'manual'::character varying NOT NULL,
   "egcs_fc_sourcecategory" bigint,
@@ -1728,6 +1729,22 @@ AS $function$
       ) THEN
         RAISE EXCEPTION 'Budget line item original must be a root row'
           USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_budgetlineitemoriginalroot';
+      END IF;
+      RETURN NEW;
+    END
+    $function$;
+
+CREATE FUNCTION guard_saved_budget_line_reference()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NOT NEW._deleted AND EXISTS (
+        SELECT 1 FROM "Funding_Case_Agreement_Budget_Line_Item" line
+        WHERE line.id = NEW.egcs_fc_fundingagreementbudgetlineitem AND line.egcs_fc_pendingfunding
+      ) THEN
+        RAISE EXCEPTION 'A pending budget line cannot be referenced by a Forecast or Claim'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_budgetline_reference_not_pending';
       END IF;
       RETURN NEW;
     END
@@ -3604,6 +3621,8 @@ CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseagreementclaim_status_agency A
 
 CREATE TRIGGER trg_resolve_claim_line_agreement BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreementclaim, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Claim_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_claim_line_agreement();
 
+CREATE TRIGGER guard_saved_budget_line_reference BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreementbudgetlineitem, _deleted ON "Funding_Case_Agreement_Claim_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_saved_budget_line_reference();
+
 CREATE TRIGGER zz_guard_agreement_financial_currency BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Claim_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_currency();
 
 CREATE TRIGGER trg_validate_agreement_line_funding_agency BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Claim_Line_Item_Funding" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_agreement_line_funding_agency();
@@ -3697,6 +3716,8 @@ CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseforecast_status_agency AFTER I
 CREATE TRIGGER trg_guard_forecast_identity BEFORE UPDATE OF egcs_fc_fundingagreement, egcs_fc_fiscalyear, egcs_fc_version ON "Funding_Case_Agreement_Forecast" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_forecast_identity();
 
 CREATE TRIGGER trg_resolve_forecast_line_agreement BEFORE INSERT OR UPDATE OF egcs_fc_agreementforecast, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Forecast_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_forecast_line_agreement();
+
+CREATE TRIGGER guard_saved_budget_line_reference BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreementbudgetlineitem, _deleted ON "Funding_Case_Agreement_Forecast_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_saved_budget_line_reference();
 
 CREATE TRIGGER zz_guard_agreement_financial_currency BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Forecast_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_currency();
 

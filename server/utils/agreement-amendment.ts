@@ -13,6 +13,9 @@ import type { SubmissionRisk } from '~~/shared/types/risk'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources, replaceBudgetFundingSources } from './agreement-budget-funding'
+import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
+import type { TransferPaymentBudgetFundingMode } from '~~/shared/types/schemas/transfer-payment'
+import { sumMoney } from '~~/shared/utils/money'
 
 type AmendmentDb = Kysely<Database> | Transaction<Database>
 
@@ -242,6 +245,7 @@ export const createAgreementAmendmentBudgetSnapshot = async (
   agreementId: string,
   amendmentId: string
 ) => {
+  const { egcs_tp_budgetfundingmode: fundingMode } = await loadAgreementBudgetManagement(trx, agreementId)
   const currentVersion = await trx
     .selectFrom('Funding_Case_Agreement_Budget_Version')
     .select('id')
@@ -260,8 +264,8 @@ export const createAgreementAmendmentBudgetSnapshot = async (
     })
     .returning('id')
     .executeTakeFirstOrThrow()
-  await cloneBudgetVersionRows(trx, String(currentVersion.id), String(snapshot.id), agreementId)
-  return String(snapshot.id)
+  await cloneBudgetVersionRows(trx, String(currentVersion.id), String(snapshot.id), agreementId, fundingMode)
+  return { id: String(snapshot.id), programFundingOnly: fundingMode === 'program_only' }
 }
 
 export const createAgreementAmendmentActivitySnapshot = async (
@@ -295,7 +299,8 @@ const cloneBudgetVersionRows = async (
   trx: Transaction<Database>,
   sourceVersionId: string,
   targetVersionId: string,
-  agreementId: string
+  agreementId: string,
+  fundingMode: TransferPaymentBudgetFundingMode = 'manual'
 ) => {
   const years = await trx
     .selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
@@ -328,10 +333,18 @@ const cloneBudgetVersionRows = async (
       ])
       .where('egcs_fc_fundingagreementbudgetfiscalyear', '=', String(year.id))
       .where('_deleted', '=', false)
+      .where('egcs_fc_pendingfunding', '=', false)
       .orderBy('id', 'asc')
       .execute()
-    const sourcesByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(trx, lines.map(line => String(line.id))))
+    const sourcesByLine = budgetFundingSourcesByLine(fundingMode === 'program_only'
+      ? []
+      : await loadBudgetFundingSources(trx, lines.map(line => String(line.id))))
     for (const line of lines) {
+      const sources = sourcesByLine.get(String(line.id)) ?? []
+      const programFunding = parseDatabaseMoney(line.egcs_fc_programfunding, line.egcs_fc_currency)
+      const totalCost = fundingMode === 'manual'
+        ? parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)
+        : sumMoney([programFunding, ...sources.map(source => source.egcs_fc_amount)], line.egcs_fc_currency)
       const clonedLine = await trx.insertInto('Funding_Case_Agreement_Budget_Line_Item').values({
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fundingagreementbudgetfiscalyear: String(clonedYear.id),
@@ -346,12 +359,12 @@ const cloneBudgetVersionRows = async (
         egcs_fc_costsubsection_fr: line.egcs_fc_costsubsection_fr,
         egcs_fc_description: line.egcs_fc_description,
         egcs_fc_description_fr: line.egcs_fc_description_fr,
-        egcs_fc_totalamount: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)),
-        egcs_fc_programfunding: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_programfunding, line.egcs_fc_currency)),
+        egcs_fc_totalamount: databaseMoneyValue(totalCost),
+        egcs_fc_programfunding: databaseMoneyValue(programFunding),
         egcs_fc_currency: line.egcs_fc_currency,
         _deleted: false
       }).returning('id').executeTakeFirstOrThrow()
-      await replaceBudgetFundingSources(trx, String(clonedLine.id), sourcesByLine.get(String(line.id)) ?? [])
+      if (sources.length > 0) await replaceBudgetFundingSources(trx, String(clonedLine.id), sources)
     }
   }
 }

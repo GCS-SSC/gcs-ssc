@@ -4,6 +4,7 @@ import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { onBeforeUnmount, watch } from 'vue'
+import { TransferPaymentStreamGeneralSchema } from '~~/shared/types/schemas'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -139,10 +140,10 @@ const saveStream = async () => {
   const generation = contextGeneration
   const requestedProgramId = programId
   const targetId = persistedStream.value?.id ?? null
-  const payload = {
+  const payload = TransferPaymentStreamGeneralSchema.parse({
     ...selectedStream.value,
     egcs_tp_parentstream: selectedStream.value.egcs_tp_parentstream || null
-  }
+  })
   const isUpdate = targetId !== null
   let closedSession = false
   try {

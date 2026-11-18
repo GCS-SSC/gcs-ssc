@@ -27,10 +27,13 @@ export default defineEventHandler(async event => {
   const reconciliation = await event.context.$db.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
     .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim')
     .innerJoin('Funding_Case_Agreement_Profile', 'Funding_Case_Agreement_Profile.id', 'Funding_Case_Agreement_Claim.egcs_fc_fundingagreement')
+    .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
     .selectAll('Funding_Case_Agreement_Claim_Reconcile')
     .select([
       'Funding_Case_Agreement_Claim.egcs_fc_fundingagreement as agreement_id',
       'Funding_Case_Agreement_Claim.egcs_fc_status as claim_status',
+      'Transfer_Payment_Stream.egcs_tp_hidecostcategory',
+      'Transfer_Payment_Stream.egcs_tp_hidecostsubsection',
       'Funding_Case_Agreement_Profile.egcs_fc_agreementnumber as agreement_number',
       'Funding_Case_Agreement_Profile.egcs_fc_currency as egcs_fc_currency',
       'Funding_Case_Agreement_Profile.egcs_fc_title_en as agreement_title_en',
@@ -57,6 +60,7 @@ export default defineEventHandler(async event => {
         budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection').as('egcs_fc_costsubsection')
       ])
       .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', String(reconciliation.agreement_id))
+      .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)

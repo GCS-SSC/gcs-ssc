@@ -84,8 +84,23 @@ export const TransferPaymentProfileSchema = TransferPaymentProfileBaseSchema.ref
 export type TransferPaymentProfile = z.infer<typeof TransferPaymentProfileSchema>
 export type TransferPaymentProfileItem = WithId<TransferPaymentProfile>
 
-export const TransferPaymentStreamSchema = z.object({
+export const TransferPaymentBudgetFundingModeSchema = z.enum(['program_only', 'manual', 'automatic'])
+export type TransferPaymentBudgetFundingMode = z.infer<typeof TransferPaymentBudgetFundingModeSchema>
+
+export const TransferPaymentStreamBudgetManagementSchema = z.object({
+  egcs_tp_budgetfundingmode: TransferPaymentBudgetFundingModeSchema,
+  egcs_tp_hidecostcategory: z.boolean(),
+  egcs_tp_hidecostsubsection: z.boolean(),
+  egcs_tp_requireforecastfundingbreakdown: z.boolean(),
+  egcs_tp_requireclaimfundingbreakdown: z.boolean()
+})
+export type TransferPaymentStreamBudgetManagement = z.infer<typeof TransferPaymentStreamBudgetManagementSchema>
+
+const TransferPaymentStreamBaseSchema = z.object({
   egcs_tp_requireconsistentproponenttype: z.boolean().default(false),
+  egcs_tp_budgetfundingmode: TransferPaymentBudgetFundingModeSchema.default('manual'),
+  egcs_tp_hidecostcategory: z.boolean().default(false),
+  egcs_tp_hidecostsubsection: z.boolean().default(false),
   egcs_tp_requireforecastfundingbreakdown: z.boolean().default(false),
   egcs_tp_requireclaimfundingbreakdown: z.boolean().default(false),
   egcs_tp_parentstream: z.preprocess(value => value === '' ? null : value, PositivePostgresBigintIdSchema.nullable()).optional(),
@@ -101,8 +116,25 @@ export const TransferPaymentStreamSchema = z.object({
   egcs_tp_active: z.boolean().default(false)
 })
 
+export const TransferPaymentStreamGeneralSchema = TransferPaymentStreamBaseSchema.omit({
+  egcs_tp_budgetfundingmode: true,
+  egcs_tp_hidecostcategory: true,
+  egcs_tp_hidecostsubsection: true,
+  egcs_tp_requireforecastfundingbreakdown: true,
+  egcs_tp_requireclaimfundingbreakdown: true
+})
+
+export const TransferPaymentStreamSchema = TransferPaymentStreamBaseSchema.refine(
+  data => data.egcs_tp_budgetfundingmode !== 'program_only'
+    || (!data.egcs_tp_requireforecastfundingbreakdown && !data.egcs_tp_requireclaimfundingbreakdown),
+  { error: 'validation.stream_budget_breakdown_conflict', path: ['egcs_tp_budgetfundingmode'] }
+)
+
 // PATCH omission must preserve stored flags rather than apply create defaults.
-export const TransferPaymentStreamPatchSchema = TransferPaymentStreamSchema.partial().extend({
+export const TransferPaymentStreamPatchSchema = TransferPaymentStreamBaseSchema.partial().extend({
+  egcs_tp_budgetfundingmode: TransferPaymentBudgetFundingModeSchema.optional(),
+  egcs_tp_hidecostcategory: z.boolean().optional(),
+  egcs_tp_hidecostsubsection: z.boolean().optional(),
   egcs_tp_requireconsistentproponenttype: z.boolean().optional(),
   egcs_tp_requireforecastfundingbreakdown: z.boolean().optional(),
   egcs_tp_requireclaimfundingbreakdown: z.boolean().optional(),

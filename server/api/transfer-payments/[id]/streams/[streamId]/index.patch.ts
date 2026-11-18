@@ -4,6 +4,7 @@ import { TransferPaymentStreamPatchSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
+import { assertStreamBudgetFundingModeChange } from '~~/server/utils/transfer-payment-stream-budget-management'
 import { normalizeTextKey } from '~~/server/utils/transfer-payment-uniqueness'
 
 /**
@@ -29,17 +30,31 @@ export default defineEventHandler(async event => {
 
   try {
     return await executeFreshAuthorizedTransferPaymentStreamWrite(
-      event, db, profileId, access.agencyId, streamId, 'update', async trx => {
+      event, db, profileId, access.agencyId, streamId, 'update', async (trx, context, authContext) => {
         if (Object.keys(validated).length === 0) {
           return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
         }
         // The shared transaction already holds the Program and target Stream locks.
         const current = await trx.selectFrom('Transfer_Payment_Stream')
-          .select(['egcs_tp_parentstream', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_active'])
+          .select([
+            'egcs_tp_parentstream', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_active',
+            'egcs_tp_budgetfundingmode', 'egcs_tp_requireforecastfundingbreakdown', 'egcs_tp_requireclaimfundingbreakdown'
+          ])
           .where('id', '=', streamId)
           .where('egcs_tp_transferpaymentprofile', '=', profileId)
           .where('_deleted', '=', false)
           .executeTakeFirstOrThrow()
+
+        const fundingMode = validated.egcs_tp_budgetfundingmode ?? current.egcs_tp_budgetfundingmode
+        if (fundingMode === 'program_only' && (
+          (validated.egcs_tp_requireforecastfundingbreakdown ?? current.egcs_tp_requireforecastfundingbreakdown)
+          || (validated.egcs_tp_requireclaimfundingbreakdown ?? current.egcs_tp_requireclaimfundingbreakdown)
+        )) {
+          return await badRequest(event, 'STREAM_BUDGET_BREAKDOWN_CONFLICT', 'validation.stream_budget_breakdown_conflict')
+        }
+        if (fundingMode && fundingMode !== current.egcs_tp_budgetfundingmode) {
+          await assertStreamBudgetFundingModeChange(event, trx, context, authContext, fundingMode)
+        }
 
         // A deleted parent remains supported history. Only a replacement must
         // satisfy current live membership and cycle checks.

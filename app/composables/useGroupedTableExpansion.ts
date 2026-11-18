@@ -1,6 +1,6 @@
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState, Updater } from '@tanstack/vue-table'
-import { ref, toValue, watch } from 'vue'
+import { computed, ref, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 
 export type GroupedTableRow<Row> = {
@@ -23,7 +23,7 @@ type GroupColumn<Row> = {
 
 type GroupedTableExpansionOptions<Row> = {
   rows: MaybeRefOrGetter<Row[]>
-  groups: GroupColumn<Row>[]
+  groups: MaybeRefOrGetter<GroupColumn<Row>[]>
   isPlaceholder?: (row: Row) => boolean
   defaultExpanded?: boolean
 }
@@ -37,21 +37,20 @@ type GroupedTableExpansionOptions<Row> = {
 export const useGroupedTableExpansion = <Row>(options: GroupedTableExpansionOptions<Row>) => {
   const defaultExpanded = options.defaultExpanded === false ? false : true
   const expandedRows: Ref<ExpandedState> = ref(defaultExpanded ? true : {})
-  const grouping: Ref<string[]> = ref(options.groups.map(group => group.id))
-  const columnVisibility: Ref<Record<string, boolean>> = ref(Object.fromEntries(
-    options.groups.map(group => [group.id, false])
-  ))
+  const groups = computed(() => toValue(options.groups))
+  const grouping = computed(() => groups.value.map(group => group.id))
+  const columnVisibility = computed(() => Object.fromEntries(groups.value.map(group => [group.id, false])))
   const groupingOptions = {
     getGroupedRowModel: getGroupedRowModel(),
     getRowId: (row: Row) => String((row as Row & { id: string }).id)
   }
   const expandedOptions = { autoResetExpanded: false }
-  const getGroupRowId = (row: Row, groupIndex: number) => options.groups
+  const getGroupRowId = (row: Row, groupIndex: number) => groups.value
     .slice(0, groupIndex + 1)
     .map(group => `${group.id}:${group.getValue(row)}`)
     .join('>')
   const getCurrentGroupRowIds = (): string[] => [...new Set(
-    toValue(options.rows).flatMap(row => options.groups.map((_group, groupIndex) => getGroupRowId(row, groupIndex)))
+    toValue(options.rows).flatMap(row => groups.value.map((_group, groupIndex) => getGroupRowId(row, groupIndex)))
   )]
 
   watch(getCurrentGroupRowIds, currentGroupRowIds => {

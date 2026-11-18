@@ -9,7 +9,7 @@ import { budgetLineItemStableId } from './agreement-budget-lineage'
 import { assertAgreementForecastBudgetLineItem, assertAgreementForecastEditable } from './agreement-forecast'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
-import { replaceAgreementLineFunding, type AgreementFundingSourceInput } from './agreement-funding-breakdown'
+import { assertAgreementFundingModeInput, loadAgreementBudgetManagement, replaceAgreementLineFunding, type AgreementFundingSourceInput } from './agreement-funding-breakdown'
 
 /**
  * Saves changed monthly cells under the caller's fresh Agreement/Forecast locks.
@@ -29,6 +29,7 @@ export const saveAgreementForecastBreakdown = async (
 ) => {
   const forecast = await assertAgreementForecastEditable(event, trx, agreementId, forecastId)
   const currency = await assertAgreementCurrency(event, trx, agreementId)
+  const { egcs_tp_budgetfundingmode: mode } = await loadAgreementBudgetManagement(trx, agreementId)
   const existingRows = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
     .innerJoin('Funding_Case_Agreement_Budget_Line_Item',
       'Funding_Case_Agreement_Budget_Line_Item.id',
@@ -39,25 +40,28 @@ export const saveAgreementForecastBreakdown = async (
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month',
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_currency',
       budgetLineItemStableId.as('stable_budget_line_id'),
-      databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('egcs_fc_amount')
+      databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('egcs_fc_amount'),
+      databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount')
     ])
     .where('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast', '=', forecastId)
     .where('Funding_Case_Agreement_Forecast_Line_Item._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', agreementId)
     .execute()
-  const fundingRows = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
-    .innerJoin('Funding_Case_Agreement_Forecast_Line_Item',
-      'Funding_Case_Agreement_Forecast_Line_Item.id',
-      'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_forecastlineitem')
-    .select([
-      'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_forecastlineitem',
-      'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_fundingsubtype',
-      databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_amount')).as('egcs_fc_amount')
-    ])
-    .where('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast', '=', forecastId)
-    .where('Funding_Case_Agreement_Forecast_Line_Item._deleted', '=', false)
-    .where('Funding_Case_Agreement_Forecast_Line_Item_Funding._deleted', '=', false)
-    .execute()
+  const fundingRows = mode === 'program_only'
+    ? []
+    : await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
+        .innerJoin('Funding_Case_Agreement_Forecast_Line_Item',
+          'Funding_Case_Agreement_Forecast_Line_Item.id',
+          'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_forecastlineitem')
+        .select([
+          'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_forecastlineitem',
+          'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_fundingsubtype',
+          databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_amount')).as('egcs_fc_amount')
+        ])
+        .where('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast', '=', forecastId)
+        .where('Funding_Case_Agreement_Forecast_Line_Item._deleted', '=', false)
+        .where('Funding_Case_Agreement_Forecast_Line_Item_Funding._deleted', '=', false)
+        .execute()
   const rowsByCell = new Map<string, typeof existingRows>()
   for (const row of existingRows) {
     const key = `${row.stable_budget_line_id}:${row.egcs_fc_month}`
@@ -76,18 +80,23 @@ export const saveAgreementForecastBreakdown = async (
   const savedCells = []
 
   for (const cell of changes.cells) {
+    await assertAgreementFundingModeInput(event, mode, { total: cell.egcs_fc_totalamount, sources: cell.egcs_fc_fundingsources })
     await assertCurrencyMoneyValues(event, currency, [
+      cell.egcs_fc_totalamount, cell.expected?.egcs_fc_totalamount,
       cell.egcs_fc_amount, ...(cell.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount),
       ...(cell.expected ? [cell.expected.egcs_fc_amount, ...(cell.expected.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)] : [])
-    ])
+    ].filter(value => value !== undefined))
     const occupants = rowsByCell.get(`${cell.egcs_fc_fundingagreementbudgetlineitem}:${cell.egcs_fc_month}`) ?? []
     const existing = occupants[0]
     const existingSources = existing ? fundingByLine.get(String(existing.id)) ?? [] : []
     const expectedSources = cell.expected?.egcs_fc_fundingsources
+    const existingTotal = existing ? parseDatabaseMoney(existing.egcs_fc_totalamount, currency) : null
+    const expectedTotal = cell.expected?.egcs_fc_totalamount
     if (occupants.length > 1 || (cell.expected === null
       ? existing !== undefined
       : !existing || String(existing.id) !== cell.expected.id
         || compareMoney(parseDatabaseMoney(existing.egcs_fc_amount, currency), cell.expected.egcs_fc_amount) !== 0)
+      || (expectedTotal && (!existingTotal || compareMoney(existingTotal, expectedTotal) !== 0))
       || (cell.egcs_fc_fundingsources !== undefined && cell.expected !== null
         && (!expectedSources || existingSources.length !== expectedSources.length
           || existingSources.some(source => !expectedSources.some(expected => expected.egcs_fc_fundingsubtype === source.egcs_fc_fundingsubtype
@@ -101,8 +110,11 @@ export const saveAgreementForecastBreakdown = async (
     const referenceMode = existing ? 'retained-existing' : 'current-choice'
     const referenceId = existing ? String(existing.egcs_fc_fundingagreementbudgetlineitem) : cell.egcs_fc_fundingagreementbudgetlineitem
     const referenceKey = `${referenceMode}:${referenceId}`
+    const clearsSavedSources = existing && existingSources.length > 0 && cell.egcs_fc_fundingsources?.length === 0
+      && cell.egcs_fc_totalamount === undefined
+      && compareMoney(parseDatabaseMoney(existing.egcs_fc_amount, currency), cell.egcs_fc_amount) === 0
     let reference = references.get(referenceKey)
-    if (!reference) {
+    if (!clearsSavedSources && !reference) {
       reference = await assertAgreementForecastBudgetLineItem(
         event, trx, agreementId, String(forecast.egcs_fc_fiscalyear), referenceId, { referenceMode }
       )
@@ -115,11 +127,13 @@ export const saveAgreementForecastBreakdown = async (
       cell.egcs_fc_amount,
       ...(cell.egcs_fc_fundingsources ?? existingSources).map(source => source.egcs_fc_amount)
     ])
-    const total = sumMoney([
-      cell.egcs_fc_amount,
-      ...(cell.egcs_fc_fundingsources ?? existingSources).map(source => source.egcs_fc_amount)
-    ], currency)
-    if (!isPersistableMoney(total)) {
+    const sources = cell.egcs_fc_fundingsources ?? existingSources
+    const fundedTotal = sumMoney([cell.egcs_fc_amount, ...sources.map(source => source.egcs_fc_amount)], currency)
+    let total = fundedTotal
+    if (mode === 'manual') total = cell.egcs_fc_totalamount ?? existingTotal ?? fundedTotal
+    if (mode === 'program_only' && existingTotal && compareMoney(existingTotal, fundedTotal) > 0) total = existingTotal
+    if (!isPersistableMoney(total) || compareMoney(total, fundedTotal) < 0
+      || (sources.length > 0 && compareMoney(total, fundedTotal) !== 0)) {
       return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_MISMATCH', 'apiErrors.agreement.funding_breakdown_required')
     }
     const values = {
@@ -133,11 +147,11 @@ export const saveAgreementForecastBreakdown = async (
       : await trx.insertInto('Funding_Case_Agreement_Forecast_Line_Item').values({
           ...values,
           egcs_fc_agreementforecast: forecastId,
-          egcs_fc_fundingagreementbudgetlineitem: String(reference.id),
+          egcs_fc_fundingagreementbudgetlineitem: String(reference?.id ?? referenceId),
           egcs_fc_month: cell.egcs_fc_month,
           egcs_fc_currency: currency
         }).returning('id').executeTakeFirstOrThrow()
-    if (cell.egcs_fc_fundingsources !== undefined) {
+    if (mode !== 'program_only' && cell.egcs_fc_fundingsources !== undefined) {
       await replaceAgreementLineFunding(event, trx, agreementId, { kind: 'forecast', lineId: String(saved.id) }, cell.egcs_fc_fundingsources)
     }
     savedCells.push({

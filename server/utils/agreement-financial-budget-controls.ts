@@ -141,7 +141,8 @@ export const getAgreementFinancialBudgetViolation = async (
       AND line.egcs_fc_fundingagreement = ${agreementId}::bigint
       AND version.egcs_fc_fundingagreement = ${agreementId}::bigint
       AND COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id) = ${context.fiscalYearId}::bigint
-      AND version.egcs_fc_iscurrent AND NOT version._deleted AND NOT year._deleted AND NOT line._deleted
+      AND version.egcs_fc_iscurrent AND NOT version._deleted AND NOT year._deleted
+      AND NOT line._deleted AND NOT line.egcs_fc_pendingfunding
       AND line.egcs_fc_currency = ${context.currency}
   `.execute(db)).rows[0]
   const budget = budgetRow ? parseDatabaseMoney(budgetRow.amount, context.currency) : zero

@@ -7,19 +7,16 @@ import { nanoid } from 'nanoid'
 type FundingSource = {
   egcs_fc_fundingsubtype: string
   egcs_fc_amount: MoneyInput
-  egcs_fc_description_en?: string | null
-  egcs_fc_description_fr?: string | null
   funding_type_name_en?: string | null
   funding_type_name_fr?: string | null
   funding_subtype_name_en?: string | null
   funding_subtype_name_fr?: string | null
 }
-const { modelValue, agreementId, currency, identity, allowDescription = false, disabled = false } = defineProps<{
+const { modelValue, agreementId, currency, identity, disabled = false } = defineProps<{
   modelValue: FundingSource[]
   agreementId: string
   currency: string
   identity?: string
-  allowDescription?: boolean
   disabled?: boolean
 }>()
 const emit = defineEmits<{ 'update:modelValue': [value: FundingSource[]] }>()
@@ -103,26 +100,6 @@ const retainedOption = (source: FundingSource) => {
         />
       </UFormField>
       <CommonActionButton v-if="!disabled" type="button" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('agreement.funding_sources.remove')" @click="removeSource(index)" />
-      <div v-if="allowDescription" class="grid gap-3 md:col-span-3 md:grid-cols-2">
-        <UFormField :label="t('agreement.funding_sources.description_en')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_en`" data-ui-target="agreement.funding-sources-editor.egcs_fc_fundingsources.egcs_fc_description_en">
-          <CommonTextarea
-            :model-value="source.egcs_fc_description_en ?? ''"
-            :disabled="disabled"
-            :aria-label="t('agreement.funding_sources.description_en')"
-            :rows="2"
-            class="w-full"
-            @update:model-value="value => updateSource(index, { egcs_fc_description_en: value })" />
-        </UFormField>
-        <UFormField :label="t('agreement.funding_sources.description_fr')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_fr`" data-ui-target="agreement.funding-sources-editor.egcs_fc_fundingsources.egcs_fc_description_fr">
-          <CommonTextarea
-            :model-value="source.egcs_fc_description_fr ?? ''"
-            :disabled="disabled"
-            :aria-label="t('agreement.funding_sources.description_fr')"
-            :rows="2"
-            class="w-full"
-            @update:model-value="value => updateSource(index, { egcs_fc_description_fr: value })" />
-        </UFormField>
-      </div>
     </div>
   </div>
 </template>

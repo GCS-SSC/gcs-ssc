@@ -9,6 +9,8 @@ import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/util
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from '~~/server/utils/agreement-budget-funding'
+import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
+import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 
 export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
@@ -102,6 +104,7 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_allowpercentageoverride',
           'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory as calculation_category_id',
+          'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding',
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection_fr as egcs_fc_costsubsection_fr',
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
@@ -125,9 +128,13 @@ export default defineEventHandler(async event => {
 
     const proponents = await loadAgreementBudgetProponents(db, agreementId)
     const fundingSourcesByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, lineItems.map(line => String(line.row_id))))
+    const budgetSettings = await loadAgreementBudgetManagement(db, agreementId)
+    const protection = await resolveBusinessStatusProtection(db, 'fundingcaseagreement', agreementId)
     return {
       fiscalYears,
       proponents,
+      budgetSettings: protection?.locked ? undefined : budgetSettings,
+      showHistoricalFunding: budgetSettings.egcs_tp_budgetfundingmode === 'program_only' && fundingSourcesByLine.size > 0,
       lineItems: lineItems.map(line => ({
         ...line,
         egcs_fc_percentage: line.egcs_fc_percentage === null ? null : parseSafeDecimal(String(line.egcs_fc_percentage)),

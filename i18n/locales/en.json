@@ -1212,6 +1212,7 @@
       "owner_changed": "The item owner changed while its assignments were being updated. Refresh and try again."
     },
     "validation": {
+    "stream_budget_breakdown_conflict": "Turn off both Other Funding breakdown requirements before switching to Program Funding only.",
       "failed": "Some fields are invalid. Review the form and try again."
     },
     "funding_history": {
@@ -1440,6 +1441,7 @@
       "invalid_funding_subtype": "Select a funding subtype available to this agreement’s stream.",
       "duplicate_funding_subtype": "Each funding subtype may appear only once per line.",
       "funding_subtype_invalid": "Select a funding subtype available to this agreement’s stream, without duplicates.",
+      "total_cost_required": "Enter the total cost for this line.",
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost.",
       "annual_budget_exceeded": "The annual {document} program amount ({amount}) exceeds the current Agreement program funding budget ({budget}).",
       "commitment_revision_required": "Payments require the combined total of all active commitments across all years to be at or below the current agreement program funding total. Use the current active commitment. For a draft tied to a previous commitment, create a new payment.",
@@ -1453,8 +1455,11 @@
       "number_exhausted": "An available agreement number could not be generated. Ask a manager to review the numbering configuration.",
       "invalid_budget_calculation": "Invalid calculation configuration or duplicate all-other-items charge.",
       "budget_calculation_read_only": "This calculated amount or percentage cannot be changed.",
+      "total_cost_read_only": "The Stream calculates Total Cost. Remove the supplied amount and try again.",
+      "other_funding_disabled": "This Stream only allows Program Funding.",
       "program_funding_required": "Program funding is required for a manual line item.",
       "calculated_funding_exceeds_total": "Total Amount must cover the recalculated funding for “{row}”.",
+      "budget_pending_funding": "Resolve the pending budget lines by adding qualifying sources or removing the lines before starting approval.",
       "stream_immutable": "The Agreement stream cannot be changed after creation.",
       "not_found": "Agreement not found.",
       "closed": "This Agreement is closed and cannot be changed.",
@@ -1657,6 +1662,9 @@
       "duplicate_stream_area_of_expertise": "This area of expertise already exists for the stream.",
       "duplicate_stream_chart_of_account": "This chart of accounts entry already exists for the stream budget.",
       "duplicate_program_name": "An active program with the same bilingual name already exists for this Agency.",
+      "budget_other_funding_exists": "Remove Other Funding sources from working records on these agreements, then save again: {references}.",
+      "budget_pending_funding_exists": "Resolve pending budget lines and remove Other Funding from working records on these agreements, then save again: {references}.",
+      "budget_total_cost_mismatch": "Adjust Total Cost to match Program Funding plus Other Funding on working records on these agreements, then save again: {references}.",
       "duplicate_program_stream_name": "A stream with this English and French name already exists for the program.",
       "duplicate_program_outcome_name": "An outcome with this English and French name already exists for the program.",
       "duplicate_program_objective": "An objective with this English and French value already exists for the program.",
@@ -1789,6 +1797,22 @@
     }
   },
   "transfer_payment": {
+    "budget_management": {
+      "title": "Budget Management",
+      "funding_mode": "Funding mode",
+      "program_only": "Program Funding only",
+      "manual": "Other Funding with manual Total Cost",
+      "automatic": "Other Funding with automatic Total Cost",
+      "program_only_note": "Saving this mode clears both Other Funding breakdown requirements. Approved and historical records keep their saved funding.",
+      "hide_cost_category": "Hide Cost Category",
+      "hide_cost_subsection": "Hide Cost Subsection",
+      "record_budget": "Budget",
+      "record_amendment": "Amendment",
+      "record_forecast": "Forecast",
+      "record_claim": "Claim",
+      "additional_records": "Other affected records ({count})",
+      "save_failed": "Budget Management settings could not be saved"
+    },
     "require_forecast_funding_breakdown": "Require other funding breakdown on forecasts",
     "require_claim_funding_breakdown": "Require other funding breakdown on claims",
     "proponent_consistency_confirm_title": "Change proponent type consistency?",
@@ -2414,6 +2438,7 @@
     "numeric_not_representable": "Enter a number that can be stored without rounding",
     "delete_via_delete": "Use the Delete action to delete this record",
     "total_amount_must_cover_funding": "Total amount must be greater than or equal to all funding amounts combined",
+    "budget_source_after_create": "Save the budget line before adding other funding sources.",
     "invalid_helper_field": "Select a valid helper field",
     "invalid_helper_value_type": "Use a value type that matches the selected helper field",
     "invalid_calculation_reference": "Select a valid assessment item reference for this calculation",
@@ -2486,6 +2511,8 @@
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost before completion."
     },
     "funding_sources": {
+      "clear": "Remove other funding sources",
+      "clear_description": "This removes all other funding sources from this line and keeps its Program Funding.",
       "in_stacking": "Included in stacking limit",
       "in_cost_sharing": "Used for cost sharing",
       "title": "Other funding sources",
@@ -2753,6 +2780,7 @@
       "english": "English",
       "french": "French",
       "language_instruction": "Provide the cost subsection and description each in at least one language.",
+      "description_language_instruction": "Provide a description in at least one language.",
       "cost_subsection": "Cost subsection",
       "cost_subsection_placeholder": "Enter the cost subsection",
       "description_placeholder": "Enter the budget line item description",
@@ -2767,6 +2795,10 @@
       "edit_fiscal_year": "Update Fiscal Year",
       "add_line_item": "Add Line Item",
       "edit_line_item": "Update Line Item",
+      "pending_funding": "Pending funding",
+      "pending_funding_notice_title": "Some budget lines are pending funding",
+      "pending_funding_notice_description": "Pending lines are excluded from budget totals. Use Add source on a pending line. The line becomes active once its funding meets the required limits.",
+      "pending_funding_activated": "The budget line is active and now counts toward budget totals.",
       "no_line_items": "No budget line items yet."
     },
     "amendments": {
@@ -2797,10 +2829,12 @@
       "create_budget_snapshot": "Create from current budget",
       "create_activity_snapshot": "Create from current activities",
       "budget_snapshot_created": "Budget snapshot created successfully",
+      "program_only_snapshot_notice": "The draft uses Program Funding only. You can still view the original funding on the approved record.",
       "activity_snapshot_created": "Activity snapshot created successfully",
       "budget_snapshot_description": "Create a working copy of the agreement budget to make this amendment's budget and fiscal-year changes.",
       "budget_difference": "Budget change",
       "budget_difference_notice": "Total budget change from the last approved budget: {amount}",
+      "program_funding_difference_notice": "Program Funding change from the last approved budget: {amount}",
       "activity_snapshot_description": "Create a working copy of the agreement activities to make this amendment's activity changes.",
       "created_success": "Amendment created successfully",
       "workflow": "Approvals",
@@ -3012,6 +3046,7 @@
       "offset_approval_description": "These offset Credit Memos are approved with this payment, including when the recipient disbursement is zero. Declining or cancelling the payment releases the recovery without posting the Credit Memos."
     },
     "forecasts": {
+      "program_only_copy_notice": "This draft includes Program Funding only. The previous forecast retains its Other Funding.",
       "historical_budget_line_read_only": "This saved line is read-only because its budget line is no longer available in the current budget.",
       "title": "Forecasts",
       "search": "Search forecasts",

@@ -9,6 +9,7 @@ import type {
   RuntimeKind,
   RuntimeState
 } from '../constants/system-lifecycle'
+import type { TransferPaymentBudgetFundingMode } from './schemas/transfer-payment'
 import type { StatusId } from './status'
 import type { PaymentEvidence } from './payment-evidence'
 
@@ -1523,6 +1524,7 @@ export interface FundingCaseAgreementBudgetLineItemTable {
   egcs_fc_description_fr: Generated<string>
   egcs_fc_totalamount: string
   egcs_fc_programfunding: string
+  egcs_fc_pendingfunding: Generated<boolean>
   egcs_fc_currency: Currency_Codes
   _deleted: Generated<boolean>
 }
@@ -2340,6 +2342,9 @@ export interface TransferPaymentFiscalYearBudgetTable {
 
 export interface TransferPaymentStreamTable {
   egcs_tp_requireconsistentproponenttype: Generated<boolean>
+  egcs_tp_budgetfundingmode: Generated<TransferPaymentBudgetFundingMode>
+  egcs_tp_hidecostcategory: Generated<boolean>
+  egcs_tp_hidecostsubsection: Generated<boolean>
   egcs_tp_requireforecastfundingbreakdown: Generated<boolean>
   egcs_tp_requireclaimfundingbreakdown: Generated<boolean>
   id: Generated<string>

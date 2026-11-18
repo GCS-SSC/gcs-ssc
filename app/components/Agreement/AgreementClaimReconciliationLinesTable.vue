@@ -5,7 +5,7 @@ import type { Ref } from 'vue'
 import type { AgreementClaimReconciliationTableLine } from '~~/shared/types/agreement-claim-reconciliation-ui'
 import { formatMoneyText, parseMoney, zeroMoney, subtractMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
-const { currency, lines = [], totalSubmitted, totalReconciled, totalSampled, editMode = 'inline', actionPending = false } = defineProps<{
+const { currency, lines = [], totalSubmitted, totalReconciled, totalSampled, editMode = 'inline', actionPending = false, hideCostCategory = false, hideCostSubsection = false } = defineProps<{
   currency: string
   lines?: AgreementClaimReconciliationTableLine[]
   totalSubmitted?: Money
@@ -13,6 +13,8 @@ const { currency, lines = [], totalSubmitted, totalReconciled, totalSampled, edi
   totalSampled?: Money
   editMode?: 'inline' | 'action'
   actionPending?: boolean
+  hideCostCategory?: boolean
+  hideCostSubsection?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -42,8 +44,8 @@ const getSubsectionGroupKey = (category: string, subsection: string) => JSON.str
 const groupedLines = computed<ReconciliationCategoryGroup[]>(() => {
   const categories = new Map<string, Map<string, AgreementClaimReconciliationTableLine[]>>()
   for (const line of lines) {
-    const category = line.costCategory || t('common.all')
-    const subsection = line.costSubsection || t('common.all')
+    const category = hideCostCategory ? '' : line.costCategory || t('common.all')
+    const subsection = hideCostSubsection ? '' : line.costSubsection || t('common.all')
     const subsections = categories.get(category) ?? new Map<string, AgreementClaimReconciliationTableLine[]>()
     const grouped = subsections.get(subsection) ?? []
     grouped.push(line)
@@ -139,7 +141,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
       </thead>
       <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800">
         <template v-for="category in groupedLines" :key="category.key">
-          <tr class="bg-zinc-50 dark:bg-zinc-900/70">
+          <tr v-if="!hideCostCategory" class="bg-zinc-50 dark:bg-zinc-900/70">
             <th scope="rowgroup" class="px-4 py-3 text-left">
               <CommonGroupedDisclosureButton
                 class="flex items-center gap-2 font-semibold"
@@ -168,14 +170,16 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
             </td>
             <td v-if="editMode === 'action'" class="px-4 py-3" />
           </tr>
-          <template v-if="isExpanded(category.key)">
+          <template v-if="hideCostCategory || isExpanded(category.key)">
             <template v-for="(subsection, subsectionIndex) in category.subsections" :key="subsection.key">
               <tr
-                :id="subsectionIndex === 0 ? getGroupedDisclosureControlsId(category.key) : undefined"
+                v-if="!hideCostSubsection"
+                :id="!hideCostCategory && subsectionIndex === 0 ? getGroupedDisclosureControlsId(category.key) : undefined"
                 class="bg-zinc-50/60 dark:bg-zinc-900/30">
                 <th scope="rowgroup" class="px-4 py-3 text-left">
                   <CommonGroupedDisclosureButton
-                    class="flex items-center gap-2 pl-6 font-medium"
+                    class="flex items-center gap-2 font-medium"
+                    :class="{ 'pl-6': !hideCostCategory }"
                     :expanded="isExpanded(subsection.key)"
                     :controls="getGroupedDisclosureControlsId(subsection.key)"
                     :label="subsection.label"
@@ -203,11 +207,13 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
               </tr>
               <tr
                 v-for="(line, lineIndex) in subsection.lines"
-                v-show="isExpanded(subsection.key)"
-                :id="isExpanded(subsection.key) && lineIndex === 0 ? getGroupedDisclosureControlsId(subsection.key) : undefined"
+                v-show="hideCostSubsection || isExpanded(subsection.key)"
+                :id="lineIndex !== 0 ? undefined : hideCostSubsection
+                  ? (!hideCostCategory && subsectionIndex === 0 ? getGroupedDisclosureControlsId(category.key) : undefined)
+                  : (isExpanded(subsection.key) ? getGroupedDisclosureControlsId(subsection.key) : undefined)"
                 :key="line.id">
                 <th scope="row" class="px-4 py-4 text-left">
-                  <div class="pl-12">
+                  <div :class="{ 'pl-12': !hideCostCategory && !hideCostSubsection, 'pl-6': hideCostCategory !== hideCostSubsection }">
                     <p class="font-semibold text-highlighted">
                       {{ line.name }}
                     </p>

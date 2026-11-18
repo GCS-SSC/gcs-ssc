@@ -151,6 +151,7 @@ export default defineEventHandler(async event => {
             .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
             .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
             .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
+            .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
             .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
             .select([
               'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement as agreementId',

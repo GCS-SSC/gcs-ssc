@@ -1212,6 +1212,7 @@
       "owner_changed": "Le responsable de l’élément a changé pendant la mise à jour de ses affectations. Actualisez la page et réessayez."
     },
     "validation": {
+    "stream_budget_breakdown_conflict": "Désactivez les deux exigences de ventilation des autres financements avant de choisir le financement du programme seulement.",
       "failed": "Certains champs sont invalides. Vérifiez le formulaire et réessayez."
     },
     "funding_history": {
@@ -1440,6 +1441,7 @@
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement offert pour le volet de cette entente.",
       "duplicate_funding_subtype": "Chaque sous-type de financement ne peut figurer qu’une fois par ligne.",
       "funding_subtype_invalid": "Sélectionnez un sous-type de financement offert pour le volet de cette entente, sans doublons.",
+      "total_cost_required": "Saisissez le coût total de cette ligne.",
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total.",
       "annual_budget_exceeded": "Le montant annuel des {document} pour le programme ({amount}) dépasse le budget courant de financement du programme de l’entente ({budget}).",
       "commitment_revision_required": "Les paiements exigent que le total combiné de tous les engagements actifs pour tous les exercices soit inférieur ou égal au financement total courant du programme de l’entente. Utilisez l’engagement actif courant. Pour un paiement provisoire lié à un engagement précédent, créez un nouveau paiement.",
@@ -1453,8 +1455,11 @@
       "number_exhausted": "Impossible de générer un numéro d’entente disponible. Demandez à un gestionnaire de vérifier la configuration.",
       "invalid_budget_calculation": "Configuration de calcul invalide ou frais sur tous les autres postes en double.",
       "budget_calculation_read_only": "Ce montant calculé ou ce pourcentage ne peut pas être modifié.",
+      "total_cost_read_only": "Le volet calcule le coût total. Retirez le montant fourni et réessayez.",
+      "other_funding_disabled": "Ce volet accepte uniquement le financement du programme.",
       "program_funding_required": "Le financement du programme est requis pour un poste manuel.",
       "calculated_funding_exceeds_total": "Le montant total doit couvrir le financement recalculé du poste « {row} ».",
+      "budget_pending_funding": "Ajoutez des sources admissibles aux postes budgétaires en attente ou retirez ces postes avant de lancer l’approbation.",
       "stream_immutable": "Le volet de l’entente ne peut pas être modifié après sa création.",
       "not_found": "Entente introuvable.",
       "closed": "Cette entente est fermée et ne peut plus être modifiée.",
@@ -1657,6 +1662,9 @@
       "duplicate_stream_area_of_expertise": "Ce domaine d'expertise existe déjà pour le volet.",
       "duplicate_stream_chart_of_account": "Cette entrée du plan comptable existe déjà pour le budget du volet.",
       "duplicate_program_name": "Un programme actif portant le même nom bilingue existe déjà pour cet organisme.",
+      "budget_other_funding_exists": "Retirez les autres sources de financement des dossiers de travail de ces ententes, puis enregistrez de nouveau : {references}.",
+      "budget_pending_funding_exists": "Réglez les postes budgétaires en attente et retirez les autres sources de financement des dossiers de travail de ces ententes, puis enregistrez de nouveau : {references}.",
+      "budget_total_cost_mismatch": "Ajustez le coût total pour qu’il corresponde à la somme du financement du programme et des autres financements dans les dossiers de travail de ces ententes, puis enregistrez de nouveau : {references}.",
       "duplicate_program_stream_name": "Un volet avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_outcome_name": "Un résultat avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_objective": "Un objectif avec cette valeur en anglais et en français existe déjà pour le programme.",
@@ -1789,6 +1797,22 @@
     }
   },
   "transfer_payment": {
+    "budget_management": {
+      "title": "Gestion du budget",
+      "funding_mode": "Mode de financement",
+      "program_only": "Financement du programme seulement",
+      "manual": "Autres financements avec coût total saisi manuellement",
+      "automatic": "Autres financements avec coût total calculé automatiquement",
+      "program_only_note": "L’enregistrement de ce mode désactive les deux exigences de ventilation des autres financements. Les dossiers approuvés et historiques conservent leur financement.",
+      "hide_cost_category": "Masquer la catégorie de coûts",
+      "hide_cost_subsection": "Masquer la sous-section de coûts",
+      "record_budget": "Budget",
+      "record_amendment": "Modification",
+      "record_forecast": "Prévision",
+      "record_claim": "Demande de remboursement",
+      "additional_records": "Autres dossiers concernés ({count})",
+      "save_failed": "Impossible d’enregistrer les paramètres de gestion du budget"
+    },
     "require_forecast_funding_breakdown": "Exiger la ventilation des autres financements dans les prévisions",
     "require_claim_funding_breakdown": "Exiger la ventilation des autres financements dans les demandes de remboursement",
     "proponent_consistency_confirm_title": "Modifier la cohérence du type de promoteur?",
@@ -2414,6 +2438,7 @@
     "numeric_not_representable": "Entrez un nombre qui peut être enregistré sans arrondissement",
     "delete_via_delete": "Utilisez l’action Supprimer pour supprimer cet enregistrement",
     "total_amount_must_cover_funding": "Le montant total doit être supérieur ou égal à l'ensemble des montants de financement combinés",
+    "budget_source_after_create": "Enregistrez la ligne budgétaire avant d’ajouter d’autres sources de financement.",
     "invalid_helper_field": "Sélectionnez un champ d'aide valide",
     "invalid_helper_value_type": "Utilisez un type de valeur compatible avec le champ d'aide sélectionné",
     "invalid_calculation_reference": "Sélectionnez une référence d'élément d'évaluation valide pour ce calcul",
@@ -2486,6 +2511,8 @@
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total avant l’achèvement."
     },
     "funding_sources": {
+      "clear": "Retirer les autres sources de financement",
+      "clear_description": "Cette action retire toutes les autres sources de financement de cette ligne et conserve le financement du programme.",
       "in_stacking": "Inclus dans la limite de cumul",
       "in_cost_sharing": "Utilisé pour le partage des coûts",
       "title": "Autres sources de financement",
@@ -2753,6 +2780,7 @@
       "english": "Anglais",
       "french": "Français",
       "language_instruction": "Indiquez la sous-section de coûts et la description dans au moins une langue chacune.",
+      "description_language_instruction": "Fournissez une description dans au moins une langue.",
       "cost_subsection": "Sous-section de coûts",
       "cost_subsection_placeholder": "Saisir la sous-section de coûts",
       "description_placeholder": "Saisir la description de la ligne budgétaire",
@@ -2767,6 +2795,10 @@
       "edit_fiscal_year": "Mettre à jour l'exercice financier",
       "add_line_item": "Ajouter une ligne budgétaire",
       "edit_line_item": "Mettre à jour la ligne budgétaire",
+      "pending_funding": "Financement en attente",
+      "pending_funding_notice_title": "Le financement de certaines lignes budgétaires est en attente",
+      "pending_funding_notice_description": "Les lignes en attente sont exclues des totaux du budget. Utilisez Ajouter une source sur une ligne en attente. La ligne devient active lorsque son financement respecte les limites requises.",
+      "pending_funding_activated": "La ligne budgétaire est active et est maintenant incluse dans les totaux du budget.",
       "no_line_items": "Aucune ligne budgétaire pour le moment."
     },
     "amendments": {
@@ -2797,10 +2829,12 @@
       "create_budget_snapshot": "Créer à partir du budget actuel",
       "create_activity_snapshot": "Créer à partir des activités actuelles",
       "budget_snapshot_created": "L’instantané du budget a été créé",
+      "program_only_snapshot_notice": "L’ébauche utilise uniquement le financement du programme. Vous pouvez consulter le financement d’origine dans le dossier approuvé.",
       "activity_snapshot_created": "L’instantané des activités a été créé",
       "budget_snapshot_description": "Créez une copie de travail du budget de l’entente afin d’apporter les changements budgétaires et aux exercices financiers de cette modification.",
       "budget_difference": "Variation du budget",
       "budget_difference_notice": "Variation totale par rapport au dernier budget approuvé : {amount}",
+      "program_funding_difference_notice": "Variation du financement du programme par rapport au dernier budget approuvé : {amount}",
       "activity_snapshot_description": "Créez une copie de travail des activités de l’entente afin d’apporter les changements aux activités de cette modification.",
       "created_success": "La modification a été créée",
       "workflow": "Approbations",
@@ -3012,6 +3046,7 @@
       "offset_approval_description": "Ces notes de crédit par compensation sont approuvées avec ce paiement, même si le versement au bénéficiaire est nul. Le refus ou l’annulation du paiement libère le recouvrement sans comptabiliser les notes de crédit."
     },
     "forecasts": {
+      "program_only_copy_notice": "Cette ébauche comprend uniquement le financement du programme. La prévision précédente conserve ses autres sources de financement.",
       "historical_budget_line_read_only": "Cette ligne enregistrée est en lecture seule, car sa ligne budgétaire n’est plus disponible dans le budget courant.",
       "title": "Prévisions",
       "search": "Rechercher des prévisions",

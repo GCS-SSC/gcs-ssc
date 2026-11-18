@@ -42,11 +42,12 @@ export default defineEventHandler(async event => {
       } satisfies Insertable<FundingCaseAgreementForecastTable>)
       .returningAll()
       .executeTakeFirstOrThrow()
+    let otherFundingOmitted = false
     if (validated.egcs_fc_copyfromactive) {
-      await copyActiveAgreementForecastLines(trx, agreementId, String(fiscalYear.id), String(forecast.id))
+      otherFundingOmitted = await copyActiveAgreementForecastLines(trx, agreementId, String(fiscalYear.id), String(forecast.id))
       await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: String(forecast.id) })
     }
     await createPrimaryEntityAssignment(trx, 'fundingcaseforecast', String(forecast.id), creatorId)
-    return forecast
+    return { ...forecast, ...(otherFundingOmitted ? { other_funding_omitted: true } : {}) }
   }, { action: 'create' })
 })

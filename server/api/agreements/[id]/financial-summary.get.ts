@@ -21,8 +21,14 @@ export default defineEventHandler(async event => {
     const agreement = await assertAgreementExists(event, agreementId, db)
     if (!agreement || typeof agreement !== 'object' || !('id' in agreement)) return agreement
 
-    const { egcs_fc_currency: agreementCurrency } = await db.selectFrom('Funding_Case_Agreement_Profile')
-      .select('egcs_fc_currency').where('id', '=', agreementId).executeTakeFirstOrThrow()
+    const settings = await db.selectFrom('Funding_Case_Agreement_Profile as agreement')
+      .innerJoin('Transfer_Payment_Stream as stream', 'stream.id', 'agreement.egcs_fc_transferpaymentstream')
+      .select(['agreement.egcs_fc_currency', 'stream.egcs_tp_budgetfundingmode', 'stream.egcs_tp_hidecostcategory', 'stream.egcs_tp_hidecostsubsection'])
+      .where('agreement.id', '=', agreementId).executeTakeFirstOrThrow()
+    const agreementCurrency = settings.egcs_fc_currency
+    const budgetAmountColumn = settings.egcs_tp_budgetfundingmode === 'program_only'
+      ? 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding'
+      : 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount'
 
     const [yearRows, budgetRows, forecastRows, forecastLineRows, claimRows, reconcileRows, paymentRows] = await Promise.all([
       db.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
@@ -53,11 +59,12 @@ export default defineEventHandler(async event => {
           'Agency_Cost_Category_Line_Item.egcs_ay_name_en as nameEn',
           'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as nameFr',
           budgetLineDisplayText('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description').as('description'),
-          databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('budget'),
+          databaseMoneyText(sql.ref(budgetAmountColumn)).as('budget'),
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as currency'
         ])
         .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
         .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+        .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
         .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
         .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
         .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
@@ -159,7 +166,15 @@ export default defineEventHandler(async event => {
     const positiveIds = new Set(states.filter(state => state.lifecycleTerminus === 'positive').map(state => String(state.id)))
 
     const years: SummaryFiscalYear[] = yearRows.map(row => ({ id: String(row.id), label: row.label, order: String(row.order) }))
-    const budgets: SummaryBudgetLine[] = budgetRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), budget: parseDatabaseMoney(row.budget, row.currency) }))
+    const budgets: SummaryBudgetLine[] = budgetRows.map(row => ({
+      ...row,
+      id: String(row.id),
+      fiscalYearId: String(row.fiscalYearId),
+      categoryNameEn: settings.egcs_tp_hidecostcategory ? '' : row.categoryNameEn,
+      categoryNameFr: settings.egcs_tp_hidecostcategory ? '' : row.categoryNameFr,
+      costSubsection: settings.egcs_tp_hidecostsubsection ? null : row.costSubsection,
+      budget: parseDatabaseMoney(row.budget, row.currency)
+    }))
     const forecasts: SummaryForecast[] = forecastRows.map(row => ({ id: String(row.id), fiscalYearId: String(row.fiscalYearId), active: row.active, version: String(row.version) }))
     const forecastLines: SummaryForecastLine[] = forecastLineRows.map(row => ({ ...row, id: String(row.id), forecastId: String(row.forecastId), fiscalYearId: String(row.fiscalYearId), budgetLineId: String(row.budgetLineId), amount: parseDatabaseMoney(row.amount, row.currency) }))
     const claims: SummaryClaimLine[] = claimRows.map(row => ({ ...row, id: String(row.id), claimId: String(row.claimId), fiscalYearId: String(row.fiscalYearId), budgetLineId: row.budgetLineId == null ? null : String(row.budgetLineId), amount: parseDatabaseMoney(row.amount, row.currency) }))

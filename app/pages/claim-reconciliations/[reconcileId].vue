@@ -39,6 +39,8 @@ type ReconciliationDetail = {
     agreement_title_en: string | null
     agreement_title_fr: string | null
     claim_status: string
+    egcs_tp_hidecostcategory?: boolean
+    egcs_tp_hidecostsubsection?: boolean
   }
   lines: ReconciliationLine[]
   can_read: boolean
@@ -419,6 +421,8 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
 
                 <AgreementClaimReconciliationLinesTable
                   :lines="reconciliationTableLines"
+                  :hide-cost-category="!data.reconciliation.isCompleted && data.reconciliation.egcs_tp_hidecostcategory"
+                  :hide-cost-subsection="!data.reconciliation.isCompleted && data.reconciliation.egcs_tp_hidecostsubsection"
                   :currency="data.reconciliation.egcs_fc_currency"
                   :total-submitted="totalSubmitted"
                   :total-reconciled="totalReconciled"

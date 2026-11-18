@@ -6,7 +6,7 @@ import type { Money } from '~~/shared/utils/money'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { badRequest } from '~~/server/utils/api-errors'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from './agreement-currency'
-import { compareMoney, sumMoney } from '~~/shared/utils/money'
+import { compareMoney, isPersistableMoney, sumMoney } from '~~/shared/utils/money'
 
 export type AgreementFundingSourceInput = {
   egcs_fc_fundingsubtype: string
@@ -16,6 +16,70 @@ export type AgreementFundingSourceInput = {
 type FundingTarget =
   | { kind: 'forecast', lineId: string }
   | { kind: 'claim', lineId: string }
+
+/** Reads the owning Stream configuration in the caller’s snapshot or locked transaction. */
+export const loadAgreementBudgetManagement = async (db: Kysely<Database>, agreementId: string) => await db
+  .selectFrom('Funding_Case_Agreement_Profile')
+  .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
+  .select(['egcs_tp_budgetfundingmode', 'egcs_tp_hidecostcategory', 'egcs_tp_hidecostsubsection'])
+  .where('Funding_Case_Agreement_Profile.id', '=', agreementId)
+  .executeTakeFirstOrThrow()
+
+type FundingMode = Awaited<ReturnType<typeof loadAgreementBudgetManagement>>['egcs_tp_budgetfundingmode']
+
+/** Rejects funding fields managed by or unavailable in the selected Stream mode. */
+export const assertAgreementFundingModeInput = async (
+  event: H3Event,
+  mode: FundingMode,
+  input: { total?: Money, sources?: AgreementFundingSourceInput[] }
+) => {
+  if (mode === 'program_only' && input.sources?.length) {
+    await badRequest(event, 'AGREEMENT_OTHER_FUNDING_DISABLED', 'apiErrors.agreement.other_funding_disabled')
+  }
+  if (mode !== 'manual' && input.total !== undefined) {
+    await badRequest(event, 'AGREEMENT_TOTAL_COST_READ_ONLY', 'apiErrors.agreement.total_cost_read_only')
+  }
+}
+
+/** Resolves the persisted total after a create or patch, preserving untouched manual totals. */
+export const resolveAgreementLineFundingTotal = async (
+  event: H3Event,
+  trx: Transaction<Database>,
+  agreementId: string,
+  input: { amount: Money, total?: Money, sources?: AgreementFundingSourceInput[] },
+  existing?: FundingTarget & { total: Money }
+): Promise<Money> => {
+  const { egcs_tp_budgetfundingmode: mode } = await loadAgreementBudgetManagement(trx, agreementId)
+  await assertAgreementFundingModeInput(event, mode, input)
+  if (mode === 'manual') {
+    const total = input.total ?? existing?.total
+    if (!total) return await badRequest(event, 'AGREEMENT_TOTAL_COST_REQUIRED', 'apiErrors.agreement.total_cost_required')
+    return total
+  }
+  const { amount } = input
+  if (mode === 'program_only') {
+    return existing && compareMoney(existing.total, amount) > 0 ? existing.total : amount
+  }
+  const sources = input.sources?.map(source => source.egcs_fc_amount)
+    ?? (existing ? await loadAgreementLineSourceAmounts(trx, existing, amount.currency) : [])
+  const total = sumMoney([amount, ...sources], amount.currency)
+  if (!isPersistableMoney(total)) {
+    return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_MISMATCH', 'apiErrors.agreement.funding_breakdown_required')
+  }
+  return total
+}
+
+/** Retrieves funding amounts for an existing persisted line. */
+const loadAgreementLineSourceAmounts = async (db: Kysely<Database>, target: FundingTarget, currency: string) => {
+  const sources = target.kind === 'forecast'
+    ? await db.selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
+        .select(({ ref }) => databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'))
+        .where('egcs_fc_forecastlineitem', '=', target.lineId).where('_deleted', '=', false).execute()
+    : await db.selectFrom('Funding_Case_Agreement_Claim_Line_Item_Funding')
+        .select(({ ref }) => databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'))
+        .where('egcs_fc_claimlineitem', '=', target.lineId).where('_deleted', '=', false).execute()
+  return sources.map(source => parseDatabaseMoney(source.egcs_fc_amount, currency))
+}
 
 /** Applies the exact program plus other-source arithmetic for a collection of lines. */
 export const areLineFundingAmountsComplete = (
@@ -238,19 +302,13 @@ export const assertAgreementLineFundingBalance = async (
           databaseMoneyText(ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
         ])
         .where('id', '=', target.lineId).executeTakeFirstOrThrow()
-  const sources = target.kind === 'forecast'
-    ? await db.selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
-        .select(({ ref }) => databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'))
-        .where('egcs_fc_forecastlineitem', '=', target.lineId).where('_deleted', '=', false).execute()
-    : await db.selectFrom('Funding_Case_Agreement_Claim_Line_Item_Funding')
-        .select(({ ref }) => databaseMoneyText(ref('egcs_fc_amount')).as('egcs_fc_amount'))
-        .where('egcs_fc_claimlineitem', '=', target.lineId).where('_deleted', '=', false).execute()
+  const sources = await loadAgreementLineSourceAmounts(db, target, line.egcs_fc_currency)
   if (compareMoney(parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency), parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency)) < 0) {
     return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_BELOW_PROGRAM', 'apiErrors.agreement.funding_breakdown_required')
   }
   if (sources.length === 0) return null
   if (compareMoney(
-    sumMoney([parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency), ...sources.map(source => parseDatabaseMoney(source.egcs_fc_amount, line.egcs_fc_currency))], line.egcs_fc_currency),
+    sumMoney([parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency), ...sources], line.egcs_fc_currency),
     parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)
   ) !== 0) {
     return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_MISMATCH', 'apiErrors.agreement.funding_breakdown_required')

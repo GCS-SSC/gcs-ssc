@@ -32,6 +32,7 @@ import {
 import {
   compareMoney,
   formatMoneyText,
+  isCanonicalMoney,
   absMoney,
   zeroMoney,
   sumMoney,
@@ -80,6 +81,7 @@ type BudgetLeafRow = {
   fundingSources?: FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources']
   currency?: string
   isPlaceholder: boolean
+  pendingFunding?: boolean
   fundingKind?: 'program' | 'other'
 }
 
@@ -160,14 +162,14 @@ const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, Fundin
     lineItemTarget.value = null
     return {
       egcs_fc_currency: agreementCurrency,
-      egcs_fc_applicantrecipient: proponents.value.length === 1 ? proponents.value[0]?.id : undefined,
-      egcs_fc_fundingsources: []
+      egcs_fc_applicantrecipient: proponents.value.length === 1 ? proponents.value[0]?.id : undefined
     }
   },
   updateState: lineItem => {
     lineItemTarget.value = lineItem.id
+    const { egcs_fc_fundingsources: _sources, egcs_fc_pendingfunding: _pendingFunding, ...line } = lineItem
     return {
-      ...lineItem,
+      ...line,
       id: lineItem.id,
       egcs_fc_fundingagreementbudgetfiscalyear: lineItem.egcs_fc_fundingagreementbudgetfiscalyear,
       egcs_fc_organizationcostcategory: lineItem.egcs_fc_organizationcostcategory,
@@ -175,7 +177,6 @@ const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, Fundin
       egcs_fc_description_fr: lineItem.egcs_fc_description_fr ?? '',
       egcs_fc_totalamount: lineItem.egcs_fc_totalamount,
       egcs_fc_programfunding: lineItem.egcs_fc_programfunding,
-      egcs_fc_fundingsources: lineItem.egcs_fc_fundingsources.map(source => ({ ...source })),
       egcs_fc_currency: lineItem.egcs_fc_currency
     }
   }
@@ -208,9 +209,18 @@ const validateLineItem = withFormRequirements(async (state: FundingCaseAgreement
   const isManual = !state.egcs_fc_calculationmode || state.egcs_fc_calculationmode === 'manual'
   const errors = await lineItemValidator({
     ...state,
+    egcs_fc_totalamount: budgetFundingMode.value === 'manual' ? state.egcs_fc_totalamount : undefined,
     egcs_fc_percentage: state.egcs_fc_percentage ?? undefined,
     egcs_fc_programfunding: isManual ? state.egcs_fc_programfunding : undefined
   } as Parameters<typeof lineItemValidator>[0])
+  if (budgetFundingMode.value === 'manual' && state.egcs_fc_totalamount == null && !errors.some(error => error.name === 'egcs_fc_totalamount')) {
+    errors.push({ name: 'egcs_fc_totalamount', message: t('validation.required') })
+  }
+  if (requiresSubsection.value && !state.egcs_fc_costsubsection?.trim() && !state.egcs_fc_costsubsection_fr?.trim()) {
+    for (const name of ['egcs_fc_costsubsection', 'egcs_fc_costsubsection_fr']) {
+      errors.push({ name, message: t('validation.bilingual_value_required') })
+    }
+  }
   if (isManual && state.egcs_fc_programfunding === undefined) {
     errors.push({ name: 'egcs_fc_programfunding', message: t('validation.required') })
   }
@@ -277,6 +287,17 @@ const {
   status: ref('success' as const)
 }
 const overview = computed<FundingCaseAgreementBudgetOverviewRow | null>(() => snapshotOverview ?? fetchedOverview.value)
+const budgetFundingMode = computed(() => overview.value?.budgetSettings?.egcs_tp_budgetfundingmode ?? 'manual')
+const showOtherFunding = computed(() => budgetFundingMode.value !== 'program_only' || overview.value?.showHistoricalFunding === true)
+const canEditFundingSources = computed(() => !staticMode
+  && budgetFundingMode.value !== 'program_only'
+  && overview.value?.showHistoricalFunding !== true)
+const hideCostCategory = computed(() => overview.value?.budgetSettings?.egcs_tp_hidecostcategory === true)
+const hideCostSubsection = computed(() => overview.value?.budgetSettings?.egcs_tp_hidecostsubsection === true)
+watch([budgetFundingMode, hideCostCategory, hideCostSubsection], () => {
+  lineItemModal.close()
+  fundingSourceModal.close()
+}, { flush: 'sync' })
 const budgetDifferences = computed(() => overview.value?.budget_differences ?? [])
 const {
   data: fiscalYearLookupResponse
@@ -293,13 +314,16 @@ const allColumns: TableColumnInput<BudgetLeafRow>[] = [
   { id: COST_CATEGORY_GROUP_COLUMN_ID, accessorKey: COST_CATEGORY_GROUP_COLUMN_ID, headerKey: 'agreement.budget.line_item' },
   { id: COST_SUBSECTION_GROUP_COLUMN_ID, accessorKey: COST_SUBSECTION_GROUP_COLUMN_ID, headerKey: 'agreement.budget.cost_subsection' },
   { id: 'name', accessorKey: 'lineItemNameEn', headerKey: 'agreement.budget.line_item' },
-  { id: 'totalAmount', accessorKey: 'totalAmount', headerKey: 'agreement.budget.total_amount' },
   { id: 'programFunding', accessorKey: 'programFunding', headerKey: 'agreement.budget.program_funding' },
   { id: 'otherFunding', headerKey: 'agreement.budget.other_funding_total' },
+  { id: 'totalAmount', accessorKey: 'totalAmount', headerKey: 'agreement.budget.total_amount' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const columns = computed<TableColumnInput<BudgetLeafRow>[]>(() =>
-  staticMode ? allColumns.filter(column => column.id !== 'actions') : allColumns)
+const columns = computed<TableColumnInput<BudgetLeafRow>[]>(() => allColumns.filter(column =>
+  (column.id !== 'actions' || !staticMode)
+  && (showOtherFunding.value || (column.id !== 'otherFunding' && column.id !== 'totalAmount'))
+  && (column.id !== COST_CATEGORY_GROUP_COLUMN_ID || !hideCostCategory.value)
+  && (column.id !== COST_SUBSECTION_GROUP_COLUMN_ID || !hideCostSubsection.value)))
 
 const bilingualColumns: BilingualColumnConfig<BudgetLeafRow>[] = [
   {
@@ -314,6 +338,13 @@ const bilingualColumns: BilingualColumnConfig<BudgetLeafRow>[] = [
 
 const fiscalYears = computed<FundingCaseAgreementBudgetFiscalYearRow[]>(() => overview.value?.fiscalYears ?? [])
 const lineItems = computed<FundingCaseAgreementBudgetLineItemRow[]>(() => overview.value?.lineItems ?? [])
+const hasPendingFunding = computed(() => !staticMode && lineItems.value.some(row => row.egcs_fc_pendingfunding))
+const requiresSubsection = computed(() => {
+  if (hideCostSubsection.value) return false
+  const id = selectedLineItem.value?.id
+  const saved = id ? lineItems.value.find(row => row.id === id) : undefined
+  return !saved || Boolean(saved.egcs_fc_costsubsection || saved.egcs_fc_costsubsection_fr)
+})
 const proponents = computed(() => overview.value?.proponents ?? [])
 const hasMultipleProponents = computed(() => (agreementProponentCount ?? proponents.value.length) > 1)
 const isSoleProponentSelected = computed(() => proponents.value.length === 1
@@ -346,6 +377,16 @@ const retainedCostCategoryOptions = computed(() => {
 })
 
 const calculationPreview = useBudgetCalculationPreview(selectedLineItem, lineItems)
+const automaticTotalPreview = computed(() => {
+  const state = selectedLineItem.value
+  if (!state) return undefined
+  const program = state.egcs_fc_calculationmode && state.egcs_fc_calculationmode !== 'manual'
+    ? calculationPreview.value
+    : state.egcs_fc_programfunding
+  if (!isCanonicalMoney(program)) return undefined
+  const sources = state.id ? lineItems.value.find(row => row.id === state.id)?.egcs_fc_fundingsources ?? [] : []
+  return sumMoney([program, ...sources.map(source => source.egcs_fc_amount)], program.currency)
+})
 /**
  * Captures the selected agency defaults for a new budget row.
  * @param items - Selected lookup records.
@@ -403,10 +444,8 @@ const filteredLineItems = computed(() => {
   return lineItems.value.filter((lineItem: FundingCaseAgreementBudgetLineItemRow) => {
     const searchableValues = [
       lineItem.fiscal_year_display,
-      lineItem.organization_cost_category_name_en,
-      lineItem.organization_cost_category_name_fr,
-      lineItem.egcs_fc_costsubsection,
-      lineItem.egcs_fc_costsubsection_fr,
+      ...(hideCostCategory.value ? [] : [lineItem.organization_cost_category_name_en, lineItem.organization_cost_category_name_fr]),
+      ...(hideCostSubsection.value ? [] : [lineItem.egcs_fc_costsubsection, lineItem.egcs_fc_costsubsection_fr]),
       lineItem.line_item_name_en,
       lineItem.line_item_name_fr,
       lineItem.applicant_recipient_name_en,
@@ -491,6 +530,7 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
       descriptionFr: lineItem.egcs_fc_description_fr,
       totalAmount: lineItem.egcs_fc_totalamount,
       programFunding: lineItem.egcs_fc_programfunding,
+      pendingFunding: lineItem.egcs_fc_pendingfunding,
       fundingSources: lineItem.egcs_fc_fundingsources,
       currency: lineItem.egcs_fc_currency,
       isPlaceholder: false
@@ -499,7 +539,7 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
 }))
 
 const totalRecords = computed(() => tableRows.value.length)
-const realTableRows = computed(() => tableRows.value.filter(row => !row.isPlaceholder))
+const activeTableRows = computed(() => tableRows.value.filter(row => !row.isPlaceholder && !row.pendingFunding))
 const getSingleCurrency = (currencies: Array<string | undefined>): string | undefined => {
   const normalizedCurrencies = Array.from(new Set(
     currencies
@@ -516,10 +556,10 @@ const requireBudgetCurrency = (row: BudgetLeafRow): string => {
 }
 const getRowAmount = (row: BudgetLeafRow, key: 'totalAmount' | 'programFunding' | 'otherFunding'): Money =>
   key === 'otherFunding' ? getOtherFundingTotal(row) : row[key] ?? zeroMoney(requireBudgetCurrency(row))
-const tableTotalCurrency = computed(() => getSingleCurrency(realTableRows.value.map(row => row.currency)))
+const tableTotalCurrency = computed(() => getSingleCurrency(activeTableRows.value.map(row => row.currency)))
 const getTableTotal = (key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
   const currency = tableTotalCurrency.value
-  return currency ? sumMoney(realTableRows.value.map(row => getRowAmount(row, key)), currency) : undefined
+  return currency ? sumMoney(activeTableRows.value.map(row => getRowAmount(row, key)), currency) : undefined
 }
 
 const {
@@ -532,31 +572,34 @@ const {
   isGroupedRow,
   isGroupRow,
   getLeafRows: getRealLeafRows,
-  getGroupedRowCount,
   canExpandGroupedRow,
   updateExpandedRows
 } = useGroupedTableExpansion<BudgetLeafRow>({
   rows: tableRows,
-  groups: [
+  groups: () => [
     {
       id: FISCAL_YEAR_GROUP_COLUMN_ID,
       getValue: row => row.fiscalYearId
     },
-    {
-      id: COST_CATEGORY_GROUP_COLUMN_ID,
-      getValue: row => row.costCategoryGroup
-    },
-    {
-      id: COST_SUBSECTION_GROUP_COLUMN_ID,
-      getValue: row => row.costSubsectionGroup
-    }
+    ...(!hideCostCategory.value
+      ? [{
+          id: COST_CATEGORY_GROUP_COLUMN_ID,
+          getValue: (row: BudgetLeafRow) => row.costCategoryGroup
+        }]
+      : []),
+    ...(!hideCostSubsection.value
+      ? [{
+          id: COST_SUBSECTION_GROUP_COLUMN_ID,
+          getValue: (row: BudgetLeafRow) => row.costSubsectionGroup
+        }]
+      : [])
   ],
   isPlaceholder: row => row.isPlaceholder || Boolean(row.fundingKind)
 })
 const groupingOptions = {
   ...groupedBudgetOptions,
   getSubRows: (row: BudgetLeafRow): BudgetLeafRow[] | undefined => {
-    if (row.isPlaceholder || row.fundingKind) return undefined
+    if (!showOtherFunding.value || row.isPlaceholder || row.fundingKind) return undefined
     return [{
       ...row,
       id: `${row.id}:program`,
@@ -582,7 +625,7 @@ const groupingOptions = {
 const expandedFundingRows: Ref<Record<string, boolean>> = ref({})
 const tableExpandedRows = computed<ExpandedState>(() => ({
   ...(expandedRows.value === true
-    ? Object.fromEntries(tableRows.value.flatMap(row => [0, 1, 2].map(index => [getGroupRowId(row, index), true])))
+    ? Object.fromEntries(tableRows.value.flatMap(row => grouping.value.map((_group, index) => [getGroupRowId(row, index), true])))
     : expandedRows.value),
   ...expandedFundingRows.value
 }))
@@ -594,11 +637,12 @@ const updateTableExpandedRows = (value: Updater<ExpandedState>) => {
 const isFiscalYearGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, FISCAL_YEAR_GROUP_COLUMN_ID)
 const isCostCategoryGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, COST_CATEGORY_GROUP_COLUMN_ID)
 const isCostSubsectionGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, COST_SUBSECTION_GROUP_COLUMN_ID)
-const getGroupedRowCurrency = (row: GroupedBudgetRow) =>
-  getSingleCurrency(getRealLeafRows(row).map(leafRow => leafRow.original.currency))
+const getActiveLeafRows = (row: GroupedBudgetRow) => getRealLeafRows(row).filter(leaf => !leaf.original.pendingFunding)
+const getGroupedRowCount = (row: GroupedBudgetRow) => getActiveLeafRows(row).length
 const getGroupedRowSum = (row: GroupedBudgetRow, key: 'totalAmount' | 'programFunding' | 'otherFunding') => {
-  const currency = getGroupedRowCurrency(row)
-  return currency ? sumMoney(getRealLeafRows(row).map(leafRow => getRowAmount(leafRow.original, key)), currency) : undefined
+  const activeRows = getActiveLeafRows(row)
+  const currency = getSingleCurrency(activeRows.map(leaf => leaf.original.currency))
+  return currency ? sumMoney(activeRows.map(leaf => getRowAmount(leaf.original, key)), currency) : undefined
 }
 const formatGroupedMoney = (row: GroupedBudgetRow, key: 'totalAmount' | 'programFunding' | 'otherFunding') => formatMoney(getGroupedRowSum(row, key))
 const formatTableTotalMoney = (key: 'totalAmount' | 'programFunding' | 'otherFunding') => formatMoney(getTableTotal(key))
@@ -645,17 +689,17 @@ const fiscalYearContext = useActionContext({
   eligible: () => !staticMode && (fiscalYearTarget.value === null || Boolean(getFiscalYearById(fiscalYearTarget.value)))
 })
 const lineItemContext = useActionContext({
-  identity: [...scopeIdentity, lineItemTarget],
+  identity: [...scopeIdentity, lineItemTarget, budgetFundingMode, hideCostCategory, hideCostSubsection],
   authority: () => lineItemTarget.value === null ? canCreate : canUpdate,
   eligible: () => !staticMode && (lineItemTarget.value === null || Boolean(getLineItemById(lineItemTarget.value)))
 })
 const fundingSourceContext = useActionContext({
-  identity: [...scopeIdentity, () => fundingSourceTarget.value?.lineId, () => fundingSourceTarget.value?.subtype],
+  identity: [...scopeIdentity, budgetFundingMode, () => fundingSourceTarget.value?.lineId, () => fundingSourceTarget.value?.subtype],
   authority: () => canUpdate,
   eligible: () => {
     const target = fundingSourceTarget.value
     const line = target ? getLineItemById(target.lineId) : undefined
-    return !staticMode && Boolean(line && (target?.subtype === null || line.egcs_fc_fundingsources.some(source => source.egcs_fc_fundingsubtype === target?.subtype)))
+    return canEditFundingSources.value && Boolean(line && (target?.subtype === null || line.egcs_fc_fundingsources.some(source => source.egcs_fc_fundingsubtype === target?.subtype)))
   }
 })
 let openingIntent = 0
@@ -813,7 +857,9 @@ const saveLineItem = async () => {
         isUpdate ? 'PATCH' : 'POST',
         {
           ...lineItemState,
-          egcs_fc_fundingsources: isUpdate ? undefined : lineItemState.egcs_fc_fundingsources,
+          egcs_fc_totalamount: budgetFundingMode.value === 'manual' ? lineItemState.egcs_fc_totalamount : undefined,
+          egcs_fc_costsubsection: hideCostSubsection.value ? undefined : lineItemState.egcs_fc_costsubsection,
+          egcs_fc_costsubsection_fr: hideCostSubsection.value ? undefined : lineItemState.egcs_fc_costsubsection_fr,
           egcs_fc_programfunding: lineItemState.egcs_fc_calculationmode && lineItemState.egcs_fc_calculationmode !== 'manual' ? undefined : lineItemState.egcs_fc_programfunding,
           egcs_fc_percentage: lineItemState.egcs_fc_allowpercentageoverride ? lineItemState.egcs_fc_percentage ?? undefined : undefined
         }
@@ -922,6 +968,7 @@ const saveFundingSource = async () => {
   const operation = fundingSourceContext.capture()
   const collectionOperation = actionContexts['budget-line'].update.capture()
   if (!selected || !target || !operation || !collectionOperation || !permitted('update', 'budget-line')) return
+  const wasPending = getLineItemById(target.lineId)?.egcs_fc_pendingfunding === true
   const base = resourceBase.value
   const key = fundingPlanKey(base, target.lineId)
   if (pendingFundingPlans.has(key)) return
@@ -941,7 +988,14 @@ const saveFundingSource = async () => {
     if (!ownsSettlement() || overviewStatus.value === 'error') return
     expandedFundingRows.value[target.lineId] = true
     if (!closed || !fundingSourceModal.isLatestSession(session)) return
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(selected.originalSubtype === null ? 'common.added_success' : 'common.updated_success'), color: 'success' })
+    const activated = wasPending && getLineItemById(target.lineId)?.egcs_fc_pendingfunding === false
+    toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized(activated
+        ? 'agreement.budget.pending_funding_activated'
+        : selected.originalSubtype === null ? 'common.added_success' : 'common.updated_success'),
+      color: 'success'
+    })
   } catch (error: unknown) {
     if (ownsSettlement() && fundingSourceModal.isCurrentSession(session)) showError(error)
   } finally {
@@ -1008,6 +1062,14 @@ const formatSignedBudgetDifference = (value: Money) => {
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget" data-scope-label-fr="Ententes > Budget" data-help-view="agreement.budget" data-help-label-en="Agreements — Budget" data-help-label-fr="Ententes — Budget" data-help-target="agreement.budget.content" data-help-kind="section">
+    <UAlert
+      v-if="hasPendingFunding"
+      role="status"
+      class="mb-4"
+      color="info"
+      icon="i-lucide-clock-3"
+      :title="t('agreement.budget.pending_funding_notice_title')"
+      :description="t('agreement.budget.pending_funding_notice_description')" />
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"
@@ -1126,8 +1188,9 @@ const formatSignedBudgetDifference = (value: Money) => {
             </p>
           </div>
 
-          <div v-else class="flex min-w-0 max-w-full items-start gap-3 pl-16">
+          <div v-else class="flex min-w-0 max-w-full items-start gap-3" :class="grouping.length > 1 ? 'pl-16' : 'pl-6'">
             <CommonGroupedDisclosureButton
+              v-if="showOtherFunding"
               class="group mt-0.5 shrink-0 cursor-default"
               :expanded="row.getIsExpanded?.() === true"
               :controls="getGroupedDisclosureControlsId(row.id)"
@@ -1141,6 +1204,11 @@ const formatSignedBudgetDifference = (value: Money) => {
               <p :lang="locale" class="leading-tight font-bold text-zinc-900 dark:text-white">
                 {{ getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
               </p>
+              <CommonStatusBadge
+                v-if="row.original.pendingFunding"
+                class="w-fit"
+                variant="warning"
+                label-key="agreement.budget.pending_funding" />
               <ActivityBilingualText
                 :english="row.original.description"
                 :french="row.original.descriptionFr"
@@ -1151,7 +1219,7 @@ const formatSignedBudgetDifference = (value: Money) => {
               <p v-if="getLineItemById(row.original.id)?.egcs_fc_calculationmode && getLineItemById(row.original.id)?.egcs_fc_calculationmode !== 'manual'" class="text-xs text-muted">
                 {{ t(`budget_calculation.${getLineItemById(row.original.id)?.egcs_fc_calculationmode}`) }}
                 {{ getLineItemById(row.original.id)?.egcs_fc_percentage }}{{ t('budget_calculation.percent_symbol') }}
-                {{ locale === 'fr' ? getLineItemById(row.original.id)?.calculation_source_name_fr : getLineItemById(row.original.id)?.calculation_source_name_en }}
+                {{ hideCostCategory ? '' : locale === 'fr' ? getLineItemById(row.original.id)?.calculation_source_name_fr : getLineItemById(row.original.id)?.calculation_source_name_en }}
               </p>
             </div>
           </div>
@@ -1242,12 +1310,12 @@ const formatSignedBudgetDifference = (value: Money) => {
             size="sm"
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
-            @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId, row.original.costSubsection)" />
+            @click="openCreateLineItem(row.original.fiscalYearId, hideCostCategory ? undefined : row.original.costCategoryId, row.original.costSubsection)" />
         </div>
 
         <div v-else-if="row.original.fundingKind === 'other'" class="flex items-center gap-2">
           <CommonActionButton
-            v-if="canUpdate"
+            v-if="canUpdate && canEditFundingSources"
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -1255,7 +1323,7 @@ const formatSignedBudgetDifference = (value: Money) => {
             :aria-label="`${t('common.edit')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
             @click="openUpdateFundingSource(row.original)" />
           <CommonActionButton
-            v-if="canDelete"
+            v-if="canDelete && canEditFundingSources"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
@@ -1264,14 +1332,15 @@ const formatSignedBudgetDifference = (value: Money) => {
             @click="deleteFundingSource(row.original)" />
         </div>
 
-        <div v-else-if="!row.original.isPlaceholder && !row.original.fundingKind" class="flex items-center gap-2">
+        <div v-else-if="!row.original.isPlaceholder && !row.original.fundingKind" class="flex flex-wrap items-center gap-2">
           <CommonActionButton
-            v-if="canUpdate && row.original.lineItemId"
+            v-if="canUpdate && canEditFundingSources && row.original.lineItemId"
             icon="i-lucide-plus"
             color="primary"
             variant="ghost"
             size="sm"
             :aria-label="`${t('agreement.funding_sources.add')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
+            :label="row.original.pendingFunding ? t('agreement.funding_sources.add') : undefined"
             @click="openCreateFundingSource(row.original)" />
           <CommonActionButton
             v-if="canUpdate && row.original.lineItemId && getLineItemById(row.original.lineItemId)"
@@ -1299,13 +1368,15 @@ const formatSignedBudgetDifference = (value: Money) => {
       </template>
 
       <template #footer-left>
-        {{ realTableRows.length }} {{ t('common.records') }}
-        <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
-        {{ t('agreement.budget.total_amount') }}: {{ formatTableTotalMoney('totalAmount') }}
+        {{ activeTableRows.length }} {{ t('common.records') }}
         <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
         {{ t('agreement.budget.program_funding') }}: {{ formatTableTotalMoney('programFunding') }}
-        <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
-        {{ t('agreement.budget.other_funding_total') }}: {{ formatTableTotalMoney('otherFunding') }}
+        <template v-if="showOtherFunding">
+          <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
+          {{ t('agreement.budget.other_funding_total') }}: {{ formatTableTotalMoney('otherFunding') }}
+          <span class="mx-2 text-zinc-300 dark:text-zinc-700">/</span>
+          {{ t('agreement.budget.total_amount') }}: {{ formatTableTotalMoney('totalAmount') }}
+        </template>
       </template>
     </CommonResourceLayout>
 
@@ -1315,7 +1386,9 @@ const formatSignedBudgetDifference = (value: Money) => {
       class="mt-4"
       color="info"
       icon="i-lucide-chart-no-axes-combined"
-      :title="t('agreement.amendments.budget_difference_notice', { amount: formatSignedBudgetDifference(budgetDifference.difference) })" />
+      :title="budgetFundingMode === 'program_only'
+        ? t('agreement.amendments.program_funding_difference_notice', { amount: formatSignedBudgetDifference(budgetDifference.difference) })
+        : t('agreement.amendments.budget_difference_notice', { amount: formatSignedBudgetDifference(budgetDifference.difference) })" />
 
     <UModal
       v-if="selectedFiscalYear"
@@ -1407,14 +1480,8 @@ const formatSignedBudgetDifference = (value: Money) => {
                 class="w-full" />
             </UFormField>
 
-            <AgreementBudgetCalculationFields v-model="selectedLineItem" data-field-container="Composite editor; its individual field declarations own their identities." :preview="calculationPreview" />
+            <AgreementBudgetCalculationFields v-model="selectedLineItem" data-field-container="Composite editor; its individual field declarations own their identities." :preview="calculationPreview" :hide-cost-category="hideCostCategory" />
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
-              <UFormField :label="t('agreement.budget.total_amount')" name="egcs_fc_totalamount">
-                <CommonCurrencyInput
-                  v-model="selectedLineItem.egcs_fc_totalamount"
-                  :currency="selectedLineItem.egcs_fc_currency" />
-              </UFormField>
-
               <UFormField :label="t('agreement.budget.program_funding')" name="egcs_fc_programfunding" :required="!selectedLineItem.egcs_fc_calculationmode || selectedLineItem.egcs_fc_calculationmode === 'manual'">
                 <CommonCurrencyInput
                   :currency="selectedLineItem.egcs_fc_currency"
@@ -1422,33 +1489,32 @@ const formatSignedBudgetDifference = (value: Money) => {
                   :readonly="Boolean(selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual')"
                   @update:model-value="selectedLineItem.egcs_fc_programfunding = $event" />
               </UFormField>
+              <UFormField v-if="budgetFundingMode !== 'program_only'" :label="t('agreement.budget.total_amount')" name="egcs_fc_totalamount" :required="budgetFundingMode === 'manual'">
+                <CommonCurrencyInput
+                  :model-value="budgetFundingMode === 'automatic' ? automaticTotalPreview : selectedLineItem.egcs_fc_totalamount"
+                  :readonly="budgetFundingMode === 'automatic'"
+                  :required="budgetFundingMode === 'manual'"
+                  :aria-required="budgetFundingMode === 'manual'"
+                  :currency="selectedLineItem.egcs_fc_currency"
+                  @update:model-value="selectedLineItem.egcs_fc_totalamount = $event" />
+              </UFormField>
             </div>
-            <AgreementFundingSourcesEditor
-              v-if="!selectedLineItem.id"
-              data-field-container="Composite editor; its individual field declarations own their identities."
-              :model-value="selectedLineItem.egcs_fc_fundingsources ?? []"
-              :agreement-id="agreementId"
-              :currency="selectedLineItem.egcs_fc_currency!"
-              :identity="`${agreementId}:new:${selectedLineItem.egcs_fc_organizationcostcategory ?? ''}`"
-              allow-description
-              class="lg:col-span-2"
-              @update:model-value="selectedLineItem.egcs_fc_fundingsources = $event" />
           </div>
 
           <p :id="budgetLanguageInstructionId" class="text-sm text-muted">
-            {{ t('agreement.budget.language_instruction') }}
+            {{ t(requiresSubsection ? 'agreement.budget.language_instruction' : 'agreement.budget.description_language_instruction') }}
           </p>
 
-          <div class="grid gap-6 lg:grid-cols-2">
+          <div class="grid gap-6 lg:grid-cols-2" data-either-language-pairs="egcs_fc_costsubsection egcs_fc_costsubsection_fr">
             <fieldset class="min-w-0 space-y-4">
               <legend class="mb-2 font-semibold">
                 {{ t('agreement.budget.english') }}
               </legend>
 
-              <UFormField :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection">
+              <UFormField v-if="!hideCostSubsection" :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection">
                 <template #label>
                   {{ t('agreement.budget.cost_subsection') }}
-                  <CommonEitherLanguage fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
+                  <CommonEitherLanguage v-if="requiresSubsection" fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
                 </template>
                 <UInput
                   v-model="selectedLineItem.egcs_fc_costsubsection"
@@ -1477,10 +1543,10 @@ const formatSignedBudgetDifference = (value: Money) => {
                 {{ t('agreement.budget.french') }}
               </legend>
 
-              <UFormField :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection_fr">
+              <UFormField v-if="!hideCostSubsection" :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection_fr">
                 <template #label>
                   {{ t('agreement.budget.cost_subsection') }}
-                  <CommonEitherLanguage fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
+                  <CommonEitherLanguage v-if="requiresSubsection" fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
                 </template>
                 <UInput
                   v-model="selectedLineItem.egcs_fc_costsubsection_fr"

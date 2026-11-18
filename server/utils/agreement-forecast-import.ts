@@ -12,6 +12,7 @@ import { databaseMoneyValue } from '~~/server/utils/database-money'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { compareMoney, parseMoney, zeroMoney } from '~~/shared/utils/money'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
+import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
 
 /**
  * Creates one inactive Draft Forecast with all monthly lines in the authorized transaction.
@@ -34,6 +35,18 @@ export const createAgreementForecastAggregate = async (
   }
   if (input.lineItems.some(line => compareMoney(parseMoney(line.amount), zeroMoney(currency)) < 0)) {
     throw new RangeError('Forecast line amounts must be nonnegative.')
+  }
+  const { egcs_tp_budgetfundingmode: mode } = await loadAgreementBudgetManagement(trx, input.agreementId)
+  for (const [index, line] of input.lineItems.entries()) {
+    if (line.totalAmount === undefined) continue
+    if (mode === 'program_only') return { status: 'total_cost_hidden', lineNumber: index + 1 }
+    const total = parseMoney(line.totalAmount)
+    const amount = parseMoney(line.amount)
+    if (total.currency !== amount.currency
+      || compareMoney(total, amount) < 0
+      || (mode === 'automatic' && compareMoney(total, amount) !== 0)) {
+      return { status: 'total_cost_mismatch', lineNumber: index + 1 }
+    }
   }
   const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
     .select('id')
@@ -77,6 +90,7 @@ export const createAgreementForecastAggregate = async (
     .where(budgetLineItemStableId, 'in', budgetIds)
     .where(budgetFiscalYearStableId, '=', input.fiscalYearId)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', input.agreementId)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
@@ -116,7 +130,7 @@ export const createAgreementForecastAggregate = async (
       egcs_fc_fundingagreementbudgetlineitem: line.budgetLineItemId,
       egcs_fc_month: line.month,
       egcs_fc_amount: databaseMoneyValue(parseMoney(line.amount)),
-      egcs_fc_totalamount: databaseMoneyValue(parseMoney(line.amount)),
+      egcs_fc_totalamount: databaseMoneyValue(parseMoney(line.totalAmount ?? line.amount)),
       egcs_fc_currency: line.currency as Database['Funding_Case_Agreement_Forecast_Line_Item']['egcs_fc_currency']
     }).returning('id').executeTakeFirstOrThrow()
     lineItemIds.push(String(inserted.id))

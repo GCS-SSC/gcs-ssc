@@ -44,9 +44,9 @@ import {
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { parseMoney } from '~~/shared/utils/money'
+import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
-import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 import { hasSuccessfulInitialAgreementApproval } from '~~/server/utils/agreement-approval-submission'
 
@@ -140,6 +140,7 @@ export const createAgreementClaimAggregate = async (
       .where(budgetLineItemStableId, 'in', budgetLineItemIds)
       .where(budgetFiscalYearStableId, '=', input.fiscalYearId)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', input.agreementId)
+      .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
@@ -594,7 +595,9 @@ export const assertAgreementClaimLineItemForAgreement = async (
       'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem as egcs_fc_fundingagreementbudgetlineitem',
       'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_currency as egcs_fc_currency',
       'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear as claim_fiscalyear',
-      'Funding_Case_Agreement_Claim.egcs_fc_status as claim_status'
+      'Funding_Case_Agreement_Claim.egcs_fc_status as claim_status',
+      databaseMoneyText(sql.ref('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_amount')).as('egcs_fc_amount'),
+      databaseMoneyText(sql.ref('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount')
     ])
     .executeTakeFirst()
 
@@ -674,6 +677,11 @@ const validateAgreementClaimLineItemPatchReferences = async (
     return nextClaim
   }
 
+  if (patchKeys.length === 1 && patchValues.egcs_fc_fundingsources?.length === 0) {
+    // A retired budget reference may keep the line while its former sources are removed.
+    return { nextClaimId }
+  }
+
   const nextBudgetLineItemId = Object.hasOwn(patchValues, 'egcs_fc_fundingagreementbudgetlineitem')
     ? patchValues.egcs_fc_fundingagreementbudgetlineitem
     : existing.egcs_fc_fundingagreementbudgetlineitem
@@ -714,16 +722,6 @@ export const patchAgreementClaimLineItem = async (
   const patchValues = await readAgreementClaimLineItemPatchBody(event)
   if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
   const { egcs_fc_amount: patchedAmount, egcs_fc_totalamount: patchedTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
-  const updateValues = {
-    ...nonMoneyPatchValues,
-    ...(patchedAmount === undefined
-      ? {}
-      : { egcs_fc_amount: databaseMoneyValue(patchedAmount) }),
-    ...(patchedTotalAmount === undefined
-      ? {}
-      : { egcs_fc_totalamount: databaseMoneyValue(patchedTotalAmount) })
-  }
-
   try {
     return await executeAgreementClaimMutation(
       event,
@@ -750,15 +748,27 @@ export const patchAgreementClaimLineItem = async (
         }
 
         const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? existing.egcs_fc_currency)
-        await assertCurrencyMoneyValues(event, currency, [patchedAmount, patchedTotalAmount].filter(value => value !== undefined))
+        await assertCurrencyMoneyValues(event, currency, [patchedAmount, patchedTotalAmount, ...(fundingSources ?? []).map(source => source.egcs_fc_amount)].filter(value => value !== undefined))
         const references = await validateAgreementClaimLineItemPatchReferences(event, trx, agreementId, existing, patchValues)
         if (!hasKey(references, 'nextClaimId')) {
           return references
         }
 
+        const existingTotal = parseDatabaseMoney(existing.egcs_fc_totalamount, currency)
+        const total = await resolveAgreementLineFundingTotal(event, trx, agreementId, {
+          amount: patchedAmount ?? parseDatabaseMoney(existing.egcs_fc_amount, currency),
+          total: patchedTotalAmount,
+          sources: fundingSources
+        }, { kind: 'claim', lineId, total: existingTotal })
+        const updateValues = {
+          ...nonMoneyPatchValues,
+          ...(patchedAmount === undefined ? {} : { egcs_fc_amount: databaseMoneyValue(patchedAmount) }),
+          ...(patchedTotalAmount !== undefined || compareMoney(total, existingTotal) !== 0
+            ? { egcs_fc_totalamount: databaseMoneyValue(total) }
+            : {})
+        }
         const lineQuery = Object.keys(updateValues).length > 0
-          ? trx.updateTable('Funding_Case_Agreement_Claim_Line_Item')
-              .set(updateValues)
+          ? trx.updateTable('Funding_Case_Agreement_Claim_Line_Item').set(updateValues)
               .where('id', '=', lineId)
               .where('egcs_fc_fundingagreementclaim', '=', String(existing.egcs_fc_fundingagreementclaim))
               .where('_deleted', '=', false)

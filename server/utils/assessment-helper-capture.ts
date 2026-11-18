@@ -83,6 +83,7 @@ export const captureAssessmentHelpers = async (
         .select(databaseMoneyText(sql.ref('line.egcs_fc_programfunding')).as('amount'))
         .where('year.egcs_fc_fundingagreement', '=', owner.agreementId)
         .where('line.egcs_fc_currency', '=', agreement.egcs_fc_currency)
+        .where('line.egcs_fc_pendingfunding', '=', false)
         .where('line._deleted', '=', false).where('year._deleted', '=', false).where('version._deleted', '=', false).where('fiscal._deleted', '=', false)
         .where('version.egcs_fc_iscurrent', '=', true).execute()
       const total = sumMoney(lines.map(line => parseDatabaseMoney(line.amount, agreement.egcs_fc_currency)), agreement.egcs_fc_currency)

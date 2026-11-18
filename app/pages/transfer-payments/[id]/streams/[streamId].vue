@@ -8,7 +8,7 @@ import type { Ref } from 'vue'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
-import type { TransferPaymentStreamItem } from '~~/shared/types/schemas'
+import { TransferPaymentStreamGeneralSchema, type TransferPaymentStreamItem } from '~~/shared/types/schemas'
 import type { TransferPaymentStreamRow } from '~~/shared/types/transfer-payment-ui'
 
 definePageMeta({
@@ -97,7 +97,7 @@ const saveStream = async () => {
   if (!operation?.canDispatch() || !selectedStream.value || !canUpdateChild.value || isSavingStream.value || session === null || streamModal.isDisposed()) return
   const ownsSave = () => operation.isCurrent() && streamModal.isCurrentSession(session)
   const draft = selectedStream.value
-  const submittedDraft = JSON.stringify({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null })
+  const submittedDraft = JSON.stringify(TransferPaymentStreamGeneralSchema.parse({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null }))
   isSavingStream.value = true
   try {
     const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${id}/streams/${streamId}`), {
@@ -110,7 +110,7 @@ const saveStream = async () => {
     await refreshStream()
     if (!ownsSave()) return
     if (streamStatus.value === 'error' || streamError.value) return
-    if (selectedStream.value === draft && JSON.stringify({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null }) === submittedDraft) {
+    if (selectedStream.value === draft && JSON.stringify(TransferPaymentStreamGeneralSchema.parse({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null })) === submittedDraft) {
       isUpdateModalOpen.value = false
       selectedStream.value = null
       persistedStream.value = null

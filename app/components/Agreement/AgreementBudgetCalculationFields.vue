@@ -3,7 +3,7 @@ import type { FundingCaseAgreementBudgetLineItemForm } from '~~/shared/types/fun
 import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const state = defineModel<FundingCaseAgreementBudgetLineItemForm>({ required: true })
-const { preview } = defineProps<{ preview: Money | null }>()
+const { preview, hideCostCategory = false } = defineProps<{ preview: Money | null, hideCostCategory?: boolean }>()
 const { t, locale } = useI18n()
 </script>
 
@@ -12,7 +12,7 @@ const { t, locale } = useI18n()
     <p class="text-sm text-muted">
       {{ t(`budget_calculation.${state.egcs_fc_calculationmode}`) }} {{ t('budget_calculation.program_only') }}
     </p>
-    <p v-if="state.egcs_fc_calculationmode === 'category'" class="text-sm">
+    <p v-if="state.egcs_fc_calculationmode === 'category' && !hideCostCategory" class="text-sm">
       {{ t('budget_calculation.source') }} {{ locale === 'fr' ? state.calculation_source_name_fr : state.calculation_source_name_en }}
     </p>
     <UFormField :label="t('budget_calculation.percentage')" name="egcs_fc_percentage">

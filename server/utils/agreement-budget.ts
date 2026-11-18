@@ -1,12 +1,12 @@
 import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
-import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
-  FundingCaseAgreementBudgetFiscalYearPatchSchema,
+import { FundingCaseAgreementBudgetFiscalYearPatchSchema,
   FundingCaseAgreementBudgetLineItemCreateSchema
 } from '~~/shared/types/schemas'
-import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
-import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
+import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
+import { prepareBudgetCalculation, prepareNewBudgetLine, recalculateBudgetAfterLineWrite } from '~~/server/utils/agreement-budget-calculation'
+import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 /* eslint-disable jsdoc/require-jsdoc -- Existing helpers use descriptive names and narrow types. */
 import { sql } from 'kysely'
 import type { Kysely, Transaction } from 'kysely'
@@ -26,7 +26,6 @@ import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/util
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareScaledMoney, parseDecimalText, type Money } from '~~/shared/utils/money'
 import { loadAgreementBudgetProponentName, resolveAgreementBudgetProponent } from './agreement-budget-proponent'
-import { loadBudgetFundingSources, replaceBudgetFundingSources, validateBudgetFundingSources } from './agreement-budget-funding'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 
@@ -138,6 +137,7 @@ const resolveAllocatedProgramFunding = async (
     .where('Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream', '=', streamId)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear', '=', fiscalYearId)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency', '=', currency)
     .where('Funding_Case_Agreement_Profile.egcs_fc_currency', '=', currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
@@ -461,19 +461,19 @@ export const createAgreementBudgetLineItem = async (
     await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, validated, undefined, String(fiscalYear.id))
     const programFunding = calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding!
-    await assertCurrencyMoneyValues(event, validated.egcs_fc_currency, [validated.egcs_fc_totalamount, programFunding, ...(validated.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)])
-
-    await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...validated, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding })
-    await validateBudgetFundingSources(event, trx, currentContext.streamId, validated.egcs_fc_fundingsources ?? [])
-    const { egcs_fc_fundingsources, ...lineValues } = validated
+    const settings = await loadAgreementBudgetManagement(trx, agreementId)
+    const line = await prepareNewBudgetLine(event, settings, validated, programFunding)
+    const evaluateFunding = settings.egcs_tp_budgetfundingmode !== 'program_only'
+    await assertCurrencyMoneyValues(event, validated.egcs_fc_currency, [line.egcs_fc_totalamount, programFunding])
     const inserted = await trx
       .insertInto('Funding_Case_Agreement_Budget_Line_Item')
       .values({
-        ...lineValues,
+        ...line,
         ...calculation,
         egcs_fc_applicantrecipient: proponentId,
-        egcs_fc_totalamount: databaseMoneyValue(validated.egcs_fc_totalamount),
+        egcs_fc_totalamount: databaseMoneyValue(line.egcs_fc_totalamount),
         egcs_fc_programfunding: databaseMoneyValue(programFunding),
+        egcs_fc_pendingfunding: evaluateFunding,
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fundingagreementbudgetfiscalyear: String(fiscalYear.id)
       })
@@ -488,9 +488,11 @@ export const createAgreementBudgetLineItem = async (
       ])
       .executeTakeFirstOrThrow()
 
-    await replaceBudgetFundingSources(trx, String(inserted.id), egcs_fc_fundingsources ?? [])
-    const amounts = await recalculateAgreementBudget(event, trx, inserted.id, currentContext.streamId)
-    const fundingSources = await loadBudgetFundingSources(trx, [String(inserted.id)])
+    const { amounts, totals, pendingFunding } = await recalculateBudgetAfterLineWrite(event, trx, {
+      lineId: inserted.id,
+      streamId: currentContext.streamId,
+      state: evaluateFunding ? 'pending' : 'active'
+    })
     const fiscalYearLabel = await fetchAgreementBudgetLineFiscalYearLabel(
       trx,
       inserted.egcs_fc_fundingagreementbudgetfiscalyear
@@ -499,9 +501,10 @@ export const createAgreementBudgetLineItem = async (
     return {
       ...inserted,
       ...await loadAgreementBudgetProponentName(trx, proponentId),
-      egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount, inserted.egcs_fc_currency),
+      egcs_fc_totalamount: totals.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_totalamount, inserted.egcs_fc_currency),
       egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding, inserted.egcs_fc_currency),
-      egcs_fc_fundingsources: fundingSources,
+      egcs_fc_fundingsources: [],
+      egcs_fc_pendingfunding: pendingFunding,
       id: inserted.egcs_fc_originalbudgetlineitem ?? inserted.id,
       egcs_fc_fundingagreementbudgetfiscalyear: validated.egcs_fc_fundingagreementbudgetfiscalyear,
       fiscal_year_id: validated.egcs_fc_fundingagreementbudgetfiscalyear,

@@ -130,12 +130,6 @@ const changeConsistency = async (value: boolean) => {
   <UFormField :label="t('transfer_payment.allows_further_distribution')" :name="field('egcs_tp_allowsfurtherdistribution')" data-field-scope="transfer-payment.fields.stream-fields">
     <USwitch v-model="model.egcs_tp_allowsfurtherdistribution" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.require_forecast_funding_breakdown')" :name="field('egcs_tp_requireforecastfundingbreakdown')" data-field-scope="transfer-payment.fields.stream-fields">
-    <USwitch v-model="model.egcs_tp_requireforecastfundingbreakdown" />
-  </UFormField>
-  <UFormField :label="t('transfer_payment.require_claim_funding_breakdown')" :name="field('egcs_tp_requireclaimfundingbreakdown')" data-field-scope="transfer-payment.fields.stream-fields">
-    <USwitch v-model="model.egcs_tp_requireclaimfundingbreakdown" />
-  </UFormField>
 
   <UFormField :label="t('common.active')" :name="field('egcs_tp_active')" data-field-scope="transfer-payment.fields.stream-fields">
     <USwitch v-model="model.egcs_tp_active" :label="t('common.active')" />

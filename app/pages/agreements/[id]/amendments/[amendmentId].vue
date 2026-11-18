@@ -39,7 +39,7 @@ const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
-const { saveJson } = useJsonRequest()
+const { saveJson, sendJson } = useJsonRequest()
 const confirmScopeRemoval = useDeleteConfirm()
 const { isTerminalStatus } = useBusinessStatusState()
 const snapshotStatusCatalog = useStatusCatalog()
@@ -309,11 +309,17 @@ const createSnapshot = async (domain: SnapshotDomain) => {
     && requestedPath === route.path && snapshotActionTokens.get(domain) === token && canCreateAmendmentSnapshot.value
   try {
     if (!await checkSnapshotPrerequisites(domain, shouldProceed) || !shouldProceed()) return
-    await saveJson(`${requestedBase}/${domain}-snapshot`, 'POST', {})
+    const snapshot = await sendJson<{ programFundingOnly?: boolean }>(`${requestedBase}/${domain}-snapshot`, 'POST', {})
     if (!shouldProceed()) return
     await refresh()
     if (!shouldProceed() || error.value || status.value === 'error') return
-    toast.add({ title: toast.localized('common.success'), description: toast.localized(`agreement.amendments.${domain}_snapshot_created`), color: 'success' })
+    toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized(snapshot?.programFundingOnly
+        ? 'agreement.amendments.program_only_snapshot_notice'
+        : `agreement.amendments.${domain}_snapshot_created`),
+      color: 'success'
+    })
   } catch (caughtError: unknown) {
     if (shouldProceed()) showError(caughtError)
   } finally {

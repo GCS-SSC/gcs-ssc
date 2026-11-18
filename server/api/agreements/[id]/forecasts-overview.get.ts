@@ -1,3 +1,4 @@
+import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 import { sql } from 'kysely'
@@ -95,6 +96,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory'
       )
       .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+      .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
@@ -269,6 +271,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
   }))
   const forecastsWithState = await withBusinessRecordState(db, 'fundingcaseforecast', forecasts)
   return {
+    budgetManagement: await loadAgreementBudgetManagement(db, agreementId),
     forecasts: await Promise.all(forecastsWithState.map(async forecast => ({
       ...forecast,
       forecast_revision_required: Boolean(forecast.egcs_fc_active

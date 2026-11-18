@@ -11,7 +11,7 @@ import {
 } from '~~/server/utils/agreement-claim'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
@@ -52,8 +52,9 @@ export default defineEventHandler(async event => {
         }
 
         const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
-        await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount])
-        const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: totalAmount, ...lineValues } = validated
+        await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount, ...(validated.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)].filter(value => value !== undefined))
+        const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: authoredTotal, ...lineValues } = validated
+        const totalAmount = await resolveAgreementLineFundingTotal(event, trx, agreementId, { amount, total: authoredTotal, sources: fundingSources })
         const created = await trx
           .insertInto('Funding_Case_Agreement_Claim_Line_Item')
           .values({ ...lineValues, egcs_fc_amount: databaseMoneyValue(amount), egcs_fc_totalamount: databaseMoneyValue(totalAmount) })

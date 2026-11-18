@@ -544,6 +544,7 @@ export const buildAgreementDocumentContext = async (
       .leftJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
       .leftJoin('Agency_Cost_Category', 'Agency_Cost_Category.id', 'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory')
       .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+      .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .$if(Boolean(versions.budgetVersionId), query => query.where('Funding_Case_Agreement_Budget_Version.id', '=', versions.budgetVersionId!))

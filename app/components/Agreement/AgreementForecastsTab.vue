@@ -299,11 +299,16 @@ const createForecastVersion = (row: ForecastGroupedRow) => runAction('create', a
   const owner = agreementId
   isCreatingVersion.value = true
   try {
-    const created = await sendJson<{ id: string }>(`/api/agreements/${owner}/forecasts`, 'POST', {
+    const created = await sendJson<{ id: string; other_funding_omitted?: boolean }>(`/api/agreements/${owner}/forecasts`, 'POST', {
       egcs_fc_fiscalyear: forecast.forecastFiscalYearId,
       egcs_fc_copyfromactive: !forecastsRequiringRevision.value.some(item => String(item.egcs_fc_fiscalyear) === forecast.forecastFiscalYearId)
     })
-    if (isCurrent()) await navigateTo(localePath(appRouteLocations.agreementForecastDetail(owner, String(created.id))))
+    if (isCurrent()) {
+      if (created.other_funding_omitted) {
+        toast.add({ title: toast.localized('agreement.forecasts.program_only_copy_notice'), color: 'info' })
+      }
+      await navigateTo(localePath(appRouteLocations.agreementForecastDetail(owner, String(created.id))))
+    }
   } finally { if (isCurrent()) isCreatingVersion.value = false }
 })
 const openCreateForecast = () => runAction('create', async (isCurrent, operation) => {

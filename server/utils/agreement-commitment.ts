@@ -460,6 +460,7 @@ export const assertAgreementCommitmentTotalWithinProgramFunding = async (
       databaseMoneyText(sql`COALESCE(SUM(${sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')}), 0)`).as('total')
     )
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_pendingfunding', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency', '=', commitment.egcs_fc_currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)

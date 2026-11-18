@@ -130,6 +130,7 @@ const isSubmissionModalOpen = submissionModal.isOpen
 const fundingEditorLine: Ref<FundingCaseAgreementClaimLineItemRow | null> = ref(null)
 const fundingEditorOpen: Ref<boolean> = ref(false)
 const fundingEditorSession = ref(0)
+const fundingEditorClearOnly = ref(false)
 const fundingEditorProgramAmount: Ref<MoneyInput> = ref(undefined)
 const fundingEditorTotalAmount: Ref<MoneyInput> = ref(undefined)
 const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: MoneyInput }>> = ref([])
@@ -209,6 +210,13 @@ const claimLineItems = computed<FundingCaseAgreementClaimOverviewRow['lineItems'
 const reconciles = computed<FundingCaseAgreementClaimOverviewRow['reconciles']>(() => overview.value?.reconciles ?? [])
 const reconcileLineItems = computed<FundingCaseAgreementClaimOverviewRow['reconcileLineItems']>(() => overview.value?.reconcileLineItems ?? [])
 const activeClaim = computed(() => claims.value.find((claim: FundingCaseAgreementClaimOverviewRow['claims'][number]) => String(claim.id) === claimId) ?? null)
+const claimFundingMode = computed(() => overview.value?.budgetManagement?.egcs_tp_budgetfundingmode ?? 'manual')
+const isHistoricalClaim = computed(() => Boolean(activeClaim.value?.isCompleted || activeClaim.value?.hasPositiveCompletionTerminus
+  || getDefinition(activeClaim.value?.egcs_fc_status)?.readOnly || isTerminalStatus(activeClaim.value?.egcs_fc_status)))
+const showClaimFunding = computed(() => claimFundingMode.value !== 'program_only' || isHistoricalClaim.value)
+const hideClaimCostCategory = computed(() => !isHistoricalClaim.value && overview.value?.budgetManagement?.egcs_tp_hidecostcategory === true)
+const hideClaimCostSubsection = computed(() => !isHistoricalClaim.value && overview.value?.budgetManagement?.egcs_tp_hidecostsubsection === true)
+
 const activeBudgetLineItems = computed(() => {
   if (!activeClaim.value) {
     return []
@@ -227,48 +235,65 @@ const warnHistoricalClaimLine = (line: FundingCaseAgreementClaimLineItemRow): bo
 }
 watch(() => {
   const current = activeClaimLineItems.value.find(line => String(line.id) === String(fundingEditorLine.value?.id))
-  return Boolean(current && !isHistoricalClaimLine(current))
+  return Boolean(current && (fundingEditorClearOnly.value || !isHistoricalClaimLine(current)))
 }, available => {
   if (available || !fundingEditorOpen.value) return
   fundingEditorOpen.value = false
   fundingEditorLine.value = null
   fundingEditorSession.value += 1
 })
-const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow) => {
+const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow, clearOnly = false) => {
+  if (claimFundingMode.value === 'program_only') return
   if (isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
-  if (warnHistoricalClaimLine(line)) return
+  if (!clearOnly && warnHistoricalClaimLine(line)) return
   fundingEditorSession.value += 1
+  fundingEditorClearOnly.value = clearOnly
   fundingEditorLine.value = line
   fundingEditorProgramAmount.value = line.egcs_fc_amount
   fundingEditorTotalAmount.value = line.egcs_fc_totalamount
   fundingEditorSources.value = line.egcs_fc_fundingsources.map(source => ({ ...source }))
   fundingEditorOpen.value = true
 }
+const automaticClaimTotal = computed(() => {
+  try {
+    return sumMoney([parseMoney(fundingEditorProgramAmount.value),
+      ...fundingEditorSources.value.map(source => parseMoney(source.egcs_fc_amount))], getCurrency())
+  } catch {
+    return null
+  }
+})
 const saveFundingEditor = async () => {
   if (!isCurrentPage()) return
   const line = fundingEditorLine.value
-  if (!line || isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
-  if (warnHistoricalClaimLine(line)) return
+  const mode = claimFundingMode.value
+  if (mode === 'program_only' || !line || isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
+  const clearOnly = fundingEditorClearOnly.value
+  if (!clearOnly && warnHistoricalClaimLine(line)) return
   const session = fundingEditorSession.value
   try {
-    const amount = parseMoney(fundingEditorProgramAmount.value)
-    const totalAmount = parseMoney(fundingEditorTotalAmount.value)
-    const sources = fundingEditorSources.value.map(source => ({
-      egcs_fc_fundingsubtype: source.egcs_fc_fundingsubtype,
-      egcs_fc_amount: parseMoney(source.egcs_fc_amount)
-    }))
-    if (sources.some(source => !source.egcs_fc_fundingsubtype)
-      || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
-      || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)], getCurrency()), totalAmount) !== 0) {
-      toast.add({ title: toast.localized('common.error'), description: toast.localized('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
-      return
-    }
     isSavingFunding.value = true
-    await sendJson(`/api/agreements/${agreementId}/claim-line-items/${line.id}`, 'PATCH', {
-      egcs_fc_amount: amount,
-      egcs_fc_totalamount: totalAmount,
-      egcs_fc_fundingsources: sources
-    })
+    if (clearOnly) {
+      await sendJson(`/api/agreements/${agreementId}/claim-line-items/${line.id}`, 'PATCH', { egcs_fc_fundingsources: [] })
+    } else {
+      const amount = parseMoney(fundingEditorProgramAmount.value)
+      const totalAmount = mode === 'manual' ? parseMoney(fundingEditorTotalAmount.value) : undefined
+      const sources = fundingEditorSources.value.map(source => ({
+        egcs_fc_fundingsubtype: source.egcs_fc_fundingsubtype,
+        egcs_fc_amount: parseMoney(source.egcs_fc_amount)
+      }))
+      if (sources.some(source => !source.egcs_fc_fundingsubtype)
+        || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
+        || (totalAmount && (compareMoney(totalAmount, amount) < 0
+          || (sources.length > 0 && compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)], getCurrency()), totalAmount) !== 0)))) {
+        toast.add({ title: toast.localized('common.error'), description: toast.localized('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
+        return
+      }
+      await sendJson(`/api/agreements/${agreementId}/claim-line-items/${line.id}`, 'PATCH', {
+        egcs_fc_amount: amount,
+        ...(totalAmount ? { egcs_fc_totalamount: totalAmount } : {}),
+        egcs_fc_fundingsources: sources
+      })
+    }
     if (!isCurrentPage()) return
     if (session === fundingEditorSession.value) fundingEditorOpen.value = false
     await refreshPage()
@@ -674,13 +699,13 @@ const allocationOptions = computed(() =>
   activeBudgetLineItems.value.map(line => ({
     id: String(line.id),
     label_en: joinLabelParts([
-      line.organization_cost_category_name_en,
-      line.egcs_fc_costsubsection,
+      hideClaimCostCategory.value ? null : line.organization_cost_category_name_en,
+      hideClaimCostSubsection.value ? null : line.egcs_fc_costsubsection,
       line.line_item_name_en ?? line.egcs_fc_description
     ]),
     label_fr: joinLabelParts([
-      line.organization_cost_category_name_fr,
-      line.egcs_fc_costsubsection,
+      hideClaimCostCategory.value ? null : line.organization_cost_category_name_fr,
+      hideClaimCostSubsection.value ? null : line.egcs_fc_costsubsection,
       line.line_item_name_fr ?? line.egcs_fc_description
     ])
   }))
@@ -730,7 +755,7 @@ const updateSelectedReconciledAmount = (value: MoneyInput): void => {
   triggerRef(selectedReconcileLine)
 }
 
-const submissionColumns: TableColumnInput<ClaimSubmissionTableRow>[] = [
+const submissionColumns = computed<TableColumnInput<ClaimSubmissionTableRow>[]>(() => [
   { id: COST_CATEGORY_GROUP_COLUMN_ID, accessorKey: COST_CATEGORY_GROUP_COLUMN_ID, headerKey: 'agreement.claims.cost_category' },
   { id: COST_SUBSECTION_GROUP_COLUMN_ID, accessorKey: COST_SUBSECTION_GROUP_COLUMN_ID, headerKey: 'agreement.budget.cost_subsection' },
   { id: 'name', accessorKey: 'lineItemNameEn', headerKey: 'agreement.budget.line_item' },
@@ -738,7 +763,8 @@ const submissionColumns: TableColumnInput<ClaimSubmissionTableRow>[] = [
   { id: 'reconciledAmount', accessorKey: 'reconciledAmount', headerKey: 'agreement.claims.reconciled_amount' },
   { id: 'balance', accessorKey: 'balance', headerKey: 'agreement.claims.balance' },
   { id: 'actions', headerKey: 'common.actions' }
-]
+].filter(column => (column.id !== COST_CATEGORY_GROUP_COLUMN_ID || !hideClaimCostCategory.value)
+  && (column.id !== COST_SUBSECTION_GROUP_COLUMN_ID || !hideClaimCostSubsection.value)))
 
 const normalizedSubmissionSearch = computed(() => submissionSearch.value.trim().toLowerCase())
 const unallocatedGroupLabel = computed(() => t('agreement.claims.unallocated'))
@@ -864,8 +890,8 @@ const filteredClaimSubmissionRows = computed(() => {
   }
 
   return claimSubmissionRows.value.filter(row => [
-    row.costCategoryLabel,
-    row.costSubsectionLabel,
+    hideClaimCostCategory.value ? '' : row.costCategoryLabel,
+    hideClaimCostSubsection.value ? '' : row.costSubsectionLabel,
     row.lineItemNameEn,
     row.lineItemNameFr,
     row.description
@@ -886,16 +912,17 @@ const {
   updateExpandedRows: updateSubmissionExpandedRows
 } = useGroupedTableExpansion<ClaimSubmissionTableRow>({
   rows: filteredClaimSubmissionRows,
-  groups: [
+  groups: () => ([
     {
       id: COST_CATEGORY_GROUP_COLUMN_ID,
-      getValue: row => row.costCategoryGroup
+      getValue: (row: ClaimSubmissionTableRow) => row.costCategoryGroup
     },
     {
       id: COST_SUBSECTION_GROUP_COLUMN_ID,
-      getValue: row => row.costSubsectionGroup
+      getValue: (row: ClaimSubmissionTableRow) => row.costSubsectionGroup
     }
-  ],
+  ]).filter(group => (group.id !== COST_CATEGORY_GROUP_COLUMN_ID || !hideClaimCostCategory.value)
+    && (group.id !== COST_SUBSECTION_GROUP_COLUMN_ID || !hideClaimCostSubsection.value)),
   defaultExpanded: true
 })
 
@@ -970,7 +997,6 @@ const saveSubmission = async () => {
     if (existing && compareMoney(existing.egcs_fc_amount, amount) !== 0) {
       await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', {
         egcs_fc_amount: amount,
-        egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)], getCurrency()),
         egcs_fc_description: existing.egcs_fc_description
       })
       didMutate = true
@@ -981,7 +1007,7 @@ const saveSubmission = async () => {
         egcs_fc_fundingagreementbudgetlineitem: String(budgetLine.id),
         egcs_fc_description: budgetLine.egcs_fc_description,
         egcs_fc_amount: amount,
-        egcs_fc_totalamount: amount,
+        ...(claimFundingMode.value === 'manual' ? { egcs_fc_totalamount: amount } : {}),
         egcs_fc_currency: budgetLine.egcs_fc_currency
       })
       didMutate = true
@@ -1337,18 +1363,18 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                             <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
                               {{ row.original.description }}
                             </p>
-                            <dl v-if="row.original.isHistorical && row.original.claimLine" data-testid="claim-historical-funding" class="space-y-1 text-sm text-muted">
-                              <div class="flex flex-wrap gap-x-2">
-                                <dt>{{ t('agreement.funding_sources.total_cost') }}</dt>
-                                <dd>{{ formatMoney(row.original.claimLine.egcs_fc_totalamount) }}</dd>
-                              </div>
+                            <dl v-if="showClaimFunding && row.original.claimLine" :data-testid="row.original.isHistorical ? 'claim-historical-funding' : undefined" class="space-y-1 text-sm text-muted">
                               <div v-for="source in row.original.claimLine.egcs_fc_fundingsources" :key="source.egcs_fc_fundingsubtype" class="flex flex-wrap gap-x-2">
                                 <dt>{{ t('agreement.funding_sources.title') }}: {{ getBilingualValue(source, 'funding_subtype_name', t('common.unavailable')) }}</dt>
                                 <dd>{{ formatMoney(source.egcs_fc_amount) }}</dd>
                               </div>
+                              <div class="flex flex-wrap gap-x-2">
+                                <dt>{{ t('agreement.funding_sources.total_cost') }}</dt>
+                                <dd>{{ formatMoney(row.original.claimLine.egcs_fc_totalamount) }}</dd>
+                              </div>
                             </dl>
                             <UButton
-                              v-if="row.original.claimLine && canUpdateClaim"
+                              v-if="showClaimFunding && !isHistoricalClaim && !row.original.isHistorical && row.original.claimLine && canUpdateClaim"
 
                               color="neutral"
                               variant="link"
@@ -1356,6 +1382,14 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                               :label="t('agreement.funding_sources.edit_line')"
                               :disabled="isLoadingDetail || isSavingFunding"
                               @click="openFundingEditor(row.original.claimLine)" />
+                            <UButton
+                              v-if="showClaimFunding && !isHistoricalClaim && row.original.isHistorical && row.original.claimLine?.egcs_fc_fundingsources.length && canUpdateClaim"
+                              color="error"
+                              variant="link"
+                              size="xs"
+                              :label="t('agreement.funding_sources.clear')"
+                              :disabled="isLoadingDetail || isSavingFunding"
+                              @click="openFundingEditor(row.original.claimLine, true)" />
                             <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
                               <UFormField data-ui-target="agreements.claims.claims.allocate_to_budget_line" :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
                                 <CommonBilingualSelectMenu
@@ -1660,6 +1694,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                       v-if="profile.egcs_fc_currency"
                       :currency="profile.egcs_fc_currency"
                       :lines="reconciliationTableLines"
+                      :hide-cost-category="!activeReconcile?.isCompleted && overview?.budgetManagement?.egcs_tp_hidecostcategory"
+                      :hide-cost-subsection="!activeReconcile?.isCompleted && overview?.budgetManagement?.egcs_tp_hidecostsubsection"
                       :total-submitted="totalSubmitted"
                       :total-reconciled="totalReconciled"
                       :total-sampled="totalSampled"
@@ -1839,19 +1875,29 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
         </form>
       </template>
     </UModal>
-    <UModal v-if="profile?.egcs_fc_currency" v-model:open="fundingEditorOpen" data-help-view="casework.claims.detail.funding-editor-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-if="profile?.egcs_fc_currency" v-model:open="fundingEditorOpen" data-help-view="casework.claims.detail.funding-editor-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t(fundingEditorClearOnly ? 'agreement.funding_sources.clear' : 'agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
-          <UFormField data-ui-target="agreements.claims.funding-source.program-amount" :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
-            <CommonCurrencyInput v-model="fundingEditorProgramAmount" :currency="profile?.egcs_fc_currency" :disabled="isSavingFunding" required aria-required="true" class="w-full" />
-          </UFormField>
-          <UFormField :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
-            <CommonCurrencyInput v-model="fundingEditorTotalAmount" :currency="profile?.egcs_fc_currency" :disabled="isSavingFunding" required aria-required="true" class="w-full" />
-          </UFormField>
-          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :disabled="isSavingFunding" data-field-container="Composite editor; its individual field declarations own their identities." :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+          <p v-if="fundingEditorClearOnly">
+            {{ t('agreement.funding_sources.clear_description') }}
+          </p>
+          <template v-else>
+            <UFormField data-ui-target="agreements.claims.funding-source.program-amount" :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
+              <CommonCurrencyInput v-model="fundingEditorProgramAmount" :currency="profile?.egcs_fc_currency" :disabled="isSavingFunding" required aria-required="true" class="w-full" />
+            </UFormField>
+            <UFormField v-if="claimFundingMode === 'manual'" :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
+              <CommonCurrencyInput v-model="fundingEditorTotalAmount" :currency="profile?.egcs_fc_currency" :disabled="isSavingFunding" required aria-required="true" class="w-full" />
+            </UFormField>
+            <AgreementFundingSourcesEditor v-if="claimFundingMode !== 'program_only'" v-model="fundingEditorSources" :disabled="isSavingFunding" data-field-container="Composite editor; its individual field declarations own their identities." :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+            <dl v-if="claimFundingMode === 'automatic'" class="flex flex-wrap gap-x-2">
+              <dt>{{ t('agreement.funding_sources.total_cost') }}</dt>
+              <dd>{{ automaticClaimTotal ? formatMoney(automaticClaimTotal) : t('common.unavailable') }}</dd>
+            </dl>
+          </template>
           <div class="flex justify-end gap-2">
             <UButton data-help-target="casework.claims.detail.funding-editor-open.common-cancel" color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
-            <CommonSaveButton data-help-target="casework.claims.detail.funding-editor-open.funding-sources-save" :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
+            <UButton v-if="fundingEditorClearOnly" color="error" :label="t('agreement.funding_sources.clear')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
+            <CommonSaveButton v-else data-help-target="casework.claims.detail.funding-editor-open.funding-sources-save" :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
           </div>
         </div>
       </template>

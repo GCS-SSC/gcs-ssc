@@ -503,6 +503,11 @@ export const budgetLineTextPairs = [
 export const FundingCaseAgreementBudgetLineTextSchema = z.object(budgetLineTextFields)
   .superRefine((data, ctx) => validateEitherLanguage(data, ctx, budgetLineTextPairs))
 
+export const FundingCaseAgreementBudgetLineDescriptionSchema = z.object({
+  egcs_fc_description: budgetLineTextFields.egcs_fc_description,
+  egcs_fc_description_fr: budgetLineTextFields.egcs_fc_description_fr
+}).superRefine((data, ctx) => validateEitherLanguage(data, ctx, [budgetLineTextPairs[1]]))
+
 export const FundingCaseAgreementBudgetLineItemBaseSchema = z.object({
   egcs_fc_applicantrecipient: RequiredBigintSelectionId().optional(),
   egcs_fc_fundingagreementbudgetfiscalyear: RequiredBigintSelectionId(),
@@ -522,15 +527,17 @@ export const FundingCaseAgreementBudgetLineItemFundingTotalsSchema = FundingCase
 }).superRefine(validateBudgetLineItemFundingTotals)
 
 export const FundingCaseAgreementBudgetLineItemCreateSchema = FundingCaseAgreementBudgetLineItemBaseSchema.extend({
+  egcs_fc_totalamount: NonNegativeMoneySchema.optional(),
+  egcs_fc_fundingsources: z.never({ error: 'validation.budget_source_after_create' }).optional(),
   egcs_fc_costsubsection: budgetLineTextFields.egcs_fc_costsubsection.default(''),
   egcs_fc_costsubsection_fr: budgetLineTextFields.egcs_fc_costsubsection_fr.default(''),
   egcs_fc_description: budgetLineTextFields.egcs_fc_description.default(''),
   egcs_fc_description_fr: budgetLineTextFields.egcs_fc_description_fr.default('')
 }).superRefine((data, ctx) => {
-  validateEitherLanguage(data, ctx, budgetLineTextPairs)
+  validateEitherLanguage(data, ctx, [budgetLineTextPairs[1]])
   validateBudgetLineItemFundingTotals(data, ctx)
   validateFinancialInputCurrencies(data, ctx)
-}).meta({ formEitherLanguagePairs: budgetLineTextPairs })
+}).meta({ formEitherLanguagePairs: [budgetLineTextPairs[1]] })
 export const FundingCaseAgreementBudgetLineItemPatchSchema = FundingCaseAgreementBudgetLineItemBaseSchema.partial().superRefine((data, ctx) => {
   if (Object.keys(data).length === 0) {
     ctx.addIssue({ code: 'custom', message: 'validation.required' })
@@ -622,7 +629,7 @@ export const FundingCaseAgreementForecastLineItemBaseSchema = z.object({
   egcs_fc_fundingagreementbudgetlineitem: RequiredBigintSelectionId(),
   egcs_fc_month: RequiredForecastMonth(),
   egcs_fc_amount: NonNegativeMoneySchema,
-  egcs_fc_totalamount: NonNegativeMoneySchema,
+  egcs_fc_totalamount: NonNegativeMoneySchema.optional(),
   egcs_fc_fundingsources: z.array(FundingCaseAgreementLineFundingAmountSchema).optional(),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
@@ -647,13 +654,18 @@ export const FundingCaseAgreementForecastBreakdownCellSchema = z.object({
   egcs_fc_fundingagreementbudgetlineitem: RequiredBigintSelectionId(),
   egcs_fc_month: RequiredForecastMonth(),
   egcs_fc_amount: NonNegativeMoneySchema,
+  egcs_fc_totalamount: NonNegativeMoneySchema.optional(),
   egcs_fc_fundingsources: ForecastFundingAmountsSchema.optional(),
   expected: z.object({
     id: RequiredBigintSelectionId(),
     egcs_fc_amount: NonNegativeMoneySchema,
+    egcs_fc_totalamount: NonNegativeMoneySchema.optional(),
     egcs_fc_fundingsources: ForecastFundingAmountsSchema.optional()
   }).strict().nullable()
 }).strict().superRefine((cell, ctx) => {
+  if (cell.egcs_fc_totalamount !== undefined && cell.expected !== null && cell.expected.egcs_fc_totalamount === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['expected', 'egcs_fc_totalamount'], message: 'validation.required' })
+  }
   if (cell.egcs_fc_fundingsources !== undefined && cell.expected !== null && cell.expected.egcs_fc_fundingsources === undefined) {
     ctx.addIssue({ code: 'custom', path: ['expected', 'egcs_fc_fundingsources'], message: 'validation.required' })
   }
@@ -816,7 +828,7 @@ export const FundingCaseAgreementClaimLineItemBaseSchema = z.object({
   egcs_fc_submittedlineitem: z.string().trim().nullable().optional(),
   egcs_fc_description: RequiredString(),
   egcs_fc_amount: NonNegativeMoneySchema,
-  egcs_fc_totalamount: NonNegativeMoneySchema,
+  egcs_fc_totalamount: NonNegativeMoneySchema.optional(),
   egcs_fc_fundingsources: z.array(FundingCaseAgreementLineFundingAmountSchema).optional(),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })

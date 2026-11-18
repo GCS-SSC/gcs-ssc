@@ -1,7 +1,8 @@
+import type { Selectable } from 'kysely'
 import type { AgreementActivityCustomFieldEvidence } from './schemas/agreement-activity-evidence'
 import type { PaymentEvidence } from './payment-evidence'
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
-import type { Agreement_Type, Currency_Codes } from './database'
+import type { Agreement_Type, Currency_Codes, TransferPaymentStreamTable } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
 import type { AccountReceivablePaymentCreditMemo } from './account-receivable'
 import type { AgreementRiskSource, SubmissionRisk } from './risk'
@@ -165,6 +166,7 @@ export interface FundingCaseAgreementBudgetLineItemRow extends Omit<FundingCaseA
     funding_type_instacking?: boolean
     funding_type_incostsharing?: boolean
   }>
+  egcs_fc_pendingfunding?: boolean
   cost_category_available?: boolean
   fiscal_year_id: string
   fiscal_year_display?: string | null
@@ -181,6 +183,8 @@ export interface FundingCaseAgreementBudgetOverviewRow {
   lineItems: FundingCaseAgreementBudgetLineItemRow[]
   proponents: Array<{ id: string, label_en: string, label_fr: string }>
   budget_differences?: FundingCaseAgreementBudgetDifference[]
+  budgetSettings?: AgreementBudgetManagementSettings
+  showHistoricalFunding?: boolean
 }
 
 export interface FundingCaseAgreementBudgetDifference {
@@ -195,7 +199,6 @@ export type FundingCaseAgreementBudgetLineItemForm = BudgetCalculationMetadata &
   'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_fundingsources'> & {
     egcs_fc_totalamount: MoneyInput
     egcs_fc_programfunding: MoneyInput
-    egcs_fc_fundingsources: Array<Omit<FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources'][number], 'egcs_fc_amount'> & { egcs_fc_amount: MoneyInput }>
   }>
 
 export interface FundingCaseAgreementAmendmentTypeRow {
@@ -429,6 +432,7 @@ export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementFor
 }
 
 export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgreementForecastLineItemItem {
+  egcs_fc_totalamount: Money
   budget_line_stable_id: string
   budget_line_available: boolean
   budget_line_description?: string | null
@@ -453,7 +457,11 @@ export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgre
   budget_line_program_funding?: Money | null
 }
 
+type AgreementBudgetManagementSettings = Pick<Selectable<TransferPaymentStreamTable>,
+  'egcs_tp_budgetfundingmode' | 'egcs_tp_hidecostcategory' | 'egcs_tp_hidecostsubsection'>
+
 export interface FundingCaseAgreementForecastOverviewRow {
+  budgetManagement?: AgreementBudgetManagementSettings
   forecasts: FundingCaseAgreementForecastRow[]
   budgetLineItems: FundingCaseAgreementBudgetLineItemRow[]
   lineItems: FundingCaseAgreementForecastLineItemRow[]
@@ -477,6 +485,7 @@ export interface FundingCaseAgreementClaimRow extends FundingCaseAgreementClaimI
 }
 
 export interface FundingCaseAgreementClaimLineItemRow extends FundingCaseAgreementClaimLineItemItem {
+  egcs_fc_totalamount: Money
   egcs_fc_fundingsources: Array<{
     egcs_fc_fundingsubtype: string
     egcs_fc_amount: Money
@@ -514,6 +523,7 @@ export interface FundingCaseAgreementClaimReconcileLineItemRow extends FundingCa
 }
 
 export interface FundingCaseAgreementClaimOverviewRow {
+  budgetManagement?: AgreementBudgetManagementSettings
   claims: FundingCaseAgreementClaimRow[]
   budgetLineItems: FundingCaseAgreementBudgetLineItemRow[]
   lineItems: FundingCaseAgreementClaimLineItemRow[]

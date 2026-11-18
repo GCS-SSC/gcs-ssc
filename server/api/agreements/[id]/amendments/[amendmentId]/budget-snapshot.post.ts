@@ -19,7 +19,7 @@ export default defineEventHandler(async event => {
     if (!('id' in amendment)) return amendment
     const existing = await trx.selectFrom('Funding_Case_Agreement_Budget_Version').select('id').where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).executeTakeFirst()
     if (existing) return await badRequest(event, 'AGREEMENT_AMENDMENT_BUDGET_EXISTS', 'apiErrors.agreement.amendment_budget_exists')
-    return { id: await createAgreementAmendmentBudgetSnapshot(trx, agreementId, amendmentId) }
+    return await createAgreementAmendmentBudgetSnapshot(trx, agreementId, amendmentId)
   }, {
     action: 'create',
     assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId },
