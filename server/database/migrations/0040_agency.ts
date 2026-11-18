@@ -241,6 +241,7 @@ CREATE TABLE "Agency_Custom_Field" (
   "egcs_ay_discriminator" boolean DEFAULT false NOT NULL,
   "egcs_ay_minimum" double precision,
   "egcs_ay_maximum" double precision,
+  "egcs_ay_decimalplaces" integer,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Custom_Field_pkey" PRIMARY KEY (id),
   CONSTRAINT "ay_chk_custom_field_kind" CHECK ((egcs_ay_kind = ANY (ARRAY['text'::text, 'number'::text, 'relational'::text]))),
@@ -248,6 +249,9 @@ CREATE TABLE "Agency_Custom_Field" (
   CONSTRAINT "ay_chk_custom_field_discriminator_kind" CHECK (((NOT egcs_ay_discriminator) OR (egcs_ay_kind = 'relational'::text))),
   CONSTRAINT "ay_chk_custom_field_multiple_kind" CHECK (((NOT egcs_ay_multiple) OR (egcs_ay_kind = 'relational'::text))),
   CONSTRAINT "ay_chk_custom_field_presentation_kind" CHECK (((egcs_ay_kind = 'text'::text) OR (egcs_ay_presentation = 'single_line'::text))),
+  CONSTRAINT "ay_chk_custom_field_decimal_places" CHECK (
+    egcs_ay_decimalplaces IS NULL OR (egcs_ay_kind = 'number' AND egcs_ay_decimalplaces BETWEEN 0 AND 324)
+  ),
   CONSTRAINT "ay_chk_custom_field_number_limits" CHECK (
     (egcs_ay_kind = 'number' OR (egcs_ay_minimum IS NULL AND egcs_ay_maximum IS NULL))
     AND egcs_ay_minimum > '-Infinity'::double precision AND egcs_ay_minimum < 'Infinity'::double precision

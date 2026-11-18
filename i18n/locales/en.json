@@ -161,6 +161,8 @@
     "invalid_json": "Enter valid JSON."
   },
   "custom_fields": {
+    "decimal_places": "Decimal places",
+    "decimal_places_hint": "Maximum decimal places: {places}",
     "minimum": "Minimum",
     "maximum": "Maximum",
     "minimum_hint": "Minimum: {minimum}",
@@ -2277,6 +2279,9 @@
     "custom_field_range_order": "The maximum must be greater than or equal to the minimum.",
     "custom_field_minimum": "Enter a number greater than or equal to {minimum}.",
     "custom_field_maximum": "Enter a number less than or equal to {maximum}.",
+    "custom_field_decimal_places_config": "Enter a whole number from 0 to 324.",
+    "custom_field_whole_number": "Enter a whole number.",
+    "custom_field_decimal_places": "Enter a number with at most {places} decimal places.",
     "custom_field_number": "Enter a valid number.",
     "activity_custom_field_required": "Enter a value for {field} on the activity {activity}.",
     "activity_custom_field_invalid": "Correct the value for {field} on the activity {activity}.",

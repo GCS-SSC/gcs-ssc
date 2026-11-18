@@ -30,7 +30,11 @@ export const AgencyCustomFieldBaseSchema = z.object({
   egcs_ay_presentation: z.enum(['single_line', 'multiline']).default('single_line'),
   egcs_ay_discriminator: z.boolean().default(false),
   egcs_ay_minimum: z.number({ error: 'validation.custom_field_number' }).nullish(),
-  egcs_ay_maximum: z.number({ error: 'validation.custom_field_number' }).nullish()
+  egcs_ay_maximum: z.number({ error: 'validation.custom_field_number' }).nullish(),
+  // The smallest positive JavaScript number is 5e-324.
+  egcs_ay_decimalplaces: z.int({ error: 'validation.custom_field_decimal_places_config' })
+    .min(0, { error: 'validation.custom_field_decimal_places_config' })
+    .max(324, { error: 'validation.custom_field_decimal_places_config' }).nullish()
 }).strict()
 
 /**
@@ -41,7 +45,7 @@ export const AgencyCustomFieldBaseSchema = z.object({
 const validateAgencyCustomField = (value: z.infer<typeof AgencyCustomFieldBaseSchema>, ctx: z.RefinementCtx) => {
   const { egcs_ay_minimum: minimum, egcs_ay_maximum: maximum } = value
   if (value.egcs_ay_kind !== 'number') {
-    for (const path of ['egcs_ay_minimum', 'egcs_ay_maximum'] as const) {
+    for (const path of ['egcs_ay_minimum', 'egcs_ay_maximum', 'egcs_ay_decimalplaces'] as const) {
       if (value[path] != null) ctx.addIssue({ code: 'custom', path: [path], message: 'validation.invalid_selection' })
     }
   } else if (minimum != null && maximum != null && minimum > maximum) {
@@ -133,6 +137,16 @@ export const customFieldOptionIds = (value: string | number | string[] | null | 
 export const customFieldHasValue = (value: string | number | string[] | null | undefined): boolean =>
   Array.isArray(value) ? value.length > 0 : typeof value === 'string' ? value.trim().length > 0 : typeof value === 'number'
 
+/**
+ * Counts fractional digits in the canonical decimal representation of a number.
+ * @param value - A finite numeric answer.
+ * @returns Fractional digits, including digits represented by a negative exponent.
+ */
+const decimalPlaces = (value: number): number => {
+  const [coefficient = '', exponent = '0'] = String(value).split('e')
+  return Math.max(0, (coefficient.split('.')[1]?.length ?? 0) - Number(exponent))
+}
+
 export type AgreementCustomFieldPatch = z.infer<typeof AgreementCustomFieldValuesSchema>
 /**
  * Validates the merged record, preserving formatting and unchanged retired selections.
@@ -183,7 +197,13 @@ export const agreementCustomFieldMergeSchema = (
       else merged[id] = supplied
     } else if (kind === 'number') {
       if (typeof supplied !== 'number' || !Number.isFinite(supplied)) issue(id, 'validation.custom_field_number')
-      else if (field.egcs_ay_minimum != null && supplied < field.egcs_ay_minimum) {
+      else if (field.egcs_ay_decimalplaces != null && decimalPlaces(supplied) > field.egcs_ay_decimalplaces) {
+        ctx.addIssue({
+          code: 'custom', path: [id],
+          message: field.egcs_ay_decimalplaces === 0 ? 'validation.custom_field_whole_number' : 'validation.custom_field_decimal_places',
+          params: { places: field.egcs_ay_decimalplaces }
+        })
+      } else if (field.egcs_ay_minimum != null && supplied < field.egcs_ay_minimum) {
         ctx.addIssue({ code: 'custom', path: [id], message: 'validation.custom_field_minimum', params: { minimum: field.egcs_ay_minimum } })
       } else if (field.egcs_ay_maximum != null && supplied > field.egcs_ay_maximum) {
         ctx.addIssue({ code: 'custom', path: [id], message: 'validation.custom_field_maximum', params: { maximum: field.egcs_ay_maximum } })

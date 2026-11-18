@@ -2603,6 +2603,7 @@ export interface AgencyCustomFieldTable {
   egcs_ay_discriminator: Generated<boolean>
   egcs_ay_minimum: Generated<number | null>
   egcs_ay_maximum: Generated<number | null>
+  egcs_ay_decimalplaces: Generated<number | null>
   _deleted: Generated<boolean>
 }
 export interface AgencyCustomFieldOptionTable {

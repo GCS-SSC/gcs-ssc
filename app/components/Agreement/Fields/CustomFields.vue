@@ -82,16 +82,17 @@ const sections = computed(() => {
 const sectionLabel = (value: { egcs_tp_name_en: string, egcs_tp_name_fr: string }) => locale.value === 'fr' ? value.egcs_tp_name_fr : value.egcs_tp_name_en
 const label = (value: { egcs_ay_name_en: string, egcs_ay_name_fr: string }) => locale.value === 'fr' ? value.egcs_ay_name_fr : value.egcs_ay_name_en
 /**
- * Describes the configured limits for an editable numeric answer.
+ * Describes the configured limits and decimal places for an editable numeric answer.
  * @param field - Assigned Agency field with its configured bounds.
  * @returns Localized description when a numeric limit applies.
  */
 const numberDescription = (field: AssignedAgencyCustomFieldDefinition) => {
   if (field.egcs_ay_kind !== 'number' || !field.egcs_tp_active) return undefined
-  const { egcs_ay_minimum: minimum, egcs_ay_maximum: maximum } = field
+  const { egcs_ay_minimum: minimum, egcs_ay_maximum: maximum, egcs_ay_decimalplaces: decimalPlaces } = field
   return [
     minimum == null ? '' : t('custom_fields.minimum_hint', { minimum: n(minimum, { maximumSignificantDigits: 21 }) }),
-    maximum == null ? '' : t('custom_fields.maximum_hint', { maximum: n(maximum, { maximumSignificantDigits: 21 }) })
+    maximum == null ? '' : t('custom_fields.maximum_hint', { maximum: n(maximum, { maximumSignificantDigits: 21 }) }),
+    decimalPlaces == null ? '' : t('custom_fields.decimal_places_hint', { places: n(decimalPlaces) })
   ].filter(Boolean).join(' ') || undefined
 }
 /**

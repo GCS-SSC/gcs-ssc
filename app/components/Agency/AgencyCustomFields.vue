@@ -99,6 +99,7 @@ watch(() => fieldModal.selected.value?.egcs_ay_kind, kind => {
   if (kind !== 'number') {
     selected.egcs_ay_minimum = null
     selected.egcs_ay_maximum = null
+    selected.egcs_ay_decimalplaces = null
   }
   if (kind !== 'relational') {
     selected.egcs_ay_multiple = false
@@ -151,6 +152,7 @@ const saveField = async () => {
     egcs_ay_presentation: selected.egcs_ay_presentation,
     egcs_ay_minimum: selected.egcs_ay_kind === 'number' ? selected.egcs_ay_minimum ?? null : undefined,
     egcs_ay_maximum: selected.egcs_ay_kind === 'number' ? selected.egcs_ay_maximum ?? null : undefined,
+    egcs_ay_decimalplaces: selected.egcs_ay_kind === 'number' ? selected.egcs_ay_decimalplaces ?? null : undefined,
     egcs_ay_discriminator: selected.egcs_ay_discriminator
   }
   let closedSession = false
@@ -321,12 +323,15 @@ const optionFormSession = useFormSession({ owner: optionModal, action: { kind: '
           <UFormField v-if="fieldModal.selected.value.egcs_ay_kind === 'text'" :label="t('custom_fields.presentation')" name="egcs_ay_presentation">
             <USelect v-model="fieldModal.selected.value.egcs_ay_presentation" :items="[{ value: 'single_line', label: t('custom_fields.single_line') }, { value: 'multiline', label: t('custom_fields.multiline') }]" />
           </UFormField>
-          <div v-if="fieldModal.selected.value.egcs_ay_kind === 'number'" class="grid gap-4 sm:grid-cols-2">
+          <div v-if="fieldModal.selected.value.egcs_ay_kind === 'number'" class="grid gap-4 sm:grid-cols-3">
             <UFormField :label="t('custom_fields.minimum')" name="egcs_ay_minimum">
               <UInput v-model.number.nullable="fieldModal.selected.value.egcs_ay_minimum" type="number" step="any" class="w-full" />
             </UFormField>
             <UFormField :label="t('custom_fields.maximum')" name="egcs_ay_maximum">
               <UInput v-model.number.nullable="fieldModal.selected.value.egcs_ay_maximum" type="number" step="any" class="w-full" />
+            </UFormField>
+            <UFormField :label="t('custom_fields.decimal_places')" name="egcs_ay_decimalplaces">
+              <UInput v-model.number.nullable="fieldModal.selected.value.egcs_ay_decimalplaces" type="number" min="0" max="324" step="1" class="w-full" />
             </UFormField>
           </div>
           <UCheckbox v-if="fieldModal.selected.value.egcs_ay_kind === 'relational'" v-model="fieldModal.selected.value.egcs_ay_multiple" :disabled="multipleSelectionLocked" :label="t('custom_fields.allow_multiple')" :description="t('custom_fields.multiple_help')" data-ui-target="agency.custom-field.egcs_ay_multiple" />

@@ -161,6 +161,8 @@
     "invalid_json": "Saisissez un JSON valide."
   },
   "custom_fields": {
+    "decimal_places": "Décimales",
+    "decimal_places_hint": "Nombre maximal de décimales : {places}",
     "minimum": "Minimum",
     "maximum": "Maximum",
     "minimum_hint": "Minimum : {minimum}",
@@ -2277,6 +2279,9 @@
     "custom_field_range_order": "Le maximum doit être supérieur ou égal au minimum.",
     "custom_field_minimum": "Saisissez un nombre supérieur ou égal à {minimum}.",
     "custom_field_maximum": "Saisissez un nombre inférieur ou égal à {maximum}.",
+    "custom_field_decimal_places_config": "Saisissez un nombre entier de 0 à 324.",
+    "custom_field_whole_number": "Saisissez un nombre entier.",
+    "custom_field_decimal_places": "Saisissez un nombre comportant au plus {places} décimales.",
     "custom_field_number": "Saisissez un nombre valide.",
     "activity_custom_field_required": "Saisissez une valeur pour {field} dans l’activité {activity}.",
     "activity_custom_field_invalid": "Corrigez la valeur de {field} dans l’activité {activity}.",
