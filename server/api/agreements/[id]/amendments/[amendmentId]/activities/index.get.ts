@@ -1,8 +1,9 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
-import { resolveAgreementAmendmentActivityVersion } from '~~/server/utils/agreement-amendment'
+import { assertAgreementAmendmentExists, resolveAgreementAmendmentActivityVersion } from '~~/server/utils/agreement-amendment'
 import { getAgreementActivityOutcomeTags, getAgreementActivityResponsiblePartyTags } from '~~/server/utils/agreement-activity'
+import { readApprovedAmendmentActivityCustomFields } from '~~/server/utils/agreement-approval-submission'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
@@ -18,7 +19,9 @@ export default defineEventHandler(async event => {
     })
     if (!agreementContext) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
-    const versionId = await resolveAgreementAmendmentActivityVersion(event, db, agreementId, amendmentId)
+    const amendment = await assertAgreementAmendmentExists(event, db, agreementId, amendmentId)
+    if (!('id' in amendment)) return amendment
+    const versionId = await resolveAgreementAmendmentActivityVersion(event, db, agreementId, amendmentId, false)
     if (typeof versionId !== 'string') return versionId
     const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
     let query = db.selectFrom('Funding_Case_Agreement_Activity')
@@ -39,13 +42,22 @@ export default defineEventHandler(async event => {
     ])
     const total = Number(countResult?.total ?? 0)
     const ids = rows.map(row => String(row.id))
-    const [outcomes, responsibleParties] = await Promise.all([
-      getAgreementActivityOutcomeTags(db, ids), getAgreementActivityResponsiblePartyTags(db, ids)
+    const [outcomes, responsibleParties, fieldEvidence] = await Promise.all([
+      getAgreementActivityOutcomeTags(db, ids),
+      getAgreementActivityResponsiblePartyTags(db, ids),
+      amendment.egcs_fc_isopen ? null : readApprovedAmendmentActivityCustomFields(db, agreementId, amendmentId, versionId)
     ])
     const items = rows.map(row => {
       const outcomeTags = outcomes.get(String(row.id)) ?? []
       const responsiblePartyTags = responsibleParties.get(String(row.id)) ?? []
-      return { ...row, outcome_ids: outcomeTags.map(item => item.id), responsible_party_ids: responsiblePartyTags.map(item => item.id), outcomes: outcomeTags, responsible_parties: responsiblePartyTags }
+      return {
+        ...row,
+        ...(fieldEvidence ? { egcs_fc_customfields: {}, custom_field_evidence: fieldEvidence.get(String(row.id)) ?? [] } : {}),
+        outcome_ids: outcomeTags.map(item => item.id),
+        responsible_party_ids: responsiblePartyTags.map(item => item.id),
+        outcomes: outcomeTags,
+        responsible_parties: responsiblePartyTags
+      }
     })
     return { items, total, stats: { total, active: total }, page, limit }
   })

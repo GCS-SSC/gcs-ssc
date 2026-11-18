@@ -32,7 +32,8 @@ export default defineEventHandler(async event => {
       trx,
       agreementId,
       currentContext.profileId,
-      childId
+      childId,
+      currentContext.streamId
     ),
     { action: 'update', blocksApprovalSubmission: true }
   )

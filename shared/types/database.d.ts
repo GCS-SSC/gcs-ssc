@@ -1857,6 +1857,7 @@ export interface FundingCaseAgreementMonitorPromisingPracticeTable {
 }
 
 export interface FundingCaseAgreementActivityTable {
+  egcs_fc_customfields: Generated<Record<string, string | number | string[]>>
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_activityversion: Generated<string>
@@ -2613,10 +2614,12 @@ export interface AgencyCustomFieldOptionTable {
   egcs_ay_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
+export type StreamFieldAssignmentTarget = 'agreement' | 'activity'
 export interface TransferPaymentStreamFieldAssignmentTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
   egcs_tp_agencyfield: string
+  egcs_tp_target: Generated<StreamFieldAssignmentTarget>
   egcs_tp_section: Generated<string | null>
   egcs_tp_required: Generated<boolean>
   egcs_tp_active: Generated<boolean>

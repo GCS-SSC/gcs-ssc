@@ -3,6 +3,7 @@
 import { computed } from 'vue'
 import type { JsonValue } from '~~/shared/types/database'
 import type { FundingCaseAgreementActivityRow, FundingCaseAgreementBudgetLineItemRow, FundingCaseAgreementBudgetOverviewRow } from '~~/shared/types/funding-case-agreement-ui'
+import { AgreementActivityCustomFieldEvidenceSchema } from '~~/shared/types/schemas/agreement-activity-evidence'
 import { parseMoney, type Money } from '~~/shared/utils/money'
 
 type PacketRecord = Record<string, JsonValue>
@@ -225,7 +226,8 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
     outcome_ids: outcomes.map(outcome => outcome.id),
     responsible_party_ids: responsibleParties.map(party => party.id),
     outcomes,
-    responsible_parties: responsibleParties
+    responsible_parties: responsibleParties,
+    custom_field_evidence: AgreementActivityCustomFieldEvidenceSchema.array().safeParse(activity.customFields).data ?? []
   }
 }))
 </script>

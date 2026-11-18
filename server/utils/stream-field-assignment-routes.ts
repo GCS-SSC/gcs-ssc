@@ -8,7 +8,7 @@ import { getDatabaseConstraintName } from './database-constraint-errors'
 import { readAssignedAgencyCustomFieldDefinitions, readAgreementCustomFieldSections } from './agreement-custom-fields'
 import { StreamFieldAssignmentCreateSchema, StreamFieldAssignmentPatchSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import type { Database } from '~~/shared/types/database'
+import type { Database, StreamFieldAssignmentTarget } from '~~/shared/types/database'
 
 type AssignmentOperation = 'read' | 'create' | 'update' | 'delete'
 
@@ -31,9 +31,10 @@ const assertSection = async (event: H3Event, trx: Transaction<Database>, streamI
  * Reads or mutates only a Stream's association to an Agency field.
  * @param event - Current request.
  * @param operation - Requested action.
+ * @param target - Record type the assignment applies to.
  * @returns Assignment rows or a changed row.
  */
-export const streamFieldAssignmentRoute = async (event: H3Event, operation: AssignmentOperation) => {
+export const streamFieldAssignmentRoute = async (event: H3Event, operation: AssignmentOperation, target: StreamFieldAssignmentTarget = 'agreement') => {
   const db = event.context.$db
   const profileId = getRouterParam(event, 'id') ?? ''
   const streamId = getRouterParam(event, 'streamId') ?? ''
@@ -50,7 +51,8 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
   if (operation === 'read') {
     return await executeFreshAuthorizedTransferPaymentStreamRead(event, db, profileId, context.agencyId, streamId, async trx => {
       const [items, sections] = await Promise.all([
-        readAssignedAgencyCustomFieldDefinitions(trx, streamId), readAgreementCustomFieldSections(trx, streamId)
+        readAssignedAgencyCustomFieldDefinitions(trx, streamId, target),
+        target === 'agreement' ? readAgreementCustomFieldSections(trx, streamId) : []
       ])
       return { items, sections }
     })
@@ -58,6 +60,9 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
   const body = operation === 'create'
     ? await readValidatedBodyI18n(event, StreamFieldAssignmentCreateSchema)
     : operation === 'update' ? await readValidatedBodyI18n(event, StreamFieldAssignmentPatchSchema) : null
+  if (target === 'activity' && body?.egcs_tp_section != null) {
+    return await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
+  }
   if (operation === 'update' && body && !Object.keys(body).length) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }
@@ -71,7 +76,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
       await assertSection(event, trx, streamId, create.egcs_tp_section)
       try {
         return await trx.insertInto('Transfer_Payment_Stream_Field_Assignment')
-          .values({ ...create, egcs_tp_transferpaymentstream: streamId })
+          .values({ ...create, egcs_tp_transferpaymentstream: streamId, egcs_tp_target: target })
           .returningAll().executeTakeFirstOrThrow()
       } catch (error) {
         if (getDatabaseConstraintName(error) === 'tp_idx_unique_live_field_assignment') {
@@ -82,6 +87,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
     }
     const current = await trx.selectFrom('Transfer_Payment_Stream_Field_Assignment').selectAll()
       .where('id', '=', assignmentId).where('egcs_tp_transferpaymentstream', '=', streamId)
+      .where('egcs_tp_target', '=', target)
       .where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!current) return await notFound(event, 'FIELD_ASSIGNMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
     if (operation === 'delete') {

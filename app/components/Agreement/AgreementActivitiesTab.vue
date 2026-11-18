@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { useActionContext } from '~/composables/useActionContext'
 import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
-import { computed, onUnmounted, useId, watch } from 'vue'
+import { computed, onUnmounted, shallowRef, useId, watch } from 'vue'
 import { useAgreementChildActionPrerequisites, type AgreementChildActionTarget } from '~/composables/useAgreementChildActionPrerequisites'
 import type { FundingCaseAgreementActivityForm, FundingCaseAgreementActivityRow } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementActivityCreateSchema } from '~~/shared/types/schemas'
 import { createAgreementActivitySchema } from '~~/shared/types/schemas/agreement-activity'
+import { customFieldHasValue } from '~~/shared/types/schemas/agreement-custom-fields'
 import { parseDate } from '@internationalized/date'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import CommonEitherLanguage from '~/components/Common/EitherLanguage.vue'
 import ActivityBilingualText from './ActivityBilingualText.vue'
 import AgreementActivityOutcomesField from './Fields/AgreementActivityOutcomesField.vue'
 import AgreementActivityResponsiblePartiesField from './Fields/AgreementActivityResponsiblePartiesField.vue'
+import CustomFields from './Fields/CustomFields.vue'
 
 type AgreementActivityCrudRow = FundingCaseAgreementActivityRow & Record<string, unknown>
 
@@ -28,7 +30,7 @@ const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, ac
   embedded?: boolean
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const languageInstructionId = useId()
 const dateValue = (date: string | Date) => typeof date === 'string' ? new Date(date) : date
 const activitySchema = computed(() => dateRange
@@ -78,6 +80,10 @@ const resourceIdentity = [
   () => actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : null,
   () => minDate.value?.toString(), () => maxDate.value?.toString()
 ]
+const customFieldActivity = computed(() => ({
+  agreementId,
+  amendmentId: actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined
+}))
 const createContext = useActionContext({
   identity: resourceIdentity, authority: () => canCreate, eligible: () => !staticMode
 })
@@ -87,6 +93,61 @@ const updateContext = useActionContext({
 const deleteContext = useActionContext({
   identity: resourceIdentity, authority: () => canDelete, eligible: () => !staticMode
 })
+const readContext = useActionContext({ identity: resourceIdentity, authority: true })
+const viewedActivity = shallowRef<FundingCaseAgreementActivityRow | null>(null)
+let viewTrigger: HTMLElement | null = null
+watch(readContext.version, () => {
+  viewedActivity.value = null
+  viewTrigger = null
+}, { flush: 'sync' })
+const viewingActivity = computed({
+  get: () => viewedActivity.value !== null,
+  set: open => {
+    if (!open) viewedActivity.value = null
+  }
+})
+const hasCustomFieldDetails = (row: FundingCaseAgreementActivityRow) => row.custom_field_evidence
+  ? row.custom_field_evidence.length > 0
+  : !staticMode && Object.values(row.egcs_fc_customfields ?? {}).some(customFieldHasValue)
+const activityName = (row: FundingCaseAgreementActivityRow) =>
+  getBilingualValue({ name_en: row.egcs_fc_name_en, name_fr: row.egcs_fc_name_fr }, 'name', '')
+const evidenceLabel = (value: { en: string; fr: string }) => locale.value === 'fr' ? value.fr : value.en
+
+/**
+ * Opens the read-only Activity dialog from its table row.
+ * @param row - Activity whose values or captured evidence are displayed.
+ * @param event - Activation of the row's custom-field details button.
+ */
+const viewActivity = (row: FundingCaseAgreementActivityRow, event: MouseEvent) => {
+  viewTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  viewedActivity.value = row
+}
+
+/**
+ * Restores focus to the visible row that opened the programmatic dialog.
+ * @param event - The dialog's default focus restoration event.
+ */
+const restoreViewFocus = (event: Event) => {
+  if (viewedActivity.value || !viewTrigger?.isConnected) return
+  event.preventDefault()
+  viewTrigger.focus()
+  viewTrigger = null
+}
+
+/**
+ * Sends only edited custom-field keys, including explicit clears.
+ * @param state - Current editor draft.
+ * @param original - Activity as opened.
+ * @returns Activity update with a custom-field patch when answers changed.
+ */
+const buildUpdatePayload = (state: Partial<AgreementActivityCrudRow>, original: AgreementActivityCrudRow) => {
+  const { egcs_fc_customfields: values, ...payload } = state
+  const before = original.egcs_fc_customfields ?? {}
+  const normalized = (value: string | string[] | number | null | undefined) => customFieldHasValue(value) ? JSON.stringify(value) : undefined
+  const changes = Object.fromEntries(Object.entries(values ?? {}).filter(([id, value]) =>
+    normalized(value) !== normalized(before[id])))
+  return Object.keys(changes).length ? { ...payload, egcs_fc_customfields: changes } : payload
+}
 const resourceAction = computed<ResourceCrudAction>(() => staticMode
   ? { kind: 'read-only' }
   : { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext })
@@ -143,9 +204,10 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     :delete-url-base="canDelete && !staticMode ? `${resourceBase}/activities` : undefined"
     :before-open="actionTarget ? beforeOpen : undefined"
     :before-save="actionTarget ? beforeSave : undefined"
+    :build-update-payload="buildUpdatePayload"
     :before-delete="actionTarget ? beforeDelete : undefined"
     :schema="activitySchema"
-    :initial-new-item="{ outcome_ids: [], responsible_party_ids: [] }"
+    :initial-new-item="{ outcome_ids: [], responsible_party_ids: [], egcs_fc_customfields: {} }"
     :columns="columns"
     :bilingual-columns="bilingualColumns"
     table-class="agreement-activities-table"
@@ -158,7 +220,17 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     :search-placeholder="t('agreement.activities.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.activities-tab" data-scope-label-en="Agreements > Activities" data-scope-label-fr="Ententes > Activités" data-help-view="agreement.activities" data-help-label-en="Agreements — Activities" data-help-label-fr="Ententes — Activités" data-help-target="agreement.activities.content" data-help-kind="section" help-save-target="agreement.activities.save" help-add-target="agreement.activities.add" help-search-target="agreement.activities.search">
     <template #name-cell="{ row }">
       <div class="flex min-w-0 flex-col gap-1">
+        <UButton
+          v-if="hasCustomFieldDetails(row.original)"
+          variant="link"
+          color="primary"
+          class="w-fit whitespace-normal p-0 text-start"
+          :aria-label="`${t('custom_fields.title')}: ${activityName(row.original)}`"
+          @click="viewActivity(row.original, $event)">
+          <ActivityBilingualText class="text-sm font-bold" :english="row.original.egcs_fc_name_en" :french="row.original.egcs_fc_name_fr" />
+        </UButton>
         <ActivityBilingualText
+          v-else
           class="text-sm font-bold text-zinc-900 dark:text-white"
           :english="row.original.egcs_fc_name_en"
           :french="row.original.egcs_fc_name_fr" />
@@ -299,9 +371,40 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
             </UFormField>
           </fieldset>
         </div>
+        <Suspense v-if="!staticMode">
+          <CustomFields
+            v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_customfields"
+            data-field-container="Composite editor; its individual field declarations own their identities."
+            :activity="customFieldActivity"
+            :permission-action="state.id ? 'update' : 'create'" />
+        </Suspense>
       </div>
     </template>
   </CommonResourceCrud>
+  <UModal
+    v-model:open="viewingActivity"
+    :content="{ onCloseAutoFocus: restoreViewFocus }"
+    :title="t('custom_fields.title')"
+    :description="viewedActivity ? activityName(viewedActivity) : ''">
+    <template v-if="viewedActivity" #body>
+      <div v-if="viewedActivity.custom_field_evidence" class="grid gap-4 sm:grid-cols-2">
+        <CommonValueCard
+          v-for="field in viewedActivity.custom_field_evidence"
+          :key="field.fieldId"
+          :label="evidenceLabel(field.label)"
+          :value="typeof field.display === 'string' ? field.display : evidenceLabel(field.display)"
+          class="whitespace-pre-wrap" />
+      </div>
+      <Suspense v-else>
+        <CustomFields
+          data-field-container="Composite display for Agency-defined custom fields."
+          :model-value="viewedActivity.egcs_fc_customfields ?? {}"
+          :activity="customFieldActivity"
+          permission-action="read"
+          readonly />
+      </Suspense>
+    </template>
+  </UModal>
 </template>
 
 <style scoped>

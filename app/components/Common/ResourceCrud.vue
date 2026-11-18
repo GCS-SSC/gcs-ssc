@@ -26,6 +26,7 @@ const {
   initialNewItem,
   beforeOpen,
   beforeSave,
+  buildUpdatePayload,
   beforeDelete,
   columns,
   bilingualColumns,
@@ -63,6 +64,7 @@ const {
   initialNewItem?: Partial<T> | null
   beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
+  buildUpdatePayload?: (state: Partial<T>, original: T) => Partial<T>
   beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   columns: TableColumnInput<T>[]
   bilingualColumns?: BilingualColumnConfig<T>[]
@@ -149,6 +151,7 @@ const {
   initialNewItem: () => initialNewItem ?? null,
   beforeOpen,
   beforeSave,
+  buildUpdatePayload,
   beforeDelete,
   buttonLabel,
   modalTitle,

@@ -376,6 +376,7 @@ const cloneActivityVersionRows = async (
     const clonedActivity = await trx.insertInto('Funding_Case_Agreement_Activity').values({
       egcs_fc_fundingagreement: agreementId,
       egcs_fc_activityversion: targetVersionId,
+      egcs_fc_customfields: activity.egcs_fc_customfields,
       egcs_fc_description_en: activity.egcs_fc_description_en,
       egcs_fc_description_fr: activity.egcs_fc_description_fr,
       egcs_fc_startdate: activity.egcs_fc_startdate,

@@ -25,6 +25,7 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
   initialNewItem?: MaybeRefOrGetter<Partial<T> | null>
   beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
+  buildUpdatePayload?: (state: Partial<T>, original: T) => Partial<T>
   beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   buttonLabel?: MaybeRefOrGetter<string | undefined>
   modalTitle?: MaybeRefOrGetter<string | undefined>
@@ -52,6 +53,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   initialNewItem,
   beforeOpen,
   beforeSave,
+  buildUpdatePayload,
   beforeDelete,
   buttonLabel,
   modalTitle,
@@ -275,14 +277,15 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
       if (editing) {
         const updateId = originalItem?.id
         const resolvedUpdateUrlBase = toValue(updateUrlBase)
-        if (!updateId || !resolvedUpdateUrlBase) {
+        if (!originalItem || !updateId || !resolvedUpdateUrlBase) {
           const message = 'Unable to save: missing id or endpoint'
           console.warn(message, { updateId, updateUrlBase: resolvedUpdateUrlBase })
           showError(new Error(message))
           return
         }
 
-        await saveJson(`${resolvedUpdateUrlBase}/${updateId}`, updateMethod, currentState)
+        const payload = buildUpdatePayload ? buildUpdatePayload(currentState, originalItem) : currentState
+        await saveJson(`${resolvedUpdateUrlBase}/${updateId}`, updateMethod, payload)
       } else {
         const url = toValue(postUrl) || toValue(fetchUrl)
         await saveJson(url, 'POST', currentState)

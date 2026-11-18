@@ -376,6 +376,8 @@ CREATE TABLE "Funding_Case_Agreement_Activity" (
   "egcs_fc_name_en" character varying(255) NOT NULL,
   "egcs_fc_name_fr" character varying(255) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
+  "egcs_fc_customfields" jsonb DEFAULT '{}'::jsonb NOT NULL,
+  CONSTRAINT "fc_chk_activitycustomfields_object" CHECK (jsonb_typeof(egcs_fc_customfields) = 'object'),
   CONSTRAINT "Funding_Case_Agreement_Activity_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_activitydaterange" CHECK ((egcs_fc_enddate >= egcs_fc_startdate))
 );

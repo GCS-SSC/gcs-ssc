@@ -1,3 +1,4 @@
+import type { AgreementActivityCustomFieldEvidence } from './schemas/agreement-activity-evidence'
 import type { PaymentEvidence } from './payment-evidence'
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
 import type { Agreement_Type, Currency_Codes } from './database'
@@ -549,6 +550,7 @@ export interface FundingCaseAgreementActivityResponsiblePartyTag {
 }
 
 export interface FundingCaseAgreementActivityRow extends Omit<FundingCaseAgreementActivityItem, 'egcs_fc_startdate' | 'egcs_fc_enddate'> {
+  custom_field_evidence?: AgreementActivityCustomFieldEvidence[]
   egcs_fc_startdate: string
   egcs_fc_enddate: string
   outcome_ids: string[]

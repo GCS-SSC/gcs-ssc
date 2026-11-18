@@ -6,23 +6,31 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { customFieldHasValue, customFieldOptionIds } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgreementCustomFieldSection, AssignedAgencyCustomFieldDefinition, AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
 
-const { streamId, agreementId, readonly = false, permissionAction = 'create' } = defineProps<{
-  streamId: string
+const { streamId, agreementId, activity, readonly = false, permissionAction = 'create' } = defineProps<{
+  streamId?: string
   agreementId?: string
+  activity?: { agreementId: string; amendmentId?: string }
   readonly?: boolean
   permissionAction?: 'create' | 'update' | 'read'
 }>()
 const model = defineModel<AgreementCustomFieldPatch>({ default: () => ({}) })
 const { t, locale, n } = useI18n()
 const { showError } = useApiErrorToast()
-const requestKey = computed(() => `agreement-custom-fields:${streamId}:${agreementId ?? 'new'}:${permissionAction}`)
 const catalogUrl = computed(() => {
-  const query = new URLSearchParams({ stream_id: streamId, permission_action: permissionAction })
+  const query = new URLSearchParams({ permission_action: permissionAction })
+  if (activity) {
+    if (activity.amendmentId) query.set('amendment_id', activity.amendmentId)
+    return `/api/agreements/${encodeURIComponent(activity.agreementId)}/activities/lookups/custom-fields?${query}`
+  }
+  if (streamId) query.set('stream_id', streamId)
   if (agreementId) query.set('agreement_id', agreementId)
   return `/api/agreements/lookups/custom-fields?${query}`
 })
-const { data, status, error, refresh, clear } = await useAsyncData<{ items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }>(requestKey, async () => {
-  const response = await fetch(getClientRequestUrl(catalogUrl.value))
+const requestKey = computed(() => activity
+  ? catalogUrl.value
+  : `agreement-custom-fields:${streamId}:${agreementId ?? 'new'}:${permissionAction}`)
+const { data, status, error, refresh, clear } = await useAsyncData<{ items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }>(requestKey, async (_nuxt, { signal }) => {
+  const response = await fetch(getClientRequestUrl(catalogUrl.value), { signal })
   if (!response.ok) await throwFetchResponseError(response)
   return await response.json() as { items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }
 })
@@ -58,6 +66,7 @@ const retryFields = async () => {
 }
 const fields = computed(() => {
   const current = data.value?.items ?? []
+  if (activity) return current.filter(field => (!readonly && field.egcs_tp_active) || customFieldHasValue(model.value[field.id]))
   const currentIds = new Set(current.map(field => field.id))
   const historical = historicalFields.value.filter(field => !currentIds.has(field.id) && customFieldHasValue(model.value[field.id]))
     .map(field => ({ ...field, egcs_tp_active: false }))
@@ -110,7 +119,10 @@ const update = (id: string, value: unknown) => {
         <UButton :label="t('common.retry')" @click="retryFields" />
       </template>
     </UAlert>
-    <CommonSection v-for="(section, index) in sections" :key="section.id" :title="sectionLabel(section)" :badge="String(index + 4).padStart(2, '0')" :grid-cols="2">
+    <p v-else-if="activity && readonly && status === 'success' && sections.length === 0" class="text-sm text-muted">
+      {{ t('common.not_available') }}
+    </p>
+    <CommonSection v-for="(section, index) in sections" :key="section.id" :title="sectionLabel(section)" :badge="activity ? undefined : String(index + 4).padStart(2, '0')" :grid-cols="2">
       <div v-for="field in section.fields" :key="field.id" class="space-y-2">
         <CommonValueCard v-if="readonly" :label="label(field)" :value="valueLabel(field) || t('common.not_available')" :sub-value="field.egcs_tp_active ? undefined : t('custom_fields.inactive')" class="whitespace-pre-wrap" />
         <UFormField v-else :label="label(field)" :name="`egcs_fc_customfields.${field.id}`" :required="field.egcs_tp_active && field.egcs_tp_required" :ui="field.egcs_ay_kind === 'relational' ? { labelWrapper: 'justify-start gap-2 mb-1.5', label: 'mb-0', hint: 'flex items-center' } : undefined">

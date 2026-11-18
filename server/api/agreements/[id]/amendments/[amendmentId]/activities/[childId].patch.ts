@@ -1,3 +1,4 @@
+import { validateActivityCustomFieldWrite } from '~~/server/utils/agreement-custom-fields'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { parseI18n } from '~~/server/utils/api-validate'
@@ -25,7 +26,7 @@ export default defineEventHandler(async event => {
     const versionId = await resolveDraftAgreementAmendmentActivityVersion(event, trx, agreementId, amendmentId)
     if (typeof versionId !== 'string') return versionId
     const existing = await trx.selectFrom('Funding_Case_Agreement_Activity').select([
-      'id', 'egcs_fc_startdate', 'egcs_fc_enddate',
+      'id', 'egcs_fc_startdate', 'egcs_fc_enddate', 'egcs_fc_customfields',
       'egcs_fc_name_en', 'egcs_fc_name_fr',
       'egcs_fc_description_en', 'egcs_fc_description_fr',
       'egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr'
@@ -42,7 +43,13 @@ export default defineEventHandler(async event => {
     }
     if (Object.hasOwn(validated, 'outcome_ids') && !await validateAgreementOutcomeSelectionIds(trx, current.profileId, validated.outcome_ids ?? [])) return await badRequest(event, 'INVALID_AGREEMENT_ACTIVITY_OUTCOME', 'apiErrors.agreement.invalid_activity_outcome')
     if (Object.hasOwn(validated, 'responsible_party_ids') && !await validateAgreementResponsiblePartySelectionIds(trx, agreementId, validated.responsible_party_ids ?? [])) return await badRequest(event, 'INVALID_AGREEMENT_ACTIVITY_RESPONSIBLE_PARTY', 'apiErrors.agreement.invalid_activity_responsible_party')
-    const { outcome_ids: outcomeIds, responsible_party_ids: partyIds, ...values } = validated
+    const { outcome_ids: outcomeIds, responsible_party_ids: partyIds, egcs_fc_customfields: customFieldPatch, ...activityValues } = validated
+    const values = customFieldPatch === undefined
+      ? activityValues
+      : {
+          ...activityValues,
+          egcs_fc_customfields: await validateActivityCustomFieldWrite(event, trx, current.streamId, existing.egcs_fc_customfields, customFieldPatch)
+        }
     const updated = Object.keys(values).length > 0
       ? await trx.updateTable('Funding_Case_Agreement_Activity').set(values).where('id', '=', childId).where('egcs_fc_activityversion', '=', versionId).where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
       : await trx.selectFrom('Funding_Case_Agreement_Activity').selectAll().where('id', '=', childId).where('egcs_fc_activityversion', '=', versionId).where('_deleted', '=', false).executeTakeFirstOrThrow()

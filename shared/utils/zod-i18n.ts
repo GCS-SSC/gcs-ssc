@@ -34,7 +34,7 @@ export const localizeBilingualIssueParams = (
    * @param base - Generic placeholder name to resolve.
    * @returns The localized value, existing placeholder, or `undefined`.
    */
-  const resolve = (base: 'question' | 'outcome'): unknown => {
+  const resolve = (base: string): unknown => {
     const preferred = localized[`${base}_${locale}`]
     if (typeof preferred === 'string' && preferred) return preferred
     const english = localized[`${base}_en`]
@@ -44,11 +44,8 @@ export const localizeBilingualIssueParams = (
     return localized[base]
   }
 
-  if ('question_en' in localized || 'question_fr' in localized) {
-    localized.question = resolve('question')
-  }
-  if ('outcome_en' in localized || 'outcome_fr' in localized) {
-    localized.outcome = resolve('outcome')
+  for (const base of ['question', 'outcome', 'activity', 'field']) {
+    if (`${base}_en` in localized || `${base}_fr` in localized) localized[base] = resolve(base)
   }
 
   return localized

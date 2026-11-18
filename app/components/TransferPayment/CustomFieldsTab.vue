@@ -11,6 +11,7 @@ import {
   StreamFieldSectionCreateSchema, StreamFieldAssignmentCreateSchema,
   type AgreementCustomFieldSection, type AssignedAgencyCustomFieldDefinition
 } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { StreamFieldAssignmentTarget } from '~~/shared/types/database'
 
 type AssignmentForm = {
   egcs_tp_agencyfield: string | undefined
@@ -23,22 +24,23 @@ type Option = AssignedAgencyCustomFieldDefinition['options'][number]
 type FieldRow = { id: string, sectionGroup: string, section: AgreementCustomFieldSection | null, fieldGroup: string, categoryGroup: string, field: AssignedAgencyCustomFieldDefinition | null, option: Option | null }
 
 const writeContext = useActionContext({
-  identity: [() => transferPaymentId, () => streamId],
+  identity: [() => transferPaymentId, () => streamId, () => target],
   authority: () => canUpdateChild
 })
 const deleteActionContext = useActionContext({
-  identity: [() => transferPaymentId, () => streamId],
+  identity: [() => transferPaymentId, () => streamId, () => target],
   authority: () => canUpdateChild
 })
-const { transferPaymentId, streamId, canUpdateChild } = defineProps<{
-  transferPaymentId: string, streamId: string, canUpdateChild: boolean, canDeleteChild: boolean
+const { transferPaymentId, streamId, canUpdateChild, target = 'agreement' } = defineProps<{
+  transferPaymentId: string, streamId: string, canUpdateChild: boolean, canDeleteChild: boolean, target?: StreamFieldAssignmentTarget
 }>()
 const { t } = useI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
 const baseUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}`)
-const assignmentUrl = computed(() => `${baseUrl.value}/custom-fields`)
+const hasSections = computed(() => target === 'agreement')
+const assignmentUrl = computed(() => `${baseUrl.value}/${hasSections.value ? 'custom-fields' : 'activity-custom-fields'}`)
 const { data, refresh, status } = await useAsyncData<{ items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }>(assignmentUrl, async () => {
   const response = await fetch(getClientRequestUrl(assignmentUrl.value))
   if (!response.ok) await throwFetchResponseError(response)
@@ -76,7 +78,7 @@ const columns: TableColumnInput<FieldRow>[] = [
   { id: 'status', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const grouping = ['sectionGroup', 'fieldGroup', 'categoryGroup']
+const grouping = computed(() => hasSections.value ? ['sectionGroup', 'fieldGroup', 'categoryGroup'] : ['fieldGroup', 'categoryGroup'])
 const groupingOptions = { getGroupedRowModel: getGroupedRowModel() }
 const expandedOptions = { autoResetExpanded: false }
 const columnVisibility = { sectionGroup: false, fieldGroup: false, categoryGroup: false }
@@ -187,7 +189,10 @@ const filteredSections = computed(() => {
     return { section, fields: matches }
   }).filter(group => group.section ? !query || group.fields.length || [group.section.egcs_tp_name_en, group.section.egcs_tp_name_fr].some(label => label.toLocaleLowerCase().includes(query)) : group.fields.length > 0)
 })
-const tableRows = computed<FieldRow[]>(() => filteredSections.value
+const tableGroups = computed(() => hasSections.value
+  ? filteredSections.value
+  : filteredSections.value.flatMap(({ fields }) => fields.map(field => ({ section: null, fields: [field] }))))
+const tableRows = computed<FieldRow[]>(() => tableGroups.value
   .slice(pagination.value.pageIndex * pagination.value.pageSize, (pagination.value.pageIndex + 1) * pagination.value.pageSize)
   .flatMap(({ section, fields }): FieldRow[] => fields.length
     ? fields.flatMap((field): FieldRow[] => field.options.length
@@ -197,10 +202,10 @@ const tableRows = computed<FieldRow[]>(() => filteredSections.value
 watch(search, () => {
   pagination.value.pageIndex = 0
 })
-watch(filteredSections, sections => {
-  pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(sections.length / pagination.value.pageSize) - 1))
+watch(tableGroups, groups => {
+  pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(groups.length / pagination.value.pageSize) - 1))
 })
-watch([baseUrl, () => canUpdateChild], () => {
+watch([assignmentUrl, () => canUpdateChild], () => {
   contextGeneration += 1
   search.value = ''
   pagination.value.pageIndex = 0
@@ -215,15 +220,15 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
 
 <template>
   <div data-field-scope="transfer-payment.custom-fields-tab">
-    <div v-if="canUpdateChild" class="mb-4 flex justify-end">
+    <div v-if="canUpdateChild && hasSections" class="mb-4 flex justify-end">
       <UButton icon="i-lucide-plus" color="neutral" variant="outline" :label="t('custom_fields.assign_field')" @click="openAssignment(null)" />
     </div>
     <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
       :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
-      :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="filteredSections.length"
-      :loading="status === 'pending'" :request-status="status" :button-label="t('custom_fields.add_section')"
-      :show-button="canUpdateChild" @add="sectionModal.openCreate()" @retry="refresh()" @update:expanded="expandedRows = $event">
+      :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="tableGroups.length"
+      :loading="status === 'pending'" :request-status="status" :button-label="t(hasSections ? 'custom_fields.add_section' : 'custom_fields.assign_field')"
+      :show-button="canUpdateChild" @add="hasSections ? sectionModal.openCreate() : openAssignment(null)" @retry="refresh()" @update:expanded="expandedRows = $event">
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row)" class="contents">
           <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-3 py-1">
@@ -233,7 +238,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
               <span v-else>{{ t('custom_fields.unsectioned') }}</span>
             </CommonGroupedDisclosureButton>
           </div>
-          <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-3 py-1 pl-6">
+          <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-3 py-1" :class="{ 'pl-6': hasSections }">
             <CommonGroupedDisclosureButton v-if="row.original.field.egcs_ay_kind === 'relational' && row.original.field.options.length" class="group flex min-w-0 items-center gap-3 text-left font-bold" :expanded="row.getIsExpanded()" :controls="getGroupedDisclosureControlsId(row.id)" :label-en="row.original.field.egcs_ay_name_en" :label-fr="row.original.field.egcs_ay_name_fr" @toggle="row.toggleExpanded()">
               <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
               <CommonBilingualName :name-en="row.original.field.egcs_ay_name_en" :name-fr="row.original.field.egcs_ay_name_fr" />
@@ -264,7 +269,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
       <template #configuration-cell="{ row }">
         <div v-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex flex-wrap gap-2">
           <UBadge v-if="row.original.field.egcs_tp_required" color="neutral" variant="subtle" :label="t('custom_fields.required')" />
-          <UBadge v-if="row.original.field.egcs_ay_discriminator" color="neutral" variant="subtle" :label="t('custom_fields.discriminator')" />
+          <UBadge v-if="hasSections && row.original.field.egcs_ay_discriminator" color="neutral" variant="subtle" :label="t('custom_fields.discriminator')" />
         </div>
         <CommonBilingualName v-else-if="!row.getIsGrouped() && row.original.option?.egcs_ay_category_en" :name-en="row.original.option.egcs_ay_category_en" :name-fr="row.original.option.egcs_ay_category_fr ?? ''" />
       </template>
@@ -286,7 +291,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
         </div>
       </template>
     </CommonResourceLayout>
-    <UModal v-model:open="sectionModal.isOpen.value" :title="t('custom_fields.section')">
+    <UModal v-if="hasSections" v-model:open="sectionModal.isOpen.value" :title="t('custom_fields.section')">
       <template #body>
         <UForm v-if="sectionModal.selected.value" v-bind="sectionFormSession" data-field-scope="transfer-payment.custom-field-section" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_tp_name_en" required>
@@ -308,7 +313,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
           <UFormField :label="t('custom_fields.agency_field')" name="egcs_tp_agencyfield" required>
             <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />
           </UFormField>
-          <UFormField :label="t('custom_fields.section')" name="egcs_tp_section">
+          <UFormField v-if="hasSections" :label="t('custom_fields.section')" name="egcs_tp_section">
             <CommonBilingualSelectMenu v-model="assignmentModal.selected.value.egcs_tp_section" :items="data?.sections ?? []" :prepend-options="[{ label: t('custom_fields.unsectioned'), value: null }]" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" value-key="id" />
           </UFormField>
           <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" data-ui-target="transfer-payment.custom-field-assignment.egcs_tp_active" />

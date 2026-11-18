@@ -161,6 +161,7 @@
     "invalid_json": "Saisissez un JSON valide."
   },
   "custom_fields": {
+    "activity_title": "Champs personnalisés des activités",
     "assign_field": "Associer un champ de l’organisme",
     "agency_field": "Champ de l’organisme",
     "unsectioned": "Sans section",
@@ -2270,6 +2271,8 @@
     "custom_field_inactive": "Les champs inactifs peuvent uniquement être effacés.",
     "custom_field_single_selection": "Sélectionnez une seule option pour ce champ.",
     "custom_field_number": "Saisissez un nombre valide.",
+    "activity_custom_field_required": "Saisissez une valeur pour {field} dans l’activité {activity}.",
+    "activity_custom_field_invalid": "Corrigez la valeur de {field} dans l’activité {activity}.",
     "custom_field_single_line": "Saisissez du texte sans saut de ligne.",
     "required": "Ce champ est obligatoire",
     "bilingual_value_required": "Fournissez une valeur anglaise ou française",

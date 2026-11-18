@@ -345,6 +345,7 @@ export const FundingCaseAgreementActivityTextSchema = z.object(activityTextField
 
 export const FundingCaseAgreementActivityBaseSchema = z.object({
   ...activityTextFields,
+  egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
   egcs_fc_startdate: RequiredDateSchema,
   egcs_fc_enddate: RequiredDateSchema,
   outcome_ids: RequiredUniqueBigintSelectionIdsSchema(),

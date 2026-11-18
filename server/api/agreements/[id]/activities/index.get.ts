@@ -148,7 +148,8 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_en as egcs_fc_expectedresults_en',
           'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_fr as egcs_fc_expectedresults_fr',
           'Funding_Case_Agreement_Activity.egcs_fc_startdate as egcs_fc_startdate',
-          'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate'
+          'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate',
+          'Funding_Case_Agreement_Activity.egcs_fc_customfields as egcs_fc_customfields'
         ])
         .execute(),
       getAgreementActivityOutcomeTags(db, pagedActivityIds),

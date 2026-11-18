@@ -1,11 +1,12 @@
-import { customFieldHasValue, customFieldOptionIds } from '~~/shared/types/schemas/agreement-custom-fields'
-import { mergeAgreementCustomFields, readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, @stylistic/multiline-ternary -- compact snapshot normalization and query fallbacks */
 import { createHash } from 'node:crypto'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { H3Event } from 'h3'
+import { z } from 'zod'
+import { agreementCustomFieldMergeSchema, customFieldHasValue, customFieldOptionIds, type AgreementCustomFieldValues, type AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
+import { AgreementActivityCustomFieldEvidenceSchema, type AgreementActivityCustomFieldEvidence } from '~~/shared/types/schemas/agreement-activity-evidence'
 import type { Amended_Type, Database, JsonValue } from '~~/shared/types/database'
-import { throwApiError } from './api-errors'
+import { throwApiError, validationError } from './api-errors'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 import type { SubmissionRisk } from '~~/shared/types/risk'
@@ -14,6 +15,7 @@ import { captureSubmissionRisk } from './risk-readiness'
 import { assertAgreementActivitiesWithinDuration } from './agreement-activity'
 import { FundingCaseAgreementTitleProposalSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import { parseI18n } from './api-validate'
+import { mergeAgreementCustomFields, readActivityCustomFieldDefinitions, readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
   'pending',
@@ -161,11 +163,54 @@ const normalizeValue = (value: unknown): JsonValue => {
 const normalizeRow = (row: Record<string, unknown>): Record<string, JsonValue> =>
   normalizeValue(row) as Record<string, JsonValue>
 
-export const canonicalSerializeAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot): string =>
+const captureCustomFields = (definitions: AssignedAgencyCustomFieldDefinition[], values: AgreementCustomFieldValues) =>
+  definitions.filter(field => customFieldHasValue(values[field.id])).map(field => ({
+    fieldId: field.id,
+    section: field.section ? { id: field.section.id, label: bilingualValue(field.section.egcs_tp_name_en, field.section.egcs_tp_name_fr), order: field.section.egcs_tp_displayorder } : null,
+    label: bilingualValue(field.egcs_ay_name_en, field.egcs_ay_name_fr),
+    value: values[field.id],
+    display: field.egcs_ay_kind !== 'relational' ? String(values[field.id]) : (() => {
+      const selections = customFieldOptionIds(values[field.id]).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { egcs_ay_name_en: optionId, egcs_ay_name_fr: optionId })
+      return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
+    })()
+  }))
+
+export const canonicalSerializeAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot | JsonValue): string =>
   JSON.stringify(normalizeValue(snapshot))
 
-export const hashAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot): string =>
+export const hashAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot | JsonValue): string =>
   createHash('sha256').update(canonicalSerializeAgreementApprovalSnapshot(snapshot)).digest('hex')
+
+const ActivityEvidencePacketSchema = z.object({
+  sourceVersions: z.object({ activity: z.string().nullable() }),
+  activities: z.array(z.object({
+    activityId: z.string().optional(),
+    customFields: AgreementActivityCustomFieldEvidenceSchema.array().optional()
+  })).nullable()
+})
+
+export const readApprovedAmendmentActivityCustomFields = async (
+  db: Kysely<Database>, agreementId: string, amendmentId: string, versionId: string
+): Promise<Map<string, AgreementActivityCustomFieldEvidence[]>> => {
+  const submission = await db.selectFrom('Funding_Case_Agreement_Revision as revision')
+    .innerJoin('Funding_Case_Agreement_Approval_Submission as submission', 'submission.id', 'revision.egcs_fc_approvalsubmission')
+    .select(['submission.egcs_fc_packet', 'submission.egcs_fc_canonicalhash'])
+    .where('revision.egcs_fc_fundingagreement', '=', agreementId)
+    .where('revision.egcs_fc_amendment', '=', amendmentId)
+    .where('revision._deleted', '=', false)
+    .where('submission.egcs_fc_fundingagreement', '=', agreementId)
+    .where('submission.egcs_fc_amendment', '=', amendmentId)
+    .orderBy('revision.egcs_fc_revisionnumber', 'desc')
+    .executeTakeFirst()
+  if (!submission) return new Map()
+  if (hashAgreementApprovalSnapshot(submission.egcs_fc_packet) !== submission.egcs_fc_canonicalhash) {
+    throw new AgreementApprovalSubmissionHashMismatchError('Agreement approval submission packet failed its integrity check')
+  }
+  const packet = ActivityEvidencePacketSchema.parse(submission.egcs_fc_packet)
+  if (packet.sourceVersions.activity !== versionId || !packet.activities) return new Map()
+  return new Map(packet.activities.flatMap(activity =>
+    activity.activityId && activity.customFields ? [[activity.activityId, activity.customFields]] : []))
+}
 
 export const buildAgreementApprovalSnapshot = async (
   event: H3Event,
@@ -392,7 +437,7 @@ export const buildAgreementApprovalSnapshot = async (
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .orderBy('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear').orderBy('Funding_Case_Agreement_Budget_Line_Item.id').execute() : [],
-    activityVersion ? trx.selectFrom('Funding_Case_Agreement_Activity').select(['id', 'egcs_fc_name_en', 'egcs_fc_name_fr', 'egcs_fc_description_en', 'egcs_fc_description_fr', 'egcs_fc_startdate', 'egcs_fc_enddate', 'egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr']).where('egcs_fc_activityversion', '=', String(activityVersion.id)).where('_deleted', '=', false).orderBy('egcs_fc_startdate').orderBy('id').execute() : [],
+    activityVersion ? trx.selectFrom('Funding_Case_Agreement_Activity').select(['id', 'egcs_fc_name_en', 'egcs_fc_name_fr', 'egcs_fc_description_en', 'egcs_fc_description_fr', 'egcs_fc_startdate', 'egcs_fc_enddate', 'egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr', 'egcs_fc_customfields']).where('egcs_fc_activityversion', '=', String(activityVersion.id)).where('_deleted', '=', false).orderBy('egcs_fc_startdate').orderBy('id').execute() : [],
     amendment ? trx.selectFrom('Funding_Case_Agreement_Amendment_Subtype').innerJoin('Transfer_Payment_Amendment_Subtype', 'Transfer_Payment_Amendment_Subtype.id', 'Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendmentsubtype').select(['Transfer_Payment_Amendment_Subtype.egcs_tp_name_en', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_fr']).where('Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendment', '=', entityId).where('Funding_Case_Agreement_Amendment_Subtype._deleted', '=', false).where('Transfer_Payment_Amendment_Subtype._deleted', '=', false).orderBy('Transfer_Payment_Amendment_Subtype.id').execute() : []
   ])
   const budgetFundingByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(trx, lineItems.map(row => String(row.row_id))))
@@ -415,17 +460,31 @@ export const buildAgreementApprovalSnapshot = async (
           .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
           .where('Applicant_Recipient_Profile._deleted', '=', false).orderBy('Applicant_Recipient_Profile.id').execute()
       ])
-  const customFieldDefinitions = await readAssignedAgencyCustomFieldDefinitions(trx, String(agreement.egcs_fc_transferpaymentstream))
-  const customFields = customFieldDefinitions.filter(field => customFieldHasValue(agreement.egcs_fc_customfields[field.id])).map(field => ({
-    fieldId: field.id,
-    section: field.section ? { id: field.section.id, label: bilingualValue(field.section.egcs_tp_name_en, field.section.egcs_tp_name_fr), order: field.section.egcs_tp_displayorder } : null,
-    label: bilingualValue(field.egcs_ay_name_en, field.egcs_ay_name_fr),
-    value: agreement.egcs_fc_customfields[field.id],
-    display: field.egcs_ay_kind !== 'relational' ? String(agreement.egcs_fc_customfields[field.id]) : (() => {
-      const selections = customFieldOptionIds(agreement.egcs_fc_customfields[field.id]).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { egcs_ay_name_en: optionId, egcs_ay_name_fr: optionId })
-      return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
-    })()
-  }))
+  const streamId = String(agreement.egcs_fc_transferpaymentstream)
+  const customFields = captureCustomFields(
+    await readAssignedAgencyCustomFieldDefinitions(trx, streamId), agreement.egcs_fc_customfields
+  )
+  const activityFieldDefinitions = activities.length ? await readActivityCustomFieldDefinitions(trx, streamId) : []
+  const activityFieldsById = new Map(activityFieldDefinitions.map(field => [field.id, field]))
+  const activityFieldIssues = activities.flatMap(activity => {
+    const result = agreementCustomFieldMergeSchema(activityFieldDefinitions, activity.egcs_fc_customfields).safeParse({})
+    return result.error?.issues.map((issue): z.ZodIssue => {
+      const fieldId = String(issue.path[0])
+      const field = activityFieldsById.get(fieldId)
+      return {
+        code: 'custom',
+        path: ['activities', String(activity.id), 'egcs_fc_customfields', fieldId],
+        message: issue.message === 'validation.required' ? 'validation.activity_custom_field_required' : 'validation.activity_custom_field_invalid',
+        params: {
+          activity_en: activity.egcs_fc_name_en,
+          activity_fr: activity.egcs_fc_name_fr,
+          field_en: field?.egcs_ay_name_en ?? fieldId,
+          field_fr: field?.egcs_ay_name_fr ?? fieldId
+        }
+      }
+    }) ?? []
+  })
+  if (activityFieldIssues.length) await validationError(event, new z.ZodError(activityFieldIssues))
   const businessPacket: AgreementApprovalSnapshot = {
     schemaVersion: 4,
     risk,
@@ -501,6 +560,8 @@ export const buildAgreementApprovalSnapshot = async (
       }))
     } : null,
     activities: activityVersion ? activities.map(activity => normalizeRow({
+      activityId: String(activity.id),
+      customFields: captureCustomFields(activityFieldDefinitions, activity.egcs_fc_customfields),
       name: bilingualValue(activity.egcs_fc_name_en, activity.egcs_fc_name_fr),
       description: bilingualValue(activity.egcs_fc_description_en, activity.egcs_fc_description_fr),
       expectedResults: bilingualValue(activity.egcs_fc_expectedresults_en, activity.egcs_fc_expectedresults_fr),

@@ -1,3 +1,4 @@
+import { validateActivityCustomFieldWrite } from '~~/server/utils/agreement-custom-fields'
 import { defineEventHandler, getRouterParam } from 'h3'
 import type { Insertable } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -39,6 +40,7 @@ export default defineEventHandler(async event => {
   const {
     outcome_ids: _outcomeIds,
     responsible_party_ids: _responsiblePartyIds,
+    egcs_fc_customfields: customFieldPatch,
     ...activityValues
   } = validated
 
@@ -66,6 +68,7 @@ export default defineEventHandler(async event => {
       .insertInto('Funding_Case_Agreement_Activity')
       .values({
         ...activityValues,
+        egcs_fc_customfields: await validateActivityCustomFieldWrite(event, trx, currentContext.streamId, {}, customFieldPatch ?? {}),
         egcs_fc_fundingagreement: agreementId
       } satisfies Insertable<FundingCaseAgreementActivityTable>)
       .returningAll()

@@ -1,3 +1,4 @@
+import { validateActivityCustomFieldWrite } from '~~/server/utils/agreement-custom-fields'
 import { defineEventHandler, getRouterParam } from 'h3'
 import type { Insertable } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -19,7 +20,7 @@ export default defineEventHandler(async event => {
   if (!agreementContext) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementActivityCreateSchema)
-  const { outcome_ids: _outcomes, responsible_party_ids: _parties, ...values } = validated
+  const { outcome_ids: _outcomes, responsible_party_ids: _parties, egcs_fc_customfields: customFieldPatch, ...values } = validated
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, current) => {
     const versionId = await resolveDraftAgreementAmendmentActivityVersion(event, trx, agreementId, amendmentId)
     if (typeof versionId !== 'string') return versionId
@@ -30,7 +31,8 @@ export default defineEventHandler(async event => {
     if (!outcomes) return await badRequest(event, 'INVALID_AGREEMENT_ACTIVITY_OUTCOME', 'apiErrors.agreement.invalid_activity_outcome')
     const parties = await validateAgreementResponsiblePartySelectionIds(trx, agreementId, responsiblePartyIds)
     if (!parties) return await badRequest(event, 'INVALID_AGREEMENT_ACTIVITY_RESPONSIBLE_PARTY', 'apiErrors.agreement.invalid_activity_responsible_party')
-    const created = await trx.insertInto('Funding_Case_Agreement_Activity').values({ ...values, egcs_fc_fundingagreement: agreementId, egcs_fc_activityversion: versionId } satisfies Insertable<FundingCaseAgreementActivityTable>).returningAll().executeTakeFirstOrThrow()
+    const customFields = await validateActivityCustomFieldWrite(event, trx, current.streamId, {}, customFieldPatch ?? {})
+    const created = await trx.insertInto('Funding_Case_Agreement_Activity').values({ ...values, egcs_fc_customfields: customFields, egcs_fc_fundingagreement: agreementId, egcs_fc_activityversion: versionId } satisfies Insertable<FundingCaseAgreementActivityTable>).returningAll().executeTakeFirstOrThrow()
     await syncAgreementActivityOutcomeSelections(trx, String(created.id), outcomeIds)
     await syncAgreementActivityResponsiblePartySelections(trx, String(created.id), responsiblePartyIds)
     const [outcomeMap, partyMap] = await Promise.all([getAgreementActivityOutcomeTags(trx, [String(created.id)]), getAgreementActivityResponsiblePartyTags(trx, [String(created.id)])])

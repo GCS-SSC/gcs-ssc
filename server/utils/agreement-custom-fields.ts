@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Kysely } from 'kysely'
 import type { H3Event } from 'h3'
-import type { Database } from '~~/shared/types/database'
+import type { Database, StreamFieldAssignmentTarget } from '~~/shared/types/database'
 import { agreementCustomFieldMergeSchema, type AgreementCustomFieldSection, type AgreementCustomFieldPatch, type AgreementCustomFieldValues, type AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { parseI18n } from './api-validate'
 import { throwApiError } from './api-errors'
@@ -16,10 +16,11 @@ export const readAgreementCustomFieldSections = async (db: Kysely<Database>, str
  * available to display and clear previously saved selections.
  * @param db - Current database transaction.
  * @param streamId - Owning Stream.
+ * @param target - Record type receiving the answers.
  * @returns Agency definitions with independent Stream settings.
  */
 export const readAssignedAgencyCustomFieldDefinitions = async (
-  db: Kysely<Database>, streamId: string
+  db: Kysely<Database>, streamId: string, target: StreamFieldAssignmentTarget = 'agreement'
 ): Promise<AssignedAgencyCustomFieldDefinition[]> => {
   const rows = await db.selectFrom('Transfer_Payment_Stream_Field_Assignment as assignment')
     .innerJoin('Agency_Custom_Field as field', 'field.id', 'assignment.egcs_tp_agencyfield')
@@ -30,11 +31,12 @@ export const readAssignedAgencyCustomFieldDefinitions = async (
       'field.egcs_ay_multiple', 'field.egcs_ay_presentation', 'field.egcs_ay_discriminator'
     ])
     .where('assignment.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('assignment.egcs_tp_target', '=', target)
     .where('assignment._deleted', '=', false).where('field._deleted', '=', false)
     .orderBy('assignment.egcs_tp_displayorder').orderBy('assignment.id').execute()
   if (!rows.length) return []
   const [sections, options] = await Promise.all([
-    readAgreementCustomFieldSections(db, streamId),
+    target === 'agreement' ? readAgreementCustomFieldSections(db, streamId) : [],
     db.selectFrom('Agency_Custom_Field_Option').selectAll()
       .where('egcs_ay_field', 'in', rows.map(row => row.id))
       .where('_deleted', '=', false)
@@ -56,6 +58,9 @@ export const readAssignedAgencyCustomFieldDefinitions = async (
   }))
 }
 
+export const readActivityCustomFieldDefinitions = async (db: Kysely<Database>, streamId: string) =>
+  await readAssignedAgencyCustomFieldDefinitions(db, streamId, 'activity')
+
 /**
  * Caller must hold the owning stream and, for updates, Agreement locks.
  * @returns Validated, merged custom-field values.
@@ -64,17 +69,23 @@ export const readAssignedAgencyCustomFieldDefinitions = async (
  * @param streamId - Owning stream identity.
  * @param current - Stored Agreement values.
  * @param patch - Supplied custom-field changes.
+ * @param target - Record type receiving the answers.
  */
 export const mergeAgreementCustomFields = async (
   event: H3Event, db: Kysely<Database>, streamId: string,
-  current: AgreementCustomFieldValues, patch: AgreementCustomFieldPatch
+  current: AgreementCustomFieldValues, patch: AgreementCustomFieldPatch, target: StreamFieldAssignmentTarget = 'agreement'
 ): Promise<AgreementCustomFieldValues> => {
-  const definitions = await readAssignedAgencyCustomFieldDefinitions(db, streamId)
+  const definitions = await readAssignedAgencyCustomFieldDefinitions(db, streamId, target)
   const result = await parseI18n(event, z.object({
     egcs_fc_customfields: agreementCustomFieldMergeSchema(definitions, current)
   }), { egcs_fc_customfields: patch })
   return result.egcs_fc_customfields
 }
+
+export const validateActivityCustomFieldWrite = async (
+  event: H3Event, db: Kysely<Database>, streamId: string,
+  current: AgreementCustomFieldValues, patch: AgreementCustomFieldPatch
+) => await mergeAgreementCustomFields(event, db, streamId, current, patch, 'activity')
 
 /**
  * Rejects malformed stored relational selections before projecting them to callers.

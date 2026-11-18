@@ -8,6 +8,7 @@ import {
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
+import { validateActivityCustomFieldWrite } from './agreement-custom-fields'
 import { FundingCaseAgreementActivityPatchSchema, FundingCaseAgreementActivityTextSchema } from '~~/shared/types/schemas'
 import type { Database, FundingCaseAgreementActivityTable } from '~~/shared/types/database'
 import type { FundingCaseAgreementActivityPatch } from '~~/shared/types/schemas'
@@ -386,7 +387,8 @@ const loadAgreementActivityRowSnapshot = async (
       'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_en as egcs_fc_expectedresults_en',
       'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_fr as egcs_fc_expectedresults_fr',
       'Funding_Case_Agreement_Activity.egcs_fc_startdate as egcs_fc_startdate',
-      'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate'
+      'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate',
+      'Funding_Case_Agreement_Activity.egcs_fc_customfields as egcs_fc_customfields'
     ])
     .executeTakeFirstOrThrow()
 
@@ -443,7 +445,8 @@ const assertAgreementActivityExists = async (
       'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_en as egcs_fc_expectedresults_en',
       'Funding_Case_Agreement_Activity.egcs_fc_expectedresults_fr as egcs_fc_expectedresults_fr',
       'Funding_Case_Agreement_Activity.egcs_fc_startdate as egcs_fc_startdate',
-      'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate'
+      'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate',
+      'Funding_Case_Agreement_Activity.egcs_fc_customfields as egcs_fc_customfields'
     ])
     .executeTakeFirst(),
   ...AGREEMENT_CHILD_ERROR_KEYS.activityNotFound
@@ -489,6 +492,7 @@ const mapAgreementActivityPatchValues = (
   const {
     outcome_ids: _outcomeIds,
     responsible_party_ids: _responsiblePartyIds,
+    egcs_fc_customfields: _customFields,
     ...patchValues
   } = validated
 
@@ -500,7 +504,8 @@ export const patchAgreementActivity = async (
   db: AgreementDb,
   agreementId: string,
   transferPaymentProfileId: string,
-  activityId: string
+  activityId: string,
+  streamId: string
 ) => {
   const agreement = await assertAgreementExists(event, agreementId, db)
   if (!hasKey(agreement, 'id')) {
@@ -538,6 +543,11 @@ export const patchAgreementActivity = async (
   }
 
   const activityPatchValues = mapAgreementActivityPatchValues(validated)
+  if (validated.egcs_fc_customfields !== undefined) {
+    activityPatchValues.egcs_fc_customfields = await validateActivityCustomFieldWrite(
+      event, db, streamId, existing.egcs_fc_customfields, validated.egcs_fc_customfields
+    )
+  }
   if (Object.keys(activityPatchValues).length > 0) {
     await db
       .updateTable('Funding_Case_Agreement_Activity')

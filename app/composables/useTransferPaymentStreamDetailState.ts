@@ -27,6 +27,7 @@ import { appRouteLocations } from '~/utils/route-locations'
 
 export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   customFields: 'custom_fields.title',
+  activityCustomFields: 'custom_fields.activity_title',
   general: 'agency.tabs.general',
   holdbackBases: 'transfer_payment.holdback_bases',
   budgets: 'transfer_payment.budgets',
@@ -158,7 +159,8 @@ export const useTransferPaymentStreamDetailState = (
       'monitorTypes',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.monitorTypes, icon: 'i-lucide-clipboard-check', component: TransferPaymentMonitorTypesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? '', canCreateChild: canCreateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
-    ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
+    ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ key: 'custom-fields', transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
+    ['activityCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields, value: 'activity-custom-fields', icon: 'i-lucide-list-todo', component: CustomFieldsTab, getProps: () => ({ key: 'activity-custom-fields', transferPaymentId: id, streamId, target: 'activity', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     [
       'riskRatings',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.riskRatings, icon: 'i-lucide-gauge', component: TransferPaymentStreamRiskRatingsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }

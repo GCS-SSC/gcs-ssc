@@ -161,6 +161,7 @@
     "invalid_json": "Enter valid JSON."
   },
   "custom_fields": {
+    "activity_title": "Activity custom fields",
     "assign_field": "Assign agency field",
     "agency_field": "Agency field",
     "unsectioned": "No section",
@@ -2270,6 +2271,8 @@
     "custom_field_inactive": "Inactive fields can only be cleared.",
     "custom_field_single_selection": "Select only one option for this field.",
     "custom_field_number": "Enter a valid number.",
+    "activity_custom_field_required": "Enter a value for {field} on the activity {activity}.",
+    "activity_custom_field_invalid": "Correct the value for {field} on the activity {activity}.",
     "custom_field_single_line": "Enter text without line breaks.",
     "required": "This field is required",
     "bilingual_value_required": "Provide an English or French value",

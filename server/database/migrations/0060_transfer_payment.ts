@@ -347,16 +347,20 @@ CREATE TABLE "Transfer_Payment_Stream_Field_Assignment" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Stream_Field_Assignment_id_seq"'::regclass) NOT NULL,
   "egcs_tp_transferpaymentstream" bigint NOT NULL,
   "egcs_tp_agencyfield" bigint NOT NULL,
+  "egcs_tp_target" text DEFAULT 'agreement' NOT NULL,
   "egcs_tp_section" bigint,
   "egcs_tp_required" boolean DEFAULT false NOT NULL,
   "egcs_tp_active" boolean DEFAULT true NOT NULL,
   "egcs_tp_displayorder" integer DEFAULT 0 NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Transfer_Payment_Stream_Field_Assignment_pkey" PRIMARY KEY (id),
-  CONSTRAINT "tp_chk_stream_field_assignment_displayorder" CHECK ((egcs_tp_displayorder >= 0))
+  CONSTRAINT "tp_chk_stream_field_assignment_displayorder" CHECK ((egcs_tp_displayorder >= 0)),
+  CONSTRAINT "tp_chk_stream_field_assignment_target" CHECK (
+    egcs_tp_target = 'agreement' OR (egcs_tp_target = 'activity' AND egcs_tp_section IS NULL)
+  )
 );
 
-CREATE UNIQUE INDEX tp_idx_unique_live_field_assignment ON "Transfer_Payment_Stream_Field_Assignment" USING btree (egcs_tp_transferpaymentstream, egcs_tp_agencyfield) WHERE (_deleted = false);
+CREATE UNIQUE INDEX tp_idx_unique_live_field_assignment ON "Transfer_Payment_Stream_Field_Assignment" USING btree (egcs_tp_transferpaymentstream, egcs_tp_target, egcs_tp_agencyfield) WHERE (_deleted = false);
 
 CREATE TABLE "Transfer_Payment_Stream_Field_Section" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Stream_Field_Section_id_seq"'::regclass) NOT NULL,
