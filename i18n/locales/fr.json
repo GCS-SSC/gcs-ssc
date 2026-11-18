@@ -1552,6 +1552,7 @@
       "claim_reconcile_lines_exist": "La demande de remboursement liée à ce rapprochement ne peut pas être modifiée, car des lignes de rapprochement ont déjà été enregistrées.",
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
+      "initial_approval_required": "Terminez la soumission initiale de l’entente pour approbation avant de créer une demande de remboursement ou un paiement.",
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",
       "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
       "forecast_cell_occupied": "Une ligne de prévision existe déjà pour cette ligne budgétaire et ce mois.",

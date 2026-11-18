@@ -25,6 +25,41 @@ export const ACTIVE_WORKFLOW_RUN_STATUSES = [
 export class AgreementApprovalSubmissionHashMismatchError extends Error {}
 export class AgreementApprovalSubmissionPromotionError extends Error {}
 
+/**
+ * Reads the durable evidence of successful initial Agreement approval.
+ * Enforce write prerequisites with this check inside the locked Agreement transaction.
+ *
+ * @param db - Database or authorized Agreement write transaction.
+ * @param agreementId - Agreement whose initial approval is required.
+ * @returns Whether the successful initial approval and its revision are recorded.
+ */
+export const hasSuccessfulInitialAgreementApproval = async (
+  db: Kysely<Database>,
+  agreementId: string
+): Promise<boolean> => {
+  const revision = await db.selectFrom('Funding_Case_Agreement_Revision as revision')
+    .innerJoin('Funding_Case_Agreement_Approval_Submission as submission', 'submission.id', 'revision.egcs_fc_approvalsubmission')
+    .innerJoin('Common_Runtime as runtime', 'runtime.id', 'submission.egcs_fc_workflowrun')
+    .select('revision.id')
+    .where('revision.egcs_fc_fundingagreement', '=', agreementId)
+    .where('revision.egcs_fc_revisionnumber', '=', 0)
+    .where('revision._deleted', '=', false)
+    .where('runtime.egcs_cn_entitytype', '=', 'fundingcaseagreement')
+    .where('runtime.egcs_cn_entityid', '=', agreementId)
+    .where('runtime.egcs_cn_kind', '=', 'workflow')
+    .where('runtime.egcs_cn_purpose', '=', 'approval_submission')
+    .where('runtime.egcs_cn_state', 'in', ['succeeded', 'approved'])
+    .where('runtime._deleted', '=', false)
+    .executeTakeFirst()
+  return revision !== undefined
+}
+
+export const throwAgreementInitialApprovalRequired = (event: H3Event) => throwApiError(event, {
+  statusCode: 409,
+  code: 'AGREEMENT_INITIAL_APPROVAL_REQUIRED',
+  key: 'apiErrors.agreement.initial_approval_required'
+})
+
 export const assertAgreementApprovalSubmissionUnlocked = async (
   event: H3Event,
   trx: Kysely<Database> | Transaction<Database>,

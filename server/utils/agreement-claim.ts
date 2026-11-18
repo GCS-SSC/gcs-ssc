@@ -48,6 +48,7 @@ import { parseMoney } from '~~/shared/utils/money'
 import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
+import { hasSuccessfulInitialAgreementApproval } from '~~/server/utils/agreement-approval-submission'
 
 type AgreementClaimDb = Kysely<Database> | Transaction<Database>
 
@@ -74,6 +75,7 @@ export const createAgreementClaimAggregate = async (
   agencyId: string,
   creatorId: string
 ): Promise<AgreementClaimAggregateCreateResult> => {
+  if (!await hasSuccessfulInitialAgreementApproval(trx, input.agreementId)) return { status: 'initial_approval_required' }
   if (!await isAgreementClaimProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) return { status: 'applicant_recipient_unavailable' }
   const currency = await resolveAgreementCurrency(trx, input.agreementId)
   if (!currency) return { status: 'agreement_unavailable' }

@@ -8,6 +8,7 @@ import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-
 import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { BusinessStatusViolation } from '~~/server/utils/business-status-runtime'
+import { throwAgreementInitialApprovalRequired } from '~~/server/utils/agreement-approval-submission'
 
 export default defineEventHandler(async event => {
   const prepared = await prepareAgreementClaimRoute(event, 'create')
@@ -33,6 +34,7 @@ export default defineEventHandler(async event => {
       submissionUuid: null,
       lineItems: []
     }, current.agencyId, creatorId)
+    if (result.status === 'initial_approval_required') return await throwAgreementInitialApprovalRequired(event)
     if (result.status === 'applicant_recipient_unavailable') return await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
     if (result.status === 'fiscal_year_unavailable') {
       return await badRequest(event, 'INVALID_AGREEMENT_CLAIM_FISCAL_YEAR', 'apiErrors.agreement.invalid_claim_fiscal_year')

@@ -1552,6 +1552,7 @@
       "claim_reconcile_lines_exist": "The claim linked to this reconciliation cannot be changed because reconciliation lines have already been recorded.",
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
       "currency_mismatch": "Currency must match the Agreement currency.",
+      "initial_approval_required": "Complete the initial Agreement approval submission before creating a Claim or Payment.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
       "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
       "forecast_cell_occupied": "A forecast line already exists for this budget line and month.",

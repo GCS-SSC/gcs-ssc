@@ -18,6 +18,7 @@ import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { allocateAgreementPayment } from '~~/server/utils/agreement-coding-allocator'
 import { prepareAgreementPaymentOffsetPlan, validateAgreementPaymentOffsetPlan } from '~~/server/utils/agreement-payment-offset-plan'
+import { hasSuccessfulInitialAgreementApproval, throwAgreementInitialApprovalRequired } from '~~/server/utils/agreement-approval-submission'
 
 export default defineEventHandler(async event => {
   const prepared = await prepareAgreementPaymentRoute(event, 'create')
@@ -29,6 +30,7 @@ export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementPaymentCreateSchema)
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext, auth) => {
+    if (!await hasSuccessfulInitialAgreementApproval(trx, agreementId)) return await throwAgreementInitialApprovalRequired(event)
     const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_paymentamount])
     await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency })
