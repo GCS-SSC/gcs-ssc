@@ -12,7 +12,16 @@ watch(() => text, () => {
 </script>
 
 <template>
-  <UTooltip v-model:open="open" :portal="portalTarget" :content="{ collisionBoundary: portalTarget === true ? undefined : portalTarget }" :text="text" disable-closing-trigger :ui="{ content: 'max-w-sm whitespace-pre-wrap text-sm', text: 'whitespace-pre-wrap' }">
+  <UTooltip
+    v-model:open="open"
+    :portal="portalTarget"
+    :content="{ side: 'top', collisionBoundary: portalTarget === true ? undefined : portalTarget }"
+    :text="text"
+    disable-closing-trigger
+    :ui="{
+      content: 'h-auto max-w-[min(24rem,var(--reka-tooltip-content-available-width))] rounded-lg px-4 py-3 text-sm leading-relaxed shadow-md',
+      text: 'overflow-visible whitespace-pre-wrap text-clip [overflow-wrap:anywhere]'
+    }">
     <button
       ref="trigger"
       type="button"
