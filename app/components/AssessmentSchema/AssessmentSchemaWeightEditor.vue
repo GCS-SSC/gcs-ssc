@@ -411,7 +411,7 @@ watch(
         <UFormField
           v-if="getAdjustableWeight().on.type === 'helpers'"
           :label="t('transfer_payment.helper_field')" required data-ui-target="assessment-schema.weight-editor.transfer_payment.helper_field">
-          <AssessmentSchemaHelperFieldSelect v-model="getAdjustableWeight().on.field" />
+          <AssessmentSchemaHelperFieldSelect v-model="getAdjustableWeight().on.field" :exclude-data-types="['id_list']" />
         </UFormField>
       </div>
 
@@ -495,7 +495,7 @@ watch(
           </UFormField>
 
           <UFormField v-if="scenario.on.type === 'helpers'" :label="t('transfer_payment.helper_field')" required data-ui-target="assessment-schema.weight-editor.scenario.helper-field">
-            <AssessmentSchemaHelperFieldSelect v-model="scenario.on.field" />
+            <AssessmentSchemaHelperFieldSelect v-model="scenario.on.field" :exclude-data-types="['id_list']" />
           </UFormField>
         </div>
 

@@ -8,6 +8,7 @@ import { resolveBusinessStatusProtection } from '~~/server/utils/business-status
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { hasRiskRatingRuns, isRiskRatingWorkflowManaged, resolveLatestRiskRating } from '~~/server/utils/agreement-risk-rating'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { resolveAgreementActivityDuration } from '~~/server/utils/agreement-activity'
 
 export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
@@ -65,7 +66,8 @@ export default defineEventHandler(async event => {
       can_edit: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true,
       can_edit_scope: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true,
       can_delete_documents: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true && actor.userAbilities.authorize('agreement', 'delete', context.scope),
-      can_cancel: hasUpdateRole && amendment.egcs_fc_isopen
+      can_cancel: hasUpdateRole && amendment.egcs_fc_isopen,
+      activity_date_range: await resolveAgreementActivityDuration(db, agreementId, amendmentId)
     }
   })
 })

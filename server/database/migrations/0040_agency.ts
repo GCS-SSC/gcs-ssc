@@ -379,6 +379,7 @@ CREATE TABLE "Agency_Profile" (
   "egcs_ay_claimreconciliationstartstatus" bigint,
   "egcs_ay_claimreconciliationfinalstatus" bigint,
   "egcs_ay_gwcoanumber" bigint NOT NULL,
+  "egcs_ay_requireconsistentproponenttype" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Profile_pkey" PRIMARY KEY (id)
 );
 

@@ -101,7 +101,7 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="state?.id ? t('workflow.edit_setup') : t('workflow.add_setup')" data-field-scope="agency.workflow-setup-modal">
+  <UModal v-model:open="open" :title="state?.id ? t('workflow.edit_setup') : t('workflow.add_setup')" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="agency.workflow-setup-modal">
     <template #body>
       <UForm v-if="state" v-bind="formSession" :state="state" :validate="validate" :validate-on="[]" class="space-y-5">
         <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype">

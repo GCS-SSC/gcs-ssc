@@ -420,6 +420,13 @@ CREATE TABLE "Funding_Case_Agreement_Amendment" (
   "egcs_fc_isopen" boolean DEFAULT true NOT NULL,
   "egcs_fc_changerisk" boolean DEFAULT false NOT NULL,
   "egcs_fc_proposedriskscore" numeric(8,2),
+  "egcs_fc_proposedtitle_en" character varying(255),
+  "egcs_fc_proposedtitle_fr" character varying(255),
+  CONSTRAINT fc_chk_amendmentproposedtitle CHECK (
+    (egcs_fc_proposedtitle_en IS NULL AND egcs_fc_proposedtitle_fr IS NULL)
+    OR (egcs_fc_proposedtitle_en IS NOT NULL AND egcs_fc_proposedtitle_fr IS NOT NULL
+      AND btrim(egcs_fc_proposedtitle_en) <> '' AND btrim(egcs_fc_proposedtitle_fr) <> '')
+  ),
   "egcs_fc_proposedauthorizedassistancestartdate" date,
   "egcs_fc_proposedauthorizedassistanceenddate" date,
   "_deleted" boolean DEFAULT false NOT NULL,

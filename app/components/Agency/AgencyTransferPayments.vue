@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onScopeDispose, watch } from 'vue'
-import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
 import { buildTransferPaymentProfileSaveRequest, completeTransferPaymentProfileSave } from '~/utils/transfer-payment-profile-save'
 import type { TransferPaymentProfileItem } from '~~/shared/types/schemas'
@@ -31,15 +31,11 @@ const { search, statusFilter, pagination, items, totalRecords, refresh, status }
 
 const columns: TableColumnInput<TransferPaymentProfileItem>[] = [
   { accessorKey: 'egcs_tp_name_en', headerKey: 'transfer_payment.title' },
-  { id: 'abbreviation', accessorKey: 'egcs_tp_abbreviation_en', headerKey: 'transfer_payment.abbreviation' },
   { accessorKey: 'egcs_tp_active', headerKey: 'transfer_payment.status' },
   { accessorKey: 'egcs_tp_datestart', headerKey: 'transfer_payment.start_date' },
   { accessorKey: 'egcs_tp_dateend', headerKey: 'transfer_payment.end_date' }
 ]
 
-const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileItem>[] = [
-  { id: 'abbreviation', accessorKey: { en: 'egcs_tp_abbreviation_en', fr: 'egcs_tp_abbreviation_fr' } }
-]
 const canCreateTransferPayment = computed(() =>
   can('transfer_payment', 'create', { type: 'agency', agencyId: String(agencyId) })
 )
@@ -155,7 +151,6 @@ const saveProfile = async () => {
       v-model:pagination="pagination"
       :data="items"
       :columns="columns"
-      :bilingual-columns="bilingualColumns"
       :total-records="totalRecords"
       :button-label="t('transfer_payment.new')"
       :show-button="canCreateTransferPayment"

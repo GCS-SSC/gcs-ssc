@@ -1,3 +1,4 @@
+import { findAssessmentBand } from '~~/shared/utils/assessment-scoring'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { FetchError } from 'ofetch'
@@ -84,7 +85,7 @@ const createOutcomeKey = (section: string, subsection: string, nameEn: string, n
 const getCurrentOverallResultOption = (
   scoringMatrixItems: ScoringMatrixItem[],
   weightedScore: number
-) => scoringMatrixItems.find(item => weightedScore <= item.max) ?? null
+) => findAssessmentBand(scoringMatrixItems, weightedScore) ?? null
 
 /**
  * Coordinates assessment detail page state, persistence, and runtime derivations.

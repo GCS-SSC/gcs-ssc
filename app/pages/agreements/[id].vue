@@ -680,6 +680,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <AgreementActivitiesTab
               v-else-if="selectedTab === 'activities'"
               :agreement-id="id"
+              :date-range="{ startDate: profile.egcs_fc_authorizedassistancestartdate, endDate: profile.egcs_fc_authorizedassistanceenddate }"
               :action-target="{ kind: 'agreement', agreementId: id }"
               :can-create="canCreateFinancialChildRole"
               :can-update="canUpdateFinancialChildRole"

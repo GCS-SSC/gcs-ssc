@@ -1,3 +1,4 @@
+import { canAdmitWorkflowForTarget } from './workflow-terminalization-admission'
 import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { assertAgreementPaymentCommitmentCurrent } from './agreement-payment-commitment-controls'
 import { extensionLifecycleAdapterContext,
@@ -39,6 +40,7 @@ import {
   AgreementApprovalSubmissionPromotionError,
   buildAgreementApprovalSnapshot,
   hashAgreementApprovalSnapshot,
+  readApprovalPacketTitle,
   type AgreementApprovalSnapshot
 } from './agreement-approval-submission'
 import { promoteApprovedAgreementAmendment, resolveAgreementAmendmentRuntimeContext } from './agreement-amendment'
@@ -434,7 +436,7 @@ const applyRiskRatingEffect = async (
   if (!review || !['succeeded', 'approved'].includes(review.egcs_cn_state) || !Number.isFinite(assessmentScore)) {
     return await fail('risk_rating_evidence_invalid')
   }
-  const band = mapping.bands.find(candidate => assessmentScore <= candidate.maximumScore)
+  const band = mapping.bands.toSorted((left, right) => left.maximumScore - right.maximumScore).find(candidate => assessmentScore <= candidate.maximumScore)
   if (!band) return await fail('risk_rating_score_out_of_range')
   if (run.egcs_cn_entitytype === 'fundingcaseamendment') {
     await trx.updateTable('Funding_Case_Agreement_Amendment')
@@ -520,6 +522,7 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
           budgetVersionId: packet.sourceVersions.budget,
           activityVersionId: packet.sourceVersions.activity,
           risk: packet.risk,
+          title: readApprovalPacketTitle(packet),
           duration: packet.amendment !== null && Object.hasOwn(packet.amendment, 'proposedAuthorizedAssistanceStartDate')
         }
       : undefined
@@ -1378,6 +1381,14 @@ const startWorkflowUnchecked = async (
   }
   if ('status' in targetStatus ? targetStatus.status.terminal : targetStatus.terminal) {
     return await badRequest(event, 'WORKFLOW_TARGET_TERMINAL', 'apiErrors.request.invalid_status')
+  }
+  if (!await canAdmitWorkflowForTarget(trx, context, setup, {
+    statusId: targetStatus.statusId,
+    terminal: 'status' in targetStatus ? targetStatus.status.terminal : targetStatus.terminal
+  })) {
+    return await throwApiError(event, {
+      statusCode: 409, code: 'WORKFLOW_TARGET_CLOSED', key: 'apiErrors.request.invalid_status'
+    })
   }
   if (context.entityType === 'fundingcasepayment') {
     await assertAgreementPaymentForecastCurrent(trx, context.entityId)

@@ -24,10 +24,10 @@ const navigationTotal = computed(() => cursor
       <CommonActionButton icon="i-lucide-chevron-left" color="neutral" variant="outline" :aria-label="t('common.pagination_previous')" />
     </template>
     <template #next>
-      <CommonActionButton icon="i-lucide-chevron-right" color="neutral" variant="outline" :aria-label="t('common.pagination_next')" :disabled="cursor ? !cursor.hasNextPage : undefined" />
+      <CommonActionButton icon="i-lucide-chevron-right" color="neutral" variant="outline" :aria-label="t('common.pagination_next')" v-bind="cursor ? { disabled: !cursor.hasNextPage } : {}" />
     </template>
     <template #last>
-      <CommonActionButton icon="i-lucide-chevrons-right" color="neutral" variant="outline" :aria-label="t('common.pagination_last')" :disabled="cursor ? true : undefined" />
+      <CommonActionButton icon="i-lucide-chevrons-right" color="neutral" variant="outline" :aria-label="t('common.pagination_last')" v-bind="cursor ? { disabled: true } : {}" />
     </template>
   </UPagination>
 </template>

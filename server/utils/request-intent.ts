@@ -1,4 +1,4 @@
-import { getHeader, getMethod, type H3Event } from 'h3'
+import { getHeader, getMethod, getRequestURL, type H3Event } from 'h3'
 import { useRuntimeConfig } from 'nitropack/runtime'
 import { resolveAuthRuntimeConfig } from './auth'
 import { throwApiError } from './api-errors'
@@ -34,6 +34,12 @@ export const requireBusinessRequestIntent = async (event: H3Event): Promise<void
   const referer = getHeader(event, 'referer')
   const isSerializedOrigin = origin === undefined || origin === parseHttpOrigin(origin)
   if (isSerializedOrigin && getHeader(event, 'sec-fetch-site') === 'same-origin') {
+    return
+  }
+
+  // HTTP LAN development pages do not receive secure-context Fetch Metadata.
+  if (process.env.NODE_ENV === 'development' && origin !== undefined && isSerializedOrigin
+    && origin === getRequestURL(event, { xForwardedHost: false, xForwardedProto: false }).origin) {
     return
   }
 

@@ -35,7 +35,7 @@ const runMigrations = async (db: DatabaseLease['database']): Promise<void> => {
     const migrationErrorMessage = error instanceof Error ? error.message : String(error)
     if (migrationErrorMessage.includes('corrupted migrations')) {
       console.error(
-        'Detected old migration history against compacted baseline. Run `bun run dev --clean` to reset local PGlite data.'
+        'Migration history does not match this application build. Preserve the database and verify the deployed migration journal and upgrade path before restarting.'
       )
     }
     throw error

@@ -4,6 +4,8 @@ import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertDraftAgreementAmendment, resolveDraftAgreementAmendmentBudgetVersion } from '~~/server/utils/agreement-amendment'
 import { FundingCaseAgreementAmendmentPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementTitleProposalSchema } from '~~/shared/types/schemas/funding-case-agreement'
+import { parseI18n } from '~~/server/utils/api-validate'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { assertAgreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import { dateOnlySql } from '~~/server/utils/database-date'
@@ -91,6 +93,21 @@ export default defineEventHandler(async event => {
     const budgetEnabled = types.some(type => ['budget', 'duration'].includes(type.egcs_tp_amended))
     const activitiesEnabled = types.some(type => type.egcs_tp_amended === 'activities')
     const durationEnabled = types.some(type => type.egcs_tp_amended === 'duration')
+    const titleEnabled = types.some(type => type.egcs_tp_amended === 'title')
+    const currentTitle = titleEnabled && !amendment.egcs_fc_proposedtitle_en && !amendment.egcs_fc_proposedtitle_fr
+      ? await trx.selectFrom('Funding_Case_Agreement_Profile').select(['egcs_fc_title_en', 'egcs_fc_title_fr'])
+          .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+      : null
+    const proposedTitle = titleEnabled
+      ? await parseI18n(event, FundingCaseAgreementTitleProposalSchema, {
+          egcs_fc_proposedtitle_en: body.egcs_fc_proposedtitle_en !== undefined
+            ? body.egcs_fc_proposedtitle_en
+            : amendment.egcs_fc_proposedtitle_en ?? currentTitle?.egcs_fc_title_en,
+          egcs_fc_proposedtitle_fr: body.egcs_fc_proposedtitle_fr !== undefined
+            ? body.egcs_fc_proposedtitle_fr
+            : amendment.egcs_fc_proposedtitle_fr ?? currentTitle?.egcs_fc_title_fr
+        })
+      : null
     const proposedStartDate = body.egcs_fc_proposedauthorizedassistancestartdate
       ?? amendment.egcs_fc_proposedauthorizedassistancestartdate
     const proposedEndDate = body.egcs_fc_proposedauthorizedassistanceenddate
@@ -148,6 +165,8 @@ export default defineEventHandler(async event => {
       egcs_fc_name_fr: body.egcs_fc_name_fr,
       egcs_fc_changerisk: riskWorkflowManaged ? true : body.egcs_fc_changerisk,
       egcs_fc_proposedriskscore: body.egcs_fc_proposedriskscore,
+      egcs_fc_proposedtitle_en: proposedTitle?.egcs_fc_proposedtitle_en ?? null,
+      egcs_fc_proposedtitle_fr: proposedTitle?.egcs_fc_proposedtitle_fr ?? null,
       egcs_fc_proposedauthorizedassistancestartdate: durationEnabled && proposedStartDate ? dateOnlySql(proposedStartDate) : null,
       egcs_fc_proposedauthorizedassistanceenddate: durationEnabled && proposedEndDate ? dateOnlySql(proposedEndDate) : null
     }).where('id', '=', amendmentId).where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()

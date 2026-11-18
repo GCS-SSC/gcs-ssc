@@ -11,6 +11,9 @@ import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreemen
 import type { SubmissionRisk } from '~~/shared/types/risk'
 import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { captureSubmissionRisk } from './risk-readiness'
+import { assertAgreementActivitiesWithinDuration } from './agreement-activity'
+import { FundingCaseAgreementTitleProposalSchema } from '~~/shared/types/schemas/funding-case-agreement'
+import { parseI18n } from './api-validate'
 
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
   'pending',
@@ -82,8 +85,25 @@ export const resolveApprovalPacketDomains = (
   agreement: entityType === 'fundingcaseagreement',
   budget: entityType === 'fundingcaseagreement' || amendedDomains.includes('budget'),
   activities: entityType === 'fundingcaseagreement' || amendedDomains.includes('activities'),
-  duration: entityType === 'fundingcaseagreement' || amendedDomains.includes('duration')
+  duration: entityType === 'fundingcaseagreement' || amendedDomains.includes('duration'),
+  title: entityType === 'fundingcaseamendment' && amendedDomains.includes('title')
 })
+
+/**
+ * Reads only explicitly captured Title scope; existing packets have no title effect.
+ * @param packet Immutable approval evidence.
+ * @returns The submitted title, or null when Title is outside the captured scope.
+ */
+export const readApprovalPacketTitle = (packet: AgreementApprovalSnapshot): { en: string, fr: string } | null => {
+  const title = packet.amendment?.proposedTitle
+  if (title === undefined) return null
+  const value = title !== null && typeof title === 'object' && !Array.isArray(title) ? title : {}
+  const parsed = FundingCaseAgreementTitleProposalSchema.parse({
+    egcs_fc_proposedtitle_en: value.en,
+    egcs_fc_proposedtitle_fr: value.fr
+  })
+  return { en: parsed.egcs_fc_proposedtitle_en, fr: parsed.egcs_fc_proposedtitle_fr }
+}
 
 const bilingualValue = (en: unknown, fr: unknown): Record<string, JsonValue> => ({
   en: normalizeValue(en),
@@ -240,6 +260,14 @@ export const buildAgreementApprovalSnapshot = async (
   const includesBudget = packetDomains.budget
   const includesActivities = packetDomains.activities
   const includesDuration = packetDomains.duration
+  const proposedTitle = packetDomains.title
+    ? previousPacket
+      ? readApprovalPacketTitle(previousPacket)
+      : await parseI18n(event, FundingCaseAgreementTitleProposalSchema, {
+          egcs_fc_proposedtitle_en: amendment?.egcs_fc_proposedtitle_en,
+          egcs_fc_proposedtitle_fr: amendment?.egcs_fc_proposedtitle_fr
+        }).then(title => ({ en: title.egcs_fc_proposedtitle_en, fr: title.egcs_fc_proposedtitle_fr }))
+    : null
   const budgetVersion = includesBudget
     ? amendment
       ? await trx.selectFrom('Funding_Case_Agreement_Budget_Version').selectAll()
@@ -276,6 +304,15 @@ export const buildAgreementApprovalSnapshot = async (
       code: 'AGREEMENT_AMENDMENT_ACTIVITY_SNAPSHOT_NOT_FOUND',
       key: 'apiErrors.agreement.amendment_activity_snapshot_not_found'
     })
+  }
+  if (includesActivities || includesDuration) {
+    const durationError = await assertAgreementActivitiesWithinDuration(event, trx, agreementId, {
+      startDate: includesDuration && amendment?.egcs_fc_proposedauthorizedassistancestartdate
+        ? amendment.egcs_fc_proposedauthorizedassistancestartdate : agreement.egcs_fc_authorizedassistancestartdate,
+      endDate: includesDuration && amendment?.egcs_fc_proposedauthorizedassistanceenddate
+        ? amendment.egcs_fc_proposedauthorizedassistanceenddate : agreement.egcs_fc_authorizedassistanceenddate
+    }, activityVersion ? String(activityVersion.id) : undefined)
+    if (durationError) return durationError
   }
   const [fiscalYears, lineItems, activities, amendmentSubtypes] = await Promise.all([
     budgetVersion ? trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
@@ -388,6 +425,7 @@ export const buildAgreementApprovalSnapshot = async (
     amendment: amendment ? normalizeRow({
       amendmentNumber: amendment.egcs_fc_amendmentnumber,
       name: bilingualValue(amendment.egcs_fc_name_en, amendment.egcs_fc_name_fr),
+      ...(proposedTitle ? { proposedTitle } : {}),
       ...(includesDuration
         ? {
             proposedAuthorizedAssistanceStartDate: amendment.egcs_fc_proposedauthorizedassistancestartdate,

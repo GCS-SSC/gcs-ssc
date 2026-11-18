@@ -19,7 +19,7 @@ type FinancialIdWarning = {
   resolve: (confirmed: boolean) => void
 }
 
-const { applicantRecipientId, canCreate, canUpdate, canDelete, canCreateRole = false, canUpdateRole = false, canDeleteRole = false } = defineProps<{
+const { applicantRecipientId, canCreateRole = false, canUpdateRole = false, canDeleteRole = false } = defineProps<{
   applicantRecipientId: string
   canCreate: boolean
   canUpdate: boolean
@@ -30,20 +30,18 @@ const { applicantRecipientId, canCreate, canUpdate, canDelete, canCreateRole = f
 }>()
 
 const { canAny } = useCan()
+// Role admission lets the fresh domain prerequisite check explain missing assignment.
 const createContext = useActionContext({
   identity: [() => applicantRecipientId],
-  authority: () => canAny('applicant_recipient', 'create', ['global', 'agency']) && canCreateRole,
-  eligible: () => canCreate
+  authority: () => canAny('applicant_recipient', 'create', ['global', 'agency']) && canCreateRole
 })
 const updateContext = useActionContext({
   identity: [() => applicantRecipientId],
-  authority: () => canAny('applicant_recipient', 'update', ['global', 'agency']) && canUpdateRole,
-  eligible: () => canUpdate
+  authority: () => canAny('applicant_recipient', 'update', ['global', 'agency']) && canUpdateRole
 })
 const deleteContext = useActionContext({
   identity: [() => applicantRecipientId],
-  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']) && canDeleteRole,
-  eligible: () => canDelete
+  authority: () => canAny('applicant_recipient', 'delete', ['global', 'agency']) && canDeleteRole
 })
 const resourceAction = { kind: 'remote', create: createContext, update: updateContext, delete: deleteContext } satisfies import('~/composables/useResourceCrudState').ResourceCrudAction
 

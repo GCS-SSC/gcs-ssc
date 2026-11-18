@@ -2,7 +2,7 @@ import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { badRequest } from './api-errors'
-import { isAssignableGroup } from './groups'
+import { isAssignableGroup } from './group-eligibility'
 
 /**
  * Rejects a group that is deleted, empty, or outside the template agency.

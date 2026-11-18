@@ -32,7 +32,7 @@ const AnswerDependencySchema = z.object({
 
 const DependencyOnSchema = z.discriminatedUnion('type', [HelpersDependencySchema, AnswerDependencySchema])
 
-const DependencyValueSchema = z.boolean().or(z.coerce.number().or(z.string()))
+const DependencyValueSchema = z.boolean().or(z.number().or(z.string()))
 const RequiredEnFrLabelSchema = EnFrLabelSchema.extend({
   en: z.string().trim().min(1, 'validation.required'),
   fr: z.string().trim().min(1, 'validation.required')
@@ -44,24 +44,26 @@ export const ScoringMatrixItemSchema = z.object({
   indicator: z.string().regex(/^#(?:[0-9A-Fa-f]{3}){1,2}$/, 'validation.invalid_hex_color')
 })
 
-const validateStrictlyIncreasingMaxima = (
+const validateUniqueMaxima = (
   rows: Array<{ max: number }>,
   ctx: z.RefinementCtx,
   path: Array<string | number>
 ) => {
+  const maxima = new Set<number>()
   rows.forEach((row, index) => {
-    if (index > 0 && row.max <= (rows[index - 1]?.max ?? Number.NEGATIVE_INFINITY)) {
+    if (maxima.has(row.max)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'validation.scoring_matrix_order',
+        message: 'validation.scoring_matrix_unique',
         path: [...path, index, 'max']
       })
     }
+    maxima.add(row.max)
   })
 }
 
 export const AssessmentScoringMatrixSchema = z.array(ScoringMatrixItemSchema).superRefine((rows, ctx) => {
-  validateStrictlyIncreasingMaxima(rows, ctx, [])
+  validateUniqueMaxima(rows, ctx, [])
 })
 
 const OutcomeOptionSchema = z.object({
@@ -108,9 +110,12 @@ const OptionSchema = z.object({
 })
 
 const DependencySchemaBase = z.object({
-  on: DependencyOnSchema,
+  on: HelpersDependencySchema,
   value: DependencyValueSchema
-})
+}).or(z.object({
+  on: AnswerDependencySchema,
+  value: z.boolean().or(z.coerce.number().or(z.string()))
+}))
 
 const DependencySchema = DependencySchemaBase.or(z.array(DependencySchemaBase))
 
@@ -183,14 +188,14 @@ const AssessmentDefinitionSchema = z.object({
   if (calculationCount > ASSESSMENT_CALCULATION_LIMITS.calculations) {
     ctx.addIssue({ code: 'custom', message: 'validation.calculation_resource_limit', path: ['sections'] })
   }
-  validateStrictlyIncreasingMaxima(value.sectionMatrix, ctx, ['sectionMatrix'])
+  validateUniqueMaxima(value.sectionMatrix, ctx, ['sectionMatrix'])
   value.outcomes.forEach((outcome, outcomeIndex) => {
     outcome.strategies.forEach((strategy, strategyIndex) => {
-      validateStrictlyIncreasingMaxima(strategy.options, ctx, ['outcomes', outcomeIndex, 'strategies', strategyIndex, 'options'])
+      validateUniqueMaxima(strategy.options, ctx, ['outcomes', outcomeIndex, 'strategies', strategyIndex, 'options'])
     })
   })
   value.impactors?.forEach((impactor, impactorIndex) => {
-    validateStrictlyIncreasingMaxima(impactor.scoringMatrix, ctx, ['impactors', impactorIndex, 'scoringMatrix'])
+    validateUniqueMaxima(impactor.scoringMatrix, ctx, ['impactors', impactorIndex, 'scoringMatrix'])
   })
 })
 
@@ -302,7 +307,10 @@ const validateAdjustableWeightTarget = (
     return
   }
 
-  validateHelperField(entityType, weightRecord.on.field, ctx, [...path, 'on', 'field'])
+  const helper = validateHelperField(entityType, weightRecord.on.field, ctx, [...path, 'on', 'field'])
+  if (helper?.dataType === 'id_list') {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_helper_field', path: [...path, 'on', 'field'] })
+  }
 }
 
 export const createAssessmentDefinitionSchemaForEntityType = (entityType: Entity_Type) => AssessmentDefinitionSchema.superRefine((value, ctx) => {
@@ -388,7 +396,10 @@ export const createAssessmentDefinitionSchemaForEntityType = (entityType: Entity
       return
     }
 
-    validateHelperField(entityType, impactor.on.field, ctx, ['impactors', impactorIndex, 'on', 'field'])
+    const helper = validateHelperField(entityType, impactor.on.field, ctx, ['impactors', impactorIndex, 'on', 'field'])
+    if (helper?.dataType === 'id_list') {
+      ctx.addIssue({ code: 'custom', message: 'validation.invalid_helper_field', path: ['impactors', impactorIndex, 'on', 'field'] })
+    }
   })
   const itemPathByKey = new Map(calculationItems.map(item => [item.key, item.path]))
   const calculationGraphValidation = validateAssessmentCalculationGraph(

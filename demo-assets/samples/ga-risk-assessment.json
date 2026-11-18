@@ -1,0 +1,1097 @@
+{
+  "sections": [
+    {
+      "name": "risk-factor-1",
+      "number": "1",
+      "label": {
+        "en": "Governance",
+        "fr": "Gouvernance"
+      },
+      "icon": "i-lucide-shield-check",
+      "weight": 0.25,
+      "subSections": [
+        {
+          "name": "consideration-1",
+          "label": {
+            "en": "HR Capacity",
+            "fr": "Capacité des ressources humaines"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.5
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Does the organization have enough qualified staff and backup coverage to deliver the proposed activities?",
+                "fr": "L’organisation dispose-t-elle de personnel qualifié en nombre suffisant et de remplaçants pour réaliser les activités proposées?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-2",
+          "label": {
+            "en": "Governance Management Structure",
+            "fr": "Structure de gouvernance et de gestion"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.5
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are decision-making authority, oversight responsibilities and conflict-of-interest controls clearly documented?",
+                "fr": "Les pouvoirs décisionnels, les responsabilités de surveillance et les contrôles des conflits d’intérêts sont-ils clairement documentés?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "risk-factor-2",
+      "number": "2",
+      "label": {
+        "en": "Performance History",
+        "fr": "Historique du rendement"
+      },
+      "icon": "i-lucide-shield-check",
+      "weight": 0.25,
+      "subSections": [
+        {
+          "name": "consideration-1",
+          "label": {
+            "en": "History",
+            "fr": "Historique"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.5
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Has the organization consistently met previous funding obligations, reporting deadlines and project commitments?",
+                "fr": "L’organisation a-t-elle respecté ses obligations de financement, ses échéances de rapports et ses engagements antérieurs?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-2",
+          "label": {
+            "en": "Experience with proposed activities",
+            "fr": "Expérience des activités proposées"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.5
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Has the organization successfully delivered activities of a similar scope and scale?",
+                "fr": "L’organisation a-t-elle réalisé avec succès des activités de portée et d’envergure comparables?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "risk-factor-3",
+      "number": "3",
+      "label": {
+        "en": "Financial Stability",
+        "fr": "Stabilité financière"
+      },
+      "icon": "i-lucide-shield-check",
+      "weight": 0.25,
+      "subSections": [
+        {
+          "name": "consideration-1",
+          "label": {
+            "en": "Financial and Operational Capacity",
+            "fr": "Capacité financière et opérationnelle"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.3333333333333333
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are cash flow, financial controls and operational resources sufficient to deliver the project?",
+                "fr": "La trésorerie, les contrôles financiers et les ressources opérationnelles suffisent-ils à réaliser le projet?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-2",
+          "label": {
+            "en": "Results of Last Audit",
+            "fr": "Résultats du dernier audit"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.3333333333333333
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Does the most recent audit provide assurance without unresolved significant findings?",
+                "fr": "Le dernier audit fournit-il une assurance sans constatation importante non résolue?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-3",
+          "label": {
+            "en": "Support from other sources",
+            "fr": "Soutien provenant d’autres sources"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.3333333333333333
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are other funding commitments and in-kind contributions confirmed and reliable?",
+                "fr": "Les autres engagements de financement et contributions en nature sont-ils confirmés et fiables?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "risk-factor-4",
+      "number": "4",
+      "label": {
+        "en": "Planning and Project Complexity",
+        "fr": "Planification et complexité du projet"
+      },
+      "icon": "i-lucide-shield-check",
+      "weight": 0.25,
+      "subSections": [
+        {
+          "name": "consideration-1",
+          "label": {
+            "en": "Materiality",
+            "fr": "Importance relative"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Is the requested funding proportionate to the organization’s demonstrated delivery capacity?",
+                "fr": "Le financement demandé est-il proportionnel à la capacité de réalisation démontrée de l’organisation?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-2",
+          "label": {
+            "en": "Complexity",
+            "fr": "Complexité"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are project dependencies, partners and technical requirements manageable with the proposed controls?",
+                "fr": "Les dépendances, les partenaires et les exigences techniques du projet sont-ils gérables avec les contrôles proposés?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-3",
+          "label": {
+            "en": "Feasibility of submission",
+            "fr": "Faisabilité de la proposition"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are the proposed timeline, budget and work plan realistic and supported by evidence?",
+                "fr": "Le calendrier, le budget et le plan de travail proposés sont-ils réalistes et étayés?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-4",
+          "label": {
+            "en": "Ability to Evaluate / Analyze Results",
+            "fr": "Capacité à évaluer et à analyser les résultats"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are measurable indicators, baseline data and evaluation responsibilities clearly defined?",
+                "fr": "Les indicateurs mesurables, les données de référence et les responsabilités d’évaluation sont-ils clairement définis?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-5",
+          "label": {
+            "en": "Alignment with Program Objectives",
+            "fr": "Concordance avec les objectifs du programme"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Do the proposed activities and expected results clearly support the program objectives?",
+                "fr": "Les activités proposées et les résultats attendus appuient-ils clairement les objectifs du programme?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-6",
+          "label": {
+            "en": "Sustainability",
+            "fr": "Pérennité"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Is there a credible plan to sustain the benefits after this funding ends?",
+                "fr": "Existe-t-il un plan crédible pour maintenir les retombées après la fin du financement?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-7",
+          "label": {
+            "en": "Sense of Unknown",
+            "fr": "Incertitude"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Have key uncertainties been identified and addressed through contingency plans?",
+                "fr": "Les principales incertitudes ont-elles été recensées et prises en compte dans des plans de contingence?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        },
+        {
+          "name": "consideration-8",
+          "label": {
+            "en": "Sensitivity",
+            "fr": "Sensibilité"
+          },
+          "weight": {
+            "adjustable": false,
+            "weight": 0.125
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "risk-rating",
+              "question": {
+                "en": "Are reputational, public-interest and stakeholder concerns identified and adequately managed?",
+                "fr": "Les enjeux de réputation, d’intérêt public et des parties prenantes sont-ils recensés et bien gérés?"
+              },
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 3
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Yes. Evidence is complete and controls are effective.",
+                    "fr": "Oui. Les preuves sont complètes et les contrôles sont efficaces."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Medium risk",
+                    "fr": "Risque moyen"
+                  },
+                  "description": {
+                    "en": "Partly. Some gaps exist, with a credible mitigation plan.",
+                    "fr": "En partie. Des lacunes existent et un plan d’atténuation crédible est prévu."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No, or insufficient evidence. Significant gaps remain.",
+                    "fr": "Non, ou preuves insuffisantes. Des lacunes importantes subsistent."
+                  }
+                }
+              ],
+              "help": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sectionMatrix": [
+    {
+      "max": 1,
+      "label": {
+        "en": "Low risk",
+        "fr": "Risque faible"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 2,
+      "label": {
+        "en": "Medium risk",
+        "fr": "Risque moyen"
+      },
+      "indicator": "#D97706"
+    },
+    {
+      "max": 3,
+      "label": {
+        "en": "High risk",
+        "fr": "Risque élevé"
+      },
+      "indicator": "#DC2626"
+    }
+  ],
+  "outcomes": [
+    {
+      "name": "monitoring",
+      "label": {
+        "en": "Recommended monitoring",
+        "fr": "Surveillance recommandée"
+      },
+      "strategies": [
+        {
+          "name": "monitoring-level",
+          "label": {
+            "en": "Monitoring approach",
+            "fr": "Approche de surveillance"
+          },
+          "options": [
+            {
+              "max": 1,
+              "value": "standard",
+              "label": {
+                "en": "Standard monitoring",
+                "fr": "Surveillance normale"
+              }
+            },
+            {
+              "max": 2,
+              "value": "enhanced",
+              "label": {
+                "en": "Enhanced monitoring and mitigation follow-up",
+                "fr": "Surveillance accrue et suivi des mesures d’atténuation"
+              }
+            },
+            {
+              "max": 3,
+              "value": "intensive",
+              "label": {
+                "en": "Intensive monitoring and management review",
+                "fr": "Surveillance intensive et examen par la direction"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

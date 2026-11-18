@@ -61,9 +61,10 @@ export default defineEventHandler(async event => {
         return await badRequest(event, 'INVALID_AGREEMENT_AMENDMENT_SUBTYPE', 'apiErrors.agreement.invalid_amendment_subtype')
       }
       const agreementRisk = await trx.selectFrom('Funding_Case_Agreement_Profile')
-        .select('egcs_fc_riskscore').where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+        .select(['egcs_fc_riskscore', 'egcs_fc_title_en', 'egcs_fc_title_fr']).where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
       const riskWorkflowManaged = await isRiskRatingWorkflowManaged(trx, { streamId: current.streamId, entityType: 'fundingcaseamendment' })
       const durationEnabled = types.some(type => type.egcs_tp_amended === 'duration')
+      const titleEnabled = types.some(type => type.egcs_tp_amended === 'title')
       const agreementDates = durationEnabled
         ? await trx.selectFrom('Funding_Case_Agreement_Profile')
             .select(['egcs_fc_authorizedassistancestartdate', 'egcs_fc_authorizedassistanceenddate'])
@@ -88,6 +89,8 @@ export default defineEventHandler(async event => {
         egcs_fc_status: draftStatusId,
         egcs_fc_changerisk: riskWorkflowManaged,
         egcs_fc_proposedriskscore: agreementRisk.egcs_fc_riskscore ?? null,
+        egcs_fc_proposedtitle_en: titleEnabled ? agreementRisk.egcs_fc_title_en : null,
+        egcs_fc_proposedtitle_fr: titleEnabled ? agreementRisk.egcs_fc_title_fr : null,
         egcs_fc_proposedauthorizedassistancestartdate: agreementDates?.egcs_fc_authorizedassistancestartdate
           ? dateOnlySql(agreementDates.egcs_fc_authorizedassistancestartdate)
           : undefined,

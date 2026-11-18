@@ -11,7 +11,7 @@ import type {
 } from '~~/shared/types/database'
 import type { TransferPaymentStreamReviewSetupMemberPatchSchema } from '~~/shared/types/schemas'
 import { badRequest, notFound, throwApiError } from './api-errors'
-import { isAssignableGroup } from './groups'
+import { isAssignableGroup } from './group-eligibility'
 import {
   validateReviewSchemasForAgency
 } from './transfer-payment-polymorphic'

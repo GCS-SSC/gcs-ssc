@@ -222,7 +222,7 @@ export const resolveLatestRiskRating = async (db: DbClient, target: RiskRatingTa
     ? Number.NaN
     : parseSafeDecimal(String(review.egcs_cn_reviewresult))
   const band = Number.isFinite(assessmentScore)
-    ? mapping.bands.find(candidate => assessmentScore <= candidate.maximumScore)
+    ? mapping.bands.toSorted((left, right) => left.maximumScore - right.maximumScore).find(candidate => assessmentScore <= candidate.maximumScore)
     : undefined
   return { runtimeId: String(run.id), status: run.egcs_cn_state, completedAt: run.egcs_cn_completedat,
     workflowName: { en: configuration.nameEn, fr: configuration.nameFr },

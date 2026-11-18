@@ -8,19 +8,56 @@ import {
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
-import { FundingCaseAgreementActivityBaseSchema, FundingCaseAgreementActivityPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementActivityPatchSchema } from '~~/shared/types/schemas'
 import type { Database, FundingCaseAgreementActivityTable } from '~~/shared/types/database'
 import type { FundingCaseAgreementActivityPatch } from '~~/shared/types/schemas'
+import { createAgreementActivityDateRangeSchema } from '~~/shared/types/schemas/agreement-activity'
+import { resolveAgreementAmendmentEffectiveDuration } from './agreement-fiscal-year-duration'
+import type { AgreementActivityDuration } from '~~/shared/types/schemas/agreement-activity'
+import { dateOnlySql } from './database-date'
 
 type AgreementDb = Kysely<Database> | Transaction<Database>
 
-const activityDateRangeSchema = FundingCaseAgreementActivityBaseSchema.pick({
-  egcs_fc_startdate: true,
-  egcs_fc_enddate: true
-}).refine(data => data.egcs_fc_startdate <= data.egcs_fc_enddate, {
-  message: 'validation.date_range',
-  path: ['egcs_fc_enddate']
-})
+export const resolveAgreementActivityDuration = async (db: AgreementDb, agreementId: string, amendmentId?: string) =>
+  amendmentId
+    ? await resolveAgreementAmendmentEffectiveDuration(db, amendmentId)
+    : await db.selectFrom('Funding_Case_Agreement_Profile')
+        .select(['egcs_fc_authorizedassistancestartdate as startDate', 'egcs_fc_authorizedassistanceenddate as endDate'])
+        .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+
+export const validateAgreementActivityDates = async (
+  event: H3Event,
+  db: AgreementDb,
+  agreementId: string,
+  dates: { egcs_fc_startdate: Date; egcs_fc_enddate: Date },
+  amendmentId?: string
+) => await parseI18n(event, createAgreementActivityDateRangeSchema(
+  await resolveAgreementActivityDuration(db, agreementId, amendmentId)
+), dates)
+
+export const assertAgreementActivitiesWithinDuration = async (
+  event: H3Event,
+  db: AgreementDb,
+  agreementId: string,
+  duration: AgreementActivityDuration,
+  versionId?: string
+) => {
+  let query = db.selectFrom('Funding_Case_Agreement_Activity')
+    .innerJoin('Funding_Case_Agreement_Activity_Version', 'Funding_Case_Agreement_Activity_Version.id', 'Funding_Case_Agreement_Activity.egcs_fc_activityversion')
+    .select('Funding_Case_Agreement_Activity.id')
+    .where('Funding_Case_Agreement_Activity.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Funding_Case_Agreement_Activity._deleted', '=', false)
+    .where('Funding_Case_Agreement_Activity_Version._deleted', '=', false)
+  query = versionId
+    ? query.where('Funding_Case_Agreement_Activity_Version.id', '=', versionId)
+    : query.where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true)
+  const outside = await query.where(eb => eb.or([
+    eb('Funding_Case_Agreement_Activity.egcs_fc_startdate', '<', dateOnlySql(duration.startDate)),
+    eb('Funding_Case_Agreement_Activity.egcs_fc_enddate', '>', dateOnlySql(duration.endDate))
+  ])).executeTakeFirst()
+  if (outside) return await badRequest(event, 'AGREEMENT_ACTIVITY_OUTSIDE_DURATION', 'apiErrors.agreement.activity_outside_duration')
+  return null
+}
 
 export type AgreementActivityOutcomeTag = {
   id: string
@@ -475,13 +512,9 @@ export const patchAgreementActivity = async (
   }
 
   if (Object.hasOwn(validated, 'egcs_fc_startdate') || Object.hasOwn(validated, 'egcs_fc_enddate')) {
-    await parseI18n(event, activityDateRangeSchema, {
-      egcs_fc_startdate: Object.hasOwn(validated, 'egcs_fc_startdate')
-        ? validated.egcs_fc_startdate
-        : existing.egcs_fc_startdate,
-      egcs_fc_enddate: Object.hasOwn(validated, 'egcs_fc_enddate')
-        ? validated.egcs_fc_enddate
-        : existing.egcs_fc_enddate
+    await validateAgreementActivityDates(event, db, agreementId, {
+      egcs_fc_startdate: validated.egcs_fc_startdate ?? existing.egcs_fc_startdate,
+      egcs_fc_enddate: validated.egcs_fc_enddate ?? existing.egcs_fc_enddate
     })
   }
 

@@ -71,6 +71,14 @@ export const isWorkflowOwnerPublicationFailure = (error: unknown): boolean =>
     'Workflow data collection accepts at most one matching owner mapping'
   ].includes(error.message)
 
+/**
+ * Identifies approval-submission graphs whose final success status needs correction.
+ * @param error Publication failure.
+ * @returns Whether the author must choose a terminal final success status.
+ */
+export const isWorkflowTerminalSuccessPublicationFailure = (error: unknown): boolean =>
+  error instanceof Error && error.message === 'Workflow approval-submission success must produce a terminal status for this entity type'
+
 export const isExpectedPublicationFailure = (error: unknown): boolean =>
   isRiskSourcePublicationFailure(error) || isWorkflowOwnerPublicationFailure(error) || (error instanceof Error && publicationFailurePatterns.some(pattern => pattern.test(error.message)))
 

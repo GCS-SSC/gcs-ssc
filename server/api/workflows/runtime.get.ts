@@ -1,3 +1,4 @@
+import { canAdmitWorkflowForTarget } from '~~/server/utils/workflow-terminalization-admission'
 import { defineEventHandler } from 'h3'
 import { getRiskReadiness } from '~~/server/utils/risk-readiness'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
@@ -94,7 +95,9 @@ export default defineEventHandler(async event => {
   const riskReadiness = query.purpose === 'approval_submission' && context.entityType === 'fundingcaseagreement'
     ? await getRiskReadiness(event.context.$db, { entityType: context.entityType, entityId: context.entityId })
     : null
-  const targetOpen = context.isOpen !== false
+  const targetOpen = context.isOpen !== false || (await Promise.all(setups.map(candidate =>
+    canAdmitWorkflowForTarget(event.context.$db, context, candidate, { statusId: targetStatus, terminal: targetTerminal })
+  ))).some(Boolean)
   const canStart = !riskFrozen && riskReadiness?.ready !== false && Boolean(purposeCanStart) && targetOpen && !targetTerminal && !hasActiveRuntime && Boolean(
     targetStatus
     && setups.some(candidate => isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus))

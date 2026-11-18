@@ -117,8 +117,21 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
           type="single"
           orientation="vertical"
           :ui="{
-            link: `font-black uppercase tracking-widest text-xs py-3 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg transition-colors data-[active]:text-primary dark:data-[active]:text-blue-300 data-[active]:bg-primary/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
-          }" />
+            link: `font-black uppercase tracking-widest text-xs py-3 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg transition-colors data-[active]:text-primary dark:data-[active]:text-blue-300 data-[active]:bg-primary/5 data-[active]:before:bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
+          }">
+          <template #item-leading="{ item, active, ui }">
+            <span
+              v-if="active"
+              aria-hidden="true"
+              data-slot="linkBackground"
+              class="pointer-events-none absolute inset-x-0 inset-y-px -z-1 rounded-md bg-elevated" />
+            <UIcon
+              v-if="item.icon"
+              :name="item.icon"
+              data-slot="linkLeadingIcon"
+              :class="ui.linkLeadingIcon({ class: item.ui?.linkLeadingIcon, active, disabled: !!item.disabled })" />
+          </template>
+        </CommonNavigationMenu>
 
         <CommonNavigationMenu
           :label="t('nav.secondary_navigation')"

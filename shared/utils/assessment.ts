@@ -1,3 +1,6 @@
+import { findAssessmentBand } from './assessment-scoring'
+import { assessmentValuesEqual, findAssessmentHelperBand, resolveAssessmentHelperWeight } from './assessment-helper-values'
+import { isCanonicalMoney } from './money'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- typed runtime helpers expose their contracts through explicit signatures */
 import type {
   AssessmentDefinition,
@@ -107,7 +110,7 @@ const getScoreLabel = (scoringMatrixItems: ScoringMatrixItem[], score?: number):
     return EMPTY_LABEL
   }
 
-  return scoringMatrixItems.find(item => score <= item.max)?.label ?? EMPTY_LABEL
+  return findAssessmentBand(scoringMatrixItems, score)?.label ?? EMPTY_LABEL
 }
 
 /** Resolves the configured color indicator for a numeric score. */
@@ -116,7 +119,7 @@ const getScoreIndicator = (scoringMatrixItems: ScoringMatrixItem[], score?: numb
     return ''
   }
 
-  return scoringMatrixItems.find(item => score <= item.max)?.indicator ?? ''
+  return findAssessmentBand(scoringMatrixItems, score)?.indicator ?? ''
 }
 
 /** Indexes answer rows by section, subsection, and question identity. */
@@ -187,7 +190,7 @@ const evaluateDependencyClause = (
     return true
   }
 
-  return currentValue === clause.value
+  return assessmentValuesEqual(currentValue, clause.value)
 }
 
 /** Evaluates a dependency group, supporting OR groups inside an AND list. */
@@ -295,10 +298,7 @@ const resolveWeight = (
   if (Array.isArray(weightConfig)) {
     return normalizeNumber(weightConfig[1].reduce((acc, current) => {
       const dependencyValue = getDependencyValue(answerValueMap, helpers, current.on)
-      const normalizedDependency = dependencyValue === undefined || dependencyValue === null
-        ? undefined
-        : String(dependencyValue)
-      const currentWeight = normalizedDependency ? current.weights[normalizedDependency] : undefined
+      const currentWeight = resolveAssessmentHelperWeight(dependencyValue, current.weights)
 
       if (currentWeight === undefined) {
         return acc
@@ -310,11 +310,7 @@ const resolveWeight = (
 
   if (weightConfig.adjustable) {
     const dependencyValue = getDependencyValue(answerValueMap, helpers, weightConfig.on)
-    const normalizedDependency = dependencyValue === undefined || dependencyValue === null
-      ? undefined
-      : String(dependencyValue)
-
-    return normalizeNumber(normalizedDependency ? weightConfig.weights[normalizedDependency] ?? 0 : 0)
+    return normalizeNumber(resolveAssessmentHelperWeight(dependencyValue, weightConfig.weights) ?? 0)
   }
 
   return normalizeNumber(weightConfig.weight)
@@ -492,12 +488,12 @@ export const calculateScore = (
 
   const impactors = (schema.impactors ?? []).reduce<AssessmentRuntimeImpactorScore[]>((acc, impactor) => {
     const dependencyValue = getDependencyValue(resolvedAnswerValueMap, helperValues, impactor.on)
-    const normalizedDependency = typeof dependencyValue === 'number'
+    const normalizedDependency = isCanonicalMoney(dependencyValue)
       ? dependencyValue
-      : Number(dependencyValue)
-    const impactorBand = Number.isFinite(normalizedDependency)
-      ? impactor.scoringMatrix.find(item => normalizedDependency <= item.max)?.value ?? 0
-      : 0
+      : typeof dependencyValue === 'number'
+        ? dependencyValue
+        : Number(dependencyValue)
+    const impactorBand = findAssessmentHelperBand(impactor.scoringMatrix, normalizedDependency)?.value ?? 0
     const score = normalizeNumber(impactorBand * impactor.weight)
     const indicator = getScoreIndicator(schema.sectionMatrix, impactorBand)
 
@@ -556,7 +552,7 @@ const buildApplicableOutcome = (
   outcomeMap: Map<string, AssessmentResponseOutcome>,
   score: AssessmentRuntimeScore
 ): AssessmentRuntimeGeneratedOutcome => {
-  const recommendedOption = strategy.options.find(option => score.weightedScore <= option.max) ?? strategy.options.at(-1)
+  const recommendedOption = findAssessmentBand(strategy.options, score.weightedScore) ?? strategy.options.reduce<typeof strategy.options[number] | undefined>((highest, option) => !highest || option.max > highest.max ? option : highest, undefined)
   const savedOutcome = outcomeMap.get(
     buildOutcomeKey(outcomeGroup.name, strategy.name, strategy.label.en, strategy.label.fr)
   )

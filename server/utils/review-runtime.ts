@@ -5,7 +5,8 @@ import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import type { CommonScopeEntityType, Database, Entity_Type, JsonValue } from '~~/shared/types/database'
 import { badRequest, notFound } from './api-errors'
 import { createPrimaryEntityAssignment } from './entity-assignment'
-import { isAssignableGroup } from './groups'
+import { captureAssessmentHelpers } from './assessment-helper-capture'
+import { isAssignableGroup } from './group-eligibility'
 import { readPublishedReviewSetup, type PublishedReviewSetupConfiguration, type PublishedReviewSetupMember } from './review-setup-versioning'
 import { readPublishedReviewSchema, type PublishedReviewSchemaDefinition } from './review-schema-versioning'
 import { createRuntime, createRuntimeItem, reduceRuntimeState, retryRuntime, transitionRuntime, transitionRuntimeItem } from './system-runtime'
@@ -376,7 +377,7 @@ export const fetchRuntimeReviewSetWithReviews = async (
 
 const insertReview = async (
   db: Transaction<Database>,
-  input: { runtimeId: string, setItemId: string, setId: string, member: LockedMember, actorId: string, groupAssignmentMode?: 'creator_primary' | 'group_only' }
+  input: { runtimeId: string, setItemId: string, setId: string, member: LockedMember, actorId: string, entityType: Entity_Type, entityId: string, groupAssignmentMode?: 'creator_primary' | 'group_only' }
 ) => {
   const runtimeItemId = await createRuntimeItem(db, {
     egcs_cn_runtime: input.runtimeId,
@@ -390,7 +391,11 @@ const insertReview = async (
   })
   const definition = input.member.schemaDefinition
   const review = await db.insertInto('Common_Review').values({
-    egcs_cn_helpers: null,
+    egcs_cn_helpers: definition.reviewType === 'assessment'
+      ? await captureAssessmentHelpers(db, {
+          entityType: input.entityType, entityId: input.entityId, assessmentSchema: definition.assessmentSchema
+        })
+      : null,
     egcs_cn_reviewresult: definition.reviewType === 'assessment' ? 0 : null,
     egcs_cn_reviewset: input.setId,
     egcs_cn_reviewschema: input.member.schemaId,
@@ -493,6 +498,7 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
         ? { defaultGroupId: input.groupByMemberId.get(member.memberId), defaultOwnerId: undefined }
         : {}) },
       actorId: input.creatorCommonUserId,
+      entityType: input.entityType, entityId: input.entityId,
       groupAssignmentMode: input.groupByMemberId?.has(member.memberId) ? 'group_only' : input.groupAssignmentMode
     }))
   }
@@ -885,6 +891,7 @@ export const cloneDeniedRuntimeReview = async (
   }
   const sourceReviews = await db.selectFrom('Common_Review')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review.egcs_cn_runtimeitem')
+    .innerJoin('Common_Publication_Version as Schema_Version', 'Schema_Version.id', 'Common_Runtime_Item.egcs_cn_publicationversion')
     .leftJoin('Common_Entity_Assignment', join => join
       .onRef('Common_Entity_Assignment.egcs_cn_entityid', '=', 'Common_Review.id')
       .on('Common_Entity_Assignment.egcs_cn_entitytype', '=', 'commonreview')
@@ -900,6 +907,7 @@ export const cloneDeniedRuntimeReview = async (
       'Common_Review.egcs_cn_failurethreshold',
       'Common_Runtime_Item.egcs_cn_order as itemOrder',
       'Common_Runtime_Item.egcs_cn_state as itemState',
+      'Schema_Version.egcs_cn_definition as schemaDefinition',
       'Common_Entity_Assignment.egcs_cn_user as primaryUserId'
     ])
     .where('Common_Review.egcs_cn_reviewset', '=', reviewSetId)
@@ -960,8 +968,14 @@ export const cloneDeniedRuntimeReview = async (
     const successorItem = successorItems.find(item => item.egcs_cn_kind === 'review'
       && parseSafeDecimal(String(item.egcs_cn_order)) === parseSafeDecimal(String(sourceReview.itemOrder)))
     if (!successorItem) throw new Error('Review-set retry did not copy every review item')
+    const pinnedSchema = readPublishedReviewSchema(sourceReview.schemaDefinition)
+    if (!pinnedSchema) throw new Error('Retried review has an invalid pinned schema definition')
     const review = await db.insertInto('Common_Review').values({
-      egcs_cn_helpers: null,
+      egcs_cn_helpers: pinnedSchema.reviewType === 'assessment'
+        ? await captureAssessmentHelpers(db, {
+            entityType, entityId, assessmentSchema: pinnedSchema.assessmentSchema
+          })
+        : null,
       egcs_cn_reviewresult: 0,
       egcs_cn_reviewset: String(newSet.id),
       egcs_cn_reviewschema: String(sourceReview.egcs_cn_reviewschema),

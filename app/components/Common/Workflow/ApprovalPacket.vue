@@ -88,6 +88,7 @@ const amendmentFields = computed(() => amendment.value
   ? fields(amendment.value, [
       'amendmentNumber',
       'name',
+      ...(Object.hasOwn(amendment.value, 'proposedTitle') ? ['proposedTitle'] : []),
       ...(Object.hasOwn(amendment.value, 'proposedAuthorizedAssistanceStartDate')
         ? ['proposedAuthorizedAssistanceStartDate', 'proposedAuthorizedAssistanceEndDate']
         : [])
@@ -191,6 +192,9 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow | nu
     return null
   }
 })
+const budgetProponentCount = computed(() => proponents.value.length || new Set(
+  packetBudgetOverview.value?.lineItems.map(line => line.egcs_fc_applicantrecipient).filter(id => id.trim() !== '')
+).size)
 const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => activities.value.map((activity, index) => {
   const name = asRecord(activity.name)
   const description = asRecord(activity.description)
@@ -345,7 +349,7 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
         :can-create-fiscal-year="false"
         :can-update-fiscal-year="false"
         :can-delete-fiscal-year="false"
-        :agreement-proponent-count="proponents.length"
+        :agreement-proponent-count="budgetProponentCount"
         :snapshot-overview="packetBudgetOverview" />
       <p v-else class="text-sm text-muted">
         {{ t('common.not_available') }}

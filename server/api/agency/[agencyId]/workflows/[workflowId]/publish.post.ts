@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { authorizeAgencyWorkflowSetup } from '~~/server/utils/agency-workflow-authorization'
-import { isExpectedPublicationFailure, isRiskSourcePublicationFailure } from '~~/server/utils/publication-errors'
+import { isExpectedPublicationFailure, isRiskSourcePublicationFailure, isWorkflowTerminalSuccessPublicationFailure } from '~~/server/utils/publication-errors'
 import { publishDefinition } from '~~/server/utils/system-publication'
 import { withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
 import { buildWorkflowSetupPublication, resolveWorkflowPublicationActorId } from '~~/server/utils/workflow-setup-versioning'
@@ -27,6 +27,9 @@ export default defineEventHandler(async event => {
     } catch (error: unknown) {
       if (isRiskSourcePublicationFailure(error)) {
         return await badRequest(event, 'WORKFLOW_RISK_SOURCE_INVALID', 'apiErrors.workflow.risk_source_invalid')
+      }
+      if (isWorkflowTerminalSuccessPublicationFailure(error)) {
+        return await badRequest(event, 'WORKFLOW_APPROVAL_SUBMISSION_TERMINAL_SUCCESS_REQUIRED', 'apiErrors.workflow.approval_submission_terminal_success_required')
       }
       if (!isExpectedPublicationFailure(error)) throw error
       return await badRequest(event, 'WORKFLOW_SETUP_INVALID_PUBLICATION', 'apiErrors.request.invalid_resource')

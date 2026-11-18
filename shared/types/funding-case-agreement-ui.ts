@@ -200,6 +200,7 @@ export interface FundingCaseAgreementAmendmentTypeRow {
 }
 
 export interface FundingCaseAgreementAmendmentRow extends BusinessRecordStateFields {
+  activity_date_range?: { startDate: string; endDate: string }
   id: string
   egcs_fc_amendmentnumber: number | null
   egcs_fc_name_en?: string | null
@@ -214,6 +215,8 @@ export interface FundingCaseAgreementAmendmentRow extends BusinessRecordStateFie
   risk_rating_available?: boolean
   egcs_fc_proposedauthorizedassistancestartdate?: string | null
   egcs_fc_proposedauthorizedassistanceenddate?: string | null
+  egcs_fc_proposedtitle_en?: string | null
+  egcs_fc_proposedtitle_fr?: string | null
   amendment_types: FundingCaseAgreementAmendmentTypeRow[]
   amendment_type_ids?: string[]
   amendment_subtypes?: Array<{ egcs_tp_active?: boolean, id: string, egcs_tp_name_en?: string | null, egcs_tp_name_fr?: string | null }>

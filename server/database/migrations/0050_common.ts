@@ -3864,23 +3864,33 @@ CREATE FUNCTION validate_proponent_type_choice(stream_id bigint, proponent_id bi
  RETURNS void
  LANGUAGE plpgsql
 AS $function$
-    DECLARE previous_type bigint;
+    DECLARE previous_type bigint; owner_agency bigint; agency_consistency boolean; stream_consistency boolean;
     BEGIN
-      PERFORM id FROM "Transfer_Payment_Stream" WHERE id = stream_id FOR UPDATE;
-      IF subtype_id IS NULL OR NOT EXISTS (
-        SELECT 1 FROM "Transfer_Payment_Stream" WHERE id = stream_id AND egcs_tp_requireconsistentproponenttype
-      ) THEN RETURN; END IF;
+      SELECT p.egcs_tp_agency INTO owner_agency
+        FROM "Transfer_Payment_Stream" s
+        JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
+        WHERE s.id = stream_id;
+      SELECT egcs_ay_requireconsistentproponenttype INTO agency_consistency
+        FROM "Agency_Profile" WHERE id = owner_agency FOR SHARE;
+      SELECT egcs_tp_requireconsistentproponenttype INTO stream_consistency
+        FROM "Transfer_Payment_Stream" WHERE id = stream_id FOR UPDATE;
+      IF subtype_id IS NULL OR NOT (agency_consistency OR stream_consistency) THEN RETURN; END IF;
+      IF agency_consistency THEN
+        PERFORM pg_advisory_xact_lock(hashtextextended('gcs.agreement-proponent-type:' || owner_agency::text, 0));
+      END IF;
       SELECT r.egcs_fc_applicantrecipientsubtype INTO previous_type
         FROM "Funding_Case_Agreement_Applicant_Recipient" r
         JOIN "Funding_Case_Agreement_Profile" a ON a.id = r.egcs_fc_fundingagreement
         JOIN "Transfer_Payment_Stream" s ON s.id = a.egcs_fc_transferpaymentstream
         JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
         JOIN "Agency_Applicant_Recipient_Subtype" t ON t.id = r.egcs_fc_applicantrecipientsubtype
-        WHERE a.egcs_fc_transferpaymentstream = stream_id AND r.egcs_fc_applicantrecipient = proponent_id
+        WHERE r.egcs_fc_applicantrecipient = proponent_id
           AND NOT a._deleted AND NOT r._deleted AND NOT t._deleted
           AND t.egcs_ay_organizationagency = p.egcs_tp_agency
-          AND EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Eligible_Recipient" e
-            WHERE e.egcs_tp_transferpaymentstream = stream_id AND e.egcs_tp_applicantrecipientsubtype = t.id AND NOT e._deleted)
+          AND ((agency_consistency AND p.egcs_tp_agency = owner_agency)
+            OR (NOT agency_consistency AND a.egcs_fc_transferpaymentstream = stream_id
+              AND EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Eligible_Recipient" e
+                WHERE e.egcs_tp_transferpaymentstream = stream_id AND e.egcs_tp_applicantrecipientsubtype = t.id AND NOT e._deleted)))
         ORDER BY a.id DESC, r.id DESC LIMIT 1;
       IF previous_type IS NOT NULL AND previous_type <> subtype_id THEN
         RAISE EXCEPTION 'Conflicting agreement proponent type' USING ERRCODE = '23514', CONSTRAINT = 'agreement_proponent_type_consistent';

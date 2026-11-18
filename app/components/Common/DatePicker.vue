@@ -13,10 +13,14 @@ const { t } = useI18n()
 
 const {
   disabled = false,
-  readonly = false
+  readonly = false,
+  minValue,
+  maxValue
 } = defineProps<{
   disabled?: boolean
   readonly?: boolean
+  minValue?: DateFieldRootProps['minValue']
+  maxValue?: DateFieldRootProps['maxValue']
 }>()
 
 const modelValue = defineModel<string | Date | null | undefined>({ required: true })
@@ -130,6 +134,8 @@ watch(() => modelValue.value, () => {
       :model-value="inputDateValue as DateFieldRootProps['modelValue']"
       :disabled="isInteractionDisabled"
       :readonly="readonly"
+      :min-value="minValue"
+      :max-value="maxValue"
       class="w-full"
       @update:model-value="updateInputDateValue" />
 
@@ -142,6 +148,8 @@ watch(() => modelValue.value, () => {
         :model-value="inputDateValue as CalendarProps['modelValue']"
         :disabled="isInteractionDisabled"
         :readonly="readonly"
+        :min-value="minValue"
+        :max-value="maxValue"
         class="p-2"
         @update:model-value="updateInputDateValue" />
     </template>

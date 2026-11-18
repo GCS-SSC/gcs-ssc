@@ -223,6 +223,11 @@ export type FundingCaseAgreementAddress = z.infer<typeof FundingCaseAgreementAdd
 export type FundingCaseAgreementAddressPatch = z.infer<typeof FundingCaseAgreementAddressPatchSchema>
 export type FundingCaseAgreementAddressItem = WithId<FundingCaseAgreementAddress>
 
+export const FundingCaseAgreementTitleProposalSchema = z.object({
+  egcs_fc_proposedtitle_en: AgreementProfileText(255),
+  egcs_fc_proposedtitle_fr: AgreementProfileText(255)
+})
+
 export const FundingCaseAgreementAmendmentBaseSchema = z.object({
   egcs_fc_name_en: OptionalBilingualName(),
   egcs_fc_name_fr: OptionalBilingualName(),
@@ -237,7 +242,9 @@ export const FundingCaseAgreementAmendmentBaseSchema = z.object({
       .nullable().optional()
   ).meta({ formRequired: false }),
   egcs_fc_proposedauthorizedassistancestartdate: z.coerce.date().nullable().optional(),
-  egcs_fc_proposedauthorizedassistanceenddate: z.coerce.date().nullable().optional()
+  egcs_fc_proposedauthorizedassistanceenddate: z.coerce.date().nullable().optional(),
+  egcs_fc_proposedtitle_en: AgreementProfileText(255).nullable().optional(),
+  egcs_fc_proposedtitle_fr: AgreementProfileText(255).nullable().optional()
 })
 
 const validateAmendmentName = (
@@ -298,6 +305,8 @@ export type FundingCaseAgreementAmendmentItem = WithId<{
   egcs_fc_name_fr?: string | null
   egcs_fc_proposedauthorizedassistancestartdate?: Date | null
   egcs_fc_proposedauthorizedassistanceenddate?: Date | null
+  egcs_fc_proposedtitle_en?: string | null
+  egcs_fc_proposedtitle_fr?: string | null
   amendment_type_ids: string[]
   amendment_subtype_ids: string[]
 }>

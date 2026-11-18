@@ -416,6 +416,7 @@ export const promoteApprovedAgreementAmendment = async (
     budgetVersionId: string | null
     activityVersionId: string | null
     duration: boolean
+    title?: { en: string, fr: string } | null
     risk?: SubmissionRisk | null
   }
 ) => {
@@ -509,6 +510,12 @@ export const promoteApprovedAgreementAmendment = async (
   }
 
   const risk = approvedDomains?.risk
+  if (approvedDomains?.title) {
+    await trx.updateTable('Funding_Case_Agreement_Profile').set({
+      egcs_fc_title_en: approvedDomains.title.en,
+      egcs_fc_title_fr: approvedDomains.title.fr
+    }).where('id', '=', context.agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  }
   if (risk?.apply && risk.proposedScore !== null) {
     await trx.updateTable('Funding_Case_Agreement_Profile')
       .set({ egcs_fc_riskscore: risk.proposedScore })

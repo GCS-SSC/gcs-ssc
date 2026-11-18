@@ -73,6 +73,8 @@ export const agencyStatusesE2eSpecPaths = [
 ] as const
 
 export const lifecycleFixturePgliteE2eSpecPaths = [
+  'tests/e2e/health-canada-reconciliation-terminal-config.spec.ts',
+  'tests/e2e/agreement-activity-duration.spec.ts',
   'tests/e2e/casework-help-catalog.spec.ts',
   'tests/e2e/agency-address-type-review.spec.ts',
   'tests/e2e/agreement-activity-relationship-lookup.spec.ts',

@@ -91,7 +91,7 @@ export type WorkflowTargetEntityType = (typeof WORKFLOW_TARGET_ENTITY_TYPE_ENUM)
 export const ASSIGNABLE_ENTITY_TYPE_ENUM = CORE_ASSIGNABLE_ENTITY_TYPE_ENUM
 export type AssignableEntityType = (typeof ASSIGNABLE_ENTITY_TYPE_ENUM)[number]
 
-export const AMENDED_TYPE_ENUM = ['articles', 'activities', 'budget', 'duration', 'other'] as const
+export const AMENDED_TYPE_ENUM = ['articles', 'activities', 'budget', 'duration', 'other', 'title'] as const
 export const AGREEMENT_TYPE_ENUM = ['grant', 'nonrepayable', 'repayable', 'partiallyrepayable', 'other'] as const
 export const HOLDBACK_BASES_ENUM = ['fullagreement', 'finalfiscal'] as const
 export const APPLICANT_RECIPIENT_TYPE_ENUM = [

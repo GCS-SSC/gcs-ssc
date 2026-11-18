@@ -47,6 +47,25 @@ const nativeBindings = (source: string): string[] => {
   return bindings
 }
 /**
+ * Prove two endpoints cannot coexist using explicit complementary Boolean guards.
+ * Complex expressions remain unsupported rather than assuming exclusivity.
+ * @param endpoints Controls forwarding the same target prop.
+ * @returns Whether the controls have independently exclusive guards.
+ */
+const exclusiveEndpoints = (endpoints: ElementNode[]): boolean => {
+  if (endpoints.length !== 2) return false
+  const guards = endpoints.map(node => {
+    const guard = node.props.find(prop => prop.type === NodeTypes.DIRECTIVE && ['if', 'else-if'].includes(prop.name))
+    return guard?.type === NodeTypes.DIRECTIVE && guard.exp?.type === NodeTypes.SIMPLE_EXPRESSION
+      ? guard.exp.content.trim()
+      : undefined
+  })
+  const [first, second] = guards
+  if (!first || !second) return false
+  return (/^[A-Za-z_$][\w$]*$/.test(first) && second === `!${first}`)
+    || (/^[A-Za-z_$][\w$]*$/.test(second) && first === `!${second}`)
+}
+/**
  * Identify the semantic kind from the actual control declaration.
  * @returns Semantic kind supported by the actual control.
  * @param node Vue template element to inspect.
@@ -122,7 +141,7 @@ export const checkVueContracts = ({ ledger, sources, componentKinds = {}, forwar
     const endpoints = (nodes.get(contract.filename) ?? []).filter(node => binding(node, 'data-help-target') === contract.prop)
     const endpointValid = contract.nativeAttribute
       ? contract.kind === 'button' && (scriptBindings.get(contract.filename) ?? []).filter(name => name === contract.prop).length === 1
-      : endpoints.length === 1 && (contract.scope === 'instance' ? Boolean(instanceBinding(endpoints[0]!)) : !repeatedNodes.has(endpoints[0]!)) && kindOf(endpoints[0]!, kinds) === contract.kind
+      : (endpoints.length === 1 || exclusiveEndpoints(endpoints)) && endpoints.every(node => (contract.scope === 'instance' ? Boolean(instanceBinding(node)) : !repeatedNodes.has(node)) && kindOf(node, kinds) === contract.kind)
     const valid = endpointValid
       && (contract.via ?? []).every(hop => (nodes.get(hop.filename) ?? []).filter(node => node.tag === hop.component && !repeatedNodes.has(node) && propBinding(node, contract.prop) === contract.prop).length === 1)
     if (!valid) diagnostics.push({ code: 'invalid-forwarding', filename: contract.filename, message: `${contract.component}.${contract.prop}: expected independently verified forwarding to ${contract.kind}.` })

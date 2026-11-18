@@ -1,3 +1,4 @@
+import { canAdmitWorkflowForTarget } from '~~/server/utils/workflow-terminalization-admission'
 import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorizeWorkflowOwnerRead } from '~~/server/utils/review-runtime-access'
@@ -49,13 +50,13 @@ export default defineEventHandler(async event => {
     ?? coreProtection?.statusId
     ?? await resolveWorkflowTargetStatus(event.context.$db, context.entityType, context.entityId)
   const targetTerminal = extensionRuntime?.lockedEntity.status?.terminal ?? coreProtection?.terminal ?? false
-  const targetOpen = context.isOpen !== false
-  const targetEligible = Boolean(targetStatus && !targetTerminal && !active && targetOpen)
+  const targetEligible = Boolean(targetStatus && !targetTerminal && !active)
   return {
-    items: setups.map(setup => {
+    items: await Promise.all(setups.map(async setup => {
+      const targetOpen = await canAdmitWorkflowForTarget(event.context.$db, context, setup, { statusId: targetStatus, terminal: targetTerminal })
       const statusAllowed = Boolean(targetStatus)
         && isWorkflowStartStatusAllowed(setup.egcs_cn_allowedstartstatuses, targetStatus!)
-      const eligible = targetEligible && statusAllowed
+      const eligible = targetEligible && targetOpen && statusAllowed
       const ineligibleReason = eligible
         ? null
         : active
@@ -79,6 +80,6 @@ export default defineEventHandler(async event => {
         eligible,
         ineligibleReason
       }
-    })
+    }))
   }
 })

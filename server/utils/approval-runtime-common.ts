@@ -9,7 +9,8 @@ import type { AddApprovalStepInput } from '~~/shared/types/schemas/review-approv
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import { createRuntimeItem, transitionRuntimeItem } from './system-runtime'
-import { isActiveGroupMember, isAssignableGroup } from './groups'
+import { isActiveGroupMember } from './groups'
+import { isAssignableGroup } from './group-eligibility'
 
 export class ApprovalTemplatePublicationMissingError extends Error {
   constructor(public readonly approvalTemplateId: string) {

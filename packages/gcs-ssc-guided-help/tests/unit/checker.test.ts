@@ -125,3 +125,29 @@ it('rejects forwarding endpoints inside loops and dynamic consumer references', 
 it('accepts standard HTML void elements in supported and unrelated Vue templates', () => {
   expect(check('<template><main data-help-view="agency.general"><input data-help-target="agency.name"><br><hr></main></template>')).toEqual([])
 })
+
+describe('exclusive forwarding endpoints', () => {
+  it('accepts complementary guards but rejects duplicates, repetition and changed kinds', () => {
+    const targetLedger: TargetLedger = { ...ledger, views: [{ ...ledger.views[0]!, targets: [{ ...ledger.views[0]!.targets[0]!, kind: 'button' }] }] }
+    const endpoint = '<template><div><UButton v-if="terminal" :data-help-target="helpTarget" /></div><section><UButton v-if="!terminal" :data-help-target="helpTarget" /></section></template>'
+    const options = {
+      ledger: targetLedger,
+      sources: [
+        { filename: 'Agency.vue', source: '<template><main data-help-view="agency.general"><ActionHost help-target="agency.name" /></main></template>' },
+        { filename: 'ActionHost.vue', source: endpoint }
+      ],
+      forwardedTargets: [{ component: 'ActionHost', prop: 'helpTarget', kind: 'button' as const, filename: 'ActionHost.vue' }]
+    }
+    expect(checkVueContracts(options)).toEqual([])
+    for (const broken of [
+      endpoint.replace('!terminal', 'other'),
+      endpoint.replace('!terminal', 'terminal'),
+      endpoint.replace('!terminal', '!terminal || other'),
+      endpoint.replace('<section>', '<section v-for="row in rows">'),
+      endpoint.replace('<UButton v-if="!terminal"', '<UInput v-if="!terminal"'),
+      endpoint.replace('</template>', '<UButton :data-help-target="helpTarget" /></template>')
+    ]) {
+      expect(checkVueContracts({ ...options, sources: options.sources.map(file => file.filename === 'ActionHost.vue' ? { ...file, source: broken } : file) }).map(item => item.code)).toContain('invalid-forwarding')
+    }
+  })
+})

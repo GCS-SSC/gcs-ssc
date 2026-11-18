@@ -62,5 +62,10 @@ watch(request.error, error => {
       :placeholder="t('agreement.applicant_recipients.not_selected')"
       @update:model-value="model = $event" />
     <USelectMenu v-else disabled :placeholder="t('agreement.applicant_recipients.not_selected')" />
+    <UAlert
+      v-if="fixed && !eligibleIds.includes(fixed)"
+      color="warning"
+      :title="t('agency.proponent_consistency_type_unavailable')"
+      class="mt-2" />
   </UFormField>
 </template>

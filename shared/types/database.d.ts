@@ -22,7 +22,7 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 
 export type Agreement_Applicant_Recipient_Type = 'guarantor' | 'obligant' | 'consultant' | 'partner'
 export type Decision_Type = 'fundingcaseintakeassessment'
-export type Amended_Type = 'articles' | 'activities' | 'budget' | 'duration' | 'other'
+export type Amended_Type = 'articles' | 'activities' | 'budget' | 'duration' | 'title' | 'other'
 export type Registry_Type = 'provincialbusinessnumber' | 'federalbusinessnumber' | 'craprogramaccountnumber' | 'noc' | 'naics' | 'other'
 export type Agreement_Type = 'grant' | 'nonrepayable' | 'repayable' | 'partiallyrepayable' | 'other'
 export type Holdback_Bases = 'fullagreement' | 'finalfiscal'
@@ -703,6 +703,7 @@ export interface SecurityAuditEventTable extends AuditAttributionColumns {
 }
 
 export interface AgencyProfileTable {
+  egcs_ay_requireconsistentproponenttype: Generated<boolean>
   id: Generated<string>
   egcs_ay_gwcoanumber: number
   egcs_ay_agencyfinancialsystemid: string
@@ -1419,6 +1420,8 @@ export interface FundingCaseAgreementAmendmentTable {
   egcs_fc_proposedriskscore: NullableDecimalColumn
   egcs_fc_proposedauthorizedassistancestartdate?: Date | null
   egcs_fc_proposedauthorizedassistanceenddate?: Date | null
+  egcs_fc_proposedtitle_en?: string | null
+  egcs_fc_proposedtitle_fr?: string | null
   _deleted: Generated<boolean>
 }
 

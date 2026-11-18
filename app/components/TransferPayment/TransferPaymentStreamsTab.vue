@@ -66,7 +66,6 @@ const submitStreamWizard = async (data: TransferPaymentStreamPolymorphicWizard) 
 
 const streamColumns: TableColumnInput<TransferPaymentStreamRow>[] = [
   { id: 'name', accessorKey: 'egcs_tp_name_en', headerKey: 'transfer_payment.name_en' },
-  { id: 'abbreviation', accessorKey: 'egcs_tp_abbreviation_en', headerKey: 'transfer_payment.abbreviation' },
   { accessorKey: 'egcs_tp_active', headerKey: 'transfer_payment.status' },
   { id: 'parent', accessorKey: 'parent_name_en', headerKey: 'transfer_payment.parent_stream' },
   { id: 'actions', headerKey: 'common.actions' }
@@ -74,7 +73,6 @@ const streamColumns: TableColumnInput<TransferPaymentStreamRow>[] = [
 
 const streamBilingualColumns: BilingualColumnConfig<TransferPaymentStreamRow>[] = [
   { id: 'name', accessorKey: { en: 'egcs_tp_name_en', fr: 'egcs_tp_name_fr' } },
-  { id: 'abbreviation', accessorKey: { en: 'egcs_tp_abbreviation_en', fr: 'egcs_tp_abbreviation_fr' } },
   { id: 'parent', accessorKey: { en: 'parent_name_en', fr: 'parent_name_fr' } }
 ]
 

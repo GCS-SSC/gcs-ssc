@@ -11,7 +11,8 @@ import {
   syncAgreementActivityResponsiblePartySelections,
   syncAgreementActivityOutcomeSelections,
   validateAgreementResponsiblePartySelectionIds,
-  validateAgreementOutcomeSelectionIds
+  validateAgreementOutcomeSelectionIds,
+  validateAgreementActivityDates
 } from '~~/server/utils/agreement-activity'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 
@@ -42,6 +43,7 @@ export default defineEventHandler(async event => {
   } = validated
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext) => {
+    await validateAgreementActivityDates(event, trx, agreementId, validated)
     const selectedOutcomes = await validateAgreementOutcomeSelectionIds(
       trx,
       currentContext.profileId,

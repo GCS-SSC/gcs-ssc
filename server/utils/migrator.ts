@@ -4,11 +4,11 @@ import { pathToFileURL } from 'node:url'
 import { productionCoreMigrationProvider } from '../database/production-core-migrations'
 import type { Migration, MigrationProvider } from 'kysely'
 
-type DemoMigrationBundle = Migration
+type DemoMigrationBundle = { demoMigrations: Record<string, Migration> }
 type DemoMigrationLoader = (url: string) => Promise<DemoMigrationBundle>
 
 /**
- * Loads a separately packaged demo migration.
+ * Loads the separately packaged demo migrations.
  *
  * @param url - Packaged demo migration URL.
  * @returns Demo migration module.
@@ -31,7 +31,7 @@ const resolveRuntimeModuleUrl = (): string => {
 }
 
 /**
- * Resolves demo seed migrations only for explicit demo runtime modes.
+ * Resolves demo migrations only for explicit demo runtime modes.
  *
  * @param migrationMode - Explicit runtime migration mode.
  * @param demoMigrationSuffix - Required demo migration suffix.
@@ -54,12 +54,12 @@ export const resolveProductionMigrationProvider = async (
   )
   return {
     /**
-     * Includes the final demo seed after the canonical schema migrations.
-     * @returns Core migrations and the separately packaged final demo seed.
+     * Includes the current core baselines and canonical seed for a fresh demo database.
+     * @returns Core migrations and the separately packaged demo migrations.
      */
     getMigrations: async () => ({
       ...await productionCoreMigrationProvider.getMigrations(),
-      [`9999_${demoMigrationSuffix}`]: demoMigration
+      ...demoMigration.demoMigrations
     })
   }
 }

@@ -1,3 +1,4 @@
+import { isClosedFinancialWorkflowTarget } from '~~/server/utils/workflow-terminalization-admission'
 import { defineEventHandler } from 'h3'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeReviewRuntimeAction, executeFreshAuthorizedReviewRuntimeWrite } from '~~/server/utils/review-runtime-access'
@@ -46,7 +47,7 @@ export default defineEventHandler(async event => {
      * @returns The created Workflow run, or null when no setup applies.
      */
     const startCurrent = async (trx: Parameters<typeof startWorkflow>[1], currentContext: typeof context, currentUserId: string) => {
-      if (currentContext.isOpen === false) {
+      if (currentContext.isOpen === false && !isClosedFinancialWorkflowTarget(currentContext)) {
         return await throwApiError(event, {
           statusCode: 409,
           code: 'WORKFLOW_TARGET_CLOSED',

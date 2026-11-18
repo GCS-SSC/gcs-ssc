@@ -12,7 +12,8 @@ import {
 } from '~~/shared/types/schemas/review-approval'
 import { readPublishedApprovalTemplate, type PublishedApprovalTemplate } from './approval-template-versioning'
 import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from './additional-reviewer-runtime'
-import { isActiveGroupMember, isAssignableGroup } from './groups'
+import { isActiveGroupMember } from './groups'
+import { isAssignableGroup } from './group-eligibility'
 import { badRequest, forbidden, notFound } from './api-errors'
 import { parseI18n } from './api-validate'
 import {

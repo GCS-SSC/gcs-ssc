@@ -38,6 +38,7 @@
 
 @layer base {
   body {
+    min-block-size: 100dvh;
     @apply text-zinc-900 antialiased dark:text-zinc-100;
     letter-spacing: -0.011em;
   }

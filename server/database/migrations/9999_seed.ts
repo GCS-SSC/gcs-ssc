@@ -7,8 +7,9 @@ import { seedGuidedHelpExample } from '../guided-help-seed'
 import { seedFieldTooltipExamples } from '../field-tooltip-seed'
 import { initializeCatalogCacheRevisions } from '../catalog-cache-revisions'
 import { seedNotificationDemo } from '../notification-demo-seed'
+import { upgradeNciaGaRiskAssessment } from '../ncia-ga-risk-assessment'
 
-type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: number }> }
+type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: string | number }> }
 
 interface ForeignKey {
   table_name: string
@@ -17,16 +18,7 @@ interface ForeignKey {
 
 // The curated snapshot includes captured casework and authored approval evidence.
 // Restoring it through authoring triggers would duplicate Entity/Publication identities.
-const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
-  // Keep the captured JSON opaque to TypeScript while bundling it into demo.mjs.
-  const [{ default: captured }, { default: maple }] = await Promise.all([
-    import('../seeds/ncia-demo.json' as string) as Promise<{ default: DemoSnapshot }>,
-    import('../seeds/maple-demo.json' as string) as Promise<{ default: Record<string, Array<Record<string, unknown>>> }>
-  ])
-  const snapshot: DemoSnapshot = { ...captured }
-  for (const [table, rows] of Object.entries(maple)) {
-    snapshot[table] = [...(snapshot[table] ?? []), ...rows]
-  }
+export const restoreDemoSnapshot = async <DB>(db: Kysely<DB>, snapshot: DemoSnapshot): Promise<void> => {
   const tables = Object.entries(snapshot)
   const foreignKeys = await sql<ForeignKey>`
     SELECT conrelid::regclass::text AS table_name, conname AS constraint_name
@@ -82,18 +74,20 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
   await restoreNciaTemplateObjects(db as unknown as Kysely<Database>)
   // Publication state and transition history are validated together at the end of the seed.
   await sql`SET CONSTRAINTS ALL DEFERRED`.execute(db)
-  await seedGuidedHelpExample(db as unknown as import('kysely').Transaction<Database>)
+  if (!snapshot.Common_Guided_Help?.length) {
+    await seedGuidedHelpExample(db as unknown as import('kysely').Transaction<Database>)
+  }
   await seedFieldTooltipExamples(db as unknown as import('kysely').Transaction<Database>)
   await sql`SET CONSTRAINTS ALL IMMEDIATE`.execute(db)
   await initializeCatalogCacheRevisions(db)
   await seedNotificationDemo(db as unknown as Kysely<Database>)
+  await upgradeNciaGaRiskAssessment(db as unknown as Kysely<Database>)
   await validatePersistedMonetaryRows(db)
 }
 
 export const up: Migration['up'] = async db => {
-  if (db.isTransaction) {
-    await restoreSnapshot(db)
-  } else {
-    await db.transaction().execute(restoreSnapshot)
-  }
+  // One coherent snapshot includes NCIA, Maple and Health Canada, including publications.
+  const { default: snapshot } = await import('../seeds/demo.json' as string) as { default: DemoSnapshot }
+  if (db.isTransaction) await restoreDemoSnapshot(db, snapshot)
+  else await db.transaction().execute(transaction => restoreDemoSnapshot(transaction, snapshot))
 }

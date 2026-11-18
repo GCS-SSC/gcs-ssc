@@ -9,7 +9,7 @@ import { notFound } from './api-errors'
 import { buildAgreementDocumentContext } from './document-generation'
 import { valueOrFallback } from './document-rendering'
 import { readSubmissionRisk } from './risk-readiness'
-import type { AgreementApprovalSnapshot } from './agreement-approval-submission'
+import { readApprovalPacketTitle, type AgreementApprovalSnapshot } from './agreement-approval-submission'
 
 export const authorizeAmendmentDocumentResource = async (
   event: H3Event, db: Kysely<Database>, agreementId: string, amendmentId: string,
@@ -68,6 +68,12 @@ export const buildAmendmentDocumentContext = async (
   const risk = packet
     ? packet.risk
     : await readSubmissionRisk(db, { entityType: 'fundingcaseamendment', entityId: amendmentId })
+  const capturedTitle = packet ? readApprovalPacketTitle(packet) : null
+  const proposedTitle = packet
+    ? capturedTitle
+    : types.some(type => type.egcs_tp_amended === 'title')
+      ? { en: amendment.egcs_fc_proposedtitle_en, fr: amendment.egcs_fc_proposedtitle_fr }
+      : null
   return {
     ...agreementContext,
     amendment: {
@@ -84,6 +90,7 @@ export const buildAmendmentDocumentContext = async (
       subtypeIds: subtypes.map(subtype => String(subtype.id)),
       proposedStartDate: dateValue(amendment.egcs_fc_proposedauthorizedassistancestartdate),
       proposedEndDate: dateValue(amendment.egcs_fc_proposedauthorizedassistanceenddate),
+      proposedTitle: proposedTitle ? localized(proposedTitle.en, proposedTitle.fr) : null,
       changeRisk: risk?.enabled ?? false,
       applyRisk: risk?.apply ?? false,
       proposedRiskScore: risk?.proposedScore ?? null,

@@ -124,7 +124,7 @@ const updateProfile = async () => {
 
 <template>
   <NuxtPage v-if="isStreamRoute" />
-  <div v-else class="flex w-full flex-col">
+  <div v-else class="flex w-full min-w-0 flex-col">
     <div v-if="isLoadingProfile && !profile" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>

@@ -4,7 +4,7 @@ import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { resolveDraftAgreementAmendmentActivityVersion } from '~~/server/utils/agreement-amendment'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
-import { getAgreementActivityOutcomeTags, getAgreementActivityResponsiblePartyTags, syncAgreementActivityOutcomeSelections, syncAgreementActivityResponsiblePartySelections, validateAgreementOutcomeSelectionIds, validateAgreementResponsiblePartySelectionIds } from '~~/server/utils/agreement-activity'
+import { getAgreementActivityOutcomeTags, getAgreementActivityResponsiblePartyTags, syncAgreementActivityOutcomeSelections, syncAgreementActivityResponsiblePartySelections, validateAgreementOutcomeSelectionIds, validateAgreementResponsiblePartySelectionIds, validateAgreementActivityDates } from '~~/server/utils/agreement-activity'
 import type { FundingCaseAgreementActivityTable } from '~~/shared/types/database'
 import { FundingCaseAgreementActivityCreateSchema } from '~~/shared/types/schemas'
 
@@ -23,6 +23,7 @@ export default defineEventHandler(async event => {
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, current) => {
     const versionId = await resolveDraftAgreementAmendmentActivityVersion(event, trx, agreementId, amendmentId)
     if (typeof versionId !== 'string') return versionId
+    await validateAgreementActivityDates(event, trx, agreementId, validated, amendmentId)
     const outcomeIds = validated.outcome_ids ?? []
     const responsiblePartyIds = validated.responsible_party_ids ?? []
     const outcomes = await validateAgreementOutcomeSelectionIds(trx, current.profileId, outcomeIds)

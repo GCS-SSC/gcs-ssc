@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useActionContext } from '~/composables/useActionContext'
+import { useResourceRequest } from '~/composables/useResourceRequest'
+import type { EntityAssignmentRoster } from '~/composables/useEntityAssignmentRoster'
 /* eslint-disable jsdoc/require-jsdoc -- local table presentation helpers are self-documenting */
 import { getPaginationRowModel } from '@tanstack/table-core'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -70,10 +72,28 @@ const deleteContext = useActionContext({
 })
 const isWizardOpen: Ref<boolean> = ref(false)
 const selectedHistory: Ref<VisibleFundingHistoryRow | null> = ref(null)
+const contactAgreement: Ref<{ id: string; label: string } | null> = ref(null)
+const contactsOpen = computed({
+  get: () => contactAgreement.value !== null,
+  set: (open: boolean) => { if (!open) contactAgreement.value = null }
+})
+const { user, permissionRevision } = useAuth()
+const { data: contactRoster, status: contactsStatus, error: contactsError, refresh: refreshContacts } = useResourceRequest<EntityAssignmentRoster>({
+  identity: () => JSON.stringify([applicantRecipientId, contactAgreement.value?.id, user.value?.id, permissionRevision.value]),
+  enabled: () => contactAgreement.value !== null,
+  refreshData: 'clear',
+  failureData: 'clear',
+  load: signal => $fetch<EntityAssignmentRoster, string>(`/api/entity-assignments/fundingcaseagreement/${contactAgreement.value?.id}`, { signal })
+})
+const openContacts = (history: VisibleFundingHistoryRow) => {
+  if (history.source !== 'system' || !history.agreementId) return
+  contactAgreement.value = { id: history.agreementId, label: history.agreementNumber }
+}
 
 watch(() => applicantRecipientId, () => {
   isWizardOpen.value = false
   selectedHistory.value = null
+  contactAgreement.value = null
 })
 
 const columns: TableColumnInput<FundingHistoryRow>[] = [
@@ -307,6 +327,13 @@ const visibleRows = computed(() => items.value)
         <div v-if="isVisible(row.original)" class="flex justify-end">
           <CommonActionButton
             v-if="row.original.source === 'system' && row.original.agreementId"
+            icon="i-lucide-contact"
+            color="neutral"
+            variant="ghost"
+            :aria-label="t('applicant_recipient.funding_history.actions.view_contacts')"
+            @click="openContacts(row.original)" />
+          <CommonActionButton
+            v-if="row.original.source === 'system' && row.original.agreementId"
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
@@ -322,6 +349,43 @@ const visibleRows = computed(() => items.value)
         </div>
       </template>
     </CommonResourceLayout>
+
+    <UModal
+      v-model:open="contactsOpen"
+      :title="t('applicant_recipient.funding_history.contacts_title')"
+      :description="contactAgreement?.label"
+      :ui="{ content: 'sm:max-w-2xl', body: 'max-h-[60vh] overflow-y-auto' }">
+      <template #body>
+        <div v-if="contactsStatus === 'pending'" role="status" :aria-label="t('common.loading')" class="space-y-3">
+          <USkeleton v-for="index in 2" :key="index" class="h-16 w-full" />
+        </div>
+        <UAlert v-else-if="contactsError" color="error" :title="t('assignments.load_failed')" :description="t('assignments.load_failed_description')">
+          <template #actions>
+            <UButton :label="t('common.retry')" color="error" variant="soft" @click="refreshContacts" />
+          </template>
+        </UAlert>
+        <ul v-else-if="contactRoster?.assignments.length" class="divide-y divide-default">
+          <li v-for="assignment in contactRoster.assignments" :key="assignment.user_id" class="space-y-1 py-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-medium">{{ assignment.name }}</span>
+              <UBadge v-if="assignment.is_primary" color="primary" variant="subtle">
+                {{ t('assignments.primary') }}
+              </UBadge>
+              <UBadge v-if="assignment.is_inactive" color="neutral" variant="subtle">
+                {{ t('assignments.inactive') }}
+              </UBadge>
+            </div>
+            <ULink :to="`mailto:${assignment.email}`" class="break-all text-sm">{{ assignment.email }}</ULink>
+          </li>
+        </ul>
+        <p v-else class="text-sm text-muted">
+          {{ t('assignments.empty') }}
+        </p>
+      </template>
+      <template #footer>
+        <UButton :label="t('common.close')" color="neutral" variant="outline" @click="contactsOpen = false" />
+      </template>
+    </UModal>
 
     <ApplicantRecipientFundingHistoryWizardModal
       v-model:open="isWizardOpen"
@@ -342,7 +406,12 @@ const visibleRows = computed(() => items.value)
   table-layout: fixed;
 }
 
-:deep(th),
+:deep(th) {
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: normal;
+}
+
 :deep(td) {
   overflow-wrap: anywhere;
   white-space: normal;
@@ -350,10 +419,10 @@ const visibleRows = computed(() => items.value)
 
 :deep(th:nth-child(1)) { width: 11%; }
 :deep(th:nth-child(2)) { width: 12%; }
-:deep(th:nth-child(3)) { width: 18%; }
+:deep(th:nth-child(3)) { width: 14%; }
 :deep(th:nth-child(4)) { width: 12%; }
-:deep(th:nth-child(5)) { width: 18%; }
+:deep(th:nth-child(5)) { width: 17%; }
 :deep(th:nth-child(6)) { width: 12%; }
 :deep(th:nth-child(7)) { width: 11%; }
-:deep(th:nth-child(8)) { width: 6%; }
+:deep(th:nth-child(8)) { width: 11%; }
 </style>

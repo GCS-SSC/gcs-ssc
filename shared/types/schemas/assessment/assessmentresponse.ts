@@ -1,3 +1,4 @@
+import { findAssessmentBand } from '../../../utils/assessment-scoring'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- schema factory types document the validation contract */
 import { z } from 'zod'
 import type { AssessmentDefinition, ScoringMatrixItem } from './assessment'
@@ -74,7 +75,7 @@ export const AssessmentResponseSchema = z.object({
 const getCurrentOverallResultOption = (
   scoringMatrix: ScoringMatrixItem[],
   weightedScore: number
-) => scoringMatrix.find(item => weightedScore <= item.max) ?? null
+) => findAssessmentBand(scoringMatrix, weightedScore) ?? null
 
 /**
  * Builds validation for the optional review alignment documentation fields.

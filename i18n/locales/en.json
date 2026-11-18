@@ -695,6 +695,7 @@
       "activities": "Activities",
       "budget": "Budget",
       "duration": "Duration",
+      "title": "Title",
       "other": "Other"
     },
     "monitor_action_type": {
@@ -757,6 +758,10 @@
     }
   },
   "agency": {
+    "proponent_consistency_type_unavailable": "The proponent type required by this agency is not eligible for this stream. Add that type to the stream’s eligible proponent types before making a new selection.",
+    "proponent_consistency_description": "Applies across all agreements in this agency and takes precedence over stream settings.",
+    "proponent_consistency_enable_description": "Future proponent additions and type changes must match the proponent’s most recent active type across this agency (highest agreement ID), even when the stream does not require consistency. Historical differences and unchanged saved types remain allowed. No existing types are changed automatically. This takes effect when you save the agency.",
+    "proponent_consistency_disable_description": "The agency-wide requirement will stop applying. Each stream’s own consistency setting will still apply. Existing proponent types remain unchanged. This takes effect when you save the agency.",
     "funding_types": {
       "title": "Funding types",
       "type": "Funding type",
@@ -1213,6 +1218,7 @@
       "definition_invalid": "This assessment's saved definition is invalid and cannot be loaded. Contact support with the review number."
     },
     "workflow": {
+      "approval_submission_terminal_success_required": "This approval-submission workflow must finish with a terminal status. In Routing, edit the last step and select a terminal Success status. If none is available, create a terminal status in the agency’s Statuses section.",
       "risk_source_invalid": "Select one assessment from the published review set as the workflow’s risk rating source. Only one source is allowed.",
       "route_invalid": "Populate valid workflow discriminator values and ensure the selected route includes all required steps.",
       "recommendation_invalid": "Complete all required recommendation questions before submitting.",
@@ -1482,6 +1488,7 @@
       "invalid_cost_category_line_item": "The selected cost category line item is invalid.",
       "invalid_budget_fiscal_year": "The selected agreement budget fiscal year is invalid.",
       "fiscal_year_outside_duration": "The selected fiscal year does not overlap the agreement's authorized start and end dates.",
+      "activity_outside_duration": "All activities must fall within the agreement's authorized start and end dates before submission.",
       "budget_fiscal_year_not_found": "Agreement budget fiscal year not found.",
       "budget_fiscal_year_in_use": "Remove all budget line items before deleting this fiscal year.",
       "budget_currency_immutable": "Budget currency cannot be changed. Create a separate budget for the other currency.",
@@ -2249,7 +2256,7 @@
     "note_subject_required": "Enter a subject in English or French",
     "note_body_required": "Enter a note in English or French",
     "proponent_type_in_use": "This type is used by an agreement proponent.",
-    "proponent_type_conflict": "Select the proponent’s most recent eligible type in this stream.",
+    "proponent_type_conflict": "Select the proponent type required by this agency or stream.",
     "budget_percentage": "Enter a percentage from 0 to 100 with at most two decimal places.",
     "retroactive_costs_not_supported": "Retroactive cost limits are not implemented. Omit this field.",
     "budget_calculation": "Select a valid calculation mode and source category.",
@@ -2292,6 +2299,7 @@
     "role_permission_ineffective": "Select an access level or assignment-management permission",
     "invalid_url": "Enter a valid URL",
     "date_range": "Start date must be the same as or before end date",
+    "activity_date_outside_agreement": "The activity date must be within the agreement's authorized start and end dates.",
     "id_required": "Financial System ID is required",
     "gwcoa_required": "GWCOA number is required",
     "applicant_recipient_subtype_required": "Proponent subtype is required",
@@ -2322,7 +2330,7 @@
     "duplicate_response_key": "Use a unique response key",
     "duplicate_semantic_key": "Use a unique language-independent key",
     "recommendation_unknown_question": "Select a question from this form",
-    "scoring_matrix_order": "Order scoring thresholds from lowest to highest",
+    "scoring_matrix_unique": "Scoring thresholds must be unique",
     "checklist_duplicate_key": "Use a unique language independent code",
     "checklist_invalid_count": "Enter a whole number no greater than the number of items in this group",
     "checklist_invalid_rate": "Enter a percentage greater than 0 and no greater than 100",
@@ -2587,6 +2595,12 @@
     "stream_route": "Stream route",
     "agreement_subtype": "Agreement subtype",
     "agreement_subtype_placeholder": "Select the agreement subtype",
+    "assessment_helpers": {
+      "agreement_value": "Agreement value (program funding)",
+      "average_annual_value": "Average annual value",
+      "recipient_subtypes": "Recipient subtype (any recipient)",
+      "recipient_count": "Number of recipients"
+    },
     "agreement_type": "Agreement type",
     "agreement_number": "Agreement number",
     "agreement_number_placeholder": "Enter the agreement number",
@@ -2772,6 +2786,8 @@
       "open_exists": "Complete or close the open amendment before creating another.",
       "duration": "Authorized assistance period",
       "duration_description": "Set the proposed authorized dates. Duration amendments can then add, change, or remove budget fiscal years.",
+      "agreement_title": "Agreement title",
+      "agreement_title_description": "Set the proposed agreement title in English and French. It replaces the current title only after this amendment is approved.",
       "duration_updated": "Proposed authorized dates updated successfully",
       "edit_scope": "Edit scope",
       "remove_areas_title": "Remove amendment areas?",
@@ -3386,6 +3402,7 @@
     "funding_history": {
       "title": "Funding History",
       "description": "Review active system agreements and shared external funding reported for this proponent.",
+      "contacts_title": "Assigned user contacts",
       "search": "Search funding history",
       "restricted": "Agreement details unavailable",
       "source": {
@@ -3393,6 +3410,7 @@
         "external": "External"
       },
       "actions": {
+        "view_contacts": "View assigned user contacts",
         "add_external": "Add External Agreement",
         "add_recipient": "Add another proponent",
         "unlink": "Unlink from this proponent"
@@ -3872,6 +3890,7 @@
         "name": "Name",
         "proposedAuthorizedAssistanceStartDate": "Proposed start date",
         "proposedAuthorizedAssistanceEndDate": "Proposed end date",
+        "proposedTitle": "Proposed agreement title",
         "amendmentTypes": "Amendment types",
         "amendmentSubtypes": "Amendment subtypes",
         "operatingName": "Operating name",
@@ -4244,6 +4263,8 @@
   },
   "assessment": {
     "result_incomplete": "Result available after all required answers are complete.",
+    "impactor_contribution": "Score contribution",
+    "impactor_total": "Total impactor contribution",
     "runtime_status": {
       "optional": "Optional — none requested",
       "empty": "Not started",

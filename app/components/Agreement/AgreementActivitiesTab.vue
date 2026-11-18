@@ -5,18 +5,21 @@ import { computed, onUnmounted, watch } from 'vue'
 import { useAgreementChildActionPrerequisites, type AgreementChildActionTarget } from '~/composables/useAgreementChildActionPrerequisites'
 import type { FundingCaseAgreementActivityForm, FundingCaseAgreementActivityRow } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementActivityCreateSchema } from '~~/shared/types/schemas'
+import { createAgreementActivitySchema } from '~~/shared/types/schemas/agreement-activity'
+import { parseDate } from '@internationalized/date'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import AgreementActivityOutcomesField from './Fields/AgreementActivityOutcomesField.vue'
 import AgreementActivityResponsiblePartiesField from './Fields/AgreementActivityResponsiblePartiesField.vue'
 
 type AgreementActivityCrudRow = FundingCaseAgreementActivityRow & Record<string, unknown>
 
-const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, actionTarget, staticMode = false, embedded = false } = defineProps<{
+const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, actionTarget, dateRange, staticMode = false, embedded = false } = defineProps<{
   agreementId: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
   actionTarget?: AgreementChildActionTarget
+  dateRange?: { startDate: string | Date; endDate: string | Date }
   apiBase?: string
   snapshotItems?: FundingCaseAgreementActivityRow[]
   staticMode?: boolean
@@ -24,6 +27,15 @@ const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, ac
 }>()
 
 const { t } = useI18n()
+const dateValue = (date: string | Date) => typeof date === 'string' ? new Date(date) : date
+const activitySchema = computed(() => dateRange
+  ? createAgreementActivitySchema({
+      startDate: dateValue(dateRange.startDate), endDate: dateValue(dateRange.endDate)
+    })
+  : FundingCaseAgreementActivityCreateSchema)
+const calendarDate = (date: string | Date) => parseDate(typeof date === 'string' ? date.slice(0, 10) : date.toISOString().slice(0, 10))
+const minDate = computed(() => dateRange ? calendarDate(dateRange.startDate) : undefined)
+const maxDate = computed(() => dateRange ? calendarDate(dateRange.endDate) : undefined)
 const confirmDelete = useDeleteConfirm()
 const { check } = useAgreementChildActionPrerequisites(() => actionTarget)
 let actionGeneration = 0
@@ -60,7 +72,8 @@ const resourceIdentity = [
   () => agreementId,
   () => resourceBase.value,
   () => actionTarget?.kind,
-  () => actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : null
+  () => actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : null,
+  () => minDate.value?.toString(), () => maxDate.value?.toString()
 ]
 const createContext = useActionContext({
   identity: resourceIdentity, authority: () => canCreate, eligible: () => !staticMode
@@ -128,7 +141,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     :before-open="actionTarget ? beforeOpen : undefined"
     :before-save="actionTarget ? beforeSave : undefined"
     :before-delete="actionTarget ? beforeDelete : undefined"
-    :schema="FundingCaseAgreementActivityCreateSchema"
+    :schema="activitySchema"
     :initial-new-item="{ outcome_ids: [], responsible_party_ids: [] }"
     :columns="columns"
     :bilingual-columns="bilingualColumns"
@@ -198,11 +211,11 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
         </UFormField>
 
         <UFormField :label="t('agreement.activities.start_date')" name="egcs_fc_startdate">
-          <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_startdate" />
+          <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_startdate" :min-value="minDate" :max-value="maxDate" />
         </UFormField>
 
         <UFormField :label="t('agreement.activities.end_date')" name="egcs_fc_enddate">
-          <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_enddate" />
+          <CommonDatePicker v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_enddate" :min-value="minDate" :max-value="maxDate" />
         </UFormField>
 
         <div>

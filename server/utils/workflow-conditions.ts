@@ -4,7 +4,7 @@ import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { WorkflowMemberConditionsSchema, type CustomFieldCondition, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
-import { readAgencyCustomFieldDefinitions } from './agreement-custom-fields'
+import { readAgencyCustomFieldDefinitions } from './agency-custom-field-definitions'
 
 export const readWorkflowConditions = async (db: Kysely<Database>, memberId: string): Promise<WorkflowMemberCondition[]> => {
   const rows = await db.selectFrom('Common_Workflow_Member_Condition').selectAll()

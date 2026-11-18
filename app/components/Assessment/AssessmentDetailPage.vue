@@ -422,7 +422,7 @@ const handleApprovalChanged = async () => {
                       v-for="(customOutcome, customOutcomeIndex) in assessmentResponse.customOutcomes"
                       :key="customOutcome.id ?? `custom-outcome-${customOutcomeIndex}`"
                       class="space-y-4"
-                      :class="customOutcomeIndex > 0 ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
+                      :class="customOutcomeIndex > 0 ? 'mt-8 border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
                       <div class="pl-4 md:pl-6">
                         <div class="flex items-start justify-between gap-4">
                           <p class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">

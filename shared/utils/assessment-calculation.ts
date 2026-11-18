@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- explicit typed signatures keep the calculation helpers self-describing */
+import { assessmentValuesEqual, compareAssessmentValues } from './assessment-helper-values'
 import type {
   AssessmentCalculationExpression,
   AssessmentCalculationOperator
@@ -299,12 +300,24 @@ const calculationOperationEvaluators: Record<AssessmentCalculationOperator, Calc
     const condition = toBoolean(values[0])
     return condition === undefined ? undefined : condition ? values[1] : values[2]
   },
-  eq: values => values[0] === values[1],
-  ne: values => values[0] !== values[1],
-  gt: values => evaluateNumericBinaryOperation(values, (left, right) => left > right),
-  gte: values => evaluateNumericBinaryOperation(values, (left, right) => left >= right),
-  lt: values => evaluateNumericBinaryOperation(values, (left, right) => left < right),
-  lte: values => evaluateNumericBinaryOperation(values, (left, right) => left <= right),
+  eq: values => assessmentValuesEqual(values[0], values[1]),
+  ne: values => !assessmentValuesEqual(values[0], values[1]),
+  gt: values => {
+    const comparison = compareAssessmentValues(values[0], values[1])
+    return comparison === undefined ? undefined : comparison > 0
+  },
+  gte: values => {
+    const comparison = compareAssessmentValues(values[0], values[1])
+    return comparison === undefined ? undefined : comparison >= 0
+  },
+  lt: values => {
+    const comparison = compareAssessmentValues(values[0], values[1])
+    return comparison === undefined ? undefined : comparison < 0
+  },
+  lte: values => {
+    const comparison = compareAssessmentValues(values[0], values[1])
+    return comparison === undefined ? undefined : comparison <= 0
+  },
   and: values => {
     const booleanValues = getBooleanValues(values)
     return booleanValues !== undefined ? booleanValues.every(Boolean) : undefined

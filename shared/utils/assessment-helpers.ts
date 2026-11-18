@@ -1,7 +1,8 @@
 /* eslint-disable jsdoc/require-jsdoc -- typed helper registry declarations are self-describing */
 import type { Entity_Type } from '../types/database'
+import { getCoreEntityDefinition, isCoreEntityType } from '../constants/entity-registry'
 
-export const ASSESSMENT_HELPER_DATA_TYPES = ['string', 'number', 'boolean', 'id'] as const
+export const ASSESSMENT_HELPER_DATA_TYPES = ['string', 'number', 'boolean', 'id', 'id_list', 'money'] as const
 
 export type AssessmentHelperDataType = typeof ASSESSMENT_HELPER_DATA_TYPES[number]
 export type AssessmentHelperComparableValueType = 'string' | 'number' | 'boolean'
@@ -20,7 +21,7 @@ const APPLICANT_RECIPIENT_HELPER_DEFINITIONS: AssessmentEntityHelperDefinition[]
   { field: 'id', dataType: 'id', labelKey: 'common.id', referenceTable: 'Applicant_Recipient_Profile' },
   { retired: true, field: 'egcs_ar_applicantrecipientsubtypes', dataType: 'id', labelKey: 'applicant_recipient.subtype', referenceTable: 'Agency_Applicant_Recipient_Subtype' },
   { field: 'egcs_ar_leadagency', dataType: 'id', labelKey: 'applicant_recipient.lead_agency', referenceTable: 'Agency_Profile' },
-  { field: 'egcs_ar_leadofficer', dataType: 'id', labelKey: 'applicant_recipient.lead_officer', referenceTable: 'Common_User' },
+  { retired: true, field: 'egcs_ar_leadofficer', dataType: 'id', labelKey: 'applicant_recipient.lead_officer', referenceTable: 'Common_User' },
   { field: 'egcs_ar_legalname_en', dataType: 'string', labelKey: 'applicant_recipient.legal_name_en' },
   { field: 'egcs_ar_legalname_fr', dataType: 'string', labelKey: 'applicant_recipient.legal_name_fr' },
   { field: 'egcs_ar_researchorganization_en', dataType: 'string', labelKey: 'applicant_recipient.research_organization_en' },
@@ -32,19 +33,35 @@ const assessmentEntityHelperRegistry: AssessmentEntityHelperRegistry = {
   applicantrecipient: APPLICANT_RECIPIENT_HELPER_DEFINITIONS
 }
 
+const AGREEMENT_HELPER_DEFINITIONS: AssessmentEntityHelperDefinition[] = [
+  { field: 'egcs_fc_agreementsubtype', dataType: 'id', labelKey: 'agreement.agreement_subtype', referenceTable: 'Transfer_Payment_Agreement_Subtype' },
+  { field: 'egcs_fc_furtherdistribution', dataType: 'boolean', labelKey: 'agreement.further_distribution' },
+  { field: 'egcs_fc_applicantrecipientsubtypes', dataType: 'id_list', labelKey: 'agreement.assessment_helpers.recipient_subtypes', referenceTable: 'Agency_Applicant_Recipient_Subtype' },
+  { field: 'egcs_fc_agreementvalue', dataType: 'money', labelKey: 'agreement.assessment_helpers.agreement_value' },
+  { field: 'egcs_fc_averageannualvalue', dataType: 'money', labelKey: 'agreement.assessment_helpers.average_annual_value' },
+  { field: 'egcs_fc_agreementtype', dataType: 'string', labelKey: 'agreement.agreement_type' },
+  { field: 'egcs_fc_currency', dataType: 'string', labelKey: 'common.currency' },
+  { field: 'egcs_fc_recipientcount', dataType: 'number', labelKey: 'agreement.assessment_helpers.recipient_count' }
+]
+
+const getEntityHelperDefinitions = (entityType: Entity_Type) =>
+  isCoreEntityType(entityType) && getCoreEntityDefinition(entityType).ownerKind === 'agreement'
+    ? AGREEMENT_HELPER_DEFINITIONS
+    : assessmentEntityHelperRegistry[entityType] ?? []
+
 export const getAssessmentHelperDefinitionsForEntityType = (entityType: Entity_Type): AssessmentEntityHelperDefinition[] =>
-  (assessmentEntityHelperRegistry[entityType] ?? []).filter(definition => !definition.retired)
+  getEntityHelperDefinitions(entityType).filter(definition => !definition.retired)
 
 export const getAssessmentHelperDefinition = (
   entityType: Entity_Type,
   field: string
 ): AssessmentEntityHelperDefinition | null =>
-  (assessmentEntityHelperRegistry[entityType] ?? []).find(definition => definition.field === field) ?? null
+  getEntityHelperDefinitions(entityType).find(definition => definition.field === field) ?? null
 
 export const getAssessmentHelperComparableValueType = (
   definition: AssessmentEntityHelperDefinition
 ): AssessmentHelperComparableValueType => {
-  if (definition.dataType === 'number') {
+  if (definition.dataType === 'number' || definition.dataType === 'money') {
     return 'number'
   }
 

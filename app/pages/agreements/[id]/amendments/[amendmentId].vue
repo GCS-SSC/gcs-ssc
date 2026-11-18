@@ -15,6 +15,7 @@ import AgreementBudgetTab from '~/components/Agreement/AgreementBudgetTab.vue'
 import { hasRequiredAmendmentSubtypeSelections, resolveSelectedAmendmentScopeTypes } from '~/utils/agreement-amendment-scope'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
+import { FundingCaseAgreementTitleProposalSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import type {
   FundingCaseAgreementAmendmentRow
 } from '~~/shared/types/funding-case-agreement-ui'
@@ -61,6 +62,7 @@ const scopeTypeIds: Ref<string[]> = ref([])
 const scopeSubtypeIds: Ref<string[]> = ref([])
 const amendmentNameEn: Ref<string> = ref('')
 const amendmentNameFr: Ref<string> = ref('')
+const proposedTitle: Ref<{ egcs_fc_proposedtitle_en: string; egcs_fc_proposedtitle_fr: string } | null> = ref(null)
 const requiredSubtypeIdsByType: Ref<Record<string, string[]>> = ref({})
 let scopeSubtypeFilterRequest = 0
 let scopeSubtypeRequirementRequest = 0
@@ -176,6 +178,15 @@ const hasRequiredScopeSubtypes = computed(() => hasRequiredAmendmentSubtypeSelec
 const isHistoricalAmendment = computed(() => amendment.value?.egcs_fc_isopen === false
   || isTerminalStatus(amendment.value?.egcs_fc_status))
 const scopeIncludesDuration = computed(() => selectedScopeTypes.value.some(type => type.egcs_tp_amended === 'duration'))
+const scopeIncludesTitle = computed(() => selectedScopeTypes.value.some(type => type.egcs_tp_amended === 'title'))
+const proposedTitleValid = computed(() => FundingCaseAgreementTitleProposalSchema.safeParse(proposedTitle.value).success)
+watch(scopeIncludesTitle, enabled => {
+  if (!enabled || !proposedTitle.value || proposedTitle.value.egcs_fc_proposedtitle_en || proposedTitle.value.egcs_fc_proposedtitle_fr) return
+  proposedTitle.value = {
+    egcs_fc_proposedtitle_en: profile.value?.egcs_fc_title_en ?? '',
+    egcs_fc_proposedtitle_fr: profile.value?.egcs_fc_title_fr ?? ''
+  }
+})
 const scopeSubtypeQuery = computed(() => ({ amendment_type_ids: scopeTypeIds.value.join(','), amendmentId }))
 const inactiveScopeTypeIds = computed(() => (amendment.value?.amendment_types ?? []).filter(type => type.egcs_tp_active === false).map(type => String(type.id)))
 const inactiveScopeSubtypeIds = computed(() => (amendment.value?.amendment_subtypes ?? []).filter(subtype => subtype.egcs_tp_active === false).map(subtype => String(subtype.id)))
@@ -319,7 +330,9 @@ const serializeGeneralDraft = () => JSON.stringify([
   [...scopeTypeIds.value].sort(),
   [...scopeSubtypeIds.value].sort(),
   scopeIncludesDuration.value ? durationDates.value?.egcs_fc_proposedauthorizedassistancestartdate || null : null,
-  scopeIncludesDuration.value ? durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate || null : null
+  scopeIncludesDuration.value ? durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate || null : null,
+  scopeIncludesTitle.value ? proposedTitle.value?.egcs_fc_proposedtitle_en ?? null : null,
+  scopeIncludesTitle.value ? proposedTitle.value?.egcs_fc_proposedtitle_fr ?? null : null
 ])
 const serializeRiskDraft = () => JSON.stringify([changeRisk.value, proposedRiskScoreSelection.value || null])
 let hydratedAmendmentId: string | null = null
@@ -334,6 +347,7 @@ watch(amendment, value => {
     scopeTypeIds.value = []
     scopeSubtypeIds.value = []
     durationDates.value = null
+    proposedTitle.value = null
     changeRisk.value = false
     proposedRiskScoreSelection.value = undefined
     return
@@ -348,7 +362,9 @@ watch(amendment, value => {
     [...(value.amendment_type_ids ?? [])].sort(),
     [...(value.amendment_subtype_ids ?? [])].sort(),
     value.egcs_fc_proposedauthorizedassistancestartdate ?? null,
-    value.egcs_fc_proposedauthorizedassistanceenddate ?? null
+    value.egcs_fc_proposedauthorizedassistanceenddate ?? null,
+    value.egcs_fc_proposedtitle_en ?? null,
+    value.egcs_fc_proposedtitle_fr ?? null
   ])
   const nextRiskScore = value.egcs_fc_proposedriskscore === null || value.egcs_fc_proposedriskscore === undefined
     ? undefined
@@ -358,6 +374,10 @@ watch(amendment, value => {
     scopeSubtypeIds.value = [...(value.amendment_subtype_ids ?? [])]
     amendmentNameEn.value = value.egcs_fc_name_en ?? ''
     amendmentNameFr.value = value.egcs_fc_name_fr ?? ''
+    proposedTitle.value = {
+      egcs_fc_proposedtitle_en: value.egcs_fc_proposedtitle_en ?? '',
+      egcs_fc_proposedtitle_fr: value.egcs_fc_proposedtitle_fr ?? ''
+    }
     durationDates.value = {
       egcs_fc_proposedauthorizedassistancestartdate: value.egcs_fc_proposedauthorizedassistancestartdate ?? undefined,
       egcs_fc_proposedauthorizedassistanceenddate: value.egcs_fc_proposedauthorizedassistanceenddate ?? undefined
@@ -442,6 +462,7 @@ const saveScope = async () => {
     || scopeTypeIds.value.length === 0
     || !hasRequiredScopeSubtypes.value
     || (scopeIncludesDuration.value && !durationDatesValid.value)
+    || (scopeIncludesTitle.value && !proposedTitleValid.value)
     || isSavingScope.value) return
   const generation = amendmentActionGeneration
   const requestedPath = route.path
@@ -460,7 +481,9 @@ const saveScope = async () => {
       egcs_fc_name_fr: amendmentNameFr.value,
       amendment_subtype_ids: [...scopeSubtypeIds.value],
       startDate: durationDates.value?.egcs_fc_proposedauthorizedassistancestartdate,
-      endDate: durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate
+      endDate: durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate,
+      proposedTitleEn: proposedTitle.value?.egcs_fc_proposedtitle_en,
+      proposedTitleFr: proposedTitle.value?.egcs_fc_proposedtitle_fr
     }
     const selectedTypes = await resolveSelectedAmendmentScopeTypes(
       selectedTypeIds,
@@ -487,7 +510,9 @@ const saveScope = async () => {
         : null,
       egcs_fc_proposedauthorizedassistanceenddate: selectedDomains.has('duration')
         ? submittedDraft.endDate
-        : null
+        : null,
+      egcs_fc_proposedtitle_en: selectedDomains.has('title') ? submittedDraft.proposedTitleEn : null,
+      egcs_fc_proposedtitle_fr: selectedDomains.has('title') ? submittedDraft.proposedTitleFr : null
     }
     if (removedAreas.length > 0) {
       const confirmed = await confirmScopeRemoval({
@@ -642,10 +667,24 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               </div>
             </CommonSection>
 
+            <CommonSection v-if="scopeIncludesTitle && proposedTitle" :title="t('agreement.amendments.agreement_title')" badge="03" :grid-cols="1">
+              <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                {{ t('agreement.amendments.agreement_title_description') }}
+              </p>
+              <div class="grid gap-4 md:grid-cols-2">
+                <UFormField :label="t('agreement.title_en')" name="egcs_fc_proposedtitle_en" required>
+                  <UInput v-model="proposedTitle.egcs_fc_proposedtitle_en" class="w-full" :disabled="!canEditAmendmentScope" required />
+                </UFormField>
+                <UFormField :label="t('agreement.title_fr')" name="egcs_fc_proposedtitle_fr" required>
+                  <UInput v-model="proposedTitle.egcs_fc_proposedtitle_fr" class="w-full" :disabled="!canEditAmendmentScope" required />
+                </UFormField>
+              </div>
+            </CommonSection>
+
             <CommonSection
               v-if="scopeIncludesDuration && durationDates"
               :title="t('agreement.amendments.duration')"
-              badge="03"
+              :badge="scopeIncludesTitle ? '04' : '03'"
               :grid-cols="1">
               <div class="space-y-4">
                 <p class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -667,7 +706,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             </CommonSection>
             <CommonSection
               :title="t('agreement.amendments.risk_changes')"
-              :badge="scopeIncludesDuration ? '04' : '03'"
+              :badge="String(3 + Number(scopeIncludesDuration) + Number(scopeIncludesTitle)).padStart(2, '0')"
               :grid-cols="1">
               <div class="space-y-5">
                 <UFormField
@@ -742,7 +781,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                 data-help-target="casework.amendments.detail.common-save"
                 :label="t('common.save')"
                 :loading="isSavingScope"
-                :disabled="!isScopeLookupReady || isSavingScope || !hasAmendmentName || scopeTypeIds.length === 0 || !hasRequiredScopeSubtypes || (scopeIncludesDuration && !durationDatesValid)"
+                :disabled="!isScopeLookupReady || isSavingScope || !hasAmendmentName || scopeTypeIds.length === 0 || !hasRequiredScopeSubtypes || (scopeIncludesDuration && !durationDatesValid) || (scopeIncludesTitle && !proposedTitleValid)"
                 @click="saveScope" />
             </div>
           </section>
@@ -802,6 +841,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             <AgreementActivitiesTab
               v-if="amendment.has_activity_snapshot"
               :agreement-id="agreementId"
+              :date-range="amendment.activity_date_range"
               :action-target="{ kind: 'amendment', agreementId, amendmentId }"
               :api-base="amendmentApiBase"
               :can-create="profile?.can_create_agreement_role === true"

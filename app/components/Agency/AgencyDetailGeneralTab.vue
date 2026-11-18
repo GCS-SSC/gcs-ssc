@@ -48,6 +48,13 @@ const statusLabel = computed(() => t(agency.egcs_ay_active ? 'common.active' : '
               variant="ghost" />
 
             <CommonValueCard
+              :label="t('transfer_payment.require_consistent_proponent_type')"
+              :value="t(agency.egcs_ay_requireconsistentproponenttype ? 'common.yes' : 'common.no')"
+              :sub-value="t('agency.proponent_consistency_description')"
+              icon="i-lucide-users"
+              variant="ghost" />
+
+            <CommonValueCard
               :label="t('agency.detail.op_status')"
               :value="statusLabel"
               :sub-value="t('agency.detail.lifecycle')"

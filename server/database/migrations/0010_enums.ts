@@ -28,7 +28,7 @@ CREATE TYPE "agreement_applicant_recipient_type" AS ENUM ('guarantor', 'obligant
 
 CREATE TYPE "agreement_type" AS ENUM ('grant', 'nonrepayable', 'repayable', 'partiallyrepayable', 'other');
 
-CREATE TYPE "amended_type" AS ENUM ('articles', 'activities', 'budget', 'duration', 'other');
+CREATE TYPE "amended_type" AS ENUM ('articles', 'activities', 'budget', 'duration', 'other', 'title');
 
 CREATE TYPE "applicant_recipient_type" AS ENUM ('aboriginalrecipients', 'forprofitorganizations', 'government', 'internationalnongov', 'notforprofitorganizationsandcharities', 'other', 'individualorsoleproprietorships', 'academia');
 

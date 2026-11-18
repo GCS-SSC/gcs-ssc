@@ -41,7 +41,6 @@ const availabilityItems = computed(() => [
 
 const columns: TableColumnInput<AgencyProfileItem>[] = [
   { accessorKey: 'id', headerKey: 'common.id' },
-  { id: 'abbreviation', header: '' },
   { id: 'name', accessorKey: 'egcs_ay_name_en', headerKey: 'agency.name_en' },
   { accessorKey: 'egcs_ay_agencyfinancialsystemid', headerKey: 'agency.financial_id' },
   { accessorKey: 'egcs_ay_active', headerKey: 'common.status' },
@@ -80,15 +79,6 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
       <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
         {{ row.original.id }}
       </span>
-    </template>
-
-    <template #abbreviation-cell="{ row }">
-      <div
-        class="bg-primary/10 border-primary/10 flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border px-2 shadow-sm">
-        <span class="text-primary text-xs font-black tracking-tighter">
-          {{ getBilingualValue(row.original, 'egcs_ay_abbreviation', '??').toUpperCase() }}
-        </span>
-      </div>
     </template>
 
     <template #name-cell="{ row }">

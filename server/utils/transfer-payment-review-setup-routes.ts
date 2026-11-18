@@ -17,7 +17,7 @@ import {
 } from './transfer-payment-polymorphic'
 import { readReviewSetupPublicationMetadata } from './review-setup-versioning'
 import { supportsDirectReviewConfiguration } from './entity-type-registry'
-import { isAssignableGroup } from './groups'
+import { isAssignableGroup } from './group-eligibility'
 
 type ReviewSetupPatchBody = z.infer<typeof TransferPaymentStreamReviewSetupPatchSchema>
 type ReviewSetupMember = NonNullable<ReviewSetupPatchBody['members']>[number]

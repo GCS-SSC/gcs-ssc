@@ -141,6 +141,26 @@ const navigationItems = computed<ReviewRuntimeNavigationItem[]>(() => [
             ({{ formatScore(section.score.rawScore) }}/{{ formatScore(section.totalScore) }})
           </p>
         </div>
+
+        <section v-if="summary.score.impactors.length" :aria-label="t('transfer_payment.impactors')" class="space-y-3 border-t border-default px-3 py-3">
+          <h3 class="text-sm font-semibold text-zinc-950 dark:text-white">
+            {{ t('transfer_payment.impactors') }}
+          </h3>
+          <dl class="space-y-3">
+            <div v-for="(impactor, index) in summary.score.impactors" :key="index" class="space-y-1">
+              <dt class="break-words font-medium text-zinc-800 dark:text-zinc-200">
+                {{ getLabel(impactor.label) }}
+              </dt>
+              <dd class="text-sm text-muted">
+                {{ t('common.weight') }}: {{ formatScore(impactor.weight) }}
+                <span class="block">{{ t('assessment.impactor_contribution') }}: {{ formatScore(impactor.score) }}</span>
+              </dd>
+            </div>
+          </dl>
+          <p class="text-sm font-semibold text-zinc-950 dark:text-white">
+            {{ t('assessment.impactor_total') }}: {{ formatScore(summary.score.impactorScore) }}
+          </p>
+        </section>
       </div>
     </template>
   </ReviewRuntimeSidebar>

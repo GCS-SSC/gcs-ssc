@@ -1,10 +1,10 @@
 import type { Migration, MigrationProvider } from 'kysely'
 import { productionCoreMigrations } from './production-core-migrations'
-import * as seed from './ncia-demo-seed'
+import { demoMigrations } from './demo-migrations-bundle'
 
 export const coreMigrations = {
   ...productionCoreMigrations,
-  '9999_seed': seed
+  ...demoMigrations
 } satisfies Record<string, Migration>
 
 export const coreMigrationProvider: MigrationProvider = {

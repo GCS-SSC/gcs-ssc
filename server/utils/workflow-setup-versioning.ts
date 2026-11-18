@@ -1,10 +1,10 @@
-import { isAssignableGroup } from './groups'
+import { isAssignableGroup } from './group-eligibility'
 import { isExpectedPublicationFailure } from './publication-errors'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
 import { hasWorkflowMemberApproval } from './workflow-execution-plan'
-import { readAgencyCustomFieldDefinitions } from './agreement-custom-fields'
+import { readAgencyCustomFieldDefinitions } from './agency-custom-field-definitions'
 import type { WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- typed workflow publication primitives */
 import type { Kysely, Selectable, Transaction } from 'kysely'
@@ -355,9 +355,9 @@ const buildRiskRatingEffect = async (
   if (!schema || schema.reviewType !== 'assessment') throw new Error('Risk Rating assessment schema version is unavailable')
   const parsedBands = z.array(ScoringMatrixItemSchema).safeParse(schema.scoringMatrix)
   if (!parsedBands.success || parsedBands.data.length === 0) throw new Error('Risk Rating assessment bands must not be empty')
-  const maxima = parsedBands.data.map(band => Number(band.max))
+  const maxima = parsedBands.data.map(band => Number(band.max)).sort((left, right) => left - right)
   if (maxima.some((maximum, index) => !Number.isFinite(maximum) || (index > 0 && maximum <= maxima[index - 1]!))) {
-    throw new Error('Risk Rating assessment bands must have strictly increasing maxima')
+    throw new Error('Risk Rating assessment bands must have unique finite maxima')
   }
   return {
     workflowMemberId: source.workflowMember.memberId,

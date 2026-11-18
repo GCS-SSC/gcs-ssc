@@ -54,6 +54,35 @@ watch([() => open.value, () => state.value, () => state.value.id], () => {
   modalSession.isOpen.value = open.value
 }, { immediate: true, flush: 'sync' })
 const formSession = useFormSession({ owner: modalSession, action: { kind: 'remote', context: () => actionContext }, submit: onSubmit })
+const confirm = useConfirmDialog()
+const confirmingConsistency = ref(false)
+/**
+ * Confirm the agency-wide policy without changing a replaced opening or draft.
+ * @param value Requested agency setting.
+ */
+const changeConsistency = async (value: boolean) => {
+  if (pending || confirmingConsistency.value || value === Boolean(state.value.egcs_ay_requireconsistentproponenttype)) return
+  const operation = actionContext.capture()
+  const session = modalSession.captureSession()
+  const draft = state.value
+  if (!operation?.canDispatch() || session === null) return
+  confirmingConsistency.value = true
+  try {
+    const accepted = await confirm({
+      title: t('transfer_payment.proponent_consistency_confirm_title'),
+      description: t(value ? 'agency.proponent_consistency_enable_description' : 'agency.proponent_consistency_disable_description'),
+      confirmLabel: t('transfer_payment.proponent_consistency_confirm'),
+      cancelLabel: t('common.cancel'),
+      confirmColor: 'warning'
+    })
+    if (accepted && operation.isCurrent() && modalSession.isCurrentSession(session) && state.value === draft) {
+      draft.egcs_ay_requireconsistentproponenttype = value
+    }
+  } finally {
+    confirmingConsistency.value = false
+  }
+}
+
 /** Signal a real structured-field edit after Vue updates the business control. */
 const completeActiveHelp = async () => {
   const complete = beginGuidedHelpAction(guidedHelpActions, helpForm.value?.$el ?? null, 'agency.edit.active', 'field-change', helpContext.value)
@@ -95,6 +124,12 @@ const completeActiveHelp = async () => {
         </UFormField>
         <UFormField :label="t('common.active')" name="egcs_ay_active">
           <USwitch v-model="state.egcs_ay_active" :label="t('common.active')" data-help-target="agency.edit.active" :data-help-value="state.egcs_ay_active" @update:model-value="completeActiveHelp" />
+        </UFormField>
+        <UFormField :label="t('transfer_payment.require_consistent_proponent_type')" name="egcs_ay_requireconsistentproponenttype" :description="t('agency.proponent_consistency_description')">
+          <USwitch
+            :model-value="state.egcs_ay_requireconsistentproponenttype ?? false"
+            :disabled="pending || confirmingConsistency"
+            @update:model-value="changeConsistency" />
         </UFormField>
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />

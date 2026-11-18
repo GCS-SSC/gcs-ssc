@@ -82,20 +82,6 @@ export const lockActiveGroupMember = async (trx: Transaction<Database>, groupId:
   .forUpdate(['Common_Group_Member', 'Common_Group'])
   .executeTakeFirst())
 
-export const isAssignableGroup = async (db: Db, groupId: string, agencyId: string) => isPositivePostgresBigintText(groupId) && Boolean(await db
-  .selectFrom('Common_Group')
-  .innerJoin('Common_Group_Member', 'Common_Group_Member.egcs_cn_group', 'Common_Group.id')
-  .innerJoin('Common_User', 'Common_User.id', 'Common_Group_Member.egcs_cn_user')
-  .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
-  .select('Common_Group.id')
-  .where('Common_Group.id', '=', groupId)
-  .where('Common_Group.egcs_cn_agency', '=', agencyId)
-  .where('Common_Group._deleted', '=', false)
-  .where('Common_Group_Member._deleted', '=', false)
-  .where('Common_User._deleted', '=', false)
-  .where('user._deleted', '=', false)
-  .executeTakeFirst())
-
 /** Holds the group and an active member through an assignment write. */
 export const lockAssignableGroup = async (trx: Transaction<Database>, groupId: string, agencyId: string) => {
   if (!isPositivePostgresBigintText(groupId)) return false

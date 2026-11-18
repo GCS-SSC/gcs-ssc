@@ -695,6 +695,7 @@
       "activities": "Activités",
       "budget": "Budget",
       "duration": "Durée",
+      "title": "Titre",
       "other": "Autre"
     },
     "monitor_action_type": {
@@ -757,6 +758,10 @@
     }
   },
   "agency": {
+    "proponent_consistency_type_unavailable": "Le type de promoteur exigé par cet organisme n’est pas admissible dans ce volet. Ajoutez ce type aux types de promoteur admissibles du volet avant de faire une nouvelle sélection.",
+    "proponent_consistency_description": "S’applique à toutes les ententes de cet organisme et a priorité sur les paramètres des volets.",
+    "proponent_consistency_enable_description": "Les futurs ajouts de promoteurs et changements de type doivent correspondre au dernier type actif du promoteur dans cet organisme (identifiant d’entente le plus élevé), même si le volet n’exige pas la cohérence. Les différences antérieures et les types enregistrés inchangés restent permis. Aucun type existant n’est modifié automatiquement. La modification prend effet à l’enregistrement de l’organisme.",
+    "proponent_consistency_disable_description": "L’exigence de l’organisme ne s’appliquera plus. Le paramètre de cohérence de chaque volet continuera de s’appliquer. Les types de promoteur existants restent inchangés. La modification prend effet à l’enregistrement de l’organisme.",
     "funding_types": {
       "title": "Types de financement",
       "type": "Type de financement",
@@ -1213,6 +1218,7 @@
       "definition_invalid": "La définition enregistrée de cette évaluation est invalide et ne peut pas être chargée. Communiquez avec le soutien en indiquant le numéro de l’examen."
     },
     "workflow": {
+      "approval_submission_terminal_success_required": "Ce processus de soumission pour approbation doit se terminer par un état terminal. Dans Acheminement, modifiez la dernière étape et sélectionnez un état de réussite terminal. Si aucun n’est disponible, créez un état terminal dans la section États de l’organisme.",
       "risk_source_invalid": "Sélectionnez une évaluation dans l’ensemble d’examens publié comme source de la cote de risque du processus. Une seule source est permise.",
       "route_invalid": "Renseignez des valeurs de sélection valides et vérifiez que le parcours comprend toutes les étapes obligatoires.",
       "recommendation_invalid": "Répondez à toutes les questions obligatoires de la recommandation avant de la soumettre.",
@@ -1482,6 +1488,7 @@
       "invalid_cost_category_line_item": "L'élément de catégorie de coûts sélectionné est invalide.",
       "invalid_budget_fiscal_year": "L'exercice financier du budget d'entente sélectionné est invalide.",
       "fiscal_year_outside_duration": "L'exercice financier sélectionné ne chevauche pas les dates de début et de fin autorisées de l'entente.",
+      "activity_outside_duration": "Toutes les activités doivent être comprises entre les dates de début et de fin autorisées de l’entente avant la soumission.",
       "budget_fiscal_year_not_found": "Exercice financier du budget d'entente introuvable.",
       "budget_fiscal_year_in_use": "Supprimez toutes les lignes budgétaires avant de supprimer cet exercice financier.",
       "budget_currency_immutable": "La devise du budget ne peut pas être modifiée. Créez un budget distinct pour l’autre devise.",
@@ -2249,7 +2256,7 @@
     "note_subject_required": "Saisissez un sujet en anglais ou en français",
     "note_body_required": "Saisissez une note en anglais ou en français",
     "proponent_type_in_use": "Ce type est utilisé par un promoteur d’une entente.",
-    "proponent_type_conflict": "Sélectionnez le dernier type admissible du promoteur dans ce volet.",
+    "proponent_type_conflict": "Sélectionnez le type de promoteur exigé par cet organisme ou ce volet.",
     "budget_percentage": "Saisissez un pourcentage de 0 à 100 avec au plus deux décimales.",
     "retroactive_costs_not_supported": "Les limites de coûts rétroactifs ne sont pas mises en œuvre. Omettez ce champ.",
     "budget_calculation": "Sélectionnez un mode de calcul et une catégorie source valides.",
@@ -2292,6 +2299,7 @@
     "role_permission_ineffective": "Sélectionnez un niveau d’accès ou la gestion des affectations",
     "invalid_url": "Saisissez une URL valide",
     "date_range": "La date de début doit être identique ou antérieure à la date de fin",
+    "activity_date_outside_agreement": "La date de l’activité doit être comprise entre les dates de début et de fin autorisées de l’entente.",
     "id_required": "L'ID du système financier est requis",
     "gwcoa_required": "Le numéro du plan comptable à l’échelle de l’administration fédérale est requis",
     "applicant_recipient_subtype_required": "Le sous-type de promoteur est requis",
@@ -2322,7 +2330,7 @@
     "duplicate_response_key": "Utilisez une clé de réponse unique",
     "duplicate_semantic_key": "Utilisez une clé indépendante de la langue unique",
     "recommendation_unknown_question": "Sélectionnez une question de ce formulaire",
-    "scoring_matrix_order": "Classez les seuils de pointage du plus bas au plus élevé",
+    "scoring_matrix_unique": "Les seuils de pointage doivent être uniques",
     "checklist_duplicate_key": "Utilisez un code indépendant de la langue unique",
     "checklist_invalid_count": "Saisissez un nombre entier qui ne dépasse pas le nombre d’éléments de ce groupe",
     "checklist_invalid_rate": "Saisissez un pourcentage supérieur à 0 et inférieur ou égal à 100",
@@ -2587,6 +2595,12 @@
     "stream_route": "Route du volet",
     "agreement_subtype": "Sous-type d'entente",
     "agreement_subtype_placeholder": "Sélectionner le sous-type d'entente",
+    "assessment_helpers": {
+      "agreement_value": "Valeur de l'entente (financement du programme)",
+      "average_annual_value": "Valeur annuelle moyenne",
+      "recipient_subtypes": "Sous-type de bénéficiaire (au moins un bénéficiaire)",
+      "recipient_count": "Nombre de bénéficiaires"
+    },
     "agreement_type": "Type d'entente",
     "agreement_number": "Numéro d'entente",
     "agreement_number_placeholder": "Saisir le numéro d'entente",
@@ -2772,6 +2786,8 @@
       "open_exists": "Terminez ou fermez la modification ouverte avant d’en créer une autre.",
       "duration": "Période d’aide autorisée",
       "duration_description": "Définissez les dates autorisées proposées. Une modification de durée permet ensuite d’ajouter, de modifier ou de supprimer des exercices financiers du budget.",
+      "agreement_title": "Titre de l’entente",
+      "agreement_title_description": "Définissez le titre proposé de l’entente en anglais et en français. Il remplace le titre actuel seulement après l’approbation de cette modification.",
       "duration_updated": "Les dates autorisées proposées ont été mises à jour",
       "edit_scope": "Modifier la portée",
       "remove_areas_title": "Retirer des sections de la modification?",
@@ -3386,6 +3402,7 @@
     "funding_history": {
       "title": "Historique du financement",
       "description": "Consultez les ententes actives du système et le financement externe partagé déclaré pour ce promoteur.",
+      "contacts_title": "Coordonnées des utilisateurs affectés",
       "search": "Rechercher dans l'historique du financement",
       "restricted": "Détails de l'entente non disponibles",
       "source": {
@@ -3393,6 +3410,7 @@
         "external": "Externe"
       },
       "actions": {
+        "view_contacts": "Voir les coordonnées des utilisateurs affectés",
         "add_external": "Ajouter une entente externe",
         "add_recipient": "Ajouter un autre promoteur",
         "unlink": "Dissocier de ce promoteur"
@@ -3872,6 +3890,7 @@
         "name": "Nom",
         "proposedAuthorizedAssistanceStartDate": "Date de début proposée",
         "proposedAuthorizedAssistanceEndDate": "Date de fin proposée",
+        "proposedTitle": "Titre proposé de l’entente",
         "amendmentTypes": "Types de modification",
         "amendmentSubtypes": "Sous-types de modification",
         "operatingName": "Nom commercial",
@@ -4244,6 +4263,8 @@
   },
   "assessment": {
     "result_incomplete": "Le résultat sera disponible lorsque toutes les réponses obligatoires seront complètes.",
+    "impactor_contribution": "Contribution au score",
+    "impactor_total": "Contribution totale des facteurs d'impact",
     "runtime_status": {
       "optional": "Facultatif — aucun demandé",
       "empty": "Non commencé",

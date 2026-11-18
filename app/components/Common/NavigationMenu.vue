@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { defineComponent, h } from 'vue'
+import type { NavigationMenuItem, NavigationMenuSlots } from '@nuxt/ui'
 import UNavigationMenu from '@nuxt/ui/components/NavigationMenu.vue'
 
 const { label } = defineProps<{ label: string }>()
+defineSlots<NavigationMenuSlots<NavigationMenuItem[]>>()
 const NavigationRoot = defineComponent({
   inheritAttrs: false,
   /** Applies the landmark name at the public polymorphic root, after Reka's default.

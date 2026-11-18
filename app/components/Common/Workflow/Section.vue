@@ -457,7 +457,7 @@ const reviewLocation = (review: RuntimeReview) => localePath({
 })
 const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
   const runStatus = data.value?.current?.runtimeState
-  if (data.value?.steps) {
+  if (data.value?.steps?.length) {
     let ordinal = 0
     const steps: WorkflowDisplayStep[] = []
     for (const member of data.value.steps) {
@@ -552,7 +552,8 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
     status: data.value?.sourceApprovalStage?.runtimeState ?? unmaterializedStepStatus(runStatus),
     outcome: null,
     hasApproval: false,
-    kind: 'final_approval' as const
+    kind: 'final_approval' as const,
+    routingSlipId: data.value?.sourceApprovalStage?.routingSlipId ?? undefined
   }]
 })
 const recommendationStepId = (item: RuntimeRecommendation) => {
@@ -832,6 +833,16 @@ const handleApprovalChanged = async () => {
         class="cursor-default"
         @click="openChooser" />
     </div>
+    <div v-if="status === 'success' && purpose === 'risk_rating' && hasTerminalResult && activeWorkflowTab !== 'previous' && canShowParentAction && (roleVisibleActions || data?.canStart)" class="flex justify-end">
+      <UButton
+        v-if="hasTerminalResult"
+        :data-help-target="helpStartTarget"
+        :icon="workflowStartIcon"
+        :label="workflowStartLabel"
+        :loading="isStarting"
+        :disabled="isMutationPending"
+        @click="start" />
+    </div>
     <UAlert
       v-if="purpose === 'standard' && !hasActiveWorkflow && data?.activeWorkflowPurpose"
       color="warning"
@@ -943,7 +954,7 @@ const handleApprovalChanged = async () => {
       <template v-if="$slots['pre-action-action'] || (canShowParentAction && (roleVisibleActions || data?.canStart))" #action>
         <slot v-if="$slots['pre-action-action']" name="pre-action-action" />
         <UButton
-          v-else
+          v-else-if="!hasTerminalResult"
           :data-help-target="helpStartTarget"
           :icon="workflowStartIcon"
           :label="workflowStartLabel"

@@ -229,18 +229,16 @@ const optionFormSession = useFormSession({ owner: optionModal, action: { kind: '
 
 <template>
   <section class="space-y-4" data-field-scope="agency.custom-fields">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 v-if="showHeader" class="text-xl font-semibold">
-        {{ t('custom_fields.title') }}
-      </h2>
-      <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('custom_fields.add_field')" @click="fieldModal.openCreate()" />
-    </div>
+    <h2 v-if="showHeader" class="text-xl font-semibold">
+      {{ t('custom_fields.title') }}
+    </h2>
     <CommonResourceLayout
       v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
       :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
       :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="filteredFields.length"
-      :loading="status === 'pending'" :request-status="status" :show-button="false"
-      @retry="refresh()" @update:expanded="expandedRows = $event">
+      :loading="status === 'pending'" :request-status="status" :show-button="canCreate"
+      :button-label="t('custom_fields.add_field')"
+      @add="fieldModal.openCreate()" @retry="refresh()" @update:expanded="expandedRows = $event">
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row)" class="contents">
           <div v-if="row.groupingColumnId === 'fieldGroup'" class="flex items-center gap-3 py-1">

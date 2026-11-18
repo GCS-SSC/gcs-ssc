@@ -85,7 +85,7 @@ watch(
     </UFormField>
 
     <UFormField v-if="modelValue.type === 'helpers'" :label="t('transfer_payment.helper_field')" name="dependency.field" required>
-      <AssessmentSchemaHelperFieldSelect v-model="modelValue.field" />
+      <AssessmentSchemaHelperFieldSelect v-model="modelValue.field" :exclude-data-types="['id_list']" />
     </UFormField>
 
     <UFormField v-else :label="t('transfer_payment.assessment_item')" name="dependency.question" required>

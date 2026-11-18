@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getPaginationRowModel } from '@tanstack/table-core'
-import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { TransferPaymentProfileRow } from '~~/shared/types/transfer-payment-ui'
 import type { ResourceTableStatus } from '~~/shared/types/resource-table'
@@ -46,14 +46,9 @@ const availabilityItems = computed(() => [
 const columns: TableColumnInput<TransferPaymentProfileRow>[] = [
   { accessorKey: 'id', headerKey: 'common.id' },
   { accessorKey: 'egcs_tp_name_en', headerKey: 'transfer_payment.name_en' },
-  { id: 'abbreviation', accessorKey: 'egcs_tp_abbreviation_en', headerKey: 'transfer_payment.abbreviation' },
   { id: 'agency', headerKey: 'transfer_payment.agency' },
   { accessorKey: 'egcs_tp_active', headerKey: 'transfer_payment.status' },
   { id: 'actions', headerKey: 'common.actions' }
-]
-
-const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
-  { id: 'abbreviation', accessorKey: { en: 'egcs_tp_abbreviation_en', fr: 'egcs_tp_abbreviation_fr' } }
 ]
 </script>
 
@@ -64,7 +59,6 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
     v-model:pagination="pagination" layout="page"
     :data="profiles"
     :columns="columns"
-    :bilingual-columns="bilingualColumns"
     :total-records="totalRecords"
     :loading="loading"
     :request-status="requestStatus"

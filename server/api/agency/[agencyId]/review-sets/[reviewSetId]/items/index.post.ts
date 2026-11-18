@@ -10,7 +10,7 @@ import {
   validateReviewSchemasForAgency
 } from '~~/server/utils/transfer-payment-polymorphic'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { isAssignableGroup } from '~~/server/utils/groups'
+import { isAssignableGroup } from '~~/server/utils/group-eligibility'
 
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId') ?? ''

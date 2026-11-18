@@ -47,6 +47,7 @@ export const createCatalogCacheClient = (options: CatalogCacheClientOptions = {}
   const storage = options.storage
   const listeners = new Set<(change: CatalogCacheChange) => void>()
   const owners = new Map<string, string[]>()
+  const ownerEpochs = new Map<string, number>()
   const staleOwners = new Set<string>()
   let identity: CatalogCacheIdentity | null = null
   let versions: StoredVersions | null = null
@@ -109,6 +110,7 @@ export const createCatalogCacheClient = (options: CatalogCacheClientOptions = {}
     identity = next
     versions = null
     owners.clear()
+    ownerEpochs.clear()
     staleOwners.clear()
     generation += 1
     pendingCheck = null
@@ -162,11 +164,13 @@ export const createCatalogCacheClient = (options: CatalogCacheClientOptions = {}
     url.searchParams.sort()
     return url
   }
+  const ownershipStamp = (url: URL, group: CatalogGroup, agencyIds: readonly string[], snapshot: StoredVersions | null): string =>
+    JSON.stringify([identityKey(), ownerEpochs.get(url.href) ?? 0, agencyIds.map(agencyId => [agencyId, snapshot?.agencies[agencyId]?.[group] ?? null])])
   const getRequestStamp = (value: string | URL): string => {
     const url = requestUrl(value)
     const rule = getCatalogCacheRule(url)
     if (!rule || url.origin !== origin) return ''
-    return JSON.stringify([identityKey(), (owners.get(url.href) ?? []).map(agencyId => [agencyId, versions?.agencies[agencyId]?.[rule.group] ?? null])])
+    return ownershipStamp(url, rule.group, owners.get(url.href) ?? [], versions)
   }
   const affects = (value: string | URL, change: CatalogCacheChange): boolean => {
     const url = requestUrl(value)
@@ -191,6 +195,7 @@ export const createCatalogCacheClient = (options: CatalogCacheClientOptions = {}
     const stamp = getRequestStamp(url)
     const versionsAtStart = versions
     const requestedOwners = owners.get(url.href)
+    const requestedOwnerEpoch = ownerEpochs.get(url.href) ?? 0
     const networkUrl = new URL(url)
     if (rule && identity) {
       networkUrl.searchParams.set('catalogAccount', identity.accountId)
@@ -215,19 +220,31 @@ export const createCatalogCacheClient = (options: CatalogCacheClientOptions = {}
     if (sameOriginApi && requestedGeneration === generation && response.ok && method === 'POST' && url.pathname === '/api/auth/sign-out') setIdentity(null)
     if (!rule) return response
     syncStorage()
-    if (requestedGeneration !== generation || stamp !== getRequestStamp(url)) throw obsoleteRequest()
+    if (requestedGeneration !== generation || requestedOwnerEpoch !== (ownerEpochs.get(url.href) ?? 0)) throw obsoleteRequest()
+    let responseOwners: string[] | null = null
     if (response.ok) {
       try {
         const parsed = AgencyIdsSchema.safeParse(JSON.parse(response.headers.get('X-Catalog-Agencies') ?? 'null'))
-        if (parsed.success) {
-          if (parsed.data.some(agencyId => versionsAtStart?.agencies[agencyId]?.[rule.group] !== versions?.agencies[agencyId]?.[rule.group])) throw obsoleteRequest()
-          owners.set(url.href, [...new Set(parsed.data)].sort())
-          staleOwners.delete(url.href)
-        }
+        if (parsed.success) responseOwners = [...new Set(parsed.data)].sort()
       } catch (error) {
         if (error instanceof DOMException) throw error
         // Missing ownership metadata leaves this request uncached.
       }
+    }
+    const currentOwners = owners.get(url.href)
+    if (requestedOwners === undefined && currentOwners !== undefined && responseOwners !== null
+      && JSON.stringify(responseOwners) !== JSON.stringify(currentOwners)) throw obsoleteRequest()
+    const currentStamp = getRequestStamp(url)
+    // Initial discovery can join a sibling only with the same owners and captured revisions.
+    if (stamp !== currentStamp && (requestedOwners !== undefined || responseOwners === null
+      || ownershipStamp(url, rule.group, responseOwners, versionsAtStart) !== currentStamp)) throw obsoleteRequest()
+    if (responseOwners !== null) {
+      if (responseOwners.some(agencyId => versionsAtStart?.agencies[agencyId]?.[rule.group] !== versions?.agencies[agencyId]?.[rule.group])) throw obsoleteRequest()
+      if (currentOwners !== undefined && JSON.stringify(currentOwners) !== JSON.stringify(responseOwners)) {
+        ownerEpochs.set(url.href, requestedOwnerEpoch + 1)
+      }
+      owners.set(url.href, responseOwners)
+      staleOwners.delete(url.href)
     }
     const acceptedStamp = getRequestStamp(url)
     const guardResponse = (currentResponse: Response): Response => {

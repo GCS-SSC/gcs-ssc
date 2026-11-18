@@ -229,11 +229,19 @@ const mutate = async (kind: PendingAction, action: (operation: CapturedActionCon
   const epoch = editorEpoch.value
   const current = () => mutationRequest.isCurrent(request) && editorEpoch.value === epoch && operation.isCurrent()
   const canContinue = () => current() && operation.canDispatch()
+  let failure: { error: unknown } | null = null
   try {
     await action(operation, current, canContinue)
-    mutationRequest.succeed(request)
   } catch (error) {
-    if (current() && mutationRequest.fail(request, error)) showError(error)
+    failure = { error }
+    if (current()) showError(error)
+  } finally {
+    // Canonical navigation disposes this owner; finish chained publication first.
+    if (kind === 'publish' && current() && selected.value && !guideDirty.value
+      && ('guideId' in route.params ? route.params.guideId : undefined) === 'new') {
+      await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(selected.value.id), query: { context: context.value, section: selectedTab.value } }))
+    }
+    if (failure) mutationRequest.fail(request, failure.error)
     else mutationRequest.succeed(request)
   }
 }
@@ -257,7 +265,7 @@ const createGuide = () => {
   document.value = blankGuide()
   sharedOffer.value = false
 }
-const persistGuide = async (current: () => boolean, canContinue: () => boolean): Promise<boolean> => {
+const persistGuide = async (current: () => boolean, canContinue: () => boolean, intent: 'save' | 'publish'): Promise<boolean> => {
   if (!document.value || !canContinue()) return false
   const body = { egcs_cn_document: JSON.parse(JSON.stringify(document.value)), egcs_cn_shared: sharedOffer.value }
   const endpoint = selected.value ? `/api/guided-help/${selected.value.id}` : ownedEndpoint.value
@@ -274,7 +282,7 @@ const persistGuide = async (current: () => boolean, canContinue: () => boolean):
   const unchanged = JSON.stringify(document.value) === JSON.stringify(body.egcs_cn_document) && sharedOffer.value === body.egcs_cn_shared
   selected.value = result
   if (unchanged) document.value = structuredClone(result.egcs_cn_document)
-  if (('guideId' in route.params ? route.params.guideId : undefined) === 'new') await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(result.id), query: { context: context.value, section: selectedTab.value } }))
+  if (intent === 'save' && ('guideId' in route.params ? route.params.guideId : undefined) === 'new') await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(result.id), query: { context: context.value, section: selectedTab.value } }))
   if (!current()) return false
   const index = guides.value.findIndex(guide => guide.id === result.id)
   if (index < 0) guides.value.push(result)
@@ -282,7 +290,7 @@ const persistGuide = async (current: () => boolean, canContinue: () => boolean):
   return true
 }
 const saveGuide = () => mutate('save', async (_operation, current, canContinue) => {
-  await persistGuide(current, canContinue)
+  await persistGuide(current, canContinue, 'save')
 })
 const guideAction = (action: 'publish' | 'retire' | 'delete') => mutate(action, async (operation, current, canContinue) => {
   if (action === 'retire' && guideDirty.value) {
@@ -301,7 +309,7 @@ const guideAction = (action: 'publish' | 'retire' | 'delete') => mutate(action, 
       showError(new Error(errors[0]!.message))
       return
     }
-    if ((!selected.value || guideDirty.value) && !await persistGuide(current, canContinue)) return
+    if ((!selected.value || guideDirty.value) && !await persistGuide(current, canContinue, 'publish')) return
     if (guideDirty.value) return
   }
   if (!canContinue() || !selected.value) return
@@ -318,6 +326,8 @@ const guideAction = (action: 'publish' | 'retire' | 'delete') => mutate(action, 
     })) return
   } else await helpRequest(`/api/guided-help/${targetId}/${action}`, 'POST')
   if (!current()) return
+  // The incoming canonical page owns readback after a new guide's publication.
+  if (action === 'publish' && ('guideId' in route.params ? route.params.guideId : undefined) === 'new') return
   await reload()
   if (!current()) return
   if (action === 'delete') await goIndex()
