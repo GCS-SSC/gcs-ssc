@@ -1525,7 +1525,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
             </section>
 
             <div v-else-if="selectedClaimTab === 'reconciliation'" data-help-view="casework.claims.reconciliation" data-help-target="casework.claims.detail.reconciliation" data-help-kind="section" class="w-full min-w-0">
-              <div v-if="canStartReconcile" class="mb-6 flex justify-end">
+              <div v-if="claimIsReadyForReconcile && canStartReconcile" class="mb-6 flex justify-end">
                 <UButton
                   data-help-target="casework.claims.detail.claims-new-reconcile-with-context"
                   color="primary"
