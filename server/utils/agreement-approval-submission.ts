@@ -58,11 +58,13 @@ export const hasSuccessfulInitialAgreementApproval = async (
   return revision !== undefined
 }
 
-export const throwAgreementInitialApprovalRequired = (event: H3Event) => throwApiError(event, {
-  statusCode: 409,
-  code: 'AGREEMENT_INITIAL_APPROVAL_REQUIRED',
-  key: 'apiErrors.agreement.initial_approval_required'
-})
+export const throwAgreementInitialApprovalRequired = (event: H3Event) => {
+  return throwApiError(event, {
+    statusCode: 409,
+    code: 'AGREEMENT_INITIAL_APPROVAL_REQUIRED',
+    key: 'apiErrors.agreement.initial_approval_required'
+  })
+}
 
 export const assertAgreementApprovalSubmissionUnlocked = async (
   event: H3Event,
