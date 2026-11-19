@@ -147,6 +147,7 @@ const {
   mutationRoleAllowed,
   actionRoleAllowed = undefined,
   actionPrerequisiteWarning,
+  startPrerequisiteWarning,
   purpose = 'standard',
   canEdit = true,
   refreshKey = 0,
@@ -167,6 +168,7 @@ const {
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
   actionPrerequisiteWarning?: LocalizedToastText
+  startPrerequisiteWarning?: LocalizedToastText
   purpose?: Workflow_Purpose
   canEdit?: boolean
   refreshKey?: number
@@ -385,7 +387,7 @@ const canShowParentAction = computed(() => actionRoleAllowed ?? canEdit)
 const startActionContext = useActionContext({
   identity: [runtimeIdentity],
   authority: canShowParentAction,
-  eligible: () => canEdit && activeWorkflowTab.value === 'current' && data.value?.canStart === true
+  eligible: () => canEdit && !startPrerequisiteWarning && activeWorkflowTab.value === 'current' && data.value?.canStart === true
 })
 watch(startActionContext.version, () => {
   isChooserOpen.value = false
@@ -405,6 +407,7 @@ const guardParentAction = (action: 'start' | 'retry' | 'cancel') => {
   if (!actionRoleAllowed || status.value === 'pending' || activeWorkflowTab.value === 'previous') return false
   const ready = canEdit && status.value === 'success' && (action === 'start' ? data.value?.canStart : action === 'retry' ? data.value?.canRetry : data.value?.canCancel)
   const warning = actionPrerequisiteWarning
+    || (action === 'start' ? startPrerequisiteWarning : undefined)
     || (!ready
       ? action === 'start'
         ? snapshotStartBlocker()

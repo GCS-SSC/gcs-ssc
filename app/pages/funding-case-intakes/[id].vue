@@ -60,10 +60,11 @@ const scope = computed<Scope | null>(() => acceptedOwner.value
   : null)
 const isLocked = computed(() => isStatusLocked(profile.value?.egcs_fi_status))
 const canEditRole = computed(() => Boolean(scope.value && can('funding_case', 'update', scope.value)))
-const canEdit = computed(() => canEditRole.value && isAssigned.value && !isLocked.value)
-const workWarning = computed(() => !isAssigned.value
-  ? toast.localized('assignments.read_only_description')
-  : isLocked.value ? toast.localized('workflow.action_prerequisite_unavailable') : undefined)
+const canWorkWorkflow = computed(() => canEditRole.value && isAssigned.value)
+const canEdit = computed(() => canWorkWorkflow.value && !isLocked.value)
+const workflowAssignmentWarning = computed(() => !isAssigned.value ? toast.localized('assignments.read_only_description') : undefined)
+const lockedIntakeWarning = computed(() => isLocked.value ? toast.localized('workflow.action_prerequisite_unavailable') : undefined)
+const workWarning = computed(() => workflowAssignmentWarning.value ?? lockedIntakeWarning.value)
 const canDelete = computed(() => Boolean(scope.value && can('funding_case', 'delete', scope.value)))
 const deleteContext = useActionContext({
   identity: [() => String(route.params.id), () => acceptedOwner.value?.agencyId, () => acceptedOwner.value?.programId],
@@ -157,13 +158,13 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <CommonReviewsTab entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-prerequisite-warning="workWarning" @changed="refresh" />
           </section>
           <section v-else-if="selectedTab === 'workflows'" data-help-target="intake.detail.workflow" data-help-kind="section" class="flex w-full min-w-0 flex-col">
-            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :mutation-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canWorkWorkflow" :action-role-allowed="canEditRole" :mutation-role-allowed="canEditRole" :action-prerequisite-warning="workflowAssignmentWarning" :start-prerequisite-warning="lockedIntakeWarning" @changed="refresh" />
           </section>
           <section v-else-if="selectedTab === 'supplementary-information'" data-help-target="intake.detail.supplementary-information" data-help-kind="section" class="flex w-full min-w-0 flex-col">
             <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
           </section>
           <section v-else-if="selectedTab === 'approval'" data-help-target="intake.detail.approval" data-help-kind="section" class="flex w-full min-w-0 flex-col">
-            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :mutation-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canWorkWorkflow" :action-role-allowed="canEditRole" :mutation-role-allowed="canEditRole" :action-prerequisite-warning="workflowAssignmentWarning" :start-prerequisite-warning="lockedIntakeWarning" @changed="refresh" />
           </section>
           <section v-else-if="selectedTab === 'assignments'" data-help-target="intake.detail.assignments" data-help-kind="section" class="flex w-full min-w-0 flex-col">
             <CommonAssignedUsers :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
