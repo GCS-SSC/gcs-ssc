@@ -1,5 +1,6 @@
 import { securityRemediationPostgresE2eSpecPaths } from '../tooling/gcs-ssc/scripts/security-remediation-e2e-specs'
 /* eslint-disable jsdoc/require-jsdoc */
+import { randomBytes } from 'node:crypto'
 import { realpathSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
@@ -18,6 +19,8 @@ const DEFAULT_PORT_SCAN_LIMIT = 50
 const DEFAULT_PLAYWRIGHT_WORKERS = '1'
 const E2E_POSTGRES_TEST_URL_ENV = 'E2E_POSTGRES_TEST_URL'
 const E2E_ACCESS_POSTGRES_TEST_URL_ENV = 'E2E_ACCESS_POSTGRES_TEST_URL'
+
+const hostileDeepLinksE2eSpecPath = 'tests/e2e/hostile-deep-links.spec.ts'
 
 export const extensionProfileE2eSpecPath = 'tests/e2e/agreement-extension-persistence.spec.ts'
 export const notificationEditorE2eSpecPath = 'tests/e2e/notification-provider-editor-host.spec.ts'
@@ -127,7 +130,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/forecast-historical-budget-read.spec.ts',
   'tests/e2e/forecast-role-recovery.spec.ts',
   'tests/e2e/funding-source-retained-budget.spec.ts',
-  'tests/e2e/hostile-deep-links.spec.ts',
+  hostileDeepLinksE2eSpecPath,
   'tests/e2e/journal-vouchers.spec.ts',
   'tests/e2e/monitor-historical-reference.spec.ts',
   'tests/e2e/review-group-claim-clone-caller.spec.ts',
@@ -1031,6 +1034,9 @@ export const resolveFixtureIsolationCapability = (options: {
   return JSON.stringify({ spec: options.spec, database: options.database, databaseOwned: true, storageOwned: true })
 }
 
+export const createManagedFixtureSecretsKey = (spec: string | undefined, ownsFixture: boolean): string | undefined =>
+  ownsFixture && spec === hostileDeepLinksE2eSpecPath ? randomBytes(32).toString('base64') : undefined
+
 const logPortSelection = (config: E2eScriptConfig): void => {
   if (!config.baseUrlFromEnv && config.port !== config.preferredPort) {
     console.info(`[e2e] Port ${config.preferredPort} is in use. Using port ${config.port}.`)
@@ -1118,9 +1124,10 @@ const registerCleanupSignals = (cleanup: () => Promise<void>): {
 const runE2eTests = async (
   config: E2eScriptConfig,
   env: NodeJS.ProcessEnv,
+  serverEnv: NodeJS.ProcessEnv,
   additionalCleanup?: () => Promise<void>
 ): Promise<void> => {
-  const devProcess = spawnManagedServer(config.port, env, config.serverMode)
+  const devProcess = spawnManagedServer(config.port, serverEnv, config.serverMode)
   let e2eProcess: Bun.Subprocess | undefined
   const cleanup = createProcessCleanup(devProcess, () => e2eProcess, additionalCleanup)
   const { handleSigint, handleSigterm } = registerCleanupSignals(cleanup)
@@ -1191,12 +1198,15 @@ const main = async (): Promise<void> => {
       serverOwned: !config.baseUrlFromEnv
     })
     if (fixtureIsolation) env.GCS_E2E_FIXTURE_ISOLATION = fixtureIsolation
+    const fixtureSecretsKey = createManagedFixtureSecretsKey(config.selectedSpec, fixtureIsolation !== undefined)
+    if (fixtureSecretsKey) delete env.GCS_EXTENSION_SECRETS_KEY
     await prepareManagedProductionServer(
       config.serverMode,
       env.ENVIRONMENT_TYPE,
       command => runInheritedCommandWithEnv(command, env)
     )
-    await runE2eTests(config, env, cleanupManagedResources)
+    const serverEnv = fixtureSecretsKey ? { ...env, GCS_EXTENSION_SECRETS_KEY: fixtureSecretsKey } : env
+    await runE2eTests(config, env, serverEnv, cleanupManagedResources)
   } finally {
     await cleanupManagedResources()
   }
