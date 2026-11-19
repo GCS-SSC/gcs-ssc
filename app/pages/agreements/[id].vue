@@ -184,6 +184,11 @@ const getLocalizedWorkflowName = (name: { en: string, fr: string }): string => g
   workflow_name_en: name.en,
   workflow_name_fr: name.fr
 }, 'workflow_name', t('common.not_available'))
+const financialSummaryRiskLabel = computed(() => {
+  const agreement = profile.value
+  if (agreement?.egcs_fc_riskscore == null) return t('agreement.financial_summary.risk_unassessed')
+  return getBilingualValue(agreement, 'risk_rating_name', t('agreement.financial_summary.risk_unavailable'))
+})
 const formatRiskScore = (score: number | null | undefined): string => score === null || score === undefined
   ? t('common.not_available')
   : n(score)
@@ -531,7 +536,8 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <AgreementFinancialSummaryTab
               v-else-if="selectedTab === 'financial-summary'"
-              :agreement-id="id" />
+              :agreement-id="id"
+              :risk-label="financialSummaryRiskLabel" />
 
             <CommonCompletionWorkflowPreAction
               v-else-if="selectedTab === 'recommendation'"

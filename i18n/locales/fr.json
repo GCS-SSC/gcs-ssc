@@ -2716,6 +2716,9 @@
     },
     "financial_summary": {
       "title": "Sommaire financier",
+      "risk_rating": "Cote de risque",
+      "risk_unassessed": "Non évaluée",
+      "risk_unavailable": "Cote indisponible",
       "fiscal_year": "Exercice financier",
       "grid_note": "Les demandes de remboursement, les rapprochements et les paiements figurent au mois où leur période se termine, même si les périodes se chevauchent. Le budget est annuel; les tirets indiquent l'absence de montant mensuel.",
       "budget_line": "Ligne budgétaire",

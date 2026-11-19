@@ -2716,6 +2716,9 @@
     },
     "financial_summary": {
       "title": "Financial Summary",
+      "risk_rating": "Risk rating",
+      "risk_unassessed": "Unassessed",
+      "risk_unavailable": "Rating unavailable",
       "fiscal_year": "Fiscal year",
       "grid_note": "Claims, reconciliations and payments appear in the month their period ends, including overlapping periods. Budget is annual; dashes mark no monthly amount.",
       "budget_line": "Budget line",

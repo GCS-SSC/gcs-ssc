@@ -99,7 +99,7 @@ const ROW_TONES: Record<RowType, { row: string, sticky: string, chip: string }> 
   }
 }
 
-const { agreementId } = defineProps<{ agreementId: string }>()
+const { agreementId, riskLabel } = defineProps<{ agreementId: string, riskLabel: string }>()
 const { t, locale } = useI18n()
 const selectedYearId: Ref<string | null> = ref(null)
 const visibleRowTypes: Ref<RowType[]> = ref([...ROW_TYPES])
@@ -334,11 +334,14 @@ const peakShare = (progress: FinancialProgress, currency: string): string | null
 <template>
   <section data-testid="agreement-financial-summary" class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.financial-summary-tab" data-scope-label-en="Agreements > Financial summary" data-scope-label-fr="Ententes > Sommaire financier" data-help-view="agreement.financial-summary" data-help-label-en="Agreements — Financial summary" data-help-label-fr="Ententes — Sommaire financier" data-help-target="agreement.financial-summary.content" data-help-kind="section">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div class="space-y-1">
-        <h2 class="text-xl font-semibold text-highlighted">
-          {{ t('agreement.financial_summary.title') }}
-        </h2>
-      </div>
+      <dl class="min-w-0 text-sm" data-testid="financial-summary-risk">
+        <dt class="text-muted">
+          {{ t('agreement.financial_summary.risk_rating') }}
+        </dt>
+        <dd class="break-words font-semibold text-highlighted">
+          {{ riskLabel }}
+        </dd>
+      </dl>
       <div v-if="overview?.fiscalYears.length" class="w-full shrink-0 sm:w-52">
         <label for="financial-summary-year" class="mb-1.5 block text-sm font-medium text-highlighted">
           {{ t('agreement.financial_summary.fiscal_year') }}
