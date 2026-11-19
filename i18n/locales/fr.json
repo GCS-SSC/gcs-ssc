@@ -891,7 +891,17 @@
       "workflow_setups": "Processus",
       "review_schemas": "Schémas d’examen",
       "account_receivable_types": "Types de comptes débiteurs",
-      "agreement_relationship_types": "Types de relations entre ententes"
+      "agreement_relationship_types": "Types de relations entre ententes",
+      "proponent_relationship_types": "Types de relations entre promoteurs"
+    },
+    "proponent_relationship_type": {
+      "role": "Rôle",
+      "inverse_role": "Rôle inverse",
+      "same_role": "Même rôle dans les deux profils",
+      "directional": "Rôles différents dans chaque profil",
+      "directional_description": "Par exemple, un promoteur est la société mère et l’autre est la filiale.",
+      "code": "Code indépendant de la langue",
+      "code_description": "Utilisé dans les modèles de documents. Entrez des lettres minuscules, des chiffres ou des traits de soulignement, en commençant par une lettre."
     },
     "monitor_types": {
       "receivable_eligible": "Autoriser les suivis liés aux comptes débiteurs",
@@ -1376,6 +1386,9 @@
       "duplicate_account_receivable_type_name_en": "Un type de compte débiteur avec ce titre anglais existe déjà pour l’organisme.",
       "duplicate_account_receivable_type_name_fr": "Un type de compte débiteur avec ce titre français existe déjà pour l’organisme.",
       "chart_in_use": "Cette ligne comptable est déjà utilisée et ne peut pas être modifiée ni supprimée. Désactivez-la pour empêcher de nouvelles sélections.",
+      "proponent_relationship_type_not_found": "Type de relation entre promoteurs introuvable.",
+      "proponent_relationship_type_in_use": "Un lien actif entre promoteurs utilise ce type de relation. Supprimez les liens avant de retirer le type.",
+      "duplicate_proponent_relationship_code": "Ce code est déjà réservé à un rôle de relation entre promoteurs dans cette agence.",
       "agreement_relationship_type_not_found": "Type de relation entre ententes introuvable.",
       "agreement_relationship_type_in_use": "Ce type de relation est utilisé par une entente.",
       "duplicate_agreement_relationship_type_name_en": "Un type de relation entre ententes portant ce nom anglais existe déjà.",
@@ -1694,6 +1707,10 @@
     },
     "applicant_recipient": {
       "profile_not_found": "Profil de promoteur introuvable.",
+      "invalid_relationship": "Sélectionnez un promoteur lié et un rôle de relation valides pour cette agence.",
+      "duplicate_relationship": "Cette relation existe déjà pour ces promoteurs et cette agence.",
+      "relationship_role_required": "Sélectionnez un rôle lorsque vous passez à une relation directionnelle.",
+      "relationship_profile_in_use": "Supprimez les relations actives de ce promoteur avant de le supprimer.",
       "profile_in_use": "Retirez ce promoteur des ententes actives et de l’historique de financement avant de le supprimer.",
       "invalid_subtype": "Le sous-type de promoteur sélectionné est invalide.",
       "invalid_subtype_for_lead_agency": "Le sous-type de promoteur sélectionné n'appartient pas à l'organisme principal sélectionné.",
@@ -2340,6 +2357,8 @@
     "duplicate_chart_of_account_label_fr": "Les libellés français des champs comptables doivent être uniques dans cette entrée",
     "invalid_extension_key": "Utilisez une clé d'extension en minuscules commençant par une lettre et contenant seulement des lettres, des chiffres ou des traits d'union",
     "invalid_hex_color": "Saisissez une couleur hexadécimale valide",
+    "invalid_proponent_relationship_code": "Entrez un code en minuscules commençant par une lettre. Utilisez uniquement des lettres, des chiffres et des traits de soulignement.",
+    "distinct_proponent_relationship_codes": "Entrez un code différent pour le rôle inverse.",
     "invalid_lucide_icon": "Sélectionnez une icône Lucide valide",
     "status_flags_exclusive": "Un statut ne peut pas être à la fois en lecture seule et terminal",
     "business_status_workflow_only": "Le statut administratif peut seulement être modifié par un processus publié",
@@ -3429,6 +3448,17 @@
       "legal_name": "Fournissez le nom légal dans au moins une langue : anglais ou français.",
       "operating_name": "Fournissez le nom d'exploitation dans au moins une langue : anglais ou français.",
       "description": "Fournissez la description dans au moins une langue : anglais ou français."
+    },
+    "related_proponents": {
+      "title": "Promoteurs liés",
+      "proponent": "Promoteur lié",
+      "role": "Rôle dans la relation",
+      "role_hint": "Choisissez le rôle du promoteur lié.",
+      "add": "Ajouter un promoteur lié",
+      "edit": "Modifier la relation entre promoteurs",
+      "search": "Rechercher des promoteurs liés",
+      "remove_named": "Retirer la relation avec {name}",
+      "remove_confirm": "Retirer cette relation des deux profils de promoteur ?"
     },
     "agency_financial_ids": {
       "title": "Identifiants financiers d'organisme",

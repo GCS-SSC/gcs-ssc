@@ -343,12 +343,14 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Monitor_Type: AgencyMonitorTypeTable
   Agency_Document_Template: AgencyDocumentTemplateTable
   Agency_Agreement_Relationship_Type: AgencyAgreementRelationshipTypeTable
+  Agency_Proponent_Relationship_Type: AgencyProponentRelationshipTypeTable
   Agency_Address_Type: AgencyAddressTypeTable
   Agency_Applicant_Recipient_Subtype: AgencyApplicantRecipientSubtypeTable
   Agency_Approval_Behalf_Type: AgencyApprovalBehalfTypeTable
   Agency_Agreement_Type: AgencyAgreementTypeTable
   Agency_Holdback_Basis: AgencyHoldbackBasisTable
   Applicant_Recipient_Profile: ApplicantRecipientProfileTable
+  Applicant_Recipient_Relationship: ApplicantRecipientRelationshipTable
   Applicant_Recipient_Note: ApplicantRecipientNoteTable
   Applicant_Recipient_Registry: ApplicantRecipientRegistryTable
   Applicant_Recipient_Agency_Financial_Id: ApplicantRecipientAgencyFinancialIdTable
@@ -895,6 +897,15 @@ export interface ApplicantRecipientProfileTable {
   egcs_ar_researchorganization_en?: string | null
   egcs_ar_researchorganization_fr?: string | null
   egcs_ar_active: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
+export interface ApplicantRecipientRelationshipTable {
+  id: Generated<string>
+  egcs_ar_agency: string
+  egcs_ar_proponent: string
+  egcs_ar_relatedproponent: string
+  egcs_ar_relationshiptype: string
   _deleted: Generated<boolean>
 }
 
@@ -2962,6 +2973,18 @@ export interface AgencyAgreementRelationshipTypeTable {
   egcs_ay_organizationagency: string
   egcs_ay_typename_en: string
   egcs_ay_typename_fr: string
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyProponentRelationshipTypeTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_code: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_inverse_code: string | null
+  egcs_ay_inverse_name_en: string | null
+  egcs_ay_inverse_name_fr: string | null
   _deleted: Generated<boolean>
 }
 

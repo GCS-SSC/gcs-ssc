@@ -105,6 +105,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/agreement-proponent-read-review.spec.ts',
   'tests/e2e/agreement-proponent-update-review.spec.ts',
   'tests/e2e/agreement-relationships.spec.ts',
+  'tests/e2e/related-proponents.spec.ts',
   'tests/e2e/agreement-update-review.spec.ts',
   'tests/e2e/agreements.spec.ts',
   'tests/e2e/amendment-document-ui.spec.ts',

@@ -23,6 +23,21 @@ CREATE SEQUENCE "Applicant_Recipient_Other_Name_id_seq" AS bigint START WITH 1 I
 
 CREATE SEQUENCE "Applicant_Recipient_Registry_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
+CREATE TABLE "Applicant_Recipient_Relationship" (
+  id bigserial PRIMARY KEY,
+  egcs_ar_agency bigint NOT NULL,
+  egcs_ar_proponent bigint NOT NULL,
+  egcs_ar_relatedproponent bigint NOT NULL,
+  egcs_ar_relationshiptype bigint NOT NULL,
+  _deleted boolean DEFAULT false NOT NULL,
+  CONSTRAINT ar_chk_relationship_no_self_link CHECK (egcs_ar_proponent <> egcs_ar_relatedproponent)
+);
+
+CREATE UNIQUE INDEX ar_uq_relationship_roles ON "Applicant_Recipient_Relationship"
+  (egcs_ar_agency, egcs_ar_relationshiptype, egcs_ar_proponent, egcs_ar_relatedproponent) WHERE NOT _deleted;
+CREATE INDEX ar_idx_relationship_source ON "Applicant_Recipient_Relationship" (egcs_ar_proponent) WHERE NOT _deleted;
+CREATE INDEX ar_idx_relationship_target ON "Applicant_Recipient_Relationship" (egcs_ar_relatedproponent) WHERE NOT _deleted;
+
 CREATE TABLE "Applicant_Recipient_Address" (
   "id" bigint DEFAULT nextval('"Applicant_Recipient_Address_id_seq"'::regclass) NOT NULL,
   "egcs_ar_applicantrecipient" bigint NOT NULL,
@@ -283,6 +298,73 @@ AS $function$
       RETURN NEW;
     END
     $function$;
+CREATE FUNCTION guard_proponent_relationship() RETURNS trigger LANGUAGE plpgsql AS $function$
+DECLARE
+  inverse_code text;
+  canonical_source bigint;
+BEGIN
+  IF TG_OP = 'UPDATE' AND (
+    OLD.egcs_ar_agency <> NEW.egcs_ar_agency
+    OR least(OLD.egcs_ar_proponent, OLD.egcs_ar_relatedproponent)
+      <> least(NEW.egcs_ar_proponent, NEW.egcs_ar_relatedproponent)
+    OR greatest(OLD.egcs_ar_proponent, OLD.egcs_ar_relatedproponent)
+      <> greatest(NEW.egcs_ar_proponent, NEW.egcs_ar_relatedproponent)
+  ) THEN
+    RAISE EXCEPTION 'Proponent relationship agency and endpoints are immutable'
+      USING ERRCODE = '23514', CONSTRAINT = 'ar_chk_relationship_identity';
+  END IF;
+
+  IF NEW._deleted THEN
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP = 'INSERT' OR OLD._deleted THEN
+    PERFORM id FROM "Agency_Profile"
+      WHERE id = NEW.egcs_ar_agency AND NOT _deleted AND egcs_ay_active FOR SHARE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Proponent relationship agency is unavailable'
+        USING ERRCODE = '23514', CONSTRAINT = 'ar_chk_relationship_agency';
+    END IF;
+
+    PERFORM id FROM "Applicant_Recipient_Profile"
+      WHERE id IN (NEW.egcs_ar_proponent, NEW.egcs_ar_relatedproponent)
+      ORDER BY id FOR UPDATE;
+    IF EXISTS (
+      SELECT 1 FROM "Applicant_Recipient_Profile"
+        WHERE id IN (NEW.egcs_ar_proponent, NEW.egcs_ar_relatedproponent) AND _deleted
+    ) THEN
+      RAISE EXCEPTION 'Proponent relationship endpoint is deleted'
+        USING ERRCODE = '23514', CONSTRAINT = 'ar_chk_relationship_live_endpoint';
+    END IF;
+  END IF;
+
+  SELECT egcs_ay_inverse_code INTO inverse_code
+    FROM "Agency_Proponent_Relationship_Type" WHERE id = NEW.egcs_ar_relationshiptype
+    AND egcs_ay_organizationagency = NEW.egcs_ar_agency AND NOT _deleted FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Proponent relationship type is unavailable for this agency'
+      USING ERRCODE = '23514', CONSTRAINT = 'ar_chk_relationship_live_type';
+  END IF;
+
+  IF inverse_code IS NULL AND NEW.egcs_ar_proponent > NEW.egcs_ar_relatedproponent THEN
+    canonical_source := NEW.egcs_ar_relatedproponent;
+    NEW.egcs_ar_relatedproponent := NEW.egcs_ar_proponent;
+    NEW.egcs_ar_proponent := canonical_source;
+  END IF;
+  RETURN NEW;
+END $function$;
+
+CREATE FUNCTION guard_linked_proponent_deletion() RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+  IF NEW._deleted AND NOT OLD._deleted AND EXISTS (
+    SELECT 1 FROM "Applicant_Recipient_Relationship"
+      WHERE NOT _deleted AND (egcs_ar_proponent = OLD.id OR egcs_ar_relatedproponent = OLD.id)
+  ) THEN
+    RAISE EXCEPTION 'Proponent has an active relationship'
+      USING ERRCODE = '23514', CONSTRAINT = 'ar_chk_relationship_profile_in_use';
+  END IF;
+  RETURN NEW;
+END $function$;
 END $baseline$`.execute(db)
 }
 
@@ -320,6 +402,12 @@ ALTER TABLE "Applicant_Recipient_Profile" ADD CONSTRAINT "Applicant_Recipient_Pr
 ALTER TABLE "Applicant_Recipient_Profile" ADD CONSTRAINT "ar_ref_profileid" FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Applicant_Recipient_Registry" ADD CONSTRAINT "Applicant_Recipient_Registry_egcs_ar_applicantrecipient_fkey" FOREIGN KEY (egcs_ar_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Applicant_Recipient_Relationship"
+  ADD CONSTRAINT ar_fk_relationship_agency FOREIGN KEY (egcs_ar_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT ar_fk_relationship_source FOREIGN KEY (egcs_ar_proponent) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT ar_fk_relationship_target FOREIGN KEY (egcs_ar_relatedproponent) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT ar_fk_relationship_type_agency FOREIGN KEY (egcs_ar_relationshiptype, egcs_ar_agency)
+    REFERENCES "Agency_Proponent_Relationship_Type"(id, egcs_ay_organizationagency) ON DELETE RESTRICT;
 END $baseline$`.execute(db)
 }
 
@@ -339,6 +427,11 @@ CREATE CONSTRAINT TRIGGER trg_enforce_applicantrecipient_assignment_roster AFTER
 CREATE TRIGGER trg_register_applicantrecipient BEFORE INSERT ON "Applicant_Recipient_Profile" FOR EACH ROW EXECUTE FUNCTION register_entity('applicantrecipient');
 
 CREATE TRIGGER trg_soft_delete_applicantrecipient_assignments AFTER UPDATE OF _deleted ON "Applicant_Recipient_Profile" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('applicantrecipient');
+CREATE TRIGGER guard_proponent_relationship BEFORE INSERT OR UPDATE ON "Applicant_Recipient_Relationship"
+  FOR EACH ROW EXECUTE FUNCTION guard_proponent_relationship();
+
+CREATE TRIGGER guard_linked_proponent_deletion BEFORE UPDATE OF _deleted ON "Applicant_Recipient_Profile"
+  FOR EACH ROW EXECUTE FUNCTION guard_linked_proponent_deletion();
 END $baseline$`.execute(db)
   await installMonetaryTableGuards(db, 'applicant-recipient')
 }

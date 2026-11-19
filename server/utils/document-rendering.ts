@@ -4,6 +4,7 @@ import { DocumentConditionError, evaluateDocumentCondition, resolveDocumentCondi
 import { prepareWordConditionTags, type CompiledDocumentConditions } from './document-word-conditions'
 import { loadBoundedDocx } from './document-docx-budget'
 import { createDocumentRenderBudget, createHtmlRenderBudget } from './document-render-budget'
+import { resolveDocumentPath } from './document-path'
 import puppeteer, { type Browser } from 'puppeteer'
 import { convertLibreOfficeDocument } from './document-libreoffice'
 
@@ -101,14 +102,7 @@ export const valueOrFallback = (value: unknown, language: Language_Preference = 
   return String(value)
 }
 
-const getPathValue = (source: unknown, path: string): unknown => {
-  return path.split('.').reduce<unknown>((current, segment) => {
-    if (current && typeof current === 'object' && segment in current) {
-      return (current as Record<string, unknown>)[segment]
-    }
-    return undefined
-  }, source)
-}
+const getPathValue = (source: unknown, path: string): unknown => resolveDocumentPath(source, path, 'inherited')
 
 export const getDocumentTemplateTagValue = (
   tag: string,

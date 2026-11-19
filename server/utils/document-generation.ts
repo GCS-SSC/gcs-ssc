@@ -117,6 +117,72 @@ const formatAddress = (address: {
   return lines.length > 0 ? lines.join('\n') : getFallbackValue(language)
 }
 
+const documentAddressColumns = [
+  'Common_Address.egcs_cn_street1 as street1',
+  'Common_Address.egcs_cn_street2 as street2',
+  'Common_Address.egcs_cn_street3 as street3',
+  'Common_Address.egcs_cn_addresscity as city',
+  'Common_Address.egcs_cn_addresssubdivision as subdivision',
+  'Common_Address.egcs_cn_postalcodezipcode as postalCode',
+  'Common_Address.egcs_cn_addresscountry as country'
+] as const
+
+const loadRelatedDocumentRecipients = async (
+  db: Kysely<Database>, agencyId: string, primaryId: string | undefined, language: Language_Preference
+) => {
+  if (primaryId === undefined) return {}
+
+  const rows = await db.selectFrom('Applicant_Recipient_Relationship as Link')
+    .innerJoin('Agency_Proponent_Relationship_Type as Type', join => join
+      .onRef('Type.id', '=', 'Link.egcs_ar_relationshiptype')
+      .onRef('Type.egcs_ay_organizationagency', '=', 'Link.egcs_ar_agency')
+      .on('Type._deleted', '=', false))
+    .innerJoin('Applicant_Recipient_Profile as Recipient', join => join
+      .on('Recipient._deleted', '=', false)
+      .on(eb => eb('Recipient.id', '=', eb.case()
+        .when('Link.egcs_ar_proponent', '=', primaryId)
+        .then(eb.ref('Link.egcs_ar_relatedproponent'))
+        .else(eb.ref('Link.egcs_ar_proponent'))
+        .end())))
+    .leftJoinLateral(eb => eb.selectFrom('Applicant_Recipient_Address')
+      .innerJoin('Common_Address', 'Common_Address.id', 'Applicant_Recipient_Address.egcs_ar_address')
+      .whereRef('Applicant_Recipient_Address.egcs_ar_applicantrecipient', '=', 'Recipient.id')
+      .where('Applicant_Recipient_Address._deleted', '=', false)
+      .where('Common_Address._deleted', '=', false)
+      .select(documentAddressColumns)
+      .orderBy('Applicant_Recipient_Address.id')
+      .limit(1)
+      .as('Address'), join => join.onTrue())
+    .where('Link.egcs_ar_agency', '=', agencyId)
+    .where('Link._deleted', '=', false)
+    .where(eb => eb.or([
+      eb('Link.egcs_ar_proponent', '=', primaryId),
+      eb('Link.egcs_ar_relatedproponent', '=', primaryId)
+    ]))
+    .select([
+      'Type.egcs_ay_code as forwardCode',
+      'Type.egcs_ay_inverse_code as inverseCode',
+      'Link.egcs_ar_proponent as sourceId',
+      'Recipient.egcs_ar_legalname_en as legalNameEn',
+      'Recipient.egcs_ar_legalname_fr as legalNameFr'
+    ])
+    .selectAll('Address')
+    .orderBy('Link.id')
+    .execute()
+
+  const byCode = new Map<string, { legalName: string, address: string }[]>()
+  for (const row of rows) {
+    const code = row.sourceId === primaryId ? row.forwardCode : row.inverseCode ?? row.forwardCode
+    const matches = byCode.get(code) ?? []
+    matches.push({
+      legalName: valueOrFallback(language === 'fra' ? row.legalNameFr : row.legalNameEn, language),
+      address: formatAddress(row, language)
+    })
+    byCode.set(code, matches)
+  }
+  return Object.fromEntries(byCode)
+}
+
 const loadAgreementDocumentTemplate = async (
   agreementId: string,
   templateId: string,
@@ -359,7 +425,7 @@ export const buildAgreementDocumentContext = async (
   db: Kysely<Database>,
   event?: H3Event,
   language: Language_Preference = 'eng',
-  versions: { budgetVersionId?: string, activityVersionId?: string, validationEvent?: H3Event } = {}
+  versions: { budgetVersionId?: string, activityVersionId?: string, validationEvent?: H3Event, includeRelatedProponents?: boolean } = {}
 ): Promise<Record<string, unknown>> => {
   const localized = <T extends { en: unknown, fr: unknown }>(value: T): unknown => language === 'fra' ? value.fr : value.en
   const localizedValue = (value: unknown): string => valueOrFallback(value, language)
@@ -395,6 +461,7 @@ export const buildAgreementDocumentContext = async (
       'Agency_Holdback_Basis.egcs_ay_name_en as holdbackBasisEn',
       'Agency_Holdback_Basis.egcs_ay_name_fr as holdbackBasisFr',
       'Agency_Holdback_Basis.egcs_ay_languageindependentcode as holdbackBasisCode',
+      'Agency_Profile.id as agencyId',
       'Agency_Profile.egcs_ay_name_en as agencyNameEn',
       'Agency_Profile.egcs_ay_name_fr as agencyNameFr',
       'Transfer_Payment_Profile.egcs_tp_name_en as programNameEn',
@@ -431,13 +498,7 @@ export const buildAgreementDocumentContext = async (
       .where('Common_Address._deleted', '=', false)
       .select([
         'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient as applicantRecipientId',
-        'Common_Address.egcs_cn_street1 as street1',
-        'Common_Address.egcs_cn_street2 as street2',
-        'Common_Address.egcs_cn_street3 as street3',
-        'Common_Address.egcs_cn_addresscity as city',
-        'Common_Address.egcs_cn_addresssubdivision as subdivision',
-        'Common_Address.egcs_cn_postalcodezipcode as postalCode',
-        'Common_Address.egcs_cn_addresscountry as country'
+        ...documentAddressColumns
       ])
       .orderBy('Applicant_Recipient_Address.id', 'asc')
       .execute(),
@@ -741,6 +802,9 @@ export const buildAgreementDocumentContext = async (
 
   const primaryRecipient = recipients[0]
   const primaryAddress = recipientAddresses.find(address => String(address.applicantRecipientId) === String(primaryRecipient?.applicantRecipientId))
+  const relatedRecipients = versions.includeRelatedProponents
+    ? await loadRelatedDocumentRecipients(db, agreement.agencyId, primaryRecipient?.applicantRecipientId, language)
+    : undefined
   const totalProgramFunding = sumMoney(lineItems.map(item => getAmount(item.programFunding)), agreement.currency)
   const totalProgramDeliveryFunding = sumMoney(lineItems
     .filter(item => getSchedule2ColumnKey(item.subsection) === 'programDelivery')
@@ -791,7 +855,8 @@ export const buildAgreementDocumentContext = async (
         legalName: localizedValue(localized({ en: primaryRecipient?.legalNameEn, fr: primaryRecipient?.legalNameFr })),
         address: localizedAddress(primaryAddress)
       },
-      all: recipients.map(recipient => ({ legalName: localizedValue(localized({ en: recipient.legalNameEn, fr: recipient.legalNameFr })) }))
+      all: recipients.map(recipient => ({ legalName: localizedValue(localized({ en: recipient.legalNameEn, fr: recipient.legalNameFr })) })),
+      ...(relatedRecipients ? { related: relatedRecipients } : {})
     },
     budget: {
       years: budgetYearsWithDetails,
@@ -900,7 +965,10 @@ export const loadAgreementDocumentRenderInput = async (
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
 
-  const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language, { validationEvent: event })
+  const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language, {
+    validationEvent: event,
+    includeRelatedProponents: options.entityType !== 'fundingcaseagreementcloseout'
+  })
   return {
     agreementId, template, coreContext,
     templateHash: createHash('sha256').update(JSON.stringify(template)).digest('hex'),

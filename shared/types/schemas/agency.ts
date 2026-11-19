@@ -125,6 +125,45 @@ export const AgencyHoldbackBasisPatchSchema = AgencyHoldbackBasisWriteSchema.par
 export type AgencyHoldbackBasis = z.infer<typeof AgencyHoldbackBasisSchema>
 export type AgencyHoldbackBasisItem = WithId<AgencyHoldbackBasis>
 
+const ProponentRelationshipCodeSchema = AgencyLabelSchema('validation.required')
+  .refine(
+    value => /^[a-z][a-z0-9_]*$/.test(value) && value !== 'constructor' && value !== 'prototype',
+    { error: 'validation.invalid_proponent_relationship_code' }
+  )
+
+const AgencyProponentRelationshipTypeBaseSchema = z.object({
+  egcs_ay_code: ProponentRelationshipCodeSchema,
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
+  egcs_ay_inverse_code: ProponentRelationshipCodeSchema.nullable().default(null),
+  egcs_ay_inverse_name_en: AgencyLabelSchema('validation.name_en_required').nullable().default(null),
+  egcs_ay_inverse_name_fr: AgencyLabelSchema('validation.name_fr_required').nullable().default(null)
+})
+
+export const AgencyProponentRelationshipTypeSchema = AgencyProponentRelationshipTypeBaseSchema.superRefine((value, context) => {
+  const inverseFields = ['egcs_ay_inverse_code', 'egcs_ay_inverse_name_en', 'egcs_ay_inverse_name_fr'] as const
+  if (inverseFields.every(field => value[field] === null)) return
+
+  for (const field of inverseFields) {
+    if (value[field] === null) context.addIssue({ code: 'custom', path: [field], message: 'validation.required' })
+  }
+  if (value.egcs_ay_inverse_code === value.egcs_ay_code) {
+    context.addIssue({ code: 'custom', path: ['egcs_ay_inverse_code'], message: 'validation.distinct_proponent_relationship_codes' })
+  }
+})
+
+export const AgencyProponentRelationshipTypePatchSchema = AgencyProponentRelationshipTypeBaseSchema.pick({
+  egcs_ay_name_en: true,
+  egcs_ay_name_fr: true,
+  egcs_ay_inverse_name_en: true,
+  egcs_ay_inverse_name_fr: true
+}).partial().extend({
+  egcs_ay_inverse_name_en: AgencyLabelSchema('validation.name_en_required').nullable().optional(),
+  egcs_ay_inverse_name_fr: AgencyLabelSchema('validation.name_fr_required').nullable().optional()
+})
+
+export type AgencyProponentRelationshipTypeItem = WithId<z.infer<typeof AgencyProponentRelationshipTypeSchema>>
+
 export const AgencyMonitorTypeSchema = z.object({
   egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
   egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),

@@ -1,4 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc */
+import { resolveDocumentPath } from './document-path'
+
 export type DocumentConditionReason = 'syntax' | 'type' | 'blocks' | 'limit'
 
 export class DocumentConditionError extends Error {
@@ -143,7 +145,4 @@ export const evaluateDocumentCondition = (
 }
 
 export const resolveDocumentConditionPath = (scope: unknown, path: string): unknown =>
-  path.split('.').reduce<unknown>((current, segment) =>
-    current !== null && typeof current === 'object' && Object.prototype.hasOwnProperty.call(current, segment)
-      ? (current as Record<string, unknown>)[segment]
-      : undefined, scope)
+  resolveDocumentPath(scope, path, 'own')

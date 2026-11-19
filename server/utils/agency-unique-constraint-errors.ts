@@ -5,6 +5,18 @@ const UNIQUE_VIOLATION_CODE = '23505'
 const FOREIGN_KEY_VIOLATION_CODE = '23503'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  ay_uq_proponent_reltype_code: {
+    code: 'AGENCY_DUPLICATE_PROPONENT_RELATIONSHIP_CODE',
+    key: 'apiErrors.agency.duplicate_proponent_relationship_code'
+  },
+  ay_uq_proponent_reltype_inverse_code: {
+    code: 'AGENCY_DUPLICATE_PROPONENT_RELATIONSHIP_CODE',
+    key: 'apiErrors.agency.duplicate_proponent_relationship_code'
+  },
+  ay_chk_proponent_reltype_in_use: {
+    code: 'PROPONENT_RELATIONSHIP_TYPE_IN_USE',
+    key: 'apiErrors.agency.proponent_relationship_type_in_use'
+  },
   ay_uq_agreement_relationship_type_name_en: {
     code: 'AGENCY_DUPLICATE_AGREEMENT_RELATIONSHIP_TYPE_NAME_EN',
     key: 'apiErrors.agency.duplicate_agreement_relationship_type_name_en'

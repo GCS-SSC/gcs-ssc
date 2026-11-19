@@ -190,8 +190,26 @@ export const executeFreshAuthorizedApplicantRecipientWrite = async <T>(
   db: Kysely<Database>,
   applicantRecipientId: string,
   action: AbilityAction,
-  callback: (trx: Transaction<Database>, context: AuthContext) => Promise<T>
+  callback: (trx: Transaction<Database>, context: AuthContext) => Promise<T>,
+  relationship?: { agencyId: string; otherProponentId: string }
 ): Promise<T> => {
+  if (relationship) {
+    return await db.transaction().execute(async trx => {
+      const context = await requireFreshAuthContext(event, trx)
+      // Relationship ownership is independent of both tracking lead agencies.
+      await trx.selectFrom('Agency_Profile').where('id', '=', relationship.agencyId)
+        .select('id').forShare().executeTakeFirst()
+      // Every link mutation takes the same pair locks before acquiring link and type locks.
+      const profiles = await trx.selectFrom('Applicant_Recipient_Profile')
+        .where('id', 'in', [applicantRecipientId, relationship.otherProponentId]).where('_deleted', '=', false)
+        .select('id').orderBy('id').forUpdate().execute()
+      if (!profiles.some(profile => profile.id === applicantRecipientId)) {
+        return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
+      }
+      await authorizeFreshAssignedItem(event, trx, context, 'applicantrecipient', applicantRecipientId, action)
+      return await callback(trx, context)
+    })
+  }
   class LeadAgencyChanged extends Error {}
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const hint = await db.selectFrom('Applicant_Recipient_Profile')

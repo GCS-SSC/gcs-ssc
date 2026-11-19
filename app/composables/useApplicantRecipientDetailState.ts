@@ -6,6 +6,7 @@ import ApplicantRecipientGeneralTab from '~/components/ApplicantRecipient/Applic
 import CommonAssignedUsers from '~/components/Common/AssignedUsers.vue'
 import CommonAttachmentsTab from '~/components/Common/AttachmentsTab.vue'
 import ApplicantRecipientAgencyFinancialIdsTab from '~/components/ApplicantRecipient/ApplicantRecipientAgencyFinancialIdsTab.vue'
+import ApplicantRecipientRelatedProponentsTab from '~/components/ApplicantRecipient/ApplicantRecipientRelatedProponentsTab.vue'
 import ApplicantRecipientRegistriesTab from '~/components/ApplicantRecipient/ApplicantRecipientRegistriesTab.vue'
 import ApplicantRecipientOtherNamesTab from '~/components/ApplicantRecipient/ApplicantRecipientOtherNamesTab.vue'
 import ApplicantRecipientNotesTab from '~/components/ApplicantRecipient/ApplicantRecipientNotesTab.vue'
@@ -32,6 +33,7 @@ const toSectionSlug = (label: string): string => label.normalize('NFD')
 export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
   general: 'agency.tabs.general',
   agencyFinancialIds: 'applicant_recipient.agency_financial_ids.title',
+  relatedProponents: 'applicant_recipient.related_proponents.title',
   registries: 'applicant_recipient.registries.title',
   otherNames: 'applicant_recipient.other_names.title',
   notes: 'notes.title',
@@ -159,6 +161,17 @@ export const useApplicantRecipientDetailState = (id: string, options: {
           canCreateRole: profile.value?.can_create_child_records_role === true,
           canUpdateRole: profile.value?.can_update_child_records_role === true,
           canDeleteRole: profile.value?.can_delete_child_records_role === true })
+      })
+      nextTabMap.set('related-proponents', {
+        key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.relatedProponents,
+        icon: 'i-lucide-link',
+        component: ApplicantRecipientRelatedProponentsTab,
+        /** @returns The Proponent identity and relationship role capabilities. */
+        getProps: () => ({
+          applicantRecipientId: id,
+          canCreateRole: profile.value?.can_create_child_records_role === true,
+          canUpdateRole: profile.value?.can_update_child_records_role === true
+        })
       })
       nextTabMap.set('registries', {
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.registries,

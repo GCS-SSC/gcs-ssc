@@ -30,6 +30,36 @@ CREATE TABLE "Agency_Agreement_Relationship_Type" (
 CREATE UNIQUE INDEX ay_uq_agreement_relationship_type_name_en ON "Agency_Agreement_Relationship_Type" (egcs_ay_organizationagency, lower(btrim(egcs_ay_typename_en))) WHERE NOT _deleted;
 CREATE UNIQUE INDEX ay_uq_agreement_relationship_type_name_fr ON "Agency_Agreement_Relationship_Type" (egcs_ay_organizationagency, lower(btrim(egcs_ay_typename_fr))) WHERE NOT _deleted;
 
+CREATE TABLE "Agency_Proponent_Relationship_Type" (
+  id bigserial PRIMARY KEY,
+  egcs_ay_organizationagency bigint NOT NULL,
+  egcs_ay_code varchar(255) NOT NULL,
+  egcs_ay_name_en varchar(255) NOT NULL,
+  egcs_ay_name_fr varchar(255) NOT NULL,
+  egcs_ay_inverse_code varchar(255),
+  egcs_ay_inverse_name_en varchar(255),
+  egcs_ay_inverse_name_fr varchar(255),
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_uq_proponent_reltype_owner UNIQUE (id, egcs_ay_organizationagency),
+  CONSTRAINT ay_uq_proponent_reltype_code UNIQUE (egcs_ay_organizationagency, egcs_ay_code),
+  CONSTRAINT ay_uq_proponent_reltype_inverse_code UNIQUE (egcs_ay_organizationagency, egcs_ay_inverse_code),
+  CONSTRAINT ay_chk_proponent_reltype_code CHECK (
+    egcs_ay_code ~ '^[a-z][a-z0-9_]*$' AND egcs_ay_code NOT IN ('constructor', 'prototype')
+  ),
+  CONSTRAINT ay_chk_proponent_reltype_names CHECK (
+    length(btrim(egcs_ay_name_en)) > 0 AND length(btrim(egcs_ay_name_fr)) > 0
+  ),
+  CONSTRAINT ay_chk_proponent_reltype_inverse CHECK (
+    num_nonnulls(egcs_ay_inverse_code, egcs_ay_inverse_name_en, egcs_ay_inverse_name_fr) IN (0, 3)
+    AND (egcs_ay_inverse_code IS NULL OR (
+      egcs_ay_inverse_code ~ '^[a-z][a-z0-9_]*$'
+      AND egcs_ay_inverse_code NOT IN (egcs_ay_code, 'constructor', 'prototype')
+      AND length(btrim(egcs_ay_inverse_name_en)) > 0
+      AND length(btrim(egcs_ay_inverse_name_fr)) > 0
+    ))
+  )
+);
+
 CREATE SEQUENCE "Agency_Account_Receivable_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Agency_Address_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
@@ -486,6 +516,45 @@ END $baseline$`.execute(db)
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
   await installCatalogCacheFunctions(db)
   await sql`DO $baseline$ BEGIN
+CREATE FUNCTION guard_proponent_relationship_type() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    -- Both roles share one Agency namespace. A row version change makes older
+    -- repeatable-read writers retry instead of checking codes in a stale snapshot.
+    UPDATE "Agency_Profile" SET id = id WHERE id = NEW.egcs_ay_organizationagency;
+    IF EXISTS (
+      SELECT 1 FROM "Agency_Proponent_Relationship_Type"
+      WHERE egcs_ay_organizationagency = NEW.egcs_ay_organizationagency
+        AND (
+          egcs_ay_code IN (NEW.egcs_ay_code, NEW.egcs_ay_inverse_code)
+          OR egcs_ay_inverse_code IN (NEW.egcs_ay_code, NEW.egcs_ay_inverse_code)
+        )
+    ) THEN
+      RAISE EXCEPTION USING ERRCODE = '23505', CONSTRAINT = 'ay_uq_proponent_reltype_code',
+        MESSAGE = 'Proponent relationship type code already exists in this Agency';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency
+    OR NEW.egcs_ay_code IS DISTINCT FROM OLD.egcs_ay_code
+    OR NEW.egcs_ay_inverse_code IS DISTINCT FROM OLD.egcs_ay_inverse_code THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_proponent_reltype_identity',
+      MESSAGE = 'Proponent relationship type ownership and codes are immutable';
+  END IF;
+
+  IF NEW._deleted AND NOT OLD._deleted AND EXISTS (
+    SELECT 1 FROM "Applicant_Recipient_Relationship"
+    WHERE egcs_ar_relationshiptype = OLD.id AND NOT _deleted
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_proponent_reltype_in_use',
+      MESSAGE = 'Proponent relationship type has active links';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
 CREATE FUNCTION create_default_agency_statuses()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -763,6 +832,7 @@ END $baseline$`.execute(db)
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 ALTER TABLE "Agency_Agreement_Relationship_Type" ADD CONSTRAINT ay_fk_agreement_relationship_type_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Proponent_Relationship_Type" ADD CONSTRAINT ay_fk_proponent_reltype_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Catalog_Revision" ADD CONSTRAINT ay_fk_catalogrevisionagency FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Account_Receivable_Type" ADD CONSTRAINT "Agency_Account_Receivable_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
@@ -825,6 +895,8 @@ END $baseline$`.execute(db)
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await installCatalogCacheTriggers(db)
   await sql`DO $baseline$ BEGIN
+CREATE TRIGGER guard_proponent_relationship_type BEFORE INSERT OR UPDATE ON "Agency_Proponent_Relationship_Type" FOR EACH ROW EXECUTE FUNCTION guard_proponent_relationship_type();
+
 CREATE TRIGGER protect_workflow_profile_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_ay_organizationagency ON "Agency_Agreement_Type" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references();
 
 CREATE TRIGGER guard_referenced_proponent_subtype BEFORE UPDATE ON "Agency_Applicant_Recipient_Subtype" FOR EACH ROW EXECUTE FUNCTION guard_referenced_proponent_subtype();

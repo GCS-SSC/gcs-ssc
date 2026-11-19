@@ -891,7 +891,17 @@
       "workflow_setups": "Workflows",
       "review_schemas": "Review Schemas",
       "account_receivable_types": "Receivable Types",
-      "agreement_relationship_types": "Agreement relationship types"
+      "agreement_relationship_types": "Agreement relationship types",
+      "proponent_relationship_types": "Proponent relationship types"
+    },
+    "proponent_relationship_type": {
+      "role": "Role",
+      "inverse_role": "Reverse role",
+      "same_role": "Same role on both profiles",
+      "directional": "Different roles on each profile",
+      "directional_description": "For example, one proponent is the parent and the other is the subsidiary.",
+      "code": "Language-independent code",
+      "code_description": "Used in document templates. Enter lowercase letters, numbers or underscores, starting with a letter."
     },
     "monitor_types": {
       "receivable_eligible": "Allow receivable follow-ups",
@@ -1376,6 +1386,9 @@
       "duplicate_account_receivable_type_name_en": "A receivable type with this English title already exists for the Agency.",
       "duplicate_account_receivable_type_name_fr": "A receivable type with this French title already exists for the Agency.",
       "chart_in_use": "This accounting line is already in use and cannot be edited or deleted. Deactivate it to prevent new selections.",
+      "proponent_relationship_type_not_found": "Proponent relationship type not found.",
+      "proponent_relationship_type_in_use": "This relationship type is used by an active Proponent link. Remove those links before retiring it.",
+      "duplicate_proponent_relationship_code": "This code is already reserved for a Proponent relationship role in this agency.",
       "agreement_relationship_type_not_found": "Agreement relationship type not found.",
       "agreement_relationship_type_in_use": "This relationship type is used by an agreement.",
       "duplicate_agreement_relationship_type_name_en": "An agreement relationship type with this English name already exists.",
@@ -1694,6 +1707,10 @@
     },
     "applicant_recipient": {
       "profile_not_found": "Proponent profile not found.",
+      "invalid_relationship": "Select a valid related proponent and relationship role for this agency.",
+      "duplicate_relationship": "This relationship already exists for these proponents and this agency.",
+      "relationship_role_required": "Select a role when changing to a directional relationship.",
+      "relationship_profile_in_use": "Remove this proponent’s active relationships before deleting it.",
       "profile_in_use": "Remove this proponent from active Agreements and funding history before deleting it.",
       "invalid_subtype": "The selected proponent subtype is invalid.",
       "invalid_subtype_for_lead_agency": "The selected proponent subtype does not belong to the selected lead agency.",
@@ -2340,6 +2357,8 @@
     "duplicate_chart_of_account_label_fr": "French accounting field labels must be unique within this entry",
     "invalid_extension_key": "Use a lowercase extension key beginning with a letter and containing only letters, numbers, or hyphens",
     "invalid_hex_color": "Enter a valid hexadecimal colour",
+    "invalid_proponent_relationship_code": "Enter a lowercase code starting with a letter. Use only letters, numbers and underscores.",
+    "distinct_proponent_relationship_codes": "Enter a different code for the reverse role.",
     "invalid_lucide_icon": "Select a valid Lucide icon",
     "status_flags_exclusive": "A status cannot be both read-only and terminal",
     "business_status_workflow_only": "Business status can only be changed through a published workflow",
@@ -3429,6 +3448,17 @@
       "legal_name": "Provide the legal name in at least one language: English or French.",
       "operating_name": "Provide the operating name in at least one language: English or French.",
       "description": "Provide the description in at least one language: English or French."
+    },
+    "related_proponents": {
+      "title": "Related Proponents",
+      "proponent": "Related proponent",
+      "role": "Relationship role",
+      "role_hint": "Choose the role of the related proponent.",
+      "add": "Add a related proponent",
+      "edit": "Edit proponent relationship",
+      "search": "Search related proponents",
+      "remove_named": "Remove relationship with {name}",
+      "remove_confirm": "Remove this relationship from both proponent profiles?"
     },
     "agency_financial_ids": {
       "title": "Agency Financial IDs",

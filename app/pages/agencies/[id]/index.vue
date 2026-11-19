@@ -10,6 +10,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { useRouteTabMap } from '~/composables/useRouteTabMap'
 import AgencyAgreementRelationshipTypes from '~/components/Agency/AgencyAgreementRelationshipTypes.vue'
+import AgencyProponentRelationshipTypes from '~/components/Agency/AgencyProponentRelationshipTypes.vue'
 import AgencyAddressTypes from '~/components/Agency/AgencyAddressTypes.vue'
 import AgencyAttachmentTypes from '~/components/Agency/AgencyAttachmentTypes.vue'
 import AgencyAgreementTypes from '~/components/Agency/AgencyAgreementTypes.vue'
@@ -106,6 +107,7 @@ const tabMap: TabMap = new Map([
   ['holdbackBases', { key: 'agency.tabs.holdback_bases', icon: 'i-lucide-percent', component: AgencyHoldbackBases, getProps: agencyResourceCapabilities }],
   ['monitorTypes', { key: 'agency.tabs.monitor_types', icon: 'i-lucide-clipboard-check', component: AgencyMonitorTypes, getProps: agencyResourceCapabilities }],
   ['agreementRelationshipTypes', { key: 'agency.tabs.agreement_relationship_types', icon: 'i-lucide-link', component: AgencyAgreementRelationshipTypes, getProps: agencyResourceCapabilities }],
+  ['proponentRelationshipTypes', { key: 'agency.tabs.proponent_relationship_types', icon: 'i-lucide-link', component: AgencyProponentRelationshipTypes, getProps: agencyResourceCapabilities }],
   ['addressTypes', { key: 'agency.tabs.address_types', icon: 'i-lucide-map-pin', component: AgencyAddressTypes, getProps: agencyResourceCapabilities }],
   ['attachmentTypes', { key: 'agency.tabs.attachment_types', icon: 'i-lucide-paperclip', component: AgencyAttachmentTypes, getProps: agencyResourceCapabilities }],
   [

@@ -6,13 +6,11 @@ import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import {
   loadAgreementDocumentRenderInput,
   hydrateAgreementDocumentRenderInput,
-  buildAgreementDocumentContext,
   persistPreparedAgreementDocument,
   renderAgreementDocumentInput
 } from '~~/server/utils/document-generation'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { AgreementDocumentGenerateSchema } from '~~/shared/types/schemas'
-import { createHash } from 'node:crypto'
 import { acquireDocumentRenderSlot } from '~~/server/utils/document-render-admission'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { throwApiError } from '~~/server/utils/api-errors'
@@ -62,12 +60,10 @@ export default defineEventHandler(async event => {
         agreementId,
         body.templateId,
         await (async () => {
-          const currentContext = await buildAgreementDocumentContext(agreementId, trx, undefined, body.language, { validationEvent: event })
-          const currentHash = createHash('sha256').update(JSON.stringify(currentContext)).digest('hex')
           const currentInput = await loadAgreementDocumentRenderInput(
-            event, agreementId, body.templateId, body.language, body.outputFormat, trx, { coreContext: currentContext, lockTemplate: true }
+            event, agreementId, body.templateId, body.language, body.outputFormat, trx, { lockTemplate: true }
           )
-          if (currentHash !== renderInput.coreContextHash || currentInput.templateHash !== renderInput.templateHash) return await throwApiError(event, {
+          if (currentInput.coreContextHash !== renderInput.coreContextHash || currentInput.templateHash !== renderInput.templateHash) return await throwApiError(event, {
             statusCode: 409, code: 'DOCUMENT_RENDER_INPUT_CHANGED', key: 'apiErrors.document_generation.input_changed'
           })
           return prepared

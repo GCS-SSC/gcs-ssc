@@ -48,6 +48,18 @@ export default defineEventHandler(async event => {
       })
     }
 
+    const activeProponentLink = await trx.selectFrom('Applicant_Recipient_Relationship').select('id')
+      .where('_deleted', '=', false)
+      .where(eb => eb.or([eb('egcs_ar_proponent', '=', id), eb('egcs_ar_relatedproponent', '=', id)]))
+      .executeTakeFirst()
+    if (activeProponentLink) {
+      return await throwApiError(event, {
+        statusCode: 409,
+        code: 'APPLICANT_RECIPIENT_RELATIONSHIP_IN_USE',
+        key: 'apiErrors.applicant_recipient.relationship_profile_in_use'
+      })
+    }
+
     const deleted = await trx
       .updateTable('Applicant_Recipient_Profile')
       .set({ _deleted: true })
