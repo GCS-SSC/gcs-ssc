@@ -128,7 +128,11 @@ const save = async () => {
     await writeGroup(editor.id, draft)
     if (operation.isCurrent() && modal.closeSession(session)) {
       if (editor.kind === 'clause') expanded.value[editor.id] = true
-      toast.add({ title: toast.localized(editor.kind === 'clause' ? 'clauses.clause_saved' : 'clauses.saved'), color: 'success' })
+      toast.add({
+        title: toast.localized(editor.kind === 'clause' ? 'clauses.clause_saved' : 'clauses.saved'),
+        description: toast.localized('clauses.saved_description'),
+        color: 'success'
+      })
     }
     await settlement.settle()
   } catch (error) {
@@ -148,7 +152,11 @@ const removeText = async (groupId: string, clauseId: string | undefined) => {
     const group = findClause(groupId)
     if (!group || !canEditGroup(group) || !group.rows.some(row => row.id === clauseId)) return
     await writeGroup(groupId, { ...draftFromGroup(group), rows: group.rows.filter(row => row.id !== clauseId) })
-    if (operation.isCurrent()) toast.add({ title: toast.localized('clauses.clause_removed'), color: 'success' })
+    if (operation.isCurrent()) toast.add({
+      title: toast.localized('clauses.clause_removed'),
+      description: toast.localized('clauses.clause_removed_description'),
+      color: 'success'
+    })
     await settlement.settle()
   } catch (error) {
     if (operation.isCurrent()) showError(error)
@@ -185,7 +193,11 @@ const changePublication = async (clauseId: string, action: 'publish' | 'retire')
     if (!operation.canDispatch() || !eligible()) return
     const response = await fetch(getClientRequestUrl(path), { method: 'POST' })
     if (!response.ok) await throwFetchResponseError(response)
-    if (operation.isCurrent()) toast.add({ title: toast.localized(action === 'publish' ? 'clauses.published' : 'clauses.retired'), color: 'success' })
+    if (operation.isCurrent()) toast.add({
+      title: toast.localized(action === 'publish' ? 'clauses.published' : 'clauses.retired'),
+      description: toast.localized(action === 'publish' ? 'clauses.published_description' : 'clauses.retired_description'),
+      color: 'success'
+    })
     await settlement.settle()
   } catch (error) {
     if (operation.isCurrent()) showError(error)
@@ -205,7 +217,11 @@ const removeClause = async (clauseId: string) => {
       target: { id: clauseId, resolve: () => findClause(clauseId), eligible: clause => clause.publicationState === 'draft' }
     })
     if (!removed) return
-    if (operation.isCurrent()) toast.add({ title: toast.localized('clauses.deleted'), color: 'success' })
+    if (operation.isCurrent()) toast.add({
+      title: toast.localized('clauses.deleted'),
+      description: toast.localized('clauses.deleted_description'),
+      color: 'success'
+    })
     await settlement.settle()
   } catch (error) {
     if (operation.isCurrent()) showError(error)

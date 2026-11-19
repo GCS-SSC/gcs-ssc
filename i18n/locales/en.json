@@ -23,6 +23,11 @@
     }
   },
   "clauses": {
+    "saved_description": "You can publish the draft when it is ready.",
+    "clause_removed_description": "The clause text was removed from the draft.",
+    "published_description": "The new version is available for use.",
+    "retired_description": "The clause is unavailable for new use.",
+    "deleted_description": "The unpublished draft was removed from the clause catalog.",
     "title": "Clauses",
     "clause": "Clause",
     "add": "Add clause group",
@@ -192,6 +197,7 @@
     "proponent": "Proponent",
     "application_id": "Application ID",
     "application": "Application data",
+    "attachment_upload_failed_title": "Attachment upload failed",
     "attachment_upload_failed": "The intake was saved, but an attachment could not be uploaded. Retry to finish adding attachments.",
     "select_opportunity_first": "Select a funding opportunity first",
     "inline_upload_idle": "Select a funding opportunity to check attachment options.",
@@ -1042,6 +1048,7 @@
     }
   },
   "user": {
+    "activated_title": "User activated",
     "title": "Users",
     "description": "Manage system users and their profiles.",
     "total": "Total Users",
@@ -3157,6 +3164,7 @@
       "offset_approval_description": "These offset Credit Memos are approved with this payment, including when the recipient disbursement is zero. Declining or cancelling the payment releases the recovery without posting the Credit Memos."
     },
     "forecasts": {
+      "program_only_copy_title": "Program funding copied",
       "program_only_copy_notice": "This draft includes Program Funding only. The previous forecast retains its Other Funding.",
       "historical_budget_line_read_only": "This saved line is read-only because its budget line is no longer available in the current budget.",
       "title": "Forecasts",
@@ -3833,6 +3841,8 @@
     }
   },
   "checklist": {
+    "saved_title": "Checklist saved",
+    "save_failed": "Could not save the checklist",
     "title": "Checklist",
     "questions": "Questions",
     "review": "Review",
@@ -4465,6 +4475,9 @@
     "na_description_fr": "L’exigence ne s’applique pas."
   },
   "assessment": {
+    "saved_description": "Your assessment answers were saved to the draft.",
+    "saved": "Assessment saved",
+    "save_failed": "Could not save the assessment",
     "result_incomplete": "Result available after all required answers are complete.",
     "impactor_contribution": "Score contribution",
     "impactor_total": "Total impactor contribution",

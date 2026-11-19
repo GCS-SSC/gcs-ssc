@@ -305,7 +305,11 @@ const createForecastVersion = (row: ForecastGroupedRow) => runAction('create', a
     })
     if (isCurrent()) {
       if (created.other_funding_omitted) {
-        toast.add({ title: toast.localized('agreement.forecasts.program_only_copy_notice'), color: 'info' })
+        toast.add({
+          title: toast.localized('agreement.forecasts.program_only_copy_title'),
+          description: toast.localized('agreement.forecasts.program_only_copy_notice'),
+          color: 'info'
+        })
       }
       await navigateTo(localePath(appRouteLocations.agreementForecastDetail(owner, String(created.id))))
     }

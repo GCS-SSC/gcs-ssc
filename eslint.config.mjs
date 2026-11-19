@@ -2,6 +2,7 @@
 import withNuxt from './.nuxt/eslint.config.mjs'
 import vueI18n from '@intlify/eslint-plugin-vue-i18n'
 import requireAuthorize from './eslint-rules/require-authorize.js'
+import requireToastTitle from './eslint-rules/require-toast-title.js'
 // import validateAuthorizeParams from './eslint-rules/validate-authorize-params.js'
 import jsdoc from 'eslint-plugin-jsdoc'
 import preferArrow from 'eslint-plugin-prefer-arrow'
@@ -101,6 +102,15 @@ export default withNuxt(
       'local/require-authorize': 'error'
       // 'local/validate-authorize-params': 'error'
     }
+  },
+  {
+    files: ['app/**/*.{js,ts,vue}'],
+    plugins: {
+      notifications: {
+        rules: { 'require-title': requireToastTitle }
+      }
+    },
+    rules: { 'notifications/require-title': 'error' }
   },
   // Your custom configs here
   {

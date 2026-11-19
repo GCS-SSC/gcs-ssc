@@ -32,5 +32,8 @@ export const useLocalizedToast = () => {
     (key, params) => t(key, localizeBilingualIssueParams(params ?? {}, locale.value === 'fr' ? 'fr' : 'en'))
   ))
 
-  return { ...toast, localized, validation }
+  type Notification = Parameters<typeof toast.add>[0] & { title: LocalizedToastText; description: LocalizedToastText }
+  const add = (notification: Notification) => toast.add(notification)
+
+  return { ...toast, add, localized, validation }
 }

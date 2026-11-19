@@ -23,6 +23,11 @@
     }
   },
   "clauses": {
+    "saved_description": "Vous pouvez publier le brouillon quand il est prêt.",
+    "clause_removed_description": "Le texte de la clause a été retiré du brouillon.",
+    "published_description": "La nouvelle version est disponible.",
+    "retired_description": "La clause est indisponible pour toute nouvelle utilisation.",
+    "deleted_description": "Le brouillon non publié a été retiré du catalogue de clauses.",
     "title": "Clauses",
     "clause": "Clause",
     "add": "Ajouter un groupe de clauses",
@@ -192,6 +197,7 @@
     "proponent": "Demandeur",
     "application_id": "ID de demande",
     "application": "Données de la demande",
+    "attachment_upload_failed_title": "Échec du téléversement de la pièce jointe",
     "attachment_upload_failed": "Le dossier de demande a été enregistré, mais une pièce jointe n’a pas pu être téléversée. Réessayez pour terminer l’ajout des pièces jointes.",
     "select_opportunity_first": "Sélectionnez d’abord une possibilité de financement",
     "inline_upload_idle": "Sélectionnez une possibilité de financement pour vérifier les options de pièces jointes.",
@@ -1042,6 +1048,7 @@
     }
   },
   "user": {
+    "activated_title": "Compte utilisateur activé",
     "title": "Utilisateurs",
     "description": "Gérez les utilisateurs du système et leurs profils.",
     "total": "Total des utilisateurs",
@@ -3157,6 +3164,7 @@
       "offset_approval_description": "Ces notes de crédit par compensation sont approuvées avec ce paiement, même si le versement au bénéficiaire est nul. Le refus ou l’annulation du paiement libère le recouvrement sans comptabiliser les notes de crédit."
     },
     "forecasts": {
+      "program_only_copy_title": "Financement du programme copié",
       "program_only_copy_notice": "Cette ébauche comprend uniquement le financement du programme. La prévision précédente conserve ses autres sources de financement.",
       "historical_budget_line_read_only": "Cette ligne enregistrée est en lecture seule, car sa ligne budgétaire n’est plus disponible dans le budget courant.",
       "title": "Prévisions",
@@ -3833,6 +3841,8 @@
     }
   },
   "checklist": {
+    "saved_title": "Liste de contrôle enregistrée",
+    "save_failed": "Impossible d’enregistrer la liste de contrôle",
     "title": "Liste de contrôle",
     "questions": "Questions",
     "review": "Examen",
@@ -4465,6 +4475,9 @@
     "na_description_fr": "L’exigence ne s’applique pas."
   },
   "assessment": {
+    "saved_description": "Vos réponses à l’évaluation ont été enregistrées dans le brouillon.",
+    "saved": "Évaluation enregistrée",
+    "save_failed": "Impossible d’enregistrer l’évaluation",
     "result_incomplete": "Le résultat sera disponible lorsque toutes les réponses obligatoires seront complètes.",
     "impactor_contribution": "Contribution au score",
     "impactor_total": "Contribution totale des facteurs d'impact",

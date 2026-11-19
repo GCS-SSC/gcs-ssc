@@ -76,7 +76,7 @@ export const useChecklistDetailPage = () => {
   }, true)
   const totalAdditionalReviewerCount: Ref<number> = ref(0)
   const pendingAdditionalReviewerCount: Ref<number> = ref(0)
-  const { showError } = useApiErrorToast()
+  const { showError } = useApiErrorToast('checklist.save_failed')
   const toast = useLocalizedToast()
 
   const serializeResponses = (value: EditableChecklistResponse[]) => JSON.stringify(value)
@@ -199,7 +199,11 @@ export const useChecklistDetailPage = () => {
       await refresh()
       if (generation !== saveGeneration || reviewId.value !== targetReviewId || String(checklist.value?.id) !== targetReviewId) return
       onSaved?.()
-      toast.add({ title: toast.localized('common.success'), description: toast.localized('checklist.saved'), color: 'success' })
+      toast.add({
+        title: toast.localized('checklist.saved_title'),
+        description: toast.localized('checklist.saved'),
+        color: 'success'
+      })
     } catch (error) {
       if (generation === saveGeneration) showError(error)
     } finally {

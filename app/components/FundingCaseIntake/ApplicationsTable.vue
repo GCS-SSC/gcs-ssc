@@ -125,7 +125,11 @@ const submit = async () => {
     await refresh()
     if (!ownsCompletion()) return
     if (uploadError) {
-      toast.add({ title: toast.localized('funding_case_intake.attachment_upload_failed'), color: 'error' })
+      toast.add({
+        title: toast.localized('funding_case_intake.attachment_upload_failed_title'),
+        description: toast.localized('funding_case_intake.attachment_upload_failed'),
+        color: 'error'
+      })
     }
     await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
   } catch (error: unknown) {

@@ -240,7 +240,11 @@ const activateUser = async () => {
     isActivatingUser.value = true
     await saveJson(`/api/users/${userId}/activate`, 'POST', { password: state.password })
     if (!isPageActive() || !operation.isCurrent() || activationState.value !== state) return
-    toast.add({ title: toast.localized('user.activated_success'), color: 'success' })
+    toast.add({
+      title: toast.localized('user.activated_title'),
+      description: toast.localized('user.activated_success'),
+      color: 'success'
+    })
     isActivationModalOpen.value = false
     activationState.value = null
     activatingUserId.value = null

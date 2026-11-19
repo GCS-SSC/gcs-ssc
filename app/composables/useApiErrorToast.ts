@@ -61,9 +61,10 @@ export const resolveApiErrorDetails = (error: unknown, translate?: (metadata: Ap
 /**
  * Creates a helper for showing normalized API error toasts.
  *
+ * @param titleKey - Localized title for the action that failed.
  * @returns Error toast helpers.
  */
-export const useApiErrorToast = () => {
+export const useApiErrorToast = (titleKey = 'common.error') => {
   const { locale, t, te } = useI18n({ useScope: 'global' })
   const toast = useLocalizedToast()
 
@@ -84,7 +85,7 @@ export const useApiErrorToast = () => {
       : metadata.success && te(metadata.data.key)
         ? () => h('span', t(metadata.data.key, localizeBilingualIssueParams(metadata.data.params ?? {}, locale.value === 'fr' ? 'fr' : 'en')))
         : description || toast.localized('common.unknown_error')
-    toast.add({ title: toast.localized('common.error'), description: renderedDescription, color: 'error' })
+    toast.add({ title: toast.localized(titleKey), description: renderedDescription, color: 'error' })
   }
 
   /** Resolves only explicit host metadata again when called from a reactive render/computed.

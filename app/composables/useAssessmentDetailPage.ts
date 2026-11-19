@@ -96,7 +96,7 @@ export const useAssessmentDetailPage = () => {
   const returnRouter = useRouter()
   const localePath = useLocalePath()
   const toast = useLocalizedToast()
-  const { showError } = useApiErrorToast()
+  const { showError } = useApiErrorToast('assessment.save_failed')
   const { t, locale } = useI18n()
   const { createValidator } = useZodI18n()
   const { getHeroCollapsed } = useDashboard()
@@ -427,7 +427,7 @@ export const useAssessmentDetailPage = () => {
       if (!validationResult.success) {
         const firstIssue = validationResult.error.issues[0]
         toast.add({
-          title: toast.localized('common.error'),
+          title: toast.localized('assessment.save_failed'),
           description: firstIssue ? toast.validation(firstIssue) : toast.localized('apiErrors.request.validation_failed'),
           color: 'error'
         })
@@ -451,8 +451,8 @@ export const useAssessmentDetailPage = () => {
       if (generation !== saveGeneration || reviewId.value !== targetReviewId || String(assessment.value?.id) !== targetReviewId) return
       onSaved?.()
       toast.add({
-        title: toast.localized('common.success'),
-        description: toast.localized('common.updated_success'),
+        title: toast.localized('assessment.saved'),
+        description: toast.localized('assessment.saved_description'),
         color: 'success'
       })
     } catch (error) {
