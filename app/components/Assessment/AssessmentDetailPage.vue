@@ -658,11 +658,11 @@ const handleApprovalChanged = async () => {
   </CommonDetailPage>
   <CommonDetailPage v-else id="assessment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="assessment.detail-page" data-scope-label-en="Reviews > Assessment" data-scope-label-fr="Examens > Évaluation" data-field-tooltip-context="agreement-or-intake">
     <template #body>
-      <UAlert v-if="loadError" color="error" icon="i-lucide-circle-alert" :title="t('common.load_failed')" :description="t('common.try_again')">
+      <CommonErrorNotice v-if="loadError" :title="t('common.load_failed')" :description="t('common.try_again')">
         <template #actions>
-          <UButton :label="t('common.retry')" color="error" variant="soft" @click="() => refreshAssessment()" />
+          <UButton :label="t('common.retry')" @click="() => refreshAssessment()" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <CommonLoadingState v-else :label="t('common.loading')" />
     </template>
   </CommonDetailPage>

@@ -186,18 +186,15 @@ const retryProfile = async () => {
   <div v-else class="flex min-w-0 flex-1 flex-col">
     <CommonLoadingState v-if="isLoadingProfile" :label="t('common.loading')" />
 
-    <UAlert
+    <CommonErrorNotice
       v-else-if="hasLoadError"
-      role="alert"
       aria-live="assertive"
-      color="error"
-      icon="i-lucide-circle-alert"
       :title="t('common.resource_table_load_failed')"
       :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" :label="t('common.retry')" @click="retryProfile" />
+        <UButton :label="t('common.retry')" @click="retryProfile" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
 
     <CommonDetailPage v-else-if="profile" id="applicant-recipient-detail" v-model:collapsed="isHeroCollapsed" data-help-view="proponent.detail" :breadcrumb-items="breadcrumbItems" class="min-w-0 flex-1">
       <template #body>

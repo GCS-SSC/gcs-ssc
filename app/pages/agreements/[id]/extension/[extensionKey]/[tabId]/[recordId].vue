@@ -39,11 +39,11 @@ const item = computed(() => items.value.find(tab =>
         <div v-if="status === 'idle' || status === 'pending'" role="status" aria-live="polite" class="sr-only">
           <span>{{ t('common.loading_records') }}</span>
         </div>
-        <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+        <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
           <template #actions>
-            <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="refresh" />
+            <UButton :label="t('common.retry')" @click="refresh" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
         <UAlert v-else color="warning" icon="i-lucide-lock-keyhole" :title="t('common.unavailable')" />
       </template>
     </CommonDetailPage>

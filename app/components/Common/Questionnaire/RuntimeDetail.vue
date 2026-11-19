@@ -370,11 +370,8 @@ const save = async (submit: boolean) => {
               :title="t('assignments.read_only_title')"
               :description="readOnlyDescription" />
 
-            <UAlert
+            <CommonErrorNotice
               v-if="validationIssues.length > 0"
-              color="error"
-              variant="soft"
-              icon="i-lucide-circle-alert"
               :title="t(`${configuration.messagePrefix}.validation_title`)"
               :description="t('questionnaire.validation_description')" />
 
@@ -444,16 +441,13 @@ const save = async (submit: boolean) => {
       </div>
 
       <div v-else class="p-6">
-        <UAlert
-          color="error"
-          variant="soft"
-          icon="i-lucide-circle-alert"
+        <CommonErrorNotice
           :title="t(`${configuration.messagePrefix}.load_failed`)"
           :description="embedded ? t('common.unknown_error') : error?.message ?? t('common.unknown_error')">
           <template v-if="embedded" #actions>
-            <UButton color="neutral" variant="outline" :label="t('common.retry')" :loading="isReloading" :disabled="isReloading" @click="retryLoad" />
+            <UButton :label="t('common.retry')" :loading="isReloading" :disabled="isReloading" @click="retryLoad" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
     </template>
   </QuestionnaireRuntimeShell>

@@ -353,13 +353,13 @@ const preferenceFilters = { agency: tableFilter(selectedAgency, 'all', agencyOpt
       <UModal v-model:open="memberModalOpen" :dismissible="!addingMember" :close="!addingMember" :title="t('groups.add_member')">
         <template #body>
           <UForm v-bind="memberFormBinding" :state="memberForm" :validate="validateMember" class="space-y-4">
-            <UAlert v-if="users.status.value === 'error'" color="error" :title="t('common.lookup_load_failed')">
+            <CommonErrorNotice v-if="users.status.value === 'error'" :title="t('common.lookup_load_failed')">
               <template #actions>
-                <UButton color="neutral" variant="link" @click="users.refresh()">
+                <UButton @click="users.refresh()">
                   {{ t('common.retry') }}
                 </UButton>
               </template>
-            </UAlert>
+            </CommonErrorNotice>
             <UFormField :label="t('groups.user')" name="egcs_cn_user" required>
               <USelectMenu
                 v-model="memberForm.egcs_cn_user"

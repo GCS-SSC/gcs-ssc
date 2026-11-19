@@ -315,16 +315,14 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.documents-tab" data-scope-label-en="Agreements > Documents" data-scope-label-fr="Ententes > Documents" data-help-view="agreement.documents" data-help-label-en="Agreements — Documents" data-help-label-fr="Ententes — Documents" data-help-target="agreement.documents.content" data-help-kind="section" @focusin="checkCatalogVersions">
-    <UAlert
+    <CommonErrorNotice
       v-if="templatesStatus === 'error' || catalogCheckFailed"
-      color="error"
-      icon="i-lucide-circle-alert"
       :title="t('common.error')"
       class="mb-4">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.documents.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="retryTemplates" />
+        <UButton :label="t('common.retry')" data-help-target="agreement.documents.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="retryTemplates" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <CommonResourceLayout
       v-model:search="search"
       v-model:pagination="pagination"

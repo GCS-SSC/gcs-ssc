@@ -203,18 +203,11 @@ const formSession = useFormSession({ owner: modal, action: { kind: 'remote', con
   <UModal v-if="selected && canCreateChild" v-model:open="isOpen" :title="t('common.add')">
     <template #body>
       <UForm v-bind="formSession" :state="selected" :validate="validate" class="space-y-4">
-        <div v-if="agencyHoldbackError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
-          <span>{{ t('common.lookup_load_failed') }}</span>
-          <UButton
-            type="button"
-            color="neutral"
-            variant="outline"
-            size="xs"
-            icon="i-lucide-refresh-cw"
-            :label="t('common.retry')"
-            :loading="isRetryingAgencyHoldbacks"
-            @click="retryAgencyHoldbacks" />
-        </div>
+        <CommonErrorNotice v-if="agencyHoldbackError" :title="t('common.lookup_load_failed')">
+          <template #actions>
+            <UButton type="button" :label="t('common.retry')" :loading="isRetryingAgencyHoldbacks" @click="retryAgencyHoldbacks" />
+          </template>
+        </CommonErrorNotice>
         <TransferPaymentFieldsTransferPaymentStreamHoldbackBasisFields
           :model="selected"
           :lookup-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/holdback-bases`"

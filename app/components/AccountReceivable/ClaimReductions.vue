@@ -211,11 +211,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
     <p v-if="loadStatus === 'pending'" role="status" aria-live="polite" class="text-sm text-muted">
       {{ t('common.loading_records') }}
     </p>
-    <UAlert v-if="loadError" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="loadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton :label="t('common.retry')" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="state" ref="recoveryFocusTarget" tabindex="-1" class="outline-none">
       <CommonResourceLayout
         v-model:pagination="pagination"
@@ -276,11 +276,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
         <p v-if="loadStatus === 'pending'" role="status" aria-live="polite" class="text-sm text-muted">
           {{ t('common.loading_records') }}
         </p>
-        <UAlert v-if="loadError" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+        <CommonErrorNotice v-if="loadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
           <template #actions>
             <UButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-retry" :label="t('common.retry')" @click="load" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
         <UForm v-bind="formSession" :state="selectedLine" :validate="createValidator(draftSchema)" class="space-y-4">
           <p class="font-semibold">
             {{ t('account_receivable.claim') }} {{ selectedChoice.egcs_fc_claim }}

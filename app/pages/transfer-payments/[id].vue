@@ -128,16 +128,14 @@ const updateProfile = async () => {
     <div v-if="isLoadingProfile && !profile" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <UAlert
+    <CommonErrorNotice
       v-else-if="hasLoadError"
-      color="error"
-      icon="i-lucide-circle-alert"
       :title="t('common.resource_table_load_failed')"
       :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingProfile" @click="() => refreshProfile()" />
+        <UButton :label="t('common.retry')" :loading="isLoadingProfile" @click="() => refreshProfile()" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <CommonDetailPage v-if="profile" id="transfer-payment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">

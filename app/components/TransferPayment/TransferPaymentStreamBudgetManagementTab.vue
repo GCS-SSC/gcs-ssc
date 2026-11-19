@@ -99,7 +99,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
         <USwitch v-model="draft.egcs_tp_hidecostsubsection" />
       </UFormField>
     </div>
-    <UAlert v-if="errorText" role="alert" color="error" icon="i-lucide-circle-alert" :title="t('transfer_payment.budget_management.save_failed')" :description="errorText" />
+    <CommonErrorNotice v-if="errorText" :title="t('transfer_payment.budget_management.save_failed')" :description="errorText" />
     <CommonSaveButton v-if="canUpdateChild" :label="t('common.save')" :loading="pending" :disabled="pending" />
   </UForm>
 </template>

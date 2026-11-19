@@ -1244,11 +1244,11 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Reconciliation" data-scope-label-fr="Ententes > Demandes de remboursement > Rapprochement" class="flex w-full flex-col">
-    <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="hasLoadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="isLoadingDetail && (!profile || !activeClaim)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
@@ -1666,15 +1666,14 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                         {{ t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.id }) }}
                       </p>
                     </div>
-                    <UAlert
+                    <CommonErrorNotice
                       v-if="selectedReconcileReadError"
-                      color="error"
                       :title="t('common.resource_table_load_failed')"
                       :description="t('common.resource_table_load_failed_description')">
                       <template #actions>
                         <UButton type="button" :label="t('common.retry')" @click="loadSelectedReconcileDetail()" />
                       </template>
-                    </UAlert>
+                    </CommonErrorNotice>
                     <AgreementClaimReconciliationLinesTable
                       v-if="profile.egcs_fc_currency"
                       :currency="profile.egcs_fc_currency"

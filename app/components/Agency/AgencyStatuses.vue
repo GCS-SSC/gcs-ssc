@@ -335,17 +335,14 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
           {{ t('agency.statuses.reconciliation_description') }}
         </p>
       </div>
-      <UAlert
+      <CommonErrorNotice
         v-if="reconciliationReadStatus === 'error'"
-        role="alert"
-        color="error"
-        variant="subtle"
         :title="t('common.configuration_load_failed')"
         :description="t('common.configuration_load_failed_description')">
         <template #actions>
-          <UButton :label="t('common.retry')" color="neutral" variant="outline" @click="retryReconciliationStatuses" />
+          <UButton :label="t('common.retry')" @click="retryReconciliationStatuses" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UFormField :label="t('agency.statuses.reconciliation_start_status')" data-ui-target="agency.statuses.agency.statuses.reconciliation_start_status">
           <CommonStatusSelect v-model="reconciliationStatuses.startStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />

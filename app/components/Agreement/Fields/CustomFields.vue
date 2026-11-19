@@ -130,11 +130,11 @@ const update = (id: string, value: unknown) => {
 
 <template>
   <div v-if="sections.length || (placement !== 'configured' && (error || catalogCheckFailed || (activity && readonly && status === 'success')))" :class="placement === 'profile' ? 'contents' : 'space-y-8'" data-field-exclude="Agency-defined custom inputs have separate configuration; outside static field help." @focusin="checkCatalogVersions">
-    <UAlert v-if="placement !== 'configured' && (error || catalogCheckFailed)" color="error" :class="{ 'col-span-full': placement === 'profile' }" :title="t('common.error')">
+    <CommonErrorNotice v-if="placement !== 'configured' && (error || catalogCheckFailed)" :class="{ 'col-span-full': placement === 'profile' }" :title="t('common.error')">
       <template #actions>
         <UButton :label="t('common.retry')" @click="retryFields" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <p v-else-if="activity && readonly && status === 'success' && sections.length === 0" class="text-sm text-muted">
       {{ t('common.not_available') }}
     </p>

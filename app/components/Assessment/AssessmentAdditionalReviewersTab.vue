@@ -463,16 +463,13 @@ const deleteRow = async (rowId: string) => {
         {{ t('assessment.additional_reviewers.disabled_notice') }}
       </div>
 
-      <UAlert
+      <CommonErrorNotice
         v-if="status === 'error'"
-        color="error"
-        variant="soft"
-        icon="i-lucide-circle-alert"
         :title="t('assessment.additional_reviewers.load_failed')">
         <template #actions>
-          <UButton :label="t('common.retry')" color="error" variant="soft" @click="refreshRows" />
+          <UButton :label="t('common.retry')" @click="refreshRows" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
 
       <CommonCompactTable
         v-else
@@ -565,15 +562,13 @@ const deleteRow = async (rowId: string) => {
             <USelect v-model="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" />
           </UFormField>
           <UFormField v-if="assigneeKind === 'user'" :label="t('assessment.additional_reviewers.assigned_to')" name="egcs_cn_user" required>
-            <UAlert
+            <CommonErrorNotice
               v-if="userLookupStatus === 'error'"
-              color="error"
-              variant="soft"
               :title="t('assessment.additional_reviewers.lookup_load_failed')">
               <template #actions>
-                <UButton :label="t('common.retry')" color="error" variant="soft" @click="refreshUserLookup" />
+                <UButton :label="t('common.retry')" @click="refreshUserLookup" />
               </template>
-            </UAlert>
+            </CommonErrorNotice>
             <CommonBilingualSelectMenu
               v-model="selectedReviewer.egcs_cn_user"
               :items="userOptions"

@@ -16,9 +16,10 @@ watch([() => kind, data, model], () => {
       :aria-label="t('audit.table')"
       :disabled="Boolean(error)" :prepend-options="[{ label: t(showLabel ? 'common.all' : 'audit.allTables'), value: 'all' }]"
       @update:model-value="model = !$event || $event === 'all' ? '' : $event" />
-    <div v-if="error" role="alert">
-      {{ t('common.lookup_load_failed') }}
-      <UButton :label="t('audit.retry')" @click="refresh()" />
-    </div>
+    <CommonErrorNotice v-if="error" :title="t('common.lookup_load_failed')">
+      <template #actions>
+        <UButton :label="t('audit.retry')" @click="refresh()" />
+      </template>
+    </CommonErrorNotice>
   </UFormField>
 </template>

@@ -670,18 +670,11 @@ const removeSelectedValue = (value: string) => {
       </USelectMenu>
     </div>
 
-    <div v-if="isCollectionError || hasUnavailableSelection" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
-      <span>{{ t('common.lookup_load_failed') }}</span>
-      <UButton
-        type="button"
-        color="neutral"
-        variant="outline"
-        size="xs"
-        icon="i-lucide-refresh-cw"
-        :label="t('common.retry')"
-        :loading="status === 'pending'"
-        @click="retryLookup" />
-    </div>
+    <CommonErrorNotice v-if="isCollectionError || hasUnavailableSelection" :title="t('common.lookup_load_failed')">
+      <template #actions>
+        <UButton type="button" :label="t('common.retry')" :loading="status === 'pending'" @click="retryLookup" />
+      </template>
+    </CommonErrorNotice>
     <p v-else-if="showEmptyState" class="text-sm text-zinc-500 dark:text-zinc-400">
       {{ t('common.no_options') }}
     </p>

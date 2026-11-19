@@ -83,17 +83,15 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
 </script>
 
 <template>
-  <UAlert
+  <CommonErrorNotice
     v-if="error"
-    color="error"
-    icon="i-lucide-circle-alert"
     :title="t('common.resource_table_load_failed')"
     :description="t('common.resource_table_load_failed_description')"
     class="mb-4">
     <template #actions>
-      <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="status === 'pending'" @click="refresh()" />
+      <UButton :label="t('common.retry')" :loading="status === 'pending'" @click="refresh()" />
     </template>
-  </UAlert>
+  </CommonErrorNotice>
   <UForm
     data-field-scope="transfer-payment.stream-risk-management"
     v-bind="formSession"
@@ -155,7 +153,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
         <USwitch v-model="draft.egcs_tp_applyamendmentrisktotheagreement" />
       </UFormField>
     </div>
-    <UAlert v-if="errorText" role="alert" color="error" icon="i-lucide-circle-alert" :title="t('transfer_payment.risk_management.save_failed')" :description="errorText" />
+    <CommonErrorNotice v-if="errorText" :title="t('transfer_payment.risk_management.save_failed')" :description="errorText" />
     <CommonSaveButton v-if="canUpdateChild" :label="t('common.save')" :loading="pending" :disabled="pending || status !== 'success'" />
   </UForm>
 </template>

@@ -146,11 +146,11 @@ const metaItems = computed(() => context.value?.kind === 'proponent'
   <div v-if="status === 'pending'" role="status" aria-live="polite" class="sr-only">
     <span>{{ t('common.loading_records') }}</span>
   </div>
-  <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+  <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
     <template #actions>
-      <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refresh" />
+      <UButton :label="t('common.retry')" @click="refresh" />
     </template>
-  </UAlert>
+  </CommonErrorNotice>
   <CommonDetailPage v-else-if="context" :id="presentation.id" v-model:collapsed="collapsed" v-bind="$attrs" :breadcrumb-items="breadcrumbs">
     <template #body>
       <CommonEntityHero :is-collapsed="collapsed" :icon="presentation.icon" :title="context.reference" :description="t(presentation.description)" :meta-items="metaItems" :badges="[{ lifecycleEngine: 'runtime', lifecycleState: context.runtimeState }]" />

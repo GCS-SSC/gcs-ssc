@@ -111,9 +111,7 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
         <UFormField :label="t('guided_help.fallback_step')" :required="false" :description="t('guided_help.fallback_hint')" data-ui-target="guided-help.publisher-branches.guided_help.fallback_step">
           <USelect v-model="fallback" :items="destinations" :disabled="disabled" class="w-full" />
         </UFormField>
-        <p v-if="error" role="alert" class="text-error">
-          {{ error }}
-        </p>
+        <CommonErrorNotice v-if="error" :title="error" />
       </div>
     </template>
     <template #footer>

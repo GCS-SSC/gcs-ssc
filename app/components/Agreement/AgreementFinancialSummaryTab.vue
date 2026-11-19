@@ -361,16 +361,14 @@ const peakShare = (progress: FinancialProgress, currency: string): string | null
     <div v-if="overviewStatus === 'pending' && !overview" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <UAlert
+    <CommonErrorNotice
       v-else-if="overviewStatus === 'error'"
-      color="error"
-      icon="i-lucide-circle-alert"
       :title="t('agreement.financial_summary.load_failed')"
       :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.financial-summary.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshOverview() }" />
+        <UButton :label="t('common.retry')" data-help-target="agreement.financial-summary.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshOverview() }" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="overviewStatus === 'success' && !selectedYear" class="rounded-xl border border-dashed border-default px-6 py-10 text-center text-sm text-muted">
       {{ t('agreement.financial_summary.no_fiscal_years') }}
     </div>

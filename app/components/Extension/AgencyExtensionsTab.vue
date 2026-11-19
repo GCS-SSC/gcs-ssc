@@ -240,23 +240,16 @@ const selectNotificationProvider = async (item: ExtensionAgencyRegistryItem) => 
       {{ t('common.loading') }}
     </div>
 
-    <UAlert
+    <CommonErrorNotice
       v-else-if="hasLoadError"
-      color="error"
-      variant="soft"
-      icon="i-lucide-circle-alert"
       :title="t('extensions.load_failed')"
       :description="t('extensions.load_failed_description')">
       <template #actions>
         <UButton
-          color="error"
-          variant="soft"
-          size="sm"
-          icon="i-lucide-refresh-cw"
           :label="t('common.retry')"
           @click="() => refresh().catch(showError)" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
 
     <div v-else-if="totalRecords === 0" class="text-sm text-zinc-500 dark:text-zinc-400">
       {{ t('extensions.none_available') }}

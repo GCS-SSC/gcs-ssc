@@ -95,11 +95,11 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
   <CommonDetailPage id="agreement-closeout-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="w-full">
     <template #body>
       <div v-if="hasLoadError" class="p-6">
-        <UAlert color="error" icon="i-lucide-circle-alert" :title="t('agreement.closeout.load_failed')" :description="t('common.resource_table_load_failed_description')">
+        <CommonErrorNotice :title="t('agreement.closeout.load_failed')" :description="t('common.resource_table_load_failed_description')">
           <template #actions>
-            <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoading" @click="loadDetail" />
+            <UButton :label="t('common.retry')" :loading="isLoading" @click="loadDetail" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
 
       <div v-else-if="closeout" data-help-target="casework.closeouts.detail.content" data-help-kind="section" data-help-view="casework.closeouts.detail" class="flex flex-1 flex-col">

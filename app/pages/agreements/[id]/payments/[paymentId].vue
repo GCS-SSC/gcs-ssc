@@ -347,11 +347,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.payments" data-scope-label-en="Agreements > Payments > Lines" data-scope-label-fr="Ententes > Paiements > Lignes" class="flex w-full flex-col">
-    <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="hasLoadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="isLoadingDetail && (!profile || !payment)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
@@ -380,11 +380,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}
               </p>
-              <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
+              <CommonErrorNotice v-else-if="extensionTabsError" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
                 <template #actions>
-                  <UButton data-help-target="casework.payments.detail.common-retry" color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshExtensionTabs" />
+                  <UButton data-help-target="casework.payments.detail.common-retry" :label="t('common.retry')" @click="refreshExtensionTabs" />
                 </template>
-              </UAlert>
+              </CommonErrorNotice>
             </template>
             <CommonSection v-if="selectedTab === 'lines'" data-help-view="casework.payments.lines" :show-header="false" :title="t('agreement.payments.lines_title')" :grid-cols="1">
               <AgreementPaymentRecoverySummary :payment="payment" />

@@ -554,7 +554,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
       </CommonPublicationDetailHero>
       <CommonEntityHero v-else :title="t('guided_help.title')" :description="t('guided_help.description')" icon="i-lucide-book-open" :is-collapsed="collapsed" />
       <CommonLoadingState v-if="loading" :label="t('common.loading')" />
-      <UAlert v-else-if="loadError" color="error" :title="t('common.load_failed')" class="m-6">
+      <CommonErrorNotice v-else-if="loadError" :title="t('common.load_failed')" class="m-6">
         <template #actions>
           <UButton
             :label="t('common.retry')" @click="async () => {
@@ -562,7 +562,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
               else await initialize()
             }" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <GuidedHelpPublisherTable v-else-if="!detail" :groups="groups" :offers="offers" :pending="pending" @expand="loadGroup" @create="owner => goGuide('new', owner)" @open="(owner, id) => goGuide(id, owner)" @catalog="(owner, id, catalogId) => goCatalog(id, catalogId, owner)" @clone="cloneInto" @preview="(owner, draft) => preview(draft, owner)" />
       <CommonDesignTimeEditorShell v-else-if="context && (document || settings)">
         <template #sidebar>

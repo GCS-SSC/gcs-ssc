@@ -113,9 +113,7 @@ const onLogin = async () => {
             :placeholder="t('login.password_placeholder')"
             :disabled="loading" />
         </UFormField>
-        <p v-if="loginError" role="alert" aria-live="assertive" class="text-sm text-error">
-          {{ loginError }}
-        </p>
+        <CommonErrorNotice v-if="loginError" aria-live="assertive" :title="loginError" />
         <UButton type="submit" :label="t('login.login')" block size="lg" :loading="loading" :disabled="loading" />
 
         <USeparator :label="t('login.or')" />

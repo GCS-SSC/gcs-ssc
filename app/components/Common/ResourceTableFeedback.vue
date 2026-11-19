@@ -17,13 +17,9 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <UAlert
+  <CommonErrorNotice
     v-if="status === 'error'"
     data-testid="resource-table-error"
-    role="alert"
-    color="error"
-    variant="soft"
-    icon="i-lucide-circle-alert"
     :title="t('common.resource_table_load_failed')"
     :description="t(hasStaleRows ? 'common.resource_table_stale_description' : 'common.resource_table_load_failed_description')">
     <template #actions>
@@ -33,13 +29,9 @@ const { t } = useI18n()
         </UBadge>
         <UButton
           data-testid="resource-table-retry"
-          color="error"
-          variant="soft"
-          size="sm"
-          icon="i-lucide-refresh-cw"
           :label="t('common.retry')"
           @click="$emit('retry')" />
       </div>
     </template>
-  </UAlert>
+  </CommonErrorNotice>
 </template>

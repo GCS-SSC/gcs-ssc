@@ -236,11 +236,11 @@ onScopeDispose(() => {
     <p v-if="!editorOnly" class="text-muted">
       {{ t('field_tooltips.description') }}
     </p>
-    <UAlert v-if="!editorOnly && failed" color="error" :title="t('common.load_failed')">
+    <CommonErrorNotice v-if="!editorOnly && failed" :title="t('common.load_failed')">
       <template #actions>
         <UButton :label="t('common.retry')" @click="reload()" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <CommonResourceLayout
       v-if="!editorOnly"
       v-model:search="search"

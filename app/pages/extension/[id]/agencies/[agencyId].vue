@@ -108,13 +108,13 @@ const { selectedTab } = useUrlTabState({
         <div v-if="listStatus === 'pending' || registryStatus === 'pending'" role="status" class="p-6">
           {{ t('common.loading_records') }}
         </div>
-        <UAlert
-          v-else-if="listStatus === 'error' || registryStatus === 'error'" color="error"
+        <CommonErrorNotice
+          v-else-if="listStatus === 'error' || registryStatus === 'error'"
           :title="t('common.resource_table_load_failed')">
           <template #actions>
             <UButton :label="t('common.retry')" @click="retry" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
         <template v-else-if="workspace && extension && extensionComponent">
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed" :icon="workspace.icon ?? 'i-lucide-panels-top-left'"
@@ -135,7 +135,7 @@ const { selectedTab } = useUrlTabState({
               @open-form="openForm" />
           </CommonEntityEditorWorkspace>
         </template>
-        <UAlert v-else color="error" :title="t('common.not_available')" />
+        <CommonErrorNotice v-else :title="t('common.not_available')" />
       </div>
     </template>
   </UDashboardPanel>

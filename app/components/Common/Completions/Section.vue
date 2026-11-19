@@ -234,19 +234,15 @@ const submitCompletion = async () => {
         {{ resolvedLabels.description }}
       </p>
 
-      <div
-        v-if="completionErrorDetails.length"
-        class="rounded-md border border-error-300 bg-error-50 px-4 py-3 text-sm text-error-900 dark:border-error-700 dark:bg-error-950 dark:text-error-100"
-        role="alert">
-        <p class="font-medium">
-          {{ t('workflow.completion_error_details') }}
-        </p>
-        <ul class="mt-2 list-disc space-y-1 pl-5">
-          <li v-for="(detail, index) in completionErrorDetails" :key="`${index}-${detail}`">
-            {{ detail }}
-          </li>
-        </ul>
-      </div>
+      <CommonErrorNotice v-if="completionErrorDetails.length" :title="t('workflow.completion_error_details')">
+        <template #description>
+          <ul class="mt-2 list-disc space-y-1 pl-5">
+            <li v-for="(detail, index) in completionErrorDetails" :key="`${index}-${detail}`">
+              {{ detail }}
+            </li>
+          </ul>
+        </template>
+      </CommonErrorNotice>
 
       <div
         v-if="!completionResponse && status !== 'error'"
@@ -257,15 +253,13 @@ const submitCompletion = async () => {
         <span>{{ t('common.loading') }}</span>
       </div>
 
-      <UAlert
+      <CommonErrorNotice
         v-else-if="!completionResponse"
-        color="error"
-        icon="i-lucide-triangle-alert"
         :title="t('common.unavailable')">
         <template #actions>
-          <UButton color="error" variant="soft" :label="t('common.retry')" @click="refreshCompletion" />
+          <UButton :label="t('common.retry')" @click="refreshCompletion" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
 
       <div
         v-else-if="item"

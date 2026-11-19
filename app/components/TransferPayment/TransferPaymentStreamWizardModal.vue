@@ -135,18 +135,11 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
           @next="nextStep"
           @jump-to-step="onCurrentStepUpdate">
           <template #default="slotProps">
-            <div v-if="referenceDataError" role="alert" class="mb-4 flex flex-wrap items-center gap-2 text-sm text-error">
-              <span>{{ t('common.lookup_load_failed') }}</span>
-              <UButton
-                type="button"
-                color="neutral"
-                variant="outline"
-                size="xs"
-                icon="i-lucide-refresh-cw"
-                :label="t('common.retry')"
-                :loading="isReferenceDataLoading"
-                @click="retryReferenceData" />
-            </div>
+            <CommonErrorNotice v-if="referenceDataError" class="mb-4" :title="t('common.lookup_load_failed')">
+              <template #actions>
+                <UButton type="button" :label="t('common.retry')" :loading="isReferenceDataLoading" @click="retryReferenceData" />
+              </template>
+            </CommonErrorNotice>
             <div v-if="slotProps.currentStep === 'general'" class="space-y-4">
               <TransferPaymentFieldsTransferPaymentStreamFields
                 :model="state.stream"

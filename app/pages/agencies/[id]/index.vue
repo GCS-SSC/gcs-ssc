@@ -266,16 +266,14 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
   <CommonDetailPage id="agency-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <CommonLoadingState v-if="isLoadingAgency && !agency" :label="t('common.loading')" />
-      <UAlert
+      <CommonErrorNotice
         v-else-if="agencyLoadError"
-        color="error"
-        icon="i-lucide-circle-alert"
         :title="t('common.load_failed')"
         :description="t('common.try_again')">
         <template #actions>
-          <UButton :label="t('common.retry')" color="error" variant="soft" @click="() => refresh()" />
+          <UButton :label="t('common.retry')" @click="() => refresh()" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <div v-if="agency" class="flex flex-1 flex-col">
         <AgencyDetailHero :agency="agency" :is-collapsed="isHeroCollapsed" :can-update="canUpdateAgency" @edit="openUpdateModal" />
 

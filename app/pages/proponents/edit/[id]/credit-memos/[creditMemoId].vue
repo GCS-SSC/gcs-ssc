@@ -193,11 +193,11 @@ const formSession = useFormSession({ owner: editModal, action: { kind: 'remote',
 <template>
   <div ref="content" data-field-scope="proponents.edit.credit-memos" tabindex="-1" class="flex w-full min-w-0 flex-col">
     <CommonApprovalWorkspace v-if="approvalOnly" data-help-view="casework.account-receivable.credit-memo-approval" :target="{ entityType: 'fundingcaseaccountreceivablecreditmemo', entityId: creditMemoId, proponentId }" />
-    <UAlert v-else-if="status === 'error'" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton :label="t('common.retry')" color="error" variant="soft" @click="retry" />
+        <UButton :label="t('common.retry')" @click="retry" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="!creditMemo && status === 'pending'" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>

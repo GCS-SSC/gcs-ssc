@@ -139,15 +139,13 @@ const createCloseout = async () => {
     </template>
 
     <template #notices>
-      <UAlert
+      <CommonErrorNotice
         v-if="hasLoadError"
-        color="error"
-        icon="i-lucide-circle-alert"
         :title="t('agreement.closeout.load_failed')">
         <template #actions>
-          <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.closeouts.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshAll() }" />
+          <UButton :label="t('common.retry')" data-help-target="agreement.closeouts.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshAll() }" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <UAlert
         v-else-if="readiness"
         :color="isAgreementClosed || readiness?.ready ? 'success' : 'warning'"

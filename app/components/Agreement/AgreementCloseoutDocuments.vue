@@ -211,11 +211,11 @@ const download = async (item: AgreementGeneratedDocumentItem) => {
 
 <template>
   <div class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.closeout-documents" data-scope-label-en="Agreements > Closeouts > Documents" data-scope-label-fr="Ententes > Clôtures > Documents" @focusin="checkCatalogVersions">
-    <UAlert v-if="loadStatus === 'error' || catalogCheckFailed" color="error" icon="i-lucide-circle-alert" :title="t('common.error')">
+    <CommonErrorNotice v-if="loadStatus === 'error' || catalogCheckFailed" :title="t('common.error')">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="retryTemplates" />
+        <UButton :label="t('common.retry')" @click="retryTemplates" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-if="templateOptions.length" class="grid gap-4 rounded-lg border border-default p-4 md:grid-cols-[minmax(0,2fr)_1fr_1fr_auto] md:items-end">
       <UFormField :label="t('transfer_payment.document_templates.title')" required data-ui-target="agreement.closeout-documents.transfer_payment.document_templates.title">
         <CommonBilingualSelectMenu v-model="selectedTemplateId" :items="templateOptions" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :disabled="checkingCatalog || catalogCheckFailed" class="w-full" @update:open="(open: boolean) => open && checkCatalogVersions()" />

@@ -609,23 +609,11 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
           searchable
           @update:model-value="emit('riskSelection')" />
         <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.risk_score_placeholder')" />
-        <div
-          v-if="hasRiskManagementError"
-          data-testid="risk-management-error"
-          class="mt-2 flex flex-wrap items-center gap-2 text-sm text-error"
-          role="alert">
-          <span>{{ t('agreement.risk_rating_management_load_failed') }}</span>
-          <UButton
-            data-testid="risk-management-retry"
-            color="error"
-            variant="soft"
-            size="xs"
-            icon="i-lucide-refresh-cw"
-            :label="t('common.retry')"
-            :loading="riskManagementStatus === 'pending'"
-            :disabled="riskManagementStatus === 'pending'"
-            @click="refreshRiskManagement" />
-        </div>
+        <CommonErrorNotice v-if="hasRiskManagementError" data-testid="risk-management-error" class="mt-2" :title="t('agreement.risk_rating_management_load_failed')">
+          <template #actions>
+            <UButton data-testid="risk-management-retry" :label="t('common.retry')" :loading="riskManagementStatus === 'pending'" :disabled="riskManagementStatus === 'pending'" @click="refreshRiskManagement" />
+          </template>
+        </CommonErrorNotice>
         <p v-else-if="riskManagementStatus === 'success' && riskWorkflowManaged" class="mt-1 text-sm text-muted">
           {{ t('agreement.risk_rating_managed_help') }}
         </p>

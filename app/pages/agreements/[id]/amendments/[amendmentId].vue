@@ -992,11 +992,11 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
       </div>
 
       <div v-else-if="hasLoadError" class="p-6">
-        <UAlert color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+        <CommonErrorNotice :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
           <template #actions>
-            <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+            <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
 
       <UModal

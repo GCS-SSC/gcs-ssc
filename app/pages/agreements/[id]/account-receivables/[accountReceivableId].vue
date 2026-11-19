@@ -233,11 +233,11 @@ const formSession = useFormSession({ owner: editModal, action: { kind: 'remote',
 <template>
   <div ref="detailContent" data-field-tooltip-context="agreement" data-field-scope="agreements.account-receivables" data-scope-label-en="Agreements > Receivables > General" data-scope-label-fr="Ententes > Créances > Général" tabindex="-1" class="flex w-full min-w-0 flex-col">
     <CommonApprovalWorkspace v-if="approvalOnly" data-help-view="casework.account-receivable.approval" :target="{ entityType, entityId: accountReceivableId, agreementId }" />
-    <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="retryLoad" />
+        <UButton :label="t('common.retry')" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="!receivable && status === 'pending'" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>

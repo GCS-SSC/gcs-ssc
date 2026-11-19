@@ -272,18 +272,11 @@ const formSession = useFormSession({ owner: recipientModal, action: { kind: 'rem
     :title="selectedRecipient?.id ? t('common.update') : t('common.add')">
     <template #body>
       <UForm v-bind="formSession" :state="selectedRecipient" :validate="validateRecipient" class="space-y-4">
-        <div v-if="recipientReferenceError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
-          <span>{{ t('common.lookup_load_failed') }}</span>
-          <UButton
-            type="button"
-            color="neutral"
-            variant="outline"
-            size="xs"
-            icon="i-lucide-refresh-cw"
-            :label="t('common.retry')"
-            :loading="isRetryingRecipientReferences"
-            @click="retryRecipientReferences" />
-        </div>
+        <CommonErrorNotice v-if="recipientReferenceError" :title="t('common.lookup_load_failed')">
+          <template #actions>
+            <UButton type="button" :label="t('common.retry')" :loading="isRetryingRecipientReferences" @click="retryRecipientReferences" />
+          </template>
+        </CommonErrorNotice>
         <TransferPaymentFieldsTransferPaymentEligibleRecipientFields
           :model="selectedRecipient"
           :recipient-options="recipientOptions" />

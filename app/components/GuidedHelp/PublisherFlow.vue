@@ -189,7 +189,7 @@ const remove = () => {
             </div>
           </div>
           <div class="border-default flex flex-wrap items-center justify-end gap-3 border-t bg-white px-6 py-4 dark:bg-zinc-950 lg:px-8">
-            <span v-if="removeError" role="alert" class="w-full text-error">{{ removeError }}</span>
+            <CommonErrorNotice v-if="removeError" class="w-full" :title="removeError" />
             <UButton v-if="!disabled && !creating" :label="t('common.delete')" icon="i-lucide-trash" color="error" variant="ghost" class="mr-auto" @click="remove" />
             <UButton :label="t(disabled ? 'common.close' : 'common.cancel')" color="neutral" variant="ghost" @click="reset" />
             <CommonSaveButton v-if="!disabled" type="submit" :label="t('common.save')" />

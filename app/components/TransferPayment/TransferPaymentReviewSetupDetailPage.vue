@@ -340,27 +340,20 @@ const runMemberMutation: EditorMutationRunner = async request => {
     <template #body>
       <div
         v-if="loadError"
-        class="p-6"
-        data-testid="design-time-detail-load-error"
-        role="alert"
-        :aria-label="t('common.configuration_load_failed')">
-        <UAlert
-          color="error"
-          icon="i-lucide-circle-alert"
+        class="p-6">
+        <CommonErrorNotice
+          data-testid="design-time-detail-load-error"
+          :aria-label="t('common.configuration_load_failed')"
           :title="t('common.configuration_load_failed')"
           :description="t('common.configuration_load_failed_description')">
           <template #actions>
             <UButton
-              color="error"
-              variant="soft"
-              size="sm"
-              icon="i-lucide-refresh-cw"
               :label="t('common.retry')"
               :loading="isLoadRetrying"
               :disabled="isLoadRetrying"
               @click="retryLoad" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
       <div
         v-else-if="state"

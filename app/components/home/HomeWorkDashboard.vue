@@ -298,21 +298,21 @@ const claimGroupItem = async (item: GroupItem) => {
             </div>
           </div>
           <CommonLoadingState v-if="status === 'pending' || groupStatus === 'pending'" :label="t('home_dashboard.loading')" />
-          <UAlert v-if="error" class="mt-6" color="error" variant="soft" :title="t('home.assigned_work_load_failed')">
+          <CommonErrorNotice v-if="error" class="mt-6" :title="t('home.assigned_work_load_failed')">
             <template #actions>
-              <UButton size="sm" :label="t('common.retry')" @click="refresh" />
+              <UButton :label="t('common.retry')" @click="refresh" />
             </template>
-          </UAlert>
-          <UAlert v-if="groupError" class="mt-6" color="error" variant="soft" :title="t('home_dashboard.group_load_failed')">
+          </CommonErrorNotice>
+          <CommonErrorNotice v-if="groupError" class="mt-6" :title="t('home_dashboard.group_load_failed')">
             <template #actions>
-              <UButton size="sm" :label="t('common.retry')" @click="() => refreshGroup()" />
+              <UButton :label="t('common.retry')" @click="() => refreshGroup()" />
             </template>
-          </UAlert>
-          <UAlert v-if="needsAgreementCount && agreementCountError" class="mt-6" color="error" variant="soft" :title="t('home_dashboard.agreement_count_load_failed')">
+          </CommonErrorNotice>
+          <CommonErrorNotice v-if="needsAgreementCount && agreementCountError" class="mt-6" :title="t('home_dashboard.agreement_count_load_failed')">
             <template #actions>
-              <UButton size="sm" :label="t('common.retry')" @click="() => refreshAgreementCount()" />
+              <UButton :label="t('common.retry')" @click="() => refreshAgreementCount()" />
             </template>
-          </UAlert>
+          </CommonErrorNotice>
         </div>
       </div>
     </template>

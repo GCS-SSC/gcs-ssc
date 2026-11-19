@@ -143,16 +143,14 @@ const retryLoad = async () => {
     <div v-if="isLoadingDetail && (!stream || !profile)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <UAlert
+    <CommonErrorNotice
       v-else-if="hasLoadError"
-      color="error"
-      icon="i-lucide-circle-alert"
       :title="t('common.resource_table_load_failed')"
       :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <CommonDetailPage v-if="stream && profile" id="transfer-payment-stream-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div ref="recoveryFocusTarget" tabindex="-1" class="flex flex-1 flex-col outline-none">

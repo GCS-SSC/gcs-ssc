@@ -56,16 +56,14 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
   <CommonDetailPage id="transfer-payment-assessment-schema-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <CommonLoadingState v-if="loadStatus === 'pending' && !schema" :label="t('common.loading')" />
-      <UAlert
+      <CommonErrorNotice
         v-else-if="loadError"
-        color="error"
-        icon="i-lucide-circle-alert"
         :title="t('common.load_failed')"
         :description="t('common.try_again')">
         <template #actions>
-          <UButton :label="t('common.retry')" color="error" variant="soft" @click="retryLoad" />
+          <UButton :label="t('common.retry')" @click="retryLoad" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <div v-else-if="schema" class="flex flex-1 flex-col">
         <AssessmentSchemaDetailHero
           :action-context="writeContext"

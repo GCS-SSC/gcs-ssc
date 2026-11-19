@@ -446,11 +446,11 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
     <div v-if="status === 'pending' && !profile" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshProfile() }" />
+        <UButton :label="t('common.retry')" @click="() => { void refreshProfile() }" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <CommonDetailPage v-if="profile" id="agreement-detail" v-model:collapsed="isHeroCollapsed" data-help-view="agreement.detail" :data-help-context="JSON.stringify(helpContext)" :data-help-agency="profile.agency_id" :data-help-agreement-id="id" class="min-w-0 flex-1" :breadcrumb-items="breadcrumbItems">
       <template #body>
         <div class="flex min-w-0 flex-1 flex-col">
@@ -466,11 +466,11 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}
               </p>
-              <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
+              <CommonErrorNotice v-else-if="extensionTabsError" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
                 <template #actions>
-                  <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshExtensionTabs" />
+                  <UButton :label="t('common.retry')" @click="refreshExtensionTabs" />
                 </template>
-              </UAlert>
+              </CommonErrorNotice>
             </template>
             <AgreementProfileFormPage
               v-if="selectedTab === 'general' && selectedProfile && canEditProfile"
@@ -488,15 +488,13 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               @cancel="cancel" />
 
             <div v-else-if="selectedTab === 'general'" class="space-y-4">
-              <UAlert
+              <CommonErrorNotice
                 v-if="profile.financialNumberPolicyUnavailable && canUpdateFinancialChildRole"
-                color="error"
-                icon="i-lucide-circle-alert"
                 :title="t('apiErrors.agreement.financial_number_provider_invalid')">
                 <template #actions>
-                  <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshProfile" />
+                  <UButton :label="t('common.retry')" @click="refreshProfile" />
                 </template>
-              </UAlert>
+              </CommonErrorNotice>
               <div v-if="canUpdateFinancialChildRole" class="flex justify-end">
                 <UButton data-help-target="agreement.detail.edit-profile" data-help-kind="button" :label="t('common.edit')" :loading="isCheckingProfileEdit" :disabled="isCheckingProfileEdit || isSaving" @click="requestProfileEdit" />
               </div>

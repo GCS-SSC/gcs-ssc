@@ -64,18 +64,15 @@ const breadcrumbItems = computed(() => [
 </script>
 
 <template>
-  <UAlert
+  <CommonErrorNotice
     v-if="loadError || loadStatus === 'error'"
-    role="alert"
     aria-live="assertive"
-    color="error"
-    icon="i-lucide-circle-alert"
     :title="t('common.resource_table_load_failed')"
     :description="t('common.resource_table_load_failed_description')">
     <template #actions>
-      <UButton color="error" variant="soft" :label="t('common.retry')" @click="loadDetail" />
+      <UButton :label="t('common.retry')" @click="loadDetail" />
     </template>
-  </UAlert>
+  </CommonErrorNotice>
 
   <CommonApprovalTemplatesDetailPage
     v-else-if="loadStatus === 'success'"

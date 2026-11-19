@@ -210,18 +210,15 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
 <template>
   <CommonLoadingState v-if="loadStatus === 'pending' && !role" :label="t('common.loading')" />
 
-  <UAlert
+  <CommonErrorNotice
     v-else-if="loadError || loadStatus === 'error'"
-    role="alert"
     aria-live="assertive"
-    color="error"
-    icon="i-lucide-circle-alert"
     :title="t('common.resource_table_load_failed')"
     :description="t('common.resource_table_load_failed_description')">
     <template #actions>
-      <UButton color="error" variant="soft" :label="t('common.retry')" @click="retryLoad" />
+      <UButton :label="t('common.retry')" @click="retryLoad" />
     </template>
-  </UAlert>
+  </CommonErrorNotice>
 
   <CommonDetailPage v-else-if="role" id="role-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>

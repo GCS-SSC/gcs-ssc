@@ -540,27 +540,20 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
     <template #body>
       <div
         v-if="loadError"
-        class="p-6"
-        data-testid="design-time-detail-load-error"
-        role="alert"
-        :aria-label="t('common.configuration_load_failed')">
-        <UAlert
-          color="error"
-          icon="i-lucide-circle-alert"
+        class="p-6">
+        <CommonErrorNotice
+          data-testid="design-time-detail-load-error"
+          :aria-label="t('common.configuration_load_failed')"
           :title="t('common.configuration_load_failed')"
           :description="t('common.configuration_load_failed_description')">
           <template #actions>
             <UButton
-              color="error"
-              variant="soft"
-              size="sm"
-              icon="i-lucide-refresh-cw"
               :label="t('common.retry')"
               :loading="isLoadRetrying"
               :disabled="isLoadRetrying"
               @click="retryLoad" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
       <div
         v-else-if="state"
@@ -625,10 +618,11 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                     <CommonBilingualSelectMenu
                       v-model="state.egcs_cn_entitytype" :items="entityTypeOptions" value-key="entityType"
                       label-en-key="labelEn" label-fr-key="labelFr" :loading="entityTypesStatus === 'pending'" :disabled="!canEditFields" class="w-full" />
-                    <div v-if="entityTypesError" role="alert" class="mt-2 flex items-center gap-2 text-sm text-error">
-                      <span>{{ t('common.lookup_load_failed') }}</span>
-                      <UButton :label="t('common.retry')" color="neutral" variant="ghost" @click="refreshEntityTypes()" />
-                    </div>
+                    <CommonErrorNotice v-if="entityTypesError" class="mt-2" :title="t('common.lookup_load_failed')">
+                      <template #actions>
+                        <UButton :label="t('common.retry')" @click="refreshEntityTypes()" />
+                      </template>
+                    </CommonErrorNotice>
                   </UFormField>
                   <UFormField :label="t('workflow.purpose')" name="egcs_cn_purpose" :description="t('workflow.purpose_help')">
                     <CommonEnumSelect v-model="state.egcs_cn_purpose" name="workflow_purpose" :items="purposeOptions" :disabled="!canEditFields" class="w-full" />

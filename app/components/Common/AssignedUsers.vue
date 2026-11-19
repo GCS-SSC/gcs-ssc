@@ -212,17 +212,14 @@ const remove = async (userId: string, name: string) => {
       <USkeleton v-for="index in 2" :key="index" class="h-16 w-full" />
     </div>
 
-    <UAlert
+    <CommonErrorNotice
       v-else-if="rosterError"
-      color="error"
-      variant="soft"
-      icon="i-lucide-circle-alert"
       :title="t('assignments.load_failed')"
       :description="t('assignments.load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="loadUsers" />
+        <UButton :label="t('common.retry')" @click="loadUsers" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
 
     <div v-else-if="assignmentCount === 0" class="rounded-sm border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
       <UIcon name="i-lucide-users" class="mx-auto mb-2 size-6 text-muted" />
@@ -276,11 +273,11 @@ const remove = async (userId: string, name: string) => {
       </li>
     </ul>
 
-    <UAlert v-if="usersError && canManage" color="error" :title="t('assignments.load_failed')">
+    <CommonErrorNotice v-if="usersError && canManage" :title="t('assignments.load_failed')">
       <template #actions>
         <UButton :label="t('common.retry')" :disabled="isLoadingUsers" @click="loadUsers" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-if="canManage" class="flex flex-col gap-3 rounded-sm bg-elevated p-4 sm:flex-row sm:items-end">
       <UFormField :label="t('assignments.add_assignee')" required class="min-w-0 flex-1" data-ui-target="common.assigned-users.assignments.add_assignee">
         <USelectMenu

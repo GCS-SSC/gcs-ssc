@@ -193,31 +193,23 @@ onScopeDispose(() => {
           :is-collapsed="false" />
 
         <div v-if="loadError" class="px-6 pt-6">
-          <UAlert
-            color="error"
-            variant="soft"
-            icon="i-lucide-circle-alert"
+          <CommonErrorNotice
             :title="t('common.error')"
             :description="streamId ? t('common.resource_table_load_failed_description') : t('extensions.config_missing_stream')">
             <template #actions>
               <UButton
                 v-if="streamId"
-                color="error"
-                variant="soft"
-                icon="i-lucide-refresh-cw"
                 :label="t('common.retry')"
                 :loading="isLoading"
                 :disabled="isLoading"
                 @click="refresh" />
               <UButton
                 v-else
-                color="neutral"
-                variant="soft"
                 icon="i-lucide-arrow-left"
                 :label="t('transfer_payment.title')"
                 :to="localePath(appRouteLocations.transferPayments())" />
             </template>
-          </UAlert>
+          </CommonErrorNotice>
         </div>
 
         <CommonLoadingState v-else-if="isLoading" :label="t('common.loading_records')" class="px-6 pt-6" />

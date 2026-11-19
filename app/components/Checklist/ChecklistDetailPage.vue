@@ -374,21 +374,15 @@ const handleApprovalChanged = async () => {
   <CommonDetailPage v-else id="checklist-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div v-if="loadError" class="p-6" data-testid="checklist-load-error">
-        <UAlert
-          color="error"
-          icon="i-lucide-circle-alert"
+        <CommonErrorNotice
           :title="t('checklist.load_failed')"
           :description="t('checklist.load_failed_description')">
           <template #actions>
             <UButton
-              color="error"
-              variant="soft"
-              size="sm"
-              icon="i-lucide-refresh-cw"
               :label="t('common.retry')"
               @click="() => refresh()" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
 
       <div v-else class="p-6" data-testid="checklist-loading" role="status" aria-live="polite">

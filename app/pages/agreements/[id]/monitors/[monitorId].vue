@@ -631,11 +631,11 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors" data-scope-label-fr="Ententes > Surveillances" class="flex w-full flex-col">
-    <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="hasLoadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="isLoadingDetail && (!profile || !monitor)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>

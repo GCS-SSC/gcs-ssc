@@ -102,10 +102,11 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
           <CommonBilingualSelectMenu
             v-model="state.egcs_cn_entitytype" :items="entityTypes" value-key="entityType"
             label-en-key="labelEn" label-fr-key="labelFr" :loading="entityTypesStatus === 'pending'" class="w-full" />
-          <div v-if="entityTypesError" role="alert" class="mt-2 flex items-center gap-2 text-sm text-error">
-            <span>{{ t('common.lookup_load_failed') }}</span>
-            <UButton :label="t('common.retry')" color="neutral" variant="ghost" @click="refreshEntityTypes()" />
-          </div>
+          <CommonErrorNotice v-if="entityTypesError" class="mt-2" :title="t('common.lookup_load_failed')">
+            <template #actions>
+              <UButton :label="t('common.retry')" @click="refreshEntityTypes()" />
+            </template>
+          </CommonErrorNotice>
         </UFormField>
         <div class="grid gap-4 md:grid-cols-2">
           <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">

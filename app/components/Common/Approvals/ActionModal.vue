@@ -183,11 +183,11 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
               @update:open="(value: boolean) => value && emit('check-catalog')"
               @update:model-value="value => updateState('egcs_cn_onbehalf', value === undefined ? null : value)" />
           </UFormField>
-          <UAlert v-if="catalogChoicesFailed" color="error" :title="t('common.lookup_load_failed')">
+          <CommonErrorNotice v-if="catalogChoicesFailed" :title="t('common.lookup_load_failed')">
             <template #actions>
               <UButton :label="t('common.retry')" @click="emit('check-catalog')" />
             </template>
-          </UAlert>
+          </CommonErrorNotice>
 
           <UFormField v-if="requiresActual" :label="t('assessment.approvals.approver_name')" name="egcs_cn_approvername" required>
             <UInput v-model="approverNameModel" name="egcs_cn_approvername" :disabled="isSubmittingAction" required aria-required="true" />

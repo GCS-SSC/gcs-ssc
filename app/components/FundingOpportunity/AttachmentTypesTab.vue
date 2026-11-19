@@ -214,11 +214,8 @@ const remove = async (id: string): Promise<void> => {
 
 <template>
   <section class="space-y-4" data-field-scope="funding-opportunity.attachment-types-tab">
-    <UAlert
+    <CommonErrorNotice
       v-if="mutationError"
-      role="alert"
-      color="error"
-      icon="i-lucide-circle-alert"
       :title="t('funding_opportunity.attachment_save_failed')" />
 
     <CommonResourceLayout

@@ -71,11 +71,11 @@ const period = computed(() => evidence
         </p>
       </template>
       <template #error="{ retry }">
-        <UAlert color="error" icon="i-lucide-circle-alert" :title="t('agreement.payments.evidence.extension_error')">
+        <CommonErrorNotice :title="t('agreement.payments.evidence.extension_error')">
           <template #actions>
-            <UButton :label="t('common.retry')" color="error" variant="soft" @click="retry()" />
+            <UButton :label="t('common.retry')" @click="retry()" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </template>
     </ExtensionSlotHost>
 

@@ -145,10 +145,11 @@ const truncated = computed(() => {
         </template>
         <template #footer>
           <div class="flex w-full flex-col gap-2 px-3 py-2 text-xs text-muted">
-            <div v-if="failed" role="alert" class="flex items-center justify-between gap-3">
-              <span>{{ t('global_search.failed') }}</span>
-              <UButton color="neutral" variant="outline" size="xs" :label="t('common.retry')" @click="retry" />
-            </div>
+            <CommonErrorNotice v-if="failed" :title="t('global_search.failed')">
+              <template #actions>
+                <UButton :label="t('common.retry')" @click="retry" />
+              </template>
+            </CommonErrorNotice>
             <p v-else-if="loading" role="status" aria-live="polite">
               {{ t('global_search.loading') }}
             </p>

@@ -210,11 +210,11 @@ const preferenceFilters = { owner: tableFilter(owner, 'all', ownerItems), state:
           :is-collapsed="isHeroCollapsed" icon="i-lucide-list-restart"
           :title="t('queues.title')" :description="t('queues.description')" :stats="stats" />
         <section class="min-h-0 flex-1 overflow-auto" :aria-busy="status === 'pending'" :aria-label="t('queues.handlers')">
-          <UAlert v-if="accessDenied" class="m-6" color="error" variant="subtle" icon="i-lucide-circle-alert" :title="t('queues.access_denied')" :description="t('queues.access_denied_help')">
+          <CommonErrorNotice v-if="accessDenied" class="m-6" :title="t('queues.access_denied')" :description="t('queues.access_denied_help')">
             <template v-if="canRead" #actions>
-              <UButton color="error" variant="outline" :label="t('queues.retry')" :loading="status === 'pending'" @click="refreshSnapshot()" />
+              <UButton :label="t('queues.retry')" :loading="status === 'pending'" @click="refreshSnapshot()" />
             </template>
-          </UAlert>
+          </CommonErrorNotice>
           <CommonResourceLayout
             v-if="!accessDenied"
             v-model:search="search"

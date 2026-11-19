@@ -8,7 +8,8 @@ import {
   type GcsGroupedTableExpansionOptions,
   type GcsGroupedTableExpansionResult
 } from '@gcs-ssc/extensions/ui'
-import type { Component } from 'vue'
+import { defineComponent, h, type Component } from 'vue'
+import CommonErrorNotice from '~/components/Common/ErrorNotice.vue'
 import CommonFlowDiagram from '~/components/Common/FlowDiagram.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
@@ -61,6 +62,13 @@ import {
 
 const asExtensionHostComponent = (component: object): Component => component as Component
 
+const extensionAlert = defineComponent({
+  inheritAttrs: false,
+  setup: (_, { attrs, slots }) => () => attrs.color === 'error'
+    ? h(CommonErrorNotice, attrs, slots)
+    : h(UAlert, attrs, slots)
+})
+
 const extensionHostComponents = {
   CommonFlowDiagram,
   CommonAssessmentSchemaAccordionSection: AssessmentSchemaAccordionSection,
@@ -85,7 +93,7 @@ const extensionHostComponents = {
   CommonWorkflowSection,
   CommonWorkflowSupplementaryInformation,
   UAccordion: asExtensionHostComponent(UAccordion),
-  UAlert,
+  UAlert: extensionAlert,
   UBadge,
   UButton: CommonActionButton,
   UCheckbox,

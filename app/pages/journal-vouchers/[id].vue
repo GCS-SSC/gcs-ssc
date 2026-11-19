@@ -256,11 +256,11 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="journal-vouchers" data-scope-label-en="Agreements > Journal Vouchers > General" data-scope-label-fr="Ententes > Pièces de journal > Général" class="flex w-full min-w-0 flex-col">
-    <UAlert v-if="error" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton :label="t('common.retry')" :loading="status === 'pending'" @click="refresh()" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="!voucher && status === 'pending'" role="status" aria-live="polite" class="p-6">
       {{ t('common.loading_records') }}
     </div>

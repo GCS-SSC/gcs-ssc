@@ -361,11 +361,11 @@ const visibleRows = computed(() => items.value)
         <div v-if="contactsStatus === 'pending'" role="status" :aria-label="t('common.loading')" class="space-y-3">
           <USkeleton v-for="index in 2" :key="index" class="h-16 w-full" />
         </div>
-        <UAlert v-else-if="contactsError" color="error" :title="t('assignments.load_failed')" :description="t('assignments.load_failed_description')">
+        <CommonErrorNotice v-else-if="contactsError" :title="t('assignments.load_failed')" :description="t('assignments.load_failed_description')">
           <template #actions>
-            <UButton :label="t('common.retry')" color="error" variant="soft" @click="refreshContacts" />
+            <UButton :label="t('common.retry')" @click="refreshContacts" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
         <ul v-else-if="contactRoster?.assignments.length" class="divide-y divide-default">
           <li v-for="assignment in contactRoster.assignments" :key="assignment.user_id" class="space-y-1 py-3">
             <div class="flex flex-wrap items-center gap-2">

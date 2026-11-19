@@ -990,17 +990,14 @@ const handleApprovalChanged = async () => {
       {{ t('workflow.no_previous') }}
     </p>
     <div v-if="showWorkflowContent && status === 'pending'" class="h-24 animate-pulse rounded-sm bg-muted" />
-    <UAlert
+    <CommonErrorNotice
       v-else-if="runtimeLoadFailed"
-      color="error"
-      variant="soft"
-      icon="i-lucide-circle-alert"
       :title="t('workflow.runtime_load_failed')"
       :description="t('workflow.runtime_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="retryRuntime" />
+        <UButton :label="t('common.retry')" @click="retryRuntime" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <CommonPreActionReport
       v-else-if="showWorkflowContent && showPreActionReport"
       :show-header="Boolean(previewWorkflow) || preActionShowHeader"
@@ -1146,10 +1143,8 @@ const handleApprovalChanged = async () => {
             <UButton color="warning" variant="soft" :label="t('questionnaire.reload_responses')" :disabled="isMutationPending || status === 'pending'" @click="reloadRecommendationResponses" />
           </template>
         </UAlert>
-        <UAlert
+        <CommonErrorNotice
           v-if="validationIssues.length > 0"
-          color="error"
-          icon="i-lucide-circle-alert"
           :title="t('workflow.recommendation_validation_title')"
           :description="t('workflow.recommendation_validation_description')" />
         <CommonQuestionnaireForm
@@ -1250,17 +1245,14 @@ const handleApprovalChanged = async () => {
       <template #body>
         <div class="space-y-6">
           <div v-if="isLoadingAvailable" class="h-24 animate-pulse rounded-sm bg-muted" />
-          <UAlert
+          <CommonErrorNotice
             v-else-if="availableWorkflowsStatus === 'error'"
-            color="error"
-            variant="soft"
-            icon="i-lucide-circle-alert"
             :title="t('workflow.available_load_failed')"
             :description="t('workflow.available_load_failed_description')">
             <template #actions>
-              <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="loadAvailableWorkflows" />
+              <UButton :label="t('common.retry')" @click="loadAvailableWorkflows" />
             </template>
-          </UAlert>
+          </CommonErrorNotice>
           <p v-else-if="availableWorkflows.length === 0" class="text-sm text-muted">
             {{ t('workflow.no_available_workflows') }}
           </p>

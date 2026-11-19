@@ -288,10 +288,11 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
             label-key="name"
             searchable
             @update:search-term="userSearchTerm = $event" />
-          <div v-if="usersLoadFailed" role="alert" class="mt-2 space-y-2">
-            <p>{{ t('common.lookup_load_failed') }}</p>
-            <UButton :label="t('common.retry')" variant="outline" @click="refreshUsers" />
-          </div>
+          <CommonErrorNotice v-if="usersLoadFailed" class="mt-2" :title="t('common.lookup_load_failed')">
+            <template #actions>
+              <UButton :label="t('common.retry')" @click="refreshUsers" />
+            </template>
+          </CommonErrorNotice>
         </UFormField>
         <UFormField :label="t('role.assignment.role')" name="role_id">
           <CommonBilingualSelectMenu
@@ -306,10 +307,11 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
             label-fr-key="name_fr"
             searchable
             @update:search-term="roleSearchTerm = $event" />
-          <div v-if="rolesLoadFailed" role="alert" class="mt-2 space-y-2">
-            <p>{{ t('common.lookup_load_failed') }}</p>
-            <UButton :label="t('common.retry')" variant="outline" @click="refreshRoles" />
-          </div>
+          <CommonErrorNotice v-if="rolesLoadFailed" class="mt-2" :title="t('common.lookup_load_failed')">
+            <template #actions>
+              <UButton :label="t('common.retry')" @click="refreshRoles" />
+            </template>
+          </CommonErrorNotice>
           <p v-if="roleRequiredError" class="text-error mt-1 text-sm">
             {{ t('validation.required') }}
           </p>

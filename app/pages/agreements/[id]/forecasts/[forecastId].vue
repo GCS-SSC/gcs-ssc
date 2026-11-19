@@ -865,11 +865,11 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.forecasts" data-scope-label-en="Agreements > Forecasts > Breakdown" data-scope-label-fr="Ententes > Prévisions > Ventilation" class="flex w-full flex-col">
-    <UAlert v-if="hasLoadError || (breakdownReloadRequired && !isSavingBreakdown && !monthlyEditorOpen)" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="hasLoadError || (breakdownReloadRequired && !isSavingBreakdown && !monthlyEditorOpen)" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="isLoadingDetail && (!profile || !activeForecast)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>

@@ -512,17 +512,14 @@ const retryAttachmentList = async () => {
         searchable
         data-ui-target="common.attachments-tab.selectedAgencyId" @update:model-value="selectAgency" />
     </div>
-    <UAlert
+    <CommonErrorNotice
       v-if="hasAttachmentListError"
-      color="error"
-      variant="soft"
-      icon="i-lucide-circle-alert"
       :title="t('attachments.load_failed')"
       :description="t('attachments.load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="retryAttachmentList" />
+        <UButton :label="t('common.retry')" @click="retryAttachmentList" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
 
     <CommonResourceLayout
       v-else-if="!agencyRequired || selectedAgencyId"

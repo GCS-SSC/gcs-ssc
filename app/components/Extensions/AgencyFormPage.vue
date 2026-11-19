@@ -86,11 +86,11 @@ watch(formId, id => {
       <div v-if="status === 'pending'" role="status" class="p-6">
         {{ t('common.loading_records') }}
       </div>
-      <UAlert v-else-if="status === 'error'" color="error" :title="t('common.resource_table_load_failed')">
+      <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')">
         <template #actions>
           <UButton :label="t('common.retry')" @click="retry" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <div v-else-if="formId === 'new'" />
       <div v-else-if="workspace && extension && extensionComponent" class="flex flex-1 flex-col">
         <component
@@ -101,7 +101,7 @@ watch(formId, id => {
           @form-flow="navigateTo(localePath($event === 'flow' ? appRouteLocations.extensionAgencyWorkspaceFormFlow(extensionKey, agencyId, formId) : { ...appRouteLocations.extensionAgencyWorkspaceForm(extensionKey, agencyId, formId), query: $event === 'edit' ? {} : { view: $event } }))"
           @close-form="navigateTo(formsLocation)" @form-collection-label="formCollectionLabel = $event" />
       </div>
-      <UAlert v-else color="error" :title="t('common.not_available')" />
+      <CommonErrorNotice v-else :title="t('common.not_available')" />
     </template>
   </UDashboardPanel>
 </template>

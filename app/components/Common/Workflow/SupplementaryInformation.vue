@@ -62,17 +62,14 @@ watch(() => [entityType, entityId], () => {
       {{ t('common.loading') }}
     </div>
 
-    <UAlert
+    <CommonErrorNotice
       v-else-if="hasLoadError"
-      color="error"
-      variant="soft"
-      icon="i-lucide-circle-alert"
       :title="t('supplementary_information.load_failed')"
       :description="t('supplementary_information.load_failed_description')">
       <template #actions>
-        <UButton color="neutral" variant="outline" :label="t('common.retry')" @click="retry" />
+        <UButton :label="t('common.retry')" @click="retry" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
 
     <template v-else-if="information">
       <CommonEmptyState v-if="information.workflows.length === 0" icon="i-lucide-clipboard-list" :description="t('supplementary_information.empty')" />

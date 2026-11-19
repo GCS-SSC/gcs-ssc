@@ -342,11 +342,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.commitments" data-scope-label-en="Agreements > Commitments > Lines" data-scope-label-fr="Ententes > Engagements > Lignes" class="flex w-full flex-col">
-    <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <CommonErrorNotice v-if="hasLoadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
-    </UAlert>
+    </CommonErrorNotice>
     <div v-else-if="isLoadingDetail && (!profile || !commitment)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>

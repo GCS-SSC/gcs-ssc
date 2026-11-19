@@ -94,12 +94,12 @@ const columns: TableColumnInput<Agency>[] = [
             </div>
           </template>
         </CommonResourceLayout>
-        <UAlert v-else-if="status === 'error'" color="error" :title="t('common.resource_table_load_failed')">
+        <CommonErrorNotice v-else-if="status === 'error'" :title="t('common.resource_table_load_failed')">
           <template #actions>
             <UButton :label="t('common.retry')" @click="() => refresh()" />
           </template>
-        </UAlert>
-        <UAlert v-else-if="status === 'success'" color="error" :title="t('common.not_available')" />
+        </CommonErrorNotice>
+        <CommonErrorNotice v-else-if="status === 'success'" :title="t('common.not_available')" />
       </div>
     </template>
   </UDashboardPanel>

@@ -114,11 +114,11 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
       <div v-if="status === 'pending' && !profile" role="status" class="p-6">
         {{ t('common.loading_records') }}
       </div>
-      <UAlert v-else-if="error" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')">
+      <CommonErrorNotice v-else-if="error" :title="t('common.resource_table_load_failed')">
         <template #actions>
           <UButton :label="t('common.retry')" @click="() => refresh()" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <div v-else-if="profile && String(profile.id) === String(route.params.id)" data-help-view="intake.detail" :data-help-agency="profile.agency_id" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.id}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="intake.detail.section-navigation" data-field-container="Page navigation state, not a business input field." content-test-id="funding-case-intake-detail-content" :items="tabs">

@@ -386,16 +386,14 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
           ]" />
 
         <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.claim-reconciliations.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="claim-reconciliation-detail-content">
-          <UAlert
+          <CommonErrorNotice
             v-if="readbackFailed"
-            color="error"
-            variant="soft"
             :title="t('agreement.claims.reconcile_load_failed')"
             :description="t('common.resource_table_load_failed_description')">
             <template #actions>
               <UButton :label="t('common.retry')" :loading="isRetryingLoad" :disabled="isRetryingLoad || isMutationPending" @click="retryLoad" />
             </template>
-          </UAlert>
+          </CommonErrorNotice>
           <UAlert
             v-if="selectedTab === 'reconciliation' && !data.can_update"
             color="neutral"
@@ -513,23 +511,17 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
       </div>
 
       <div v-else class="p-6">
-        <UAlert
-          color="error"
-          variant="soft"
-          icon="i-lucide-circle-alert"
+        <CommonErrorNotice
           :title="t('agreement.claims.reconcile_load_failed')"
           :description="t('common.resource_table_load_failed_description')">
           <template #actions>
             <UButton
-              color="error"
-              variant="soft"
-              icon="i-lucide-refresh-cw"
               :label="t('common.retry')"
               :loading="isRetryingLoad"
               :disabled="isRetryingLoad"
               @click="retryLoad" />
           </template>
-        </UAlert>
+        </CommonErrorNotice>
       </div>
 
       <UModal

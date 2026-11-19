@@ -241,10 +241,11 @@ onMounted(() => {
           :subtitle="t('agreement.description')" />
 
         <CommonEntityEditorWorkspace>
-          <p v-if="numberModeFailed" role="alert" class="text-error">
-            {{ t('agreement.number_mode_error') }}
-            <UButton :label="t('common.retry')" variant="link" @click="loadNumberMode" />
-          </p>
+          <CommonErrorNotice v-if="numberModeFailed" :title="t('agreement.number_mode_error')">
+            <template #actions>
+              <UButton :label="t('common.retry')" @click="loadNumberMode" />
+            </template>
+          </CommonErrorNotice>
           <AgreementProfileFormPage
             v-model:model="form"
             :action-context="actionContext"

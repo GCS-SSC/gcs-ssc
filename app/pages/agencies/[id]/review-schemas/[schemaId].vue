@@ -24,11 +24,11 @@ definePageMeta({
 
 <template>
   <CommonLoadingState v-if="status === 'pending'" :label="$t('common.loading')" />
-  <UAlert v-else-if="error" color="error" :title="$t('common.load_failed')">
+  <CommonErrorNotice v-else-if="error" :title="$t('common.load_failed')">
     <template #actions>
       <UButton :label="$t('common.retry')" @click="refresh()" />
     </template>
-  </UAlert>
+  </CommonErrorNotice>
   <ChecklistSchemaDetailPage v-else-if="data?.egcs_cn_reviewtype === 'checklist'" />
   <AssessmentSchemaDetailPage v-else-if="data?.egcs_cn_reviewtype === 'assessment'" />
 </template>

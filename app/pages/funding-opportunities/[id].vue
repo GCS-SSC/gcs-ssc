@@ -240,11 +240,11 @@ const breadcrumbs = computed(() => [
       <div v-if="status === 'pending' && !profile" role="status" class="p-6">
         {{ t('common.loading_records') }}
       </div>
-      <UAlert v-else-if="error" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')">
+      <CommonErrorNotice v-else-if="error" :title="t('common.resource_table_load_failed')">
         <template #actions>
           <UButton :label="t('common.retry')" @click="() => refresh()" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
       <div v-else-if="profile" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :meta-items="heroMetaItems" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('funding_opportunity.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="funding-opportunity-detail-content" :section-description="selectedTab === 'applications' ? t('funding_opportunity.applications_description') : undefined">

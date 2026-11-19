@@ -436,21 +436,17 @@ const formSession = useFormSession({ owner: commitmentModal, action: { kind: 're
       help-add-target="agreement.commitments.add"
       help-search-target="agreement.commitments.search" @add="openCreateCommitment" @retry="refreshOverview">
       <template #actions>
-        <UAlert
+        <CommonErrorNotice
           v-if="canCreateRole && extensionCreateError"
-          role="alert"
-          color="error"
           :title="t('common.load_failed')"
           :actions="[{ label: t('common.retry'), onClick: () => refreshExtensionCreateActions() }]" />
-        <div
+        <CommonErrorNotice
           v-if="canCreateRole && hasExtensionCreateConflict"
           role="status"
           tabindex="0"
           :aria-label="t('extensions.create_operation_conflict')"
-          class="flex max-w-sm items-start gap-2 rounded-md border border-error/30 bg-error/5 px-3 py-2 text-sm text-error">
-          <UIcon name="i-lucide-alert-triangle" aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
-          <span>{{ t('extensions.create_operation_conflict') }}</span>
-        </div>
+          class="max-w-sm"
+          :title="t('extensions.create_operation_conflict')" />
         <template v-if="canCreateRole && extensionReplacementCreateAction && !hasExtensionCreateConflict">
           <ExtensionCreateActionHost
             v-if="canCreate || readyExtensionCreateActions.has(extensionReplacementCreateAction.value)"

@@ -84,22 +84,18 @@ onMounted(() => {
 <template>
   <CommonDetailPage id="applicant-recipient-create" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
     <template #body>
-      <UAlert
+      <CommonErrorNotice
         v-if="!canCreateProfile"
-        role="alert"
         aria-live="assertive"
-        color="error"
-        icon="i-lucide-shield-alert"
         :title="t('common.error')"
         :description="t('apiErrors.auth.forbidden')">
         <template #actions>
           <UButton
-            color="error"
-            variant="soft"
+            icon="i-lucide-arrow-left"
             :label="t('applicant_recipient.title')"
             @click="cancel" />
         </template>
-      </UAlert>
+      </CommonErrorNotice>
 
       <div v-else-if="form" class="flex flex-1 flex-col">
         <ApplicantRecipientProfileHero
