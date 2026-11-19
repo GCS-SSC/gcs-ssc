@@ -16,6 +16,7 @@ const {
   actionRoleAllowed = undefined,
   mutationRoleAllowed,
   actionPrerequisiteWarning,
+  completionPrerequisiteWarning,
   canEdit = true,
   isLocked = false,
   completionComments,
@@ -34,6 +35,8 @@ const {
   mutationRoleAllowed: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
   actionPrerequisiteWarning?: LocalizedToastText
+  /** Additional prerequisite for submitting completion or starting the workflow. */
+  completionPrerequisiteWarning?: LocalizedToastText
   canEdit?: boolean
   isLocked?: boolean
   completionComments?: string
@@ -58,7 +61,7 @@ const completionState = useCompletionWorkflowStart({
   entityId: () => entityId,
   isLocked: () => isLocked || !canEdit,
   actionRoleAllowed: () => actionRoleAllowed,
-  actionPrerequisiteWarning: () => actionPrerequisiteWarning,
+  actionPrerequisiteWarning: () => completionPrerequisiteWarning ?? actionPrerequisiteWarning,
   completionComments: () => completionComments,
   completedSuccessKey: () => completedSuccessKey,
   immediate: false,

@@ -1547,7 +1547,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                 :can-edit="isAssigned"
                 :is-locked="!claimEditReady"
                 :action-role-allowed="canUpdateClaim"
-                :action-prerequisite-warning="claimEditPrerequisiteWarning"
+                :action-prerequisite-warning="claimWorkflowPrerequisiteWarning"
+                :completion-prerequisite-warning="claimEditPrerequisiteWarning"
                 show-when-unconfigured
                 title-key="agreement.claims.completion.title"
                 description-key="agreement.claims.completion.description"
