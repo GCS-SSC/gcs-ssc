@@ -646,7 +646,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
             <p v-if="document && selectedTab === 'history' && !selected?.versions.length" class="text-muted">
               {{ t('guided_help.no_versions') }}
             </p>
-            <UAlert v-for="diagnostic in [...(selected?.compatibility ?? selectedCatalog?.compatibility ?? []), ...previewDiagnostics]" :key="diagnostic.message" color="warning" :title="diagnosticText(diagnostic)" />
+            <CommonNotice v-for="diagnostic in [...(selected?.compatibility ?? selectedCatalog?.compatibility ?? []), ...previewDiagnostics]" :key="diagnostic.message" tone="warning" :title="diagnosticText(diagnostic)" />
           </div>
         </CommonDesignTimeEditorSections>
       </CommonDesignTimeEditorShell>

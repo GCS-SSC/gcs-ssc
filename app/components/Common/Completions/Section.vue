@@ -301,14 +301,14 @@ const submitCompletion = async () => {
       <div
         v-else
         class="space-y-4">
-        <UAlert
+        <CommonNotice
           v-if="completionResponse?.blocker"
-          color="warning"
+          tone="warning"
           icon="i-lucide-lock-keyhole"
           :title="t(`workflow.completion_blockers.${completionResponse.blocker}`)" />
-        <UAlert
+        <CommonNotice
           v-else-if="isLocked"
-          color="warning"
+          tone="warning"
           icon="i-lucide-lock-keyhole"
           :title="resolvedLabels.statusLocked" />
 

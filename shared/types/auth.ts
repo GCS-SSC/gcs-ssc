@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { AbilityAction, AuthorizationSubject } from '~~/shared/utils/abilities'
-import { AUTHORIZATION_ACTIONS } from '@gcs-ssc/authorization'
+import type { AuthorizationSubject } from '~~/shared/utils/abilities'
+import { STATIC_GRANT_ACTIONS, type StaticGrantAction } from '@gcs-ssc/authorization'
 import {
   AUTHORIZATION_SUBJECTS,
   isAuthorizationSubject
@@ -13,7 +13,7 @@ export interface SocialLoginResult {
 }
 
 export type StaticPermissionSource = 'role'
-export type StaticPermissionAction = AbilityAction | 'manage_assignments' | 'view_audit_inputs'
+export type StaticPermissionAction = StaticGrantAction
 export type StaticPermissionScope = RoleScope
 
 export interface StaticPermissionGrant {
@@ -43,12 +43,13 @@ const StaticPermissionScopeSchema = z.discriminatedUnion('type', [
 
 export const StaticPermissionGrantSchema = z.object({
   source: z.literal('role'),
-  action: z.enum([...AUTHORIZATION_ACTIONS, 'manage_assignments', 'view_audit_inputs']),
+  action: z.enum(STATIC_GRANT_ACTIONS),
   subject: z.enum(AUTHORIZATION_SUBJECTS),
   scope: StaticPermissionScopeSchema
 }).superRefine((grant, context) => {
   if ((grant.subject === 'audit' && !['read', 'view_audit_inputs'].includes(grant.action))
-    || (grant.action === 'view_audit_inputs' && grant.subject !== 'audit')) {
+    || (grant.action === 'view_audit_inputs' && grant.subject !== 'audit')
+    || ((grant.subject === 'debt_management') !== (grant.action === 'override_payment_debt'))) {
     context.addIssue({ code: 'custom', path: ['action'], message: 'validation.invalid_selection' })
   }
   if (!isAuthorizationSubject(grant.subject)) {

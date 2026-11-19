@@ -412,10 +412,9 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
           <UFormField v-if="canManageFlags" :label="t('agency.statuses.lifecycle')" data-ui-target="agency.statuses.agency.statuses.lifecycle">
             <URadioGroup v-model="lifecycle" :items="lifecycleOptions" variant="card" />
           </UFormField>
-          <UAlert
+          <CommonNotice
             v-else
-            color="neutral"
-            variant="subtle"
+            tone="info"
             icon="i-lucide-info"
             :title="t('agency.statuses.contributor_lifecycle_title')"
             :description="t('agency.statuses.contributor_lifecycle_description')" />

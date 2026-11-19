@@ -1,6 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { captureAgreementPaymentEvidence } from '~~/server/utils/agreement-payment-evidence'
-import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
+import { assertPaymentOverrideTerms, assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
 import type { Currency_Codes } from '~~/shared/types/database'
 import { assertAgreementCurrency, assertCurrencyMoneyValues, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementPaymentCreateSchema, FundingCaseAgreementPaymentPatchSchema } from '~~/shared/types/schemas'
@@ -55,7 +55,14 @@ export default defineEventHandler(async event => {
     const currency = await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? editablePayment.egcs_fc_currency)
     if (patchValues.egcs_fc_paymentamount) await assertCurrencyMoneyValues(event, currency, [patchValues.egcs_fc_paymentamount])
 
-    await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: patchValues.egcs_fc_applicantrecipient ?? editablePayment.egcs_fc_applicantrecipient, currency: patchValues.egcs_fc_currency ?? editablePayment.egcs_fc_currency, paymentId })
+    const applicantRecipientId = patchValues.egcs_fc_applicantrecipient ?? editablePayment.egcs_fc_applicantrecipient
+    const paymentCurrency = patchValues.egcs_fc_currency ?? editablePayment.egcs_fc_currency
+    const override = editablePayment.egcs_fc_aroverride
+    if (override) await assertPaymentOverrideTerms(event, override, {
+      applicantRecipientId, currency: paymentCurrency, gross: patchValues.egcs_fc_paymentamount ?? editablePayment.egcs_fc_paymentamount
+    })
+    await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId, currency: paymentCurrency, paymentId },
+      { skipRecovery: Boolean(override) })
     await validateMergedFinancialPeriodPatch(event, editablePayment, patchValues)
 
     const { response, nextCommitmentId } = await resolveAgreementPaymentPatchCommitmentId(event, trx, agreementId, patchValues, editablePayment.egcs_fc_currency)
@@ -80,6 +87,7 @@ export default defineEventHandler(async event => {
     }
 
     const explicitOffsetPlan = patchValues.egcs_fc_offsetplanhash !== undefined || patchValues.egcs_fc_offsetcreditmemos !== undefined
+    if (override && explicitOffsetPlan) return await badRequest(event, 'AR_OVERRIDE_CREATION_ONLY', 'validation.payment_override_creation_only')
     const nextCommitment = explicitOffsetPlan
       ? await trx.selectFrom('Funding_Case_Agreement_Commitment').select('egcs_fc_type')
           .where('id', '=', nextCommitmentId ?? String(editablePayment.egcs_fc_fundingagreementcommitment)).executeTakeFirstOrThrow()
@@ -134,6 +142,7 @@ export default defineEventHandler(async event => {
       .returning([
         'id',
         'egcs_fc_evidence',
+        'egcs_fc_aroverride',
         'egcs_fc_fundingagreementcommitment',
         'egcs_fc_fiscalyear',
         'egcs_fc_paymenttype',

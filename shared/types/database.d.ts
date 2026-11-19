@@ -670,7 +670,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'help' | 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
+  subject: 'help' | 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable' | 'debt_management'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -1800,8 +1800,18 @@ export interface FundingCaseAgreementJournalVoucherLineTable {
   _deleted: Generated<boolean>
 }
 
+export interface PaymentAROverride {
+  actorId: string
+  reason: string
+  enabledAt: string
+  payeeId: string
+  currency: Currency_Codes
+  grossMinorUnits: string
+}
+
 export interface FundingCaseAgreementPaymentTable {
   egcs_fc_evidence: Generated<PaymentEvidence | null>
+  egcs_fc_aroverride: ColumnType<PaymentAROverride | null, PaymentAROverride | null | undefined, never>
   egcs_fc_applicantrecipient: string
   id: Generated<string>
   egcs_fc_fundingagreementcommitment: string

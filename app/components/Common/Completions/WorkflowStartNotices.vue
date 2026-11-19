@@ -18,10 +18,10 @@ const { mode, completionResponse, completionErrorDetails, isLoading, loadStatus,
       </template>
     </CommonErrorNotice>
 
-    <UAlert
+    <CommonNotice
       v-if="!item && completionResponse?.blocker"
       role="alert"
-      color="warning"
+      tone="warning"
       icon="i-lucide-lock-keyhole"
       :title="t(`workflow.${mode === 'recommendation_submission' ? 'start_blockers' : 'completion_blockers'}.${completionResponse.blocker}`, completionResponse.blockerParameters ?? {})" />
 

@@ -367,9 +367,9 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
           <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.commitments.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-commitment-detail-content">
             <CommonSection v-if="selectedTab === 'lines'" data-help-view="casework.commitments.lines" :show-header="false" :title="t('agreement.commitments.lines_title')" :grid-cols="1">
               <div class="space-y-4">
-                <UAlert
+                <CommonNotice
                   v-if="!hasBalancedCoding"
-                  color="warning"
+                  tone="warning"
                   icon="i-lucide-triangle-alert"
                   :title="t('agreement.commitments.allocation_required')"
                   :description="t('agreement.commitments.allocation_total_help', { total: formatMoney(commitment.egcs_fc_totalamount), allocated: formatMoney(totalAmount) })" />

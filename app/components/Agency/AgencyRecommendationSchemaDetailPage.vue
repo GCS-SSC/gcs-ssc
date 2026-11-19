@@ -326,9 +326,9 @@ const retire = async () => {
               </AssessmentSchemaPageSection>
 
               <AssessmentSchemaPageSection section-id="recommendation-definition" :title="t('recommendation_schema.form_sections')" role="tabpanel" :aria-label="t('recommendation_schema.form_sections')">
-                <UAlert
+                <CommonNotice
                   v-if="definitionErrors.length > 0"
-                  icon="i-lucide-circle-alert" color="warning" variant="subtle"
+                  icon="i-lucide-circle-alert" tone="warning"
                   :title="t('recommendation_schema.validation_title')"
                   :description="definitionErrors.join(' ')" class="mb-5" />
                 <RecommendationSchemaRecommendationDefinitionEditor v-model="definition" data-field-container="Composite editor; its individual field declarations own their identities." />

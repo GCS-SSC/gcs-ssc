@@ -56,6 +56,11 @@ const buildRoleGrant = (
     assignment.transferPaymentId ?? undefined
   )
   if (!scope) return []
+  if (row.subject === 'debt_management') {
+    return row.access_level === 'manager'
+      ? [{ source: 'role', action: 'override_payment_debt', subject: 'debt_management', scope }]
+      : []
+  }
   if (row.subject === 'audit') {
     if (!row.access_level) return []
     return [

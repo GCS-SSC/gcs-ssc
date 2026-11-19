@@ -12,6 +12,7 @@ import { computed, onScopeDispose, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
+import AgreementPaymentArOverrideWarning from '~/components/Agreement/PaymentArOverrideWarning.vue'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
 import type {
@@ -387,7 +388,7 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
               </CommonErrorNotice>
             </template>
             <CommonSection v-if="selectedTab === 'lines'" data-help-view="casework.payments.lines" :show-header="false" :title="t('agreement.payments.lines_title')" :grid-cols="1">
-              <AgreementPaymentRecoverySummary :payment="payment" />
+              <AgreementPaymentRecoverySummary :payment="payment" :ar-override="Boolean(payment.egcs_fc_aroverride)" />
               <div class="space-y-4">
                 <div class="flex justify-end">
                   <UButton
@@ -456,7 +457,7 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
             </section>
 
             <section v-else-if="selectedTab === 'completion'" id="payment-completion" data-help-view="casework.payments.completion" data-help-target="casework.payments.detail.completion" data-help-kind="section" class="space-y-6">
-              <AgreementPaymentRecoverySummary :payment="payment" />
+              <AgreementPaymentRecoverySummary :payment="payment" :ar-override="Boolean(payment.egcs_fc_aroverride)" />
               <CommonCompletionPanel
                 :mutation-role-allowed="canAny('agreement', 'update')"
                 entity-type="fundingcasepayment"
@@ -473,7 +474,11 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
                 complete-action-key="agreement.payments.completion.complete"
                 completed-success-key="agreement.payments.completion.completed_success"
                 :refresh-key="approvalsRefreshKey"
-                @changed="handleCompleted" />
+                @changed="handleCompleted">
+                <template v-if="payment.egcs_fc_aroverride" #payment-override-notice>
+                  <AgreementPaymentArOverrideWarning :amount="payment.egcs_fc_paymentamount" :reason="payment.egcs_fc_aroverride.reason" />
+                </template>
+              </CommonCompletionPanel>
             </section>
 
             <CommonReviewsTab
@@ -484,7 +489,10 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
               :can-update="canUpdatePayment"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canAny('agreement', 'update')" data-help-view="casework.payments.workflows" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <div v-else-if="selectedTab === 'workflows'" class="space-y-6">
+              <AgreementPaymentArOverrideWarning v-if="payment.egcs_fc_aroverride" :amount="payment.egcs_fc_paymentamount" :reason="payment.egcs_fc_aroverride.reason" />
+              <CommonWorkflowSection :mutation-role-allowed="canAny('agreement', 'update')" data-help-view="casework.payments.workflows" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            </div>
             <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.payments.supplementary-information" data-help-target="casework.payments.supplementary-information.content">
               <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
             </section>

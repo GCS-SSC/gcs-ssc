@@ -283,10 +283,10 @@ const createAmendment = async () => {
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.amendments-tab" data-scope-label-en="Agreements > Amendments" data-scope-label-fr="Ententes > Modifications" data-help-view="agreement.amendments" data-help-label-en="Agreements — Amendments" data-help-label-fr="Ententes — Modifications" data-help-target="agreement.amendments.content" data-help-kind="section" @focusin="checkCatalogVersions">
-    <UAlert
+    <CommonNotice
       v-if="canCreate && hasOpenAmendment"
       class="mb-4"
-      color="info"
+      tone="info"
       icon="i-lucide-info"
       :title="t('agreement.amendments.open_exists')" />
     <CommonResourceLayout

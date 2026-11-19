@@ -8,12 +8,13 @@ import type { ExtensionPaymentAmountCalculatorItem } from '~~/shared/types/schem
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 
 const state = defineModel<FundingCaseAgreementPaymentForm>('state', { required: true })
-const { agreementId, currency, paymentAmountCalculator, paymentCalculatorModel, ceilingError, pending = false } = defineProps<{
+const { agreementId, currency, paymentAmountCalculator, paymentCalculatorModel, ceilingError, arOverrideLocked = false, pending = false } = defineProps<{
   agreementId: string
   currency: Currency_Codes
   paymentAmountCalculator: ExtensionPaymentAmountCalculatorItem | null
   paymentCalculatorModel: Record<string, unknown>
   ceilingError: string | null
+  arOverrideLocked?: boolean
   pending?: boolean
 }>()
 const emit = defineEmits<{
@@ -39,13 +40,14 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 <template>
   <div class="space-y-4" data-field-tooltip-context="agreement" data-field-scope="agreement.payment-fields" data-scope-label-en="Agreements > Payments > General" data-scope-label-fr="Ententes > Paiements > Général">
+    <CommonNotice v-if="arOverrideLocked" tone="warning" icon="i-lucide-lock-keyhole" :description="t('validation.payment_override_creation_only')" />
     <UFormField :label="t('agreement.payments.payee')" name="egcs_fc_applicantrecipient" :description="t('agreement.payments.payee_description')">
       <CommonServerLookupSelect
         v-model="state.egcs_fc_applicantrecipient"
         :fetch-url="`/api/agreements/${agreementId}/payments/lookups/proponents`"
         selected-values-query-key="selected_ids"
         value-key="id" label-en-key="label_en" label-fr-key="label_fr"
-        :disabled="pending" :limit="100" :show-value-in-label="false" close-on-select
+        :disabled="pending || arOverrideLocked" :limit="100" :show-value-in-label="false" close-on-select
         :auto-select-single="!state.id"
         :query="lookupQuery" @resolved-items="items => emit('resolved-items', 'egcs_fc_applicantrecipient', items)" />
     </UFormField>
@@ -101,7 +103,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
     <UFormField :label="t('agreement.payments.amount')" name="egcs_fc_paymentamount">
       <CommonCurrencyInput
         :model-value="state.egcs_fc_paymentamount"
-        :currency="state.egcs_fc_currency" :disabled="pending"
+        :currency="state.egcs_fc_currency" :disabled="pending || arOverrideLocked"
         @update:model-value="value => emit('amount', value)" />
       <p v-if="ceilingError" class="mt-1 text-sm text-error">
         {{ ceilingError }}

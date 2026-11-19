@@ -1,11 +1,17 @@
 /* eslint-disable jsdoc/require-jsdoc -- Payment authority delegates approved AR policy through narrow host controls. */
 import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
-import type { Currency_Codes, Database } from '~~/shared/types/database'
+import type { Currency_Codes, Database, PaymentAROverride } from '~~/shared/types/database'
+import type { Money } from '~~/shared/utils/money'
 import { throwApiError } from './api-errors'
 import { assertAccountReceivablePaymentAllowed } from './account-receivable-recovery'
 
+export const isOverridablePaymentRecoveryError = (error: unknown): boolean =>
+  error instanceof Error && ['AR_DIRECT_REPAYMENT_HOLD', 'AR_RECOVERY_UNRESOLVED', 'AR_ADJUSTMENT_UNRESOLVED'].includes(error.message)
+
 const paymentRecoveryErrorKeys: Readonly<Record<string, string>> = {
+  AR_OVERRIDE_NOT_APPLICABLE: 'apiErrors.account_receivable.payment_override_not_applicable',
+  AR_OVERRIDE_CREATION_ONLY: 'validation.payment_override_creation_only',
   AR_DIRECT_REPAYMENT_HOLD: 'apiErrors.account_receivable.payment_direct_repayment_hold',
   AR_RECOVERY_UNRESOLVED: 'apiErrors.account_receivable.payment_recovery_pending',
   AR_ADJUSTMENT_UNRESOLVED: 'apiErrors.account_receivable.payment_recovery_pending',
@@ -27,7 +33,8 @@ export const withPaymentRecoveryErrors = async <T>(event: H3Event, operation: ()
 }
 
 export const assertPaymentRecoveryAllowed = async (
-  event: H3Event, db: Kysely<Database>, input: { agreementId: string; applicantRecipientId: string; currency: Currency_Codes; paymentId?: string }
+  event: H3Event, db: Kysely<Database>, input: { agreementId: string; applicantRecipientId: string; currency: Currency_Codes; paymentId?: string },
+  options: { skipRecovery?: boolean } = {}
 ) => {
   const payee = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient as link')
     .innerJoin('Applicant_Recipient_Profile as profile', 'profile.id', 'link.egcs_fc_applicantrecipient')
@@ -35,7 +42,7 @@ export const assertPaymentRecoveryAllowed = async (
     .where('link.egcs_fc_applicantrecipient', '=', input.applicantRecipientId).where('link._deleted', '=', false)
     .where('profile._deleted', '=', false).where('profile.egcs_ar_active', '=', true).executeTakeFirst()
   if (!payee) return await throwApiError(event, { statusCode: 409, code: 'AR_PAYMENT_PAYEE_INVALID', key: 'apiErrors.account_receivable.payment_payee_unavailable' })
-  await withPaymentRecoveryErrors(event, () => assertAccountReceivablePaymentAllowed(db, input))
+  if (!options.skipRecovery) await withPaymentRecoveryErrors(event, () => assertAccountReceivablePaymentAllowed(db, input))
 }
 
 export const assertPaymentMutationRecoveryAllowed = async (
@@ -47,12 +54,21 @@ export const assertPaymentMutationRecoveryAllowed = async (
   const paymentIds = [...new Set([input.paymentId, ...(typeof destination === 'string' ? [destination] : [])])]
   for (const paymentId of paymentIds) {
     const payment = await db.selectFrom('Funding_Case_Agreement_Payment')
-      .select(['egcs_fc_applicantrecipient', 'egcs_fc_currency'])
+      .select(['egcs_fc_applicantrecipient', 'egcs_fc_currency', 'egcs_fc_aroverride'])
       .where('id', '=', paymentId).where('egcs_fc_fundingagreement', '=', input.agreementId).where('_deleted', '=', false).executeTakeFirst()
     if (!payment) return await throwApiError(event, { statusCode: 404, code: 'AGREEMENT_PAYMENT_NOT_FOUND', key: 'apiErrors.agreement.payment_not_found' })
     const changedPayee = input.operation === 'payment.update' ? input.changes?.egcs_fc_applicantrecipient : undefined
     await assertPaymentRecoveryAllowed(event, db, { agreementId: input.agreementId, paymentId,
       applicantRecipientId: typeof changedPayee === 'string' ? changedPayee : payment.egcs_fc_applicantrecipient,
-      currency: payment.egcs_fc_currency })
+      currency: payment.egcs_fc_currency }, { skipRecovery: Boolean(payment.egcs_fc_aroverride) })
+  }
+}
+
+export const assertPaymentOverrideTerms = async (
+  event: H3Event, override: PaymentAROverride,
+  terms: { applicantRecipientId: string; currency: Currency_Codes; gross: Money }
+) => {
+  if (terms.applicantRecipientId !== override.payeeId || terms.currency !== override.currency || terms.gross.amount !== override.grossMinorUnits) {
+    return await throwApiError(event, { statusCode: 409, code: 'AR_OVERRIDE_CREATION_ONLY', key: 'validation.payment_override_creation_only' })
   }
 }

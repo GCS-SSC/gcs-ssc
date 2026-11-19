@@ -153,6 +153,7 @@ const {
   refreshKey = 0,
   approvalOnly = false,
   hideWhenUnconfigured = false,
+  hidePaymentOverrideWarning = false,
   showPreActionWhenUnconfigured = false,
   preActionShowHeader = true,
   preActionTitleKey,
@@ -174,6 +175,7 @@ const {
   refreshKey?: number
   approvalOnly?: boolean
   hideWhenUnconfigured?: boolean
+  hidePaymentOverrideWarning?: boolean
   showPreActionWhenUnconfigured?: boolean
   preActionShowHeader?: boolean
   preActionTitleKey?: string
@@ -892,15 +894,15 @@ const handleApprovalChanged = async () => {
         :disabled="isMutationPending || isLoadingAvailable"
         @click="startPrimaryWorkflow" />
     </div>
-    <UAlert
+    <CommonNotice
       v-if="status === 'success' && purpose === 'risk_rating' && activeWorkflowTab !== 'previous' && !hasActiveWorkflow && !data?.canStart && startBlockerDescription && data?.startBlocker?.reason !== 'risk_rating_frozen'"
-      color="warning"
+      tone="warning"
       icon="i-lucide-triangle-alert"
       :title="t('workflow.risk_workflow_unavailable')"
       :description="startBlockerDescription" />
-    <UAlert
+    <CommonNotice
       v-if="purpose === 'standard' && !hasActiveWorkflow && data?.activeWorkflowPurpose"
-      color="warning"
+      tone="warning"
       icon="i-lucide-lock-keyhole"
       :title="t('workflow.active_target_blocker')" />
     <div v-if="roleVisibleActions && canShowParentAction && data?.current && activeWorkflowTab !== 'previous'" class="flex justify-end gap-2">
@@ -931,7 +933,7 @@ const handleApprovalChanged = async () => {
     <AccountReceivablePacket v-if="data?.submission && (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment')" :submission="data.submission" />
     <AccountReceivablePacket v-else-if="data?.submission && entityType === 'fundingcaseaccountreceivablecreditmemo'" :submission="data.submission" credit-memo />
     <CorrectionPacket v-else-if="data?.submission && entityType === 'fundingcasecorrection'" :submission="data.submission" />
-    <AgreementPaymentPacket v-else-if="data?.submission && entityType === 'fundingcasepayment'" :submission="data.submission" />
+    <AgreementPaymentPacket v-else-if="data?.submission && entityType === 'fundingcasepayment'" :submission="data.submission" :hide-override-warning="hidePaymentOverrideWarning" />
     <CommonWorkflowApprovalPacket v-else-if="data?.submission" :submission="data.submission" />
     <CommonTranslatedTabs
       v-if="data?.current || data?.previous?.length"
@@ -1052,8 +1054,8 @@ const handleApprovalChanged = async () => {
       <div v-else-if="!roleVisibleActions && canEdit && data.canCancel" class="flex justify-end">
         <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="isMutationPending" @click="cancel" />
       </div>
-      <div v-if="data.current.runtimeState === 'paused'" class="space-y-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
-        <UAlert color="warning" icon="i-lucide-pause-circle" :title="t('workflow.owner_pause_title')" :description="t(data.canResumeOwners ? 'workflow.owner_pause_help' : 'workflow.owner_pause_readonly_help')" />
+      <div v-if="data.current.runtimeState === 'paused'" class="space-y-4">
+        <CommonNotice tone="warning" icon="i-lucide-pause-circle" :title="t('workflow.owner_pause_title')" :description="t(data.canResumeOwners ? 'workflow.owner_pause_help' : 'workflow.owner_pause_readonly_help')" />
         <template v-if="data.canResumeOwners">
           <UFormField v-for="blocker in data.ownerBlockers?.filter(item => !item.egcs_cn_resolvedat)" :key="blocker.id" :label="t('workflow.replacement_owner')" required :error="resumeAttempted && !replacementOwners[blocker.id] ? t('validation.required') : undefined" data-ui-target="common.workflow.section.workflow.replacement_owner">
             <CommonServerLookupSelect
@@ -1138,11 +1140,11 @@ const handleApprovalChanged = async () => {
         </CommonSelectableTable>
       </div>
       <div v-if="selectedRecommendation" class="space-y-6">
-        <UAlert v-if="hasRecommendationConflict" color="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
+        <CommonNotice v-if="hasRecommendationConflict" tone="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
           <template #actions>
             <UButton color="warning" variant="soft" :label="t('questionnaire.reload_responses')" :disabled="isMutationPending || status === 'pending'" @click="reloadRecommendationResponses" />
           </template>
-        </UAlert>
+        </CommonNotice>
         <CommonErrorNotice
           v-if="validationIssues.length > 0"
           :title="t('workflow.recommendation_validation_title')"
@@ -1227,9 +1229,9 @@ const handleApprovalChanged = async () => {
     <p v-else-if="showWorkflowContent && !data?.current && purpose === 'standard' && canEdit && data?.canStart" class="text-sm text-muted">
       {{ t('workflow.standard_empty') }}
     </p>
-    <UAlert
+    <CommonNotice
       v-else-if="showWorkflowContent && !data?.current && purpose === 'standard'"
-      color="warning"
+      tone="warning"
       icon="i-lucide-triangle-alert"
       :title="t('workflow.standard_unavailable')"
       :description="startBlockerDescription" />

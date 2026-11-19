@@ -231,7 +231,7 @@ const download = async (item: AgreementGeneratedDocumentItem) => {
         <UButton v-if="canPersist" icon="i-lucide-file-plus" :label="t('agreement.documents.generate')" :loading="isGenerating" @click="generate(true)" />
       </div>
     </div>
-    <UAlert v-else color="info" icon="i-lucide-info" :title="t('agreement.closeout.no_document_templates')" />
+    <CommonNotice v-else tone="info" icon="i-lucide-info" :title="t('agreement.closeout.no_document_templates')" />
 
     <div class="overflow-hidden rounded-lg border border-default">
       <div v-for="item in documents" :key="item.id" class="flex items-center justify-between gap-3 border-b border-default px-4 py-3 last:border-b-0">

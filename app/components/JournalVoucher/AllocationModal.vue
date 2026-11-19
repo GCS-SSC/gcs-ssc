@@ -76,10 +76,9 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'local
               close-on-select :show-value-in-label="false" @resolved-items="resolvedCoding = $event" />
           </UFormField>
         </div>
-        <UAlert
-          v-if="codingNotOnAgreement" id="allocation-coding-warning" role="alert" color="warning" variant="soft"
+        <CommonNotice
+          v-if="codingNotOnAgreement" id="allocation-coding-warning" role="alert" tone="warning"
           icon="i-lucide-triangle-alert" :title="t('journal_voucher.coding_not_on_agreement')"
-          :ui="{ title: 'text-amber-900 dark:text-amber-100', description: 'text-amber-900 dark:text-amber-100' }"
           :description="t('journal_voucher.coding_not_on_agreement_description')" />
         <p id="allocation-modal-instruction" class="text-sm text-muted">
           {{ t('journal_voucher.balance_instruction') }}

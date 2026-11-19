@@ -12,6 +12,7 @@ import type { Ref } from 'vue'
 import type { FormError } from '#ui/types'
 import { useWizardFlow } from '~/composables/useWizardFlow'
 import AgreementPaymentFields from '~/components/Agreement/AgreementPaymentFields.vue'
+import AgreementPaymentArOverrideWarning from '~/components/Agreement/PaymentArOverrideWarning.vue'
 import { useExtensionCreateActions } from '~/composables/useExtensionCreateActions'
 import { useExtensionPaymentAmountCalculators } from '~/composables/useExtensionPaymentAmountCalculators'
 import { useJsonRequest } from '~/composables/useJsonRequest'
@@ -34,6 +35,7 @@ import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { sumMoney } from '~~/shared/utils/money'
 
 type PaymentWizardForm = FundingCaseAgreementPaymentForm & {
+  egcs_fc_aroverridereason?: string
   egcs_fc_offsetdate?: string
   egcs_fc_offsetdatetoken?: string
   egcs_fc_offsetplanhash?: string
@@ -135,6 +137,8 @@ let modalIntent = 0
 const isSavingPayment = paymentPending.isPending
 const wizardErrors: Ref<FormError[]> = ref([])
 const offsetPreview: Ref<PaymentOffsetPreview | null> = ref(null)
+const useArOverride = ref(false)
+const existingArOverride = computed(() => payments.value.find(payment => String(payment.id) === editingTarget.value)?.egcs_fc_aroverride)
 const resolvedPaymentLabels: Ref<Record<string, AdminCommonLookupResponseItem[]>> = ref({})
 const wizardSteps = computed(() => (['payment', 'credit-memos', 'review'] as const).map(value => ({
   value,
@@ -145,7 +149,7 @@ const { currentStep, steps, isFirstStep, isLastStep, stepIndex, prevStep, goToSt
   steps: wizardSteps,
   initialStep: 'payment',
   errors: wizardErrors,
-  resolveStepForField: name => name?.startsWith('egcs_fc_offsetcreditmemos') ? 'credit-memos' : 'payment'
+  resolveStepForField: name => name?.startsWith('egcs_fc_offsetcreditmemos') || name === 'egcs_fc_aroverridereason' ? 'credit-memos' : 'payment'
 })
 let disposed = false
 onBeforeUnmount(() => {
@@ -153,11 +157,16 @@ onBeforeUnmount(() => {
 })
 const paymentHeader = () => {
   if (!selectedPayment.value) return null
-  const { egcs_fc_offsetdatetoken: _token, egcs_fc_offsetdate: _date, egcs_fc_offsetplanhash: _hash, egcs_fc_offsetcreditmemos: _memos, ...header } = selectedPayment.value
+  const { egcs_fc_offsetdatetoken: _token, egcs_fc_offsetdate: _date, egcs_fc_offsetplanhash: _hash, egcs_fc_offsetcreditmemos: _memos, egcs_fc_aroverridereason: _reason, ...header } = selectedPayment.value
   return header
+}
+const resetArOverride = () => {
+  useArOverride.value = false
+  if (selectedPayment.value) delete selectedPayment.value.egcs_fc_aroverridereason
 }
 const paymentHeaderSignature = computed(() => JSON.stringify(paymentHeader()))
 watch(paymentHeaderSignature, () => {
+  resetArOverride()
   offsetPreview.value = null
   if (selectedPayment.value) {
     delete selectedPayment.value.egcs_fc_offsetdatetoken
@@ -169,6 +178,7 @@ watch(paymentHeaderSignature, () => {
   resetWizard()
 }, { flush: 'sync' })
 watch(() => paymentModal.captureSession(), () => {
+  resetArOverride()
   offsetPreview.value = null
   resolvedPaymentLabels.value = {}
   wizardErrors.value = []
@@ -187,16 +197,23 @@ const capturePaymentValidationOwner = (state: PaymentWizardForm) => {
   const owner = agreementId
   const preview = offsetPreview.value
   const step = currentStep.value
+  const override = useArOverride.value
   const signature = JSON.stringify(state)
   return () => Boolean(operation?.canDispatch()) && !disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session
     && selectedPayment.value === state && owner === agreementId && preview === offsetPreview.value
-    && step === currentStep.value && signature === JSON.stringify(state)
+    && step === currentStep.value && override === useArOverride.value && signature === JSON.stringify(state)
 }
+const overrideReasonError = computed(() => wizardErrors.value.find(error => error.name === 'egcs_fc_aroverridereason')?.message)
 const validatePayment = withFormRequirements(async (state: PaymentWizardForm) => {
   const isCurrent = capturePaymentValidationOwner(state)
   const preview = offsetPreview.value
-  const errors = await validatePaymentSchema(state)
-  for (const [memoIndex, memo] of (state.egcs_fc_offsetcreditmemos ?? []).entries()) {
+  const override = useArOverride.value
+  const validationPayload = override ? { ...paymentHeader(), egcs_fc_aroverridereason: state.egcs_fc_aroverridereason } : state
+  const errors = await validatePaymentSchema(validationPayload)
+  if (override && !state.egcs_fc_aroverridereason?.trim() && !errors.some(error => error.name === 'egcs_fc_aroverridereason')) {
+    errors.push({ name: 'egcs_fc_aroverridereason', message: t('agreement.payments.ar_override.reason_required') })
+  }
+  for (const [memoIndex, memo] of (override ? [] : state.egcs_fc_offsetcreditmemos ?? []).entries()) {
     const expected = preview?.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount
     const names = memo.egcs_fc_lines.map(line => line.egcs_fc_codingaccount).filter(Boolean)
     if (new Set(names).size !== names.length) errors.push({
@@ -236,14 +253,17 @@ const preparePaymentOffset = async () => {
     const previewUrl = recordId !== null ? `/api/agreements/${owner}/payments/${recordId}/preview` : `/api/agreements/${owner}/payments/preview`
     const preview = await sendJson<PaymentOffsetPreview>(previewUrl, 'POST', header)
     if (!isCurrent() || !selectedPayment.value) return false
+    resetArOverride()
     offsetPreview.value = preview
-    selectedPayment.value.egcs_fc_offsetdatetoken = preview.egcs_fc_offsetdatetoken
-    selectedPayment.value.egcs_fc_offsetdate = preview.egcs_fc_offsetdate
-    selectedPayment.value.egcs_fc_offsetplanhash = preview.egcs_fc_offsetplanhash
-    selectedPayment.value.egcs_fc_offsetcreditmemos = preview.egcs_fc_creditmemos.map(memo => ({
-      egcs_fc_key: memo.egcs_fc_key,
-      egcs_fc_lines: memo.egcs_fc_lines.length ? memo.egcs_fc_lines.map(line => ({ ...line })) : [{ egcs_fc_amount: memo.egcs_fc_amount }]
-    }))
+    if (!existingArOverride.value && !preview.egcs_fc_arblocked) {
+      selectedPayment.value.egcs_fc_offsetdatetoken = preview.egcs_fc_offsetdatetoken
+      selectedPayment.value.egcs_fc_offsetdate = preview.egcs_fc_offsetdate
+      selectedPayment.value.egcs_fc_offsetplanhash = preview.egcs_fc_offsetplanhash
+      selectedPayment.value.egcs_fc_offsetcreditmemos = preview.egcs_fc_creditmemos.map(memo => ({
+        egcs_fc_key: memo.egcs_fc_key,
+        egcs_fc_lines: memo.egcs_fc_lines.length ? memo.egcs_fc_lines.map(line => ({ ...line })) : [{ egcs_fc_amount: memo.egcs_fc_amount }]
+      }))
+    }
     goToStep('credit-memos')
     return true
   } catch (error) {
@@ -253,11 +273,21 @@ const preparePaymentOffset = async () => {
     paymentPending.end(session)
   }
 }
+const setArOverride = (enabled: boolean) => {
+  if (isSavingPayment.value || editingTarget.value !== null || !offsetPreview.value?.egcs_fc_aroverrideavailable) return
+  if (enabled) {
+    useArOverride.value = true
+  } else {
+    resetArOverride()
+  }
+  wizardErrors.value = []
+}
 const nextPaymentStep = async () => {
   if (isSavingPayment.value) return
   if (currentStep.value === 'payment') {
     await preparePaymentOffset()
   } else if (currentStep.value === 'credit-memos' && selectedPayment.value && offsetPreview.value) {
+    if (offsetPreview.value.egcs_fc_arblocked && !useArOverride.value) return
     const state = selectedPayment.value
     const isCurrent = capturePaymentValidationOwner(state)
     const errors = await validatePayment(state)
@@ -354,6 +384,13 @@ const formContext = useActionContext({
     return Boolean(record && !isRecordLocked(record))
   }
 })
+watch(formContext.version, () => {
+  if (!offsetPreview.value?.egcs_fc_aroverrideavailable) return
+  resetArOverride()
+  offsetPreview.value = null
+  wizardErrors.value = []
+  resetWizard()
+}, { flush: 'sync' })
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
 const tableRows = computed<FundingCaseAgreementPaymentRow[]>(() => (overview.value?.payments ?? []).filter((row: FundingCaseAgreementPaymentRow) => {
@@ -610,6 +647,9 @@ const savePayment = async () => {
     await nextPaymentStep()
     return
   }
+  const payload = useArOverride.value
+    ? { ...paymentHeader(), egcs_fc_aroverridereason: paymentState.egcs_fc_aroverridereason }
+    : paymentState
   const committed = (isUpdate ? captureUpdateCommitted : captureCreateCommitted)()
   if (!committed) return
   const session = paymentModal.captureSession()
@@ -632,7 +672,7 @@ const savePayment = async () => {
           ? `/api/agreements/${owner}/payments/${recordId}`
           : `/api/agreements/${owner}/payments`,
         isUpdate ? 'PATCH' : 'POST',
-        paymentState
+        payload
       )
     } catch (error: unknown) {
       if (ownsFeedback() && paymentModal.isCurrentSession(session)) showError(error)
@@ -877,6 +917,7 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
             :error-summary-label="t('agreement.payments.wizard.errors_summary', { count: wizardErrors.length })"
             :error-steps-label="t('agreement.payments.wizard.errors_steps')"
             :error-current-step-label="t('agreement.payments.wizard.errors_current_step')"
+            :next-disabled="currentStep === 'credit-memos' && offsetPreview?.egcs_fc_arblocked === true && !useArOverride"
             :pending="isSavingPayment || isPaymentAboveCalculatorCeiling || paymentCalculatorResult?.loading === true || (!selectedPayment.id && (!paymentCalculatorsReady || hasPaymentAmountCalculatorConflict))"
             @update:current-step="changePaymentStep" @jump-to-step="changePaymentStep"
             @next="nextPaymentStep" @previous="prevStep" @cancel="paymentModal.close()">
@@ -895,9 +936,37 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
               :payment-amount-calculator="paymentAmountCalculator" :payment-calculator-model="paymentCalculatorModel"
               :ceiling-error="isPaymentAboveCalculatorCeiling ? t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? zeroAmount) }) : null"
               :pending="isSavingPayment"
+              :ar-override-locked="Boolean(existingArOverride)"
               @amount="handlePaymentAmountInput" @calculator-result="handlePaymentCalculatorResult" @calculator-payload="handlePaymentCalculatorExtensionPayload"
               @resolved-items="(field, items) => resolvedPaymentLabels[field] = items" />
             <div v-if="currentStep !== 'payment' && offsetPreview" class="space-y-6">
+              <div v-if="currentStep === 'credit-memos' && !selectedPayment.id && offsetPreview.egcs_fc_aroverrideavailable" class="space-y-4">
+                <CommonNotice
+                  v-if="offsetPreview.egcs_fc_arblocked && !useArOverride"
+                  tone="warning"
+                  icon="i-lucide-lock-keyhole"
+                  :title="t('agreement.payments.ar_override.blocked')" />
+                <USwitch
+                  :model-value="useArOverride"
+                  :disabled="isSavingPayment"
+                  :required="false"
+                  :label="t('agreement.payments.ar_override.switch')"
+                  data-field-container="Local switch. The reason field supplies the override request."
+                  @update:model-value="setArOverride" />
+                <AgreementPaymentArOverrideWarning v-if="useArOverride" :amount="offsetPreview.egcs_fc_grossamount" />
+                <UFormField
+                  v-if="useArOverride"
+                  :label="t('agreement.payments.ar_override.reason')"
+                  :error="overrideReasonError"
+                  name="egcs_fc_aroverridereason"
+                  required>
+                  <UTextarea v-model="selectedPayment.egcs_fc_aroverridereason" :disabled="isSavingPayment" required class="w-full" />
+                </UFormField>
+              </div>
+              <AgreementPaymentArOverrideWarning
+                v-if="(useArOverride && currentStep === 'review') || existingArOverride"
+                :amount="offsetPreview.egcs_fc_grossamount"
+                :reason="existingArOverride?.reason ?? (currentStep === 'review' ? selectedPayment.egcs_fc_aroverridereason : undefined)" />
               <section v-if="currentStep === 'review'" class="space-y-4" :aria-label="t('agreement.payments.wizard.steps.payment.title')">
                 <h3 class="text-lg font-semibold">
                   {{ t('agreement.payments.wizard.steps.payment.title') }}
@@ -937,7 +1006,7 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
                   </div>
                 </dl>
               </section>
-              <dl class="grid gap-4 sm:grid-cols-3" data-testid="payment-offset-preview-totals">
+              <dl v-if="!offsetPreview.egcs_fc_arblocked || useArOverride" class="grid gap-4 sm:grid-cols-3" data-testid="payment-offset-preview-totals">
                 <div>
                   <dt class="text-sm text-muted">
                     {{ t('agreement.payments.gross') }}
@@ -949,22 +1018,22 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
                   <dt class="text-sm text-muted">
                     {{ t('agreement.payments.offset') }}
                   </dt><dd class="font-semibold tabular-nums">
-                    {{ formatMoney(offsetPreview.egcs_fc_offsetamount) }}
+                    {{ formatMoney(useArOverride ? zeroAmount : offsetPreview.egcs_fc_offsetamount) }}
                   </dd>
                 </div>
                 <div>
                   <dt class="text-sm text-muted">
                     {{ t('agreement.payments.net') }}
                   </dt><dd class="font-semibold tabular-nums">
-                    {{ formatMoney(offsetPreview.egcs_fc_netamount) }}
+                    {{ formatMoney(useArOverride ? offsetPreview.egcs_fc_grossamount : offsetPreview.egcs_fc_netamount) }}
                   </dd>
                 </div>
               </dl>
-              <p v-if="!offsetPreview.egcs_fc_creditmemos.length" role="status" class="text-muted">
+              <p v-if="!offsetPreview.egcs_fc_creditmemos.length && !offsetPreview.egcs_fc_arblocked && !useArOverride && !existingArOverride" role="status" class="text-muted">
                 {{ t('agreement.payments.wizard.no_offsets') }}
               </p>
               <fieldset
-                v-for="(memo, memoIndex) in selectedPayment.egcs_fc_offsetcreditmemos"
+                v-for="(memo, memoIndex) in (useArOverride ? [] : selectedPayment.egcs_fc_offsetcreditmemos)"
                 :key="memo.egcs_fc_key" class="space-y-4 rounded-lg border border-default p-4"
                 :data-testid="`payment-offset-memo-${memoIndex}`">
                 <legend class="px-2 font-semibold">
@@ -976,7 +1045,7 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
                 <p class="text-sm text-muted">
                   {{ t(offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_allocationmode === 'allocator' ? 'agreement.payments.wizard.allocated_coding' : 'agreement.payments.wizard.manual_coding') }}
                 </p>
-                <UAlert v-if="!memoCodingOptions(memoIndex).length" color="warning" :description="t('agreement.payments.wizard.no_coding_accounts')" />
+                <CommonNotice v-if="!memoCodingOptions(memoIndex).length" tone="warning" :description="t('agreement.payments.wizard.no_coding_accounts')" />
                 <div
                   v-for="(line, lineIndex) in memo.egcs_fc_lines" :key="lineIndex"
                   :data-testid="`payment-offset-line-${memoIndex}-${lineIndex}`"
@@ -1008,7 +1077,7 @@ const formSession = useFormSession({ owner: paymentModal, action: { kind: 'remot
                   {{ wizardErrors.find(error => error.name === `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`)?.message }}
                 </p>
               </fieldset>
-              <p v-if="offsetPreview.egcs_fc_creditmemos.length" class="text-sm text-muted">
+              <p v-if="offsetPreview.egcs_fc_creditmemos.length && !useArOverride" class="text-sm text-muted">
                 {{ t('agreement.payments.offset_approval_description') }}
               </p>
               <UButton type="button" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :label="t('agreement.payments.wizard.recheck')" :disabled="isSavingPayment" data-help-target="agreement.payments.payment-dialog.payments-wizard-recheck" data-help-kind="button" data-help-label-en="Recheck offset credit memos" data-help-label-fr="Revérifier les notes de crédit par compensation" @click="() => void preparePaymentOffset()" />

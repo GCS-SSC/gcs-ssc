@@ -50,11 +50,6 @@ const resultIcon = computed(() => result.value === 'pass'
   : result.value === 'fail'
     ? 'i-lucide-circle-x'
     : 'i-lucide-triangle-alert')
-const resultIconClass = computed(() => result.value === 'pass'
-  ? 'text-success'
-  : result.value === 'fail'
-    ? 'text-error'
-    : 'text-warning')
 const getLabel = (value: { en: string; fr: string }, fallback = '') => getBilingualValue({
   label_en: value.en,
   label_fr: value.fr
@@ -315,68 +310,62 @@ const applyPreviousReview = (result: ReviewCopyResult) => {
                 @save="handleSave">
                 <template #result>
                   <div v-if="result" class="space-y-1 pt-1">
-                    <div
-                      class="space-y-3 rounded-sm border px-3 py-3"
-                      :class="{
-                        'border-success-500 bg-success-500/10': result === 'pass',
-                        'border-error-500 bg-error-500/10': result === 'fail',
-                        'border-warning-500 bg-warning-500/10': result === 'pass_with_considerations'
-                      }">
-                      <div
-                        class="flex items-start gap-3">
-                        <UIcon :name="resultIcon" class="mt-0.5 size-5 shrink-0" :class="resultIconClass" />
-                        <p class="min-w-0 flex-1 text-sm font-semibold text-zinc-950 dark:text-white">
-                          {{ t('checklist.results') }}: {{ t(`checklist.result.${result}`) }}
+                    <CommonNotice
+                      :tone="resultColor"
+                      :icon="resultIcon"
+                      :title="`${t('checklist.results')}: ${t(`checklist.result.${result}`)}`">
+                      <template v-if="evaluationTrace" #description>
+                        <p>
+                          {{ t('checklist.na_summary', { count: evaluationTrace.overall.notApplicable ?? 0 }) }}
                         </p>
-                      </div>
-                      <p v-if="evaluationTrace" class="text-sm">
-                        {{ t('checklist.na_summary', { count: evaluationTrace.overall.notApplicable ?? 0 }) }}
-                      </p>
-                      <p v-if="evaluationTrace && evaluationTrace.overall.pass + evaluationTrace.overall.fail === 0" class="text-sm">
-                        {{ t('checklist.no_applicable_answers') }}
-                      </p>
-                      <UModal
-                        v-model:open="isResultExplanationOpen"
-                        :title="t('checklist.why_result')"
-                        :description="t(`checklist.result.${result}`)"
-                        :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] space-y-6 overflow-y-auto' }">
-                        <UButton
-                          icon="i-lucide-list-tree"
-                          :label="t('checklist.explain')"
-                          color="neutral"
-                          variant="outline"
-                          class="w-full cursor-default justify-center"
-                          @click="isResultExplanationOpen = true" />
-                        <template #body>
-                          <div class="space-y-2">
-                            <UBadge :color="resultColor" variant="subtle">{{ t(`checklist.result.${result}`) }}</UBadge>
-                            <p class="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{{ resultExplanation }}</p>
-                            <p class="text-sm">{{ t('checklist.result_policy.na_help') }}</p>
-                          </div>
-                          <div
-                            v-if="evaluationTrace?.groups.length && checklist?.checklistDefinition"
-                            class="space-y-4 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                              {{ t('checklist.evaluated_rule_tree') }}
-                            </p>
-                            <ChecklistResultTraceGroup
-                              v-for="group in evaluationTrace.groups"
-                              :key="group.key"
-                              :group="group"
-                              :definition="checklist.checklistDefinition" />
-                          </div>
-                          <div v-if="triggeringQuestionLabels.length > 0" class="space-y-3">
-                            <p class="text-sm font-semibold text-zinc-950 dark:text-white">{{ t('checklist.result_policy.triggering_questions') }}</p>
-                            <ul class="space-y-2">
-                              <li v-for="item in triggeringQuestionLabels" :key="item.key" class="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                                <UIcon name="i-lucide-circle-x" class="mt-0.5 size-4 shrink-0 text-error" />
-                                <span>{{ item.label }}</span>
-                              </li>
-                            </ul>
-                          </div>
-                        </template>
-                      </UModal>
-                    </div>
+                        <p v-if="evaluationTrace.overall.pass + evaluationTrace.overall.fail === 0">
+                          {{ t('checklist.no_applicable_answers') }}
+                        </p>
+                      </template>
+                      <template #actions>
+                        <UModal
+                          v-model:open="isResultExplanationOpen"
+                          :title="t('checklist.why_result')"
+                          :description="t(`checklist.result.${result}`)"
+                          :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] space-y-6 overflow-y-auto' }">
+                          <UButton
+                            icon="i-lucide-list-tree"
+                            :label="t('checklist.explain')"
+                            color="neutral"
+                            variant="outline"
+                            class="w-full cursor-default justify-center"
+                            @click="isResultExplanationOpen = true" />
+                          <template #body>
+                            <div class="space-y-2">
+                              <UBadge :color="resultColor" variant="subtle">{{ t(`checklist.result.${result}`) }}</UBadge>
+                              <p class="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{{ resultExplanation }}</p>
+                              <p class="text-sm">{{ t('checklist.result_policy.na_help') }}</p>
+                            </div>
+                            <div
+                              v-if="evaluationTrace?.groups.length && checklist?.checklistDefinition"
+                              class="space-y-4 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+                              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                                {{ t('checklist.evaluated_rule_tree') }}
+                              </p>
+                              <ChecklistResultTraceGroup
+                                v-for="group in evaluationTrace.groups"
+                                :key="group.key"
+                                :group="group"
+                                :definition="checklist.checklistDefinition" />
+                            </div>
+                            <div v-if="triggeringQuestionLabels.length > 0" class="space-y-3">
+                              <p class="text-sm font-semibold text-zinc-950 dark:text-white">{{ t('checklist.result_policy.triggering_questions') }}</p>
+                              <ul class="space-y-2">
+                                <li v-for="item in triggeringQuestionLabels" :key="item.key" class="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                                  <UIcon name="i-lucide-circle-x" class="mt-0.5 size-4 shrink-0 text-error" />
+                                  <span>{{ item.label }}</span>
+                                </li>
+                              </ul>
+                            </div>
+                          </template>
+                        </UModal>
+                      </template>
+                    </CommonNotice>
 
                     <div v-for="section in sections" :key="section.key" class="flex items-start gap-3 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-200">
                       <UIcon name="i-lucide-list-checks" class="mt-0.5 size-4 shrink-0 text-primary-700 dark:text-primary-200" />

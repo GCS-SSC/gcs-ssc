@@ -374,9 +374,9 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                 </AssessmentSchemaPageSection>
 
                 <AssessmentSchemaPageSection section-id="data-collection-definition" :title="t('data_collection.form_sections')" role="tabpanel" :aria-label="t('data_collection.form_sections')">
-                  <UAlert
+                  <CommonNotice
                     v-if="definitionErrors.length > 0"
-                    icon="i-lucide-circle-alert" color="warning" variant="subtle"
+                    icon="i-lucide-circle-alert" tone="warning"
                     :title="t('data_collection.validation_title')"
                     :description="definitionErrors.join(' ')" class="mb-5" />
                   <CommonQuestionnaireDefinitionEditor v-model="definition" data-field-container="Composite editor; its individual field declarations own their identities." :persistence-key="`data-collection:${schemaId}`" />

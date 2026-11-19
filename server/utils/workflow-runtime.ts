@@ -411,7 +411,7 @@ const applyRiskRatingEffect = async (
     return await fail('risk_rating_mapping_missing')
   }
   const { hash: capturedHash, ...capturedPayload } = evidence
-  if (hashPublicationDefinition(capturedPayload as JsonValue) !== capturedHash
+  if (hashPublicationDefinition(capturedPayload as unknown as JsonValue) !== capturedHash
     || mapping.bands.length !== effect.bands.length
     || mapping.bands.some((band, index) => band.maximumScore !== effect.bands[index]?.maximumScore
       || band.riskScore !== effect.bands[index]?.riskScore)) {
@@ -1569,7 +1569,7 @@ const startWorkflowUnchecked = async (
         : undefined
       const payload = { ...baseEvidence, version: 3 as const, riskRatingMapping,
         ...(amendmentRiskSelections ? { amendmentRiskSelections } : {}) }
-      routing = { ...payload, hash: hashPublicationDefinition(payload as JsonValue) }
+      routing = { ...payload, hash: hashPublicationDefinition(payload as unknown as JsonValue) }
     }
   } catch (error) {
     if (!(error instanceof WorkflowRouteValidationError)) throw error

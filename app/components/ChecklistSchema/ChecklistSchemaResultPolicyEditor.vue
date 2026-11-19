@@ -83,11 +83,10 @@ const updateGroup = (index: number, group: EditorResultPolicy['groups'][number])
         data-ui-target="checklist-schema.result-policy-editor.currentPolicy.anyFailureFails" @update:model-value="updateAnyFailureFails($event)" />
     </div>
 
-    <UAlert
+    <CommonNotice
       v-if="currentPolicy.anyFailureFails"
       icon="i-lucide-info"
-      color="info"
-      variant="subtle"
+      tone="info"
       :title="t('checklist_schema.policy.shortcut_active')"
       :description="t('checklist_schema.policy.shortcut_active_help')" />
 

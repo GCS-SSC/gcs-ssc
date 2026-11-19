@@ -572,7 +572,8 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               @changed="refreshProfile" />
 
             <div v-else-if="selectedTab === 'risk-rating'" data-help-view="agreement.risk-rating" :data-help-agency="profile.agency_id" :data-help-agreement-id="id" class="space-y-4">
-              <UAlert
+              <CommonNotice
+                tone="info"
                 :title="t('agreement.risk_rating_workflow')"
                 :description="profile.risk_workflow_managed ? t('agreement.risk_rating_managed_help') : t('agreement.risk_rating_manual_help')"
                 :icon="profile.risk_workflow_managed ? 'i-lucide-workflow' : 'i-lucide-pencil'" />

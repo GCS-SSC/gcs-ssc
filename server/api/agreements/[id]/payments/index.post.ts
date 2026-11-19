@@ -1,8 +1,9 @@
 import { defineEventHandler } from 'h3'
 import { captureAgreementPaymentEvidence } from '~~/server/utils/agreement-payment-evidence'
-import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
+import { assertPaymentRecoveryAllowed, withPaymentRecoveryErrors } from '~~/server/utils/payment-recovery-controls'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
+import type { PaymentAROverride } from '~~/shared/types/database'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementPaymentFiscalYear,
@@ -13,11 +14,11 @@ import {
 import { runExtensionCreateOperationHooks } from '~~/server/utils/extensions'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { createPrimaryEntityAssignment, resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
-import { notFound } from '~~/server/utils/api-errors'
+import { forbidden, notFound } from '~~/server/utils/api-errors'
 import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { allocateAgreementPayment } from '~~/server/utils/agreement-coding-allocator'
-import { prepareAgreementPaymentOffsetPlan, validateAgreementPaymentOffsetPlan } from '~~/server/utils/agreement-payment-offset-plan'
+import { prepareAgreementPaymentOffsetPlan, readAgreementPaymentDebtEffect, validateAgreementPaymentOffsetPlan } from '~~/server/utils/agreement-payment-offset-plan'
 import { hasSuccessfulInitialAgreementApproval, throwAgreementInitialApprovalRequired } from '~~/server/utils/agreement-approval-submission'
 
 export default defineEventHandler(async event => {
@@ -33,7 +34,10 @@ export default defineEventHandler(async event => {
     if (!await hasSuccessfulInitialAgreementApproval(trx, agreementId)) return await throwAgreementInitialApprovalRequired(event)
     const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_paymentamount])
-    await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency })
+    const overrideReason = validated.egcs_fc_aroverridereason
+    if (overrideReason && !auth.userAbilities.canOverridePaymentDebt(currentContext.scope)) return await forbidden(event)
+    await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency },
+      { skipRecovery: Boolean(overrideReason) })
     const commitment = await resolveActiveAgreementPaymentCommitmentByType(
       event,
       trx,
@@ -56,8 +60,15 @@ export default defineEventHandler(async event => {
       return fiscalYear
     }
 
-    const offsetPlan = await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, validated)
-    const offsetPlans = await validateAgreementPaymentOffsetPlan(event, offsetPlan, validated)
+    const offsetPlans = await withPaymentRecoveryErrors(event, async () => {
+      if (overrideReason) {
+        if (validated.egcs_fc_offsetplanhash || validated.egcs_fc_offsetcreditmemos?.length) throw new Error('AR_OFFSET_PLAN_CHANGED')
+        if (await readAgreementPaymentDebtEffect(trx, currentContext, validated) === 'none') throw new Error('AR_OVERRIDE_NOT_APPLICABLE')
+        return []
+      }
+      const offsetPlan = await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, validated)
+      return await validateAgreementPaymentOffsetPlan(event, offsetPlan, validated)
+    })
 
     const paymentValues = {
       egcs_fc_fundingagreementcommitment: String(commitment.id),
@@ -92,17 +103,29 @@ export default defineEventHandler(async event => {
     const draftStatusId = await lockAgencyDraftStatus(trx, currentContext.agencyId)
 
     const evidence = await captureAgreementPaymentEvidence(trx, agreementId, String(commitment.id), validated, fiscalYear.fiscal_year_display)
+    const arOverride: PaymentAROverride | null = overrideReason
+      ? {
+          actorId: creatorId,
+          reason: overrideReason,
+          enabledAt: new Date().toISOString(),
+          payeeId: validated.egcs_fc_applicantrecipient,
+          currency: validated.egcs_fc_currency,
+          grossMinorUnits: validated.egcs_fc_paymentamount.amount
+        }
+      : null
     const createdPayment = await trx
       .insertInto('Funding_Case_Agreement_Payment')
       .values({
         ...paymentValues,
         egcs_fc_evidence: sql`${JSON.stringify(evidence)}::jsonb`,
         egcs_fc_paymentamount: databaseMoneyValue(paymentValues.egcs_fc_paymentamount),
-        egcs_fc_status: draftStatusId
+        egcs_fc_status: draftStatusId,
+        egcs_fc_aroverride: arOverride ? sql`${JSON.stringify(arOverride)}::jsonb` : null
       })
       .returning([
         'id',
         'egcs_fc_evidence',
+        'egcs_fc_aroverride',
         'egcs_fc_fundingagreementcommitment',
         'egcs_fc_fiscalyear',
         'egcs_fc_paymenttype',

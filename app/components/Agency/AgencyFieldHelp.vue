@@ -282,8 +282,8 @@ onScopeDispose(() => {
     <UModal v-model:open="open" :dismissible="!saving" :close="saving ? false : undefined" :title="t(selected ? 'field_tooltips.edit' : 'field_tooltips.add')" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <UForm v-if="draft" v-bind="formSession" data-field-scope="agency.field-help" data-scope-label-en="Agency — Field help" data-scope-label-fr="Organisme — Aide aux champs" :state="draft" :validate="createValidator(FieldTooltipSaveSchema)" class="space-y-4">
-          <UAlert
-            v-if="selected && selected.availability !== 'available'" color="warning"
+          <CommonNotice
+            v-if="selected && selected.availability !== 'available'" tone="warning"
             :title="t(`field_tooltips.status.${selected.availability}`)" :description="t(`field_tooltips.${selected.availability}_help`)" />
           <p v-if="selected" class="text-sm text-muted">
             {{ `${screenLabel(selected)} > ${fieldLabel(selected)}` }}
@@ -294,7 +294,7 @@ onScopeDispose(() => {
               {{ error }}
             </template>
           </UFormField>
-          <UAlert v-if="conflict" color="warning" :title="t('field_tooltips.api.conflict')" />
+          <CommonNotice v-if="conflict" tone="warning" :title="t('field_tooltips.api.conflict')" />
           <UFormField :label="t('field_tooltips.text_en')" name="egcs_ay_text_en" :required="draft.egcs_ay_enabled" :ui="{ error: 'min-h-5' }">
             <UTextarea v-model="draft.egcs_ay_text_en" lang="en" :maxlength="4000" :disabled="saving || (!catalog?.capabilities.canEdit && Boolean(selected))" class="w-full" />
             <template #error="{ error }">

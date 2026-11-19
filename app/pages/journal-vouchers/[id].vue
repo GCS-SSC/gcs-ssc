@@ -430,7 +430,7 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
             </div>
           </UForm>
           <div v-else-if="selectedTab === 'completion'" data-help-view="casework.journal-vouchers.completion" data-help-target="casework.journal-vouchers.detail.completion" data-help-kind="section" class="space-y-4">
-            <UAlert v-if="dirty" color="warning" :title="t('journal_voucher.save_before_completion')" />
+            <CommonNotice v-if="dirty" tone="warning" :title="t('journal_voucher.save_before_completion')" />
             <CommonCompletionPanel :mutation-role-allowed="canAny('journal_voucher', 'update')" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted && !dirty && !saving && status === 'success'" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </div>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.journal-vouchers.reviews" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />

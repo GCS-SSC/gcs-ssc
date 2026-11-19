@@ -55,7 +55,7 @@ export const getAgreementPaymentCompletionRuntime = async (
     try {
       await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, paymentId,
         applicantRecipientId: payment.egcs_fc_applicantrecipient,
-        currency: payment.egcs_fc_currency })
+        currency: payment.egcs_fc_currency }, { skipRecovery: Boolean(payment.egcs_fc_aroverride) })
     } catch (error) {
       const failure = error as { statusCode?: number; data?: { code?: string } }
       if (failure?.statusCode !== 409 || typeof failure.data?.code !== 'string' || !failure.data.code.startsWith('AR_')) throw error
@@ -165,7 +165,8 @@ export const executeAgreementPaymentCompletion = async (
     await assertAgreementPaymentCommitmentCurrent(trx, paymentId)
     const header = await getAgreementPayment(trx, context.agreementId, paymentId)
     if (!header) return await notFound(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
-    await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency, paymentId })
+    await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency, paymentId },
+      { skipRecovery: Boolean(header.egcs_fc_aroverride) })
     await withPaymentRecoveryErrors(event, () => rebuildAccountReceivablePaymentOffset(trx, paymentId))
     const { completion: createdCompletion } = await createCompletionTransition(
       event,

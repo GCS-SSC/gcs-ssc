@@ -1691,10 +1691,9 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
                 <CommonSection v-if="activeReconcile" :title="t('agreement.claims.workflow.title')" badge="03" :grid-cols="1">
                   <div class="space-y-8">
-                    <UAlert
+                    <CommonNotice
                       v-if="activeReconcile.egcs_fc_isfinal && canUpdateReconcile"
-                      color="warning"
-                      variant="soft"
+                      tone="warning"
                       icon="i-lucide-triangle-alert"
                       :title="t('agreement.claims.final_reconcile_warning_title')"
                       :description="t('agreement.claims.final_reconcile_warning_description')" />

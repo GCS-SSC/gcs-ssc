@@ -117,9 +117,9 @@ const isHeroCollapsed = getHeroCollapsed(panelId.value)
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" :icon="kind === 'events' ? 'i-lucide-history' : 'i-lucide-eye'" :title="title" :description="description" />
       <div class="space-y-3 px-6 py-4">
-        <UAlert
+        <CommonNotice
           v-if="retention"
-          color="info"
+          tone="info"
           icon="i-lucide-info"
           :title="t('audit.retention', { audit: retention.auditDays, access: retention.accessDays })"
           :description="kind === 'access' ? t('audit.accessWindow') : undefined" />

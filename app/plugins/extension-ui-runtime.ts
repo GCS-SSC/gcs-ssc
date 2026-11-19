@@ -10,6 +10,7 @@ import {
 } from '@gcs-ssc/extensions/ui'
 import { defineComponent, h, type Component } from 'vue'
 import CommonErrorNotice from '~/components/Common/ErrorNotice.vue'
+import CommonNotice from '~/components/Common/Notice.vue'
 import CommonFlowDiagram from '~/components/Common/FlowDiagram.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
@@ -35,7 +36,6 @@ import {
   CommonStatusSelect,
   CommonStreamWorkflowLinks,
   UAccordion,
-  UAlert,
   UBadge,
   CommonActionButton,
   UCheckbox,
@@ -64,9 +64,22 @@ const asExtensionHostComponent = (component: object): Component => component as 
 
 const extensionAlert = defineComponent({
   inheritAttrs: false,
-  setup: (_, { attrs, slots }) => () => attrs.color === 'error'
-    ? h(CommonErrorNotice, attrs, slots)
-    : h(UAlert, attrs, slots)
+  /**
+   * Routes the extension alert API through the host notice treatments.
+   *
+   * @param _props - The adapter has no declared props.
+   * @param context - Extension-provided content and attributes.
+   * @returns A renderer that preserves the latest extension content.
+   */
+  setup: (_props, context) => {
+    const { attrs, slots } = context
+    return () => {
+      const { color, variant: _variant, ui: _ui, style: _style, ...noticeAttrs } = attrs
+      if (color === 'error') return h(CommonErrorNotice, noticeAttrs, slots)
+      const tone = color === 'success' || color === 'warning' ? color : 'info'
+      return h(CommonNotice, { ...noticeAttrs, tone }, slots)
+    }
+  }
 })
 
 const extensionHostComponents = {

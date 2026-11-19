@@ -163,6 +163,7 @@ export const getAgreementPayment = async (
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Payment.egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
       'Funding_Case_Agreement_Payment.egcs_fc_currency as egcs_fc_currency',
       'Funding_Case_Agreement_Payment.egcs_fc_comment as egcs_fc_comment',
+      'Funding_Case_Agreement_Payment.egcs_fc_aroverride as egcs_fc_aroverride',
       'Funding_Case_Agreement_Payment.egcs_fc_status as egcs_fc_status'
     ])
     .where('Funding_Case_Agreement_Payment.id', '=', paymentId)

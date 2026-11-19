@@ -1008,6 +1008,7 @@
     "permissions": "Permissions",
     "manage_assignments": "Manage assignment",
     "permission_level_help": "Choose the cumulative business-data access ceiling for this subject.",
+    "debt_management_permission_help": "Managers can choose to pay despite accounts receivable when creating a payment.",
     "permission_level": "Access level",
     "access_levels": {
       "none": "No access",
@@ -1029,6 +1030,7 @@
       "journal_voucher": "Journal Vouchers",
       "correction": "Corrections",
       "account_receivable": "Accounts receivable",
+      "debt_management": "Debt Management",
       "help": "Help"
     },
     "unknown_ability": "Unknown ability ({action}:{subject})",
@@ -1836,6 +1838,7 @@
       "claim_reduction_total": "The Claim reduction plan must equal the declared receivable amount before Completion.",
       "claim_reduction_required": "Add the required Claim reduction plan before completing this Claim-based receivable.",
       "claim_reduction_source_required": "This Claim reduction requires its retained successful Reconciliation sources. Clear or reduce the draft plan before removing its source coding.",
+      "payment_override_not_applicable": "Accounts Receivable no longer blocks or reduces this payment. Review the payment and try again.",
       "payment_direct_repayment_hold": "This payee has an outstanding receivable requiring direct repayment. Payments are held until it is repaid or an approved adjustment changes the recovery method.",
       "payment_recovery_pending": "A recovery or receivable adjustment is pending for this payee. Finish or cancel that work before processing this Payment.",
       "payment_payee_unavailable": "Select an active Proponent linked to this Agreement as the Payment payee.",
@@ -2516,6 +2519,7 @@
     "workflow_recommendation_set_required": "A recommendation-entry workflow requires a recommendation set",
     "workflow_source_approval_not_allowed": "A recommendation-entry workflow cannot have a preceding source approval",
     "recommendation_invalid_option": "Select one of the configured options",
+    "payment_override_creation_only": "Cancel this draft and create a new payment to change the override, recipient, currency, or gross amount.",
     "recommendation_max_length": "The answer exceeds the configured maximum length",
     "certification_required": "Certification is required",
     "city_required": "City is required",
@@ -3172,7 +3176,16 @@
         "no_coding_accounts": "No eligible credit memo coding account is configured for this receivable’s Stream, fiscal year and currency."
       },
       "offset_coding_title": "Offset Credit Memo coding",
-      "offset_approval_description": "These offset Credit Memos are approved with this payment, including when the recipient disbursement is zero. Declining or cancelling the payment releases the recovery without posting the Credit Memos."
+      "offset_approval_description": "These offset Credit Memos are approved with this payment, including when the recipient disbursement is zero. Declining or cancelling the payment releases the recovery without posting the Credit Memos.",
+      "ar_override": {
+        "switch": "Pay despite Accounts Receivable",
+        "title": "Accounts Receivable override warning",
+        "blocked": "Accounts Receivable blocks this payment. Turn on Pay despite Accounts Receivable to continue.",
+        "warning": "The recipient will receive the full {amount}. This payment will create no Credit Memo and will leave the debt outstanding.",
+        "reason": "Reason for paying despite Accounts Receivable",
+        "reason_required": "Enter a reason for paying despite Accounts Receivable.",
+        "recorded_reason": "Reason"
+      }
     },
     "forecasts": {
       "program_only_copy_title": "Program funding copied",

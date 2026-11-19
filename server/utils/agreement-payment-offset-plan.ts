@@ -12,12 +12,12 @@ import type { FundingCaseAgreementPaymentCreate } from '~~/shared/types/schemas'
 import { addMoney, compareMoney, minMoney, sumMoney, subtractMoney, type Money } from '~~/shared/utils/money'
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas'
 import { allocateAgreementCoding, validateCodingAllocation, type AgreementCodingAllocation } from './agreement-coding-allocator'
-import { readAccountReceivablePoolDebts } from './account-receivable-recovery'
+import { assertAccountReceivablePaymentAllowed, readAccountReceivablePoolDebts } from './account-receivable-recovery'
 import { readAccountReceivableLinePrincipals } from './account-receivable'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 import { captureAccountReceivablePoolBasis } from './account-receivable-pool-ledger'
 import { resolveAgreementScopeContext } from './agreement'
-import { assertPaymentRecoveryAllowed, withPaymentRecoveryErrors } from './payment-recovery-controls'
+import { assertPaymentRecoveryAllowed, isOverridablePaymentRecoveryError, withPaymentRecoveryErrors } from './payment-recovery-controls'
 import { hashPublicationDefinition } from './system-publication'
 import type { GcsCodingAllocationCatalogLine } from '@gcs-ssc/extensions/server'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
@@ -176,4 +176,34 @@ export const validateAgreementPaymentOffsetPlan = async (
       throw new Error('AR_OFFSET_CODING_INVALID')
     }
   })
+})
+
+export const readAgreementPaymentDebtEffect = async (
+  trx: Transaction<Database>, context: { agreementId: string; agencyId: string }, header: FundingCaseAgreementPaymentCreate
+): Promise<'blocked' | 'offset' | 'none'> => {
+  const input = { agreementId: context.agreementId, agencyId: context.agencyId,
+    applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency }
+  try {
+    await assertAccountReceivablePaymentAllowed(trx, input)
+  } catch (error) {
+    if (isOverridablePaymentRecoveryError(error)) return 'blocked'
+    throw error
+  }
+  const debts = await readAccountReceivablePoolDebts(trx, input)
+  for (const debt of debts) {
+    if (debt.egcs_fc_recoverymethod !== 'offset') continue
+    const balance = await readAccountReceivableCashBalance(trx, String(debt.id))
+    if (compareMoney(balance.egcs_fc_available, zeroMoney(input.currency)) > 0) return 'offset'
+  }
+  return 'none'
+}
+
+export const buildPaymentPreviewWithoutOffset = (header: FundingCaseAgreementPaymentCreate): PaymentOffsetPreview => ({
+  egcs_fc_offsetdate: new Date().toISOString().slice(0, 10),
+  egcs_fc_offsetdatetoken: '',
+  egcs_fc_grossamount: header.egcs_fc_paymentamount,
+  egcs_fc_offsetamount: zeroMoney(header.egcs_fc_currency),
+  egcs_fc_netamount: header.egcs_fc_paymentamount,
+  egcs_fc_offsetplanhash: '',
+  egcs_fc_creditmemos: []
 })

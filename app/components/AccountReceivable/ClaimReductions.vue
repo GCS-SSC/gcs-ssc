@@ -207,7 +207,7 @@ const formSession = useFormSession({ owner: lineModal, action: { kind: 'remote',
     <p v-if="!readOnly" class="mb-4 text-sm text-muted">
       {{ t('account_receivable.claim_reduction_requirement') }} ({{ t('common.field_required') }})
     </p>
-    <UAlert v-if="planRequirementError" class="mb-4" color="warning" :title="t('common.warning')" :description="t(`apiErrors.account_receivable.${planRequirementError}`)" />
+    <CommonNotice v-if="planRequirementError" class="mb-4" tone="warning" :title="t('common.warning')" :description="t(`apiErrors.account_receivable.${planRequirementError}`)" />
     <p v-if="loadStatus === 'pending'" role="status" aria-live="polite" class="text-sm text-muted">
       {{ t('common.loading_records') }}
     </p>

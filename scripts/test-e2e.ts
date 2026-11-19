@@ -164,6 +164,7 @@ export const freshResetE2eSpecPaths = [
   'tests/e2e/agency-publication-authoring.spec.ts',
   'tests/e2e/data-collection-workflow.spec.ts',
   'tests/e2e/advance-direct-repayment-hold.spec.ts',
+  'tests/e2e/payment-debt-override.spec.ts',
   'tests/e2e/payment-offset-coding-wizard.spec.ts',
   'tests/e2e/payment-accounting-boundaries.spec.ts',
   'tests/e2e/claim-overview-read-recovery.spec.ts',

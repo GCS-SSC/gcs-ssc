@@ -148,10 +148,9 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
           </div>
         </CommonSection>
         <CommonSection :title="t('attachments.title')" :grid-cols="1">
-          <UAlert
+          <CommonNotice
             v-if="inlineUploadState !== 'supported'"
-            color="neutral"
-            variant="soft"
+            tone="info"
             icon="i-lucide-info"
             :title="t(`funding_case_intake.inline_upload_${inlineUploadState}`)" />
           <UFormField v-else :label="t('attachments.upload')" name="files" :required="false" :error="fileError">

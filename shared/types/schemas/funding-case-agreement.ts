@@ -747,6 +747,7 @@ export const FundingCaseAgreementPaymentCreateSchema = FundingCaseAgreementPayme
   egcs_fc_offsetdate: z.iso.date({ error: 'validation.required' }).optional(),
   egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
   egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
+  egcs_fc_aroverridereason: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }).max(1000, { error: 'validation.max_length' }).optional(),
   extensions: z.record(z.string(), z.json()).optional()
 }).refine(
   data => data.egcs_fc_periodstart <= data.egcs_fc_periodend,
@@ -762,6 +763,8 @@ export const FundingCaseAgreementPaymentPatchSchema = FundingCaseAgreementPaymen
   egcs_fc_offsetdate: z.iso.date({ error: 'validation.required' }).optional(),
   egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
   egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
+  egcs_fc_aroverridereason: z.never({ error: 'validation.payment_override_creation_only' }).optional(),
+  egcs_fc_aroverride: z.never({ error: 'validation.payment_override_creation_only' }).optional(),
   egcs_fc_status: ForbiddenBusinessStatusMutation()
 }).partial().superRefine((data, ctx) => {
   validatePeriodRange(data, ctx)

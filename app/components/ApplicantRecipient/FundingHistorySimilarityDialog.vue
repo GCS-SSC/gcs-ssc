@@ -49,17 +49,16 @@ const confirm = () => {
     :dismissible="false">
     <template #body>
       <div class="space-y-4">
-        <UAlert
-          color="warning"
-          variant="soft"
+        <CommonNotice
+          tone="warning"
           icon="i-lucide-triangle-alert"
           :title="t('applicant_recipient.funding_history.similarity.notice')" />
 
-        <ul class="divide-y divide-amber-200 overflow-hidden rounded-lg border border-amber-200 bg-amber-50/60 dark:divide-amber-900 dark:border-amber-900 dark:bg-amber-950/20">
+        <ul class="divide-y divide-default overflow-hidden rounded-lg border border-default">
           <li v-for="warning in warnings" :key="warning.fingerprint" class="flex items-start gap-3 p-4">
-            <UIcon name="i-lucide-scan-search" class="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <UIcon name="i-lucide-scan-search" class="mt-0.5 size-5 shrink-0 text-muted" />
             <div class="min-w-0">
-              <p class="text-xs font-bold tracking-wider text-amber-700 uppercase dark:text-amber-300">
+              <p class="text-xs font-bold tracking-wider text-muted uppercase">
                 {{ t(`applicant_recipient.funding_history.similarity.kind.${warning.kind}`) }}
               </p>
               <p class="break-words font-medium text-zinc-900 dark:text-zinc-100">

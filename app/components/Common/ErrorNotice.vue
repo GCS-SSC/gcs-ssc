@@ -16,16 +16,14 @@ const theme = {
 
 <template>
   <UTheme :props="theme">
-    <UAlert
+    <CommonNotice
       role="alert"
       v-bind="$attrs"
-      color="error"
-      variant="soft"
-      icon="i-lucide-circle-alert"
+      tone="error"
       :actions="actions?.map(action => ({ ...action, size: 'sm' }))">
       <template v-for="(_, name) in $slots" #[name]="slotProps">
         <slot :name="name" v-bind="slotProps || {}" />
       </template>
-    </UAlert>
+    </CommonNotice>
   </UTheme>
 </template>

@@ -146,9 +146,9 @@ const createCloseout = async () => {
           <UButton :label="t('common.retry')" data-help-target="agreement.closeouts.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshAll() }" />
         </template>
       </CommonErrorNotice>
-      <UAlert
+      <CommonNotice
         v-else-if="readiness"
-        :color="isAgreementClosed || readiness?.ready ? 'success' : 'warning'"
+        :tone="isAgreementClosed || readiness?.ready ? 'success' : 'warning'"
         :icon="isAgreementClosed || readiness?.ready ? 'i-lucide-circle-check' : 'i-lucide-triangle-alert'"
         :title="isAgreementClosed ? t('agreement.closeout.closed') : readiness?.ready ? t('agreement.closeout.ready') : t('agreement.closeout.not_ready')"
         :description="isAgreementClosed ? t('agreement.closeout.closed_help') : readiness?.ready ? t('agreement.closeout.ready_help') : t('agreement.closeout.not_ready_help')" />

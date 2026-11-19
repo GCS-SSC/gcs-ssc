@@ -44,7 +44,7 @@ const item = computed(() => items.value.find(tab =>
             <UButton :label="t('common.retry')" @click="refresh" />
           </template>
         </CommonErrorNotice>
-        <UAlert v-else color="warning" icon="i-lucide-lock-keyhole" :title="t('common.unavailable')" />
+        <CommonNotice v-else tone="warning" icon="i-lucide-lock-keyhole" :title="t('common.unavailable')" />
       </template>
     </CommonDetailPage>
   </div>

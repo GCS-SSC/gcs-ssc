@@ -80,6 +80,8 @@ export type AccountReceivableOffsetMemoLine = {
 }
 
 export type PaymentOffsetPreview = {
+  egcs_fc_aroverrideavailable?: true
+  egcs_fc_arblocked?: true
   egcs_fc_offsetdate: string
   egcs_fc_offsetdatetoken: string
   egcs_fc_grossamount: Money

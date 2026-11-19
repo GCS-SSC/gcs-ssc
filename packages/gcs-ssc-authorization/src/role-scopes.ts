@@ -19,7 +19,8 @@ export const ROLE_ABILITY_SCOPE_MATRIX: Record<RoleAbilitySubject, readonly Role
   funding_case: ['global', 'agency', 'program'],
   journal_voucher: ['global', 'agency', 'program'],
   correction: ['global', 'agency', 'program'],
-  account_receivable: ['global', 'agency', 'program']
+  account_receivable: ['global', 'agency', 'program'],
+  debt_management: ['global', 'agency', 'program']
 }
 
 export const ASSIGNMENT_MANAGEMENT_SUBJECTS = [

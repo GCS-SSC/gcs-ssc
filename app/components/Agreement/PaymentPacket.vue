@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import AgreementPaymentArOverrideWarning from '~/components/Agreement/PaymentArOverrideWarning.vue'
 import type { JsonValue } from '~~/shared/types/database'
 import type { AccountReceivablePaymentCreditMemo } from '~~/shared/types/account-receivable'
 import { isCanonicalMoney, parseMoney, type Money } from '~~/shared/utils/money'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 
-const { submission } = defineProps<{ submission: { egcs_fc_submittedat: string, egcs_fc_canonicalhash: string, egcs_fc_packet: JsonValue } }>()
+const { submission, hideOverrideWarning = false } = defineProps<{ hideOverrideWarning?: boolean, submission: { egcs_fc_submittedat: string, egcs_fc_canonicalhash: string, egcs_fc_packet: JsonValue } }>()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
@@ -14,6 +15,10 @@ const asRecord = (value: JsonValue | undefined): PacketRecord => value !== null 
 const packet = computed(() => asRecord(submission.egcs_fc_packet))
 const supportedPacket = computed(() => packet.value.schemaVersion === 6)
 const header = computed(() => asRecord(packet.value.payment))
+const overrideReason = computed(() => {
+  const reason = asRecord(header.value.egcs_fc_aroverride).reason
+  return typeof reason === 'string' ? reason : undefined
+})
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
 /**
  * Validates captured minor-unit money against the retained Payment denomination.
@@ -82,6 +87,7 @@ const totalKeys = ['gross', 'offset', 'net']
 </script>
 
 <template>
+  <AgreementPaymentArOverrideWarning v-if="!hideOverrideWarning && supportedPacket && payment && overrideReason" :amount="payment.egcs_fc_paymentamount" :reason="overrideReason" />
   <CommonWorkflowPacket v-if="supportedPacket" :title="t('agreement.payments.packet_title')" :packet-id="`payment-${submission.egcs_fc_canonicalhash}`" :captured-label="t('workflow.packet.submitted_at', { date: formatDate(submission.egcs_fc_submittedat) })" :hash="submission.egcs_fc_canonicalhash" :hash-label="t('workflow.packet.hash')">
     <template #summary>
       <p class="font-semibold">
@@ -91,7 +97,7 @@ const totalKeys = ['gross', 'offset', 'net']
         {{ t('agreement.payments.payee') }}: {{ getBilingualValue(header, 'egcs_fc_payeename', t('common.none')) }}
       </p>
     </template>
-    <AgreementPaymentRecoverySummary v-if="payment" :payment="payment" />
+    <AgreementPaymentRecoverySummary v-if="payment" :payment="payment" :ar-override="Boolean(overrideReason)" />
     <dl v-else class="grid gap-4 text-sm sm:grid-cols-3">
       <div v-for="key in totalKeys" :key="key">
         <dt class="text-muted">

@@ -394,10 +394,9 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
               <UButton :label="t('common.retry')" :loading="isRetryingLoad" :disabled="isRetryingLoad || isMutationPending" @click="retryLoad" />
             </template>
           </CommonErrorNotice>
-          <UAlert
+          <CommonNotice
             v-if="selectedTab === 'reconciliation' && !data.can_update"
-            color="neutral"
-            variant="soft"
+            tone="info"
             icon="i-lucide-eye"
             :title="t('assignments.read_only_title')"
             :description="t(data.is_assigned ? 'agreement.claims.reconcile_locked_description' : 'assignments.read_only_description')" />

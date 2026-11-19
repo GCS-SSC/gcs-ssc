@@ -1008,6 +1008,7 @@
     "permissions": "Autorisations",
     "manage_assignments": "Gérer l’affectation",
     "permission_level_help": "Choisissez le plafond cumulatif d’accès aux données administratives pour ce sujet.",
+    "debt_management_permission_help": "Un gestionnaire peut choisir de payer malgré les comptes débiteurs lors de la création d’un paiement.",
     "permission_level": "Niveau d’accès",
     "access_levels": {
       "none": "Aucun accès",
@@ -1029,6 +1030,7 @@
       "journal_voucher": "Pièces de journal",
       "correction": "Corrections",
       "account_receivable": "Comptes débiteurs",
+      "debt_management": "Gestion des dettes",
       "help": "Aide"
     },
     "unknown_ability": "Autorisation inconnue ({action}:{subject})",
@@ -1836,6 +1838,7 @@
       "claim_reduction_total": "Le plan de réduction de réclamation doit correspondre au montant déclaré du compte débiteur avant la finalisation.",
       "claim_reduction_required": "Ajoutez le plan de réduction de réclamation obligatoire avant de terminer ce compte débiteur lié à une réclamation.",
       "claim_reduction_source_required": "Cette réduction de demande de remboursement nécessite ses sources de rapprochement réussies conservées. Effacez ou réduisez le plan provisoire avant de retirer ses lignes sources.",
+      "payment_override_not_applicable": "Les comptes débiteurs ne bloquent ni ne réduisent plus ce paiement. Vérifiez le paiement et réessayez.",
       "payment_direct_repayment_hold": "Ce bénéficiaire a un compte débiteur impayé exigeant un remboursement direct. Les paiements sont bloqués jusqu’à son remboursement ou jusqu’à ce qu’un ajustement approuvé modifie le mode de recouvrement.",
       "payment_recovery_pending": "Un recouvrement ou un ajustement de compte débiteur est en attente pour ce bénéficiaire. Terminez ou annulez ce travail avant de traiter ce paiement.",
       "payment_payee_unavailable": "Sélectionnez comme bénéficiaire du paiement un promoteur actif lié à cette entente.",
@@ -2516,6 +2519,7 @@
     "workflow_recommendation_set_required": "Un processus commençant par une recommandation exige un ensemble de recommandations",
     "workflow_source_approval_not_allowed": "Un processus commençant par une recommandation ne peut pas avoir d’approbation préalable de la source",
     "recommendation_invalid_option": "Sélectionnez une des options configurées",
+    "payment_override_creation_only": "Annulez ce brouillon et créez un nouveau paiement pour modifier la dérogation, le bénéficiaire, la devise ou le montant brut.",
     "recommendation_max_length": "La réponse dépasse la longueur maximale configurée",
     "certification_required": "L’attestation est requise",
     "city_required": "La ville est requise",
@@ -3172,7 +3176,16 @@
         "no_coding_accounts": "Aucun compte de codage admissible pour les notes de crédit n’est configuré pour le volet, l’exercice et la devise de ce compte débiteur."
       },
       "offset_coding_title": "Codage des notes de crédit par compensation",
-      "offset_approval_description": "Ces notes de crédit par compensation sont approuvées avec ce paiement, même si le versement au bénéficiaire est nul. Le refus ou l’annulation du paiement libère le recouvrement sans comptabiliser les notes de crédit."
+      "offset_approval_description": "Ces notes de crédit par compensation sont approuvées avec ce paiement, même si le versement au bénéficiaire est nul. Le refus ou l’annulation du paiement libère le recouvrement sans comptabiliser les notes de crédit.",
+      "ar_override": {
+        "switch": "Payer malgré les comptes débiteurs",
+        "title": "Avertissement de dérogation relative aux comptes débiteurs",
+        "blocked": "Les comptes débiteurs bloquent ce paiement. Activez l’option Payer malgré les comptes débiteurs pour continuer.",
+        "warning": "Le bénéficiaire recevra la totalité du montant de {amount}. Ce paiement ne générera aucune note de crédit et la dette restera impayée.",
+        "reason": "Motif du paiement malgré les comptes débiteurs",
+        "reason_required": "Saisissez le motif du paiement malgré les comptes débiteurs.",
+        "recorded_reason": "Motif"
+      }
     },
     "forecasts": {
       "program_only_copy_title": "Financement du programme copié",

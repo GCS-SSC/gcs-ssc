@@ -32,7 +32,8 @@ const {
   errorSummaryLabel,
   errorStepsLabel,
   errorCurrentStepLabel,
-  pending = false
+  pending = false,
+  nextDisabled = false
 } = defineProps<{
   currentStep: string
   steps: WizardStepItem[]
@@ -51,6 +52,7 @@ const {
   errorStepsLabel: string
   errorCurrentStepLabel: string
   pending?: boolean
+  nextDisabled?: boolean
 }>()
 
 const { t } = useI18n()
@@ -140,7 +142,7 @@ const onJumpToStep = (value: string) => {
             trailing-icon="i-lucide-arrow-right"
             type="button"
             :loading="pending"
-            :disabled="pending"
+            :disabled="pending || nextDisabled"
             @click="onNext" />
           <CommonSaveButton
             v-else

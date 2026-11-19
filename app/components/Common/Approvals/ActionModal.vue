@@ -282,9 +282,9 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
               <UButton type="button" :label="t('common.retry')" @click="emit('retry-attachments')" />
             </template>
           </CommonErrorNotice>
-          <UAlert
+          <CommonNotice
             v-if="attachmentStatus === 'idle' || attachmentCollection?.canUpload === false"
-            color="warning"
+            tone="warning"
             :title="t('assessment.approvals.attachment_draft_unavailable')" />
           <template v-if="attachmentCollection">
             <CommonApprovalsAttachmentFiles
@@ -318,9 +318,9 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
                     @change="selectAttachmentFile" />
                 </UFormField>
               </div>
-              <UAlert
+              <CommonNotice
                 v-else
-                color="warning"
+                tone="warning"
                 :title="t('assessment.approvals.attachment_types_unavailable')" />
             </template>
           </template>

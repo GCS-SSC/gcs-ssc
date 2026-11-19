@@ -228,9 +228,8 @@ onScopeDispose(() => {
           :host-layout="true" />
 
         <div v-else class="px-6 pt-6">
-          <UAlert
-            color="warning"
-            variant="soft"
+          <CommonNotice
+            tone="warning"
             icon="i-lucide-construction"
             :title="t('extensions.config_page_unavailable')"
             :description="t('extensions.config_page_unavailable_description')" />

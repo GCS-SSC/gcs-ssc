@@ -362,10 +362,9 @@ const save = async (submit: boolean) => {
               icon="i-lucide-user-plus" :label="t('groups.claim')"
               :loading="isClaiming" :disabled="isClaiming" class="self-start" @click="claim" />
 
-            <UAlert
+            <CommonNotice
               v-if="!isEditable"
-              color="neutral"
-              variant="soft"
+              tone="info"
               icon="i-lucide-eye"
               :title="t('assignments.read_only_title')"
               :description="readOnlyDescription" />
@@ -375,11 +374,11 @@ const save = async (submit: boolean) => {
               :title="t(`${configuration.messagePrefix}.validation_title`)"
               :description="t('questionnaire.validation_description')" />
 
-            <UAlert v-if="hasRevisionConflict" color="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
+            <CommonNotice v-if="hasRevisionConflict" tone="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
               <template #actions>
                 <UButton color="warning" variant="soft" :label="t('questionnaire.reload_responses')" @click="reloadResponses" />
               </template>
-            </UAlert>
+            </CommonNotice>
 
             <CommonWorkflowApprovalPacket
               v-if="data.approval_submission_packet && data.approval_submission_hash && data.approval_submission_submitted_at"

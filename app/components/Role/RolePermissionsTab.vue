@@ -17,6 +17,9 @@ const levelItems = computed(() => [
   { label: t('role.access_levels.contributor'), value: 'contributor' },
   { label: t('role.access_levels.manager'), value: 'manager' }
 ])
+const debtManagementLevelItems = computed(() => levelItems.value.filter(item =>
+  item.value === 'none' || item.value === 'manager'
+))
 const getPermission = (subject: RoleAbilitySubject): RolePermissionInput | null =>
   rolePermissions.find(permission => permission.subject === subject) ?? null
 /**
@@ -57,13 +60,13 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
           {{ t(`role.subjects.${subject}`) }}
         </p>
         <p class="text-sm text-muted">
-          {{ t('role.permission_level_help') }}
+          {{ t(subject === 'debt_management' ? 'role.debt_management_permission_help' : 'role.permission_level_help') }}
         </p>
       </div>
       <CommonEnumSelect
         name="role_access_level"
         :aria-label="`${t(`role.subjects.${subject}`)}: ${t('role.permission_level')}`"
-        :items="levelItems"
+        :items="subject === 'debt_management' ? debtManagementLevelItems : levelItems"
         :model-value="getPermission(subject)?.access_level ?? 'none'"
         :disabled="!canUpdateRole || pending"
         @update:model-value="value => updateLevel(subject, value ?? 'none')" />

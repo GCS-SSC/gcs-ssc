@@ -877,7 +877,8 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
           </section>
 
           <div v-else-if="selectedTab === 'risk-rating'" data-help-target="casework.amendments.risk-rating.content" data-help-kind="section" data-help-view="casework.amendments.risk-rating" class="space-y-4">
-            <UAlert
+            <CommonNotice
+              tone="info"
               :title="t('agreement.risk_rating_workflow')"
               :description="amendment.isCompleted ? t('agreement.amendments.risk_frozen_help') : amendment.risk_workflow_managed ? t('agreement.amendments.risk_managed_help') : t('agreement.amendments.risk_manual_help')"
               :icon="amendment.risk_workflow_managed ? 'i-lucide-workflow' : 'i-lucide-pencil'" />

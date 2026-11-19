@@ -31,7 +31,9 @@ const normalizeStaticGrant = (
   if (grant.scope.type === 'entity') return null
 
   if (grant.action === 'manage_assignments' && !canSubjectManageAssignments(grant.subject)) return null
-  if (grant.action !== 'manage_assignments' && grant.action !== 'view_audit_inputs' && !isRoleAbility(grant)) return null
+  if ((grant.subject === 'debt_management') !== (grant.action === 'override_payment_debt')) return null
+  if (grant.action !== 'manage_assignments' && grant.action !== 'view_audit_inputs'
+    && grant.action !== 'override_payment_debt' && !isRoleAbility(grant)) return null
   if (!isAbilityAllowedForRoleScope(grant.subject, grant.scope.type)) return null
   return { ...grant, scope: grant.scope }
 }
@@ -69,6 +71,12 @@ export class UserAbilities {
   canViewAuditInputs(requiredScope: AuthorizationScope): boolean {
     return this.grants.some(grant => grant.subject === 'audit'
       && grant.action === 'view_audit_inputs'
+      && isAuthorizationScopeCovered(grant.scope, requiredScope))
+  }
+
+  canOverridePaymentDebt(requiredScope: AuthorizationScope): boolean {
+    return this.grants.some(grant => grant.subject === 'debt_management'
+      && grant.action === 'override_payment_debt'
       && isAuthorizationScopeCovered(grant.scope, requiredScope))
   }
 

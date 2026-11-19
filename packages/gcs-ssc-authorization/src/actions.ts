@@ -6,7 +6,8 @@ export type AuthorizationAction = (typeof AUTHORIZATION_ACTIONS)[number]
 
 /** Independent roster-management grant emitted alongside expanded CRUD grants. */
 export const MANAGE_ASSIGNMENTS_ACTION = 'manage_assignments' as const
-export type StaticGrantAction = AuthorizationAction | typeof MANAGE_ASSIGNMENTS_ACTION | 'view_audit_inputs'
+export const STATIC_GRANT_ACTIONS = [...AUTHORIZATION_ACTIONS, MANAGE_ASSIGNMENTS_ACTION, 'view_audit_inputs', 'override_payment_debt'] as const
+export type StaticGrantAction = (typeof STATIC_GRANT_ACTIONS)[number]
 
 /** Narrows an unknown value to an authorization action. */
 export const isAuthorizationAction = (value: unknown): value is AuthorizationAction => {

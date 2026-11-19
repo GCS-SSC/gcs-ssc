@@ -179,10 +179,9 @@ const apply = async () => {
       <p v-else-if="state.kind === 'no_history'" role="status" class="text-sm text-muted">
         {{ t(`review_copy.${kind}.no_history`) }}
       </p>
-      <UAlert
+      <CommonNotice
         v-else-if="state.kind === 'version_mismatch'"
-        color="warning"
-        variant="soft"
+        tone="warning"
         role="alert"
         :description="t(`review_copy.${kind}.version_mismatch`)" />
       <template v-else-if="state.kind === 'choices'">
@@ -205,11 +204,10 @@ const apply = async () => {
             </span>
           </button>
         </div>
-        <UAlert
+        <CommonNotice
           v-if="state.confirmedDraft !== null"
           class="mt-4"
-          color="warning"
-          variant="soft"
+          tone="warning"
           role="status"
           :description="t('review_copy.overwrite')" />
         <CommonErrorNotice

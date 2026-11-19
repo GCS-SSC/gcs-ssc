@@ -65,6 +65,7 @@ const refreshLifecycle = () => {
 
 <template>
   <div class="w-full min-w-0 space-y-8" data-testid="completion-workflow-panel">
+    <slot name="payment-override-notice" />
     <CommonCompletionSection
       :entity-type="entityType"
       :entity-id="entityId"
@@ -89,6 +90,7 @@ const refreshLifecycle = () => {
       :entity-id="entityId"
       purpose="approval_submission"
       hide-when-unconfigured
+      :hide-payment-override-warning="Boolean($slots['payment-override-notice'])"
       :can-edit="canWorkWorkflow"
       :action-role-allowed="actionRoleAllowed"
       :mutation-role-allowed="mutationRoleAllowed"

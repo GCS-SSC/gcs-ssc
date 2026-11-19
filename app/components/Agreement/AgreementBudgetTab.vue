@@ -1063,11 +1063,11 @@ const formatSignedBudgetDifference = (value: Money) => {
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget" data-scope-label-fr="Ententes > Budget" data-help-view="agreement.budget" data-help-label-en="Agreements — Budget" data-help-label-fr="Ententes — Budget" data-help-target="agreement.budget.content" data-help-kind="section">
-    <UAlert
+    <CommonNotice
       v-if="hasPendingFunding"
       role="status"
       class="mb-4"
-      color="info"
+      tone="info"
       icon="i-lucide-clock-3"
       :title="t('agreement.budget.pending_funding_notice_title')"
       :description="t('agreement.budget.pending_funding_notice_description')" />
@@ -1382,11 +1382,11 @@ const formatSignedBudgetDifference = (value: Money) => {
       </template>
     </CommonResourceLayout>
 
-    <UAlert
+    <CommonNotice
       v-for="budgetDifference in budgetDifferences"
       :key="budgetDifference.currency"
       class="mt-4"
-      color="info"
+      tone="info"
       icon="i-lucide-chart-no-axes-combined"
       :title="budgetFundingMode === 'program_only'
         ? t('agreement.amendments.program_funding_difference_notice', { amount: formatSignedBudgetDifference(budgetDifference.difference) })

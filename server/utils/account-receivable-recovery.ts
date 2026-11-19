@@ -69,6 +69,10 @@ export const releaseAccountReceivablePaymentOffset = async (trx: Transaction<Dat
 export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Database>, paymentId: string, options: { plans?: PaymentOffsetCodingPlan[] } = {}) => {
   const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('gross')).where('id', '=', paymentId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  if (payment.egcs_fc_aroverride) {
+    if (options.plans?.length) throw new Error('AR_OVERRIDE_CREATION_ONLY')
+    return await readAccountReceivablePaymentOffset(trx, paymentId)
+  }
   const currency = payment.egcs_fc_currency
   const context = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
   if (!context) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
@@ -132,17 +136,25 @@ export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Dat
 
 /** Deliberately omits rationale, source data, sibling Agreement identity and debt navigation. */
 export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, paymentId: string, options: { liveMemoBalances?: boolean } = {}) => {
-  const payment = await db.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency'])
+  const payment = await db.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency', 'egcs_fc_aroverride'])
     .select(sql<boolean>`EXISTS (SELECT 1 FROM "Common_Status" status WHERE status.id = "Funding_Case_Agreement_Payment".egcs_fc_status AND status.egcs_cn_terminal AND NOT status._deleted)`.as('egcs_fc_isterminal'))
     .select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('gross')).where('id', '=', paymentId).executeTakeFirstOrThrow()
   const currency = payment.egcs_fc_currency
+  const gross = parseDatabaseMoney(payment.gross, currency)
+  if (payment.egcs_fc_aroverride) return {
+    egcs_fc_aroverride: payment.egcs_fc_aroverride,
+    egcs_fc_grossamount: gross,
+    egcs_fc_offsetamount: zeroMoney(currency),
+    egcs_fc_netamount: gross,
+    egcs_fc_recoverycontrol: 'allowed' as const,
+    egcs_fc_creditmemos: []
+  }
   const recoveries = await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select(['id', 'egcs_fc_outcome'])
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')).where('egcs_fc_payment', '=', paymentId)
     .where('egcs_fc_outcome', 'in', ['open', 'posted']).where('_deleted', '=', false).execute()
   const settled = payment.egcs_fc_isterminal || recoveries.some(recovery => recovery.egcs_fc_outcome === 'posted')
   const retainedRecovery = recoveries[0] ?? await db.selectFrom('Funding_Case_Account_Receivable_Recovery')
     .select(['id', 'egcs_fc_outcome']).where('egcs_fc_payment', '=', paymentId).where('_deleted', '=', false).orderBy('id', 'desc').executeTakeFirst()
-  const gross = parseDatabaseMoney(payment.gross, currency)
   const offset = sumMoney(recoveries.map(row => parseDatabaseMoney(row.amount, currency)), currency)
   let control: 'allowed' | 'direct_repayment_hold' | 'recovery_pending' = 'allowed'
   if (!settled) {
@@ -177,6 +189,11 @@ export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Dat
       'payment.egcs_fc_applicantrecipient', 'payment.egcs_fc_paymenttype',
       'payee.egcs_ar_legalname_en as egcs_fc_payeename_en', 'payee.egcs_ar_legalname_fr as egcs_fc_payeename_fr'])
     .where('payment.id', '=', paymentId).executeTakeFirstOrThrow()
+  if (summary.egcs_fc_aroverride) {
+    const { egcs_fc_aroverride, ...totals } = summary
+    return { schemaVersion: 6 as const, ...totals, payment: { ...payment, egcs_fc_aroverride, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
+      poolBasisHash: null }
+  }
   const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), db)
   if (owner) {
     const pool = await db.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
@@ -189,11 +206,12 @@ export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Dat
 }
 
 export const validateAccountReceivablePaymentOffset = async (trx: Transaction<Database>, paymentId: string, options: { packet?: JsonValue } = {}) => {
-  const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency']).where('id', '=', paymentId).executeTakeFirstOrThrow()
+  const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency', 'egcs_fc_aroverride']).where('id', '=', paymentId).executeTakeFirstOrThrow()
   const currency = payment.egcs_fc_currency
-  await assertAccountReceivablePaymentAllowed(trx, { agreementId: String(payment.egcs_fc_fundingagreement), applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
+  if (!payment.egcs_fc_aroverride) await assertAccountReceivablePaymentAllowed(trx, { agreementId: String(payment.egcs_fc_fundingagreement), applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
   const packet = await captureAccountReceivablePaymentOffsetPacket(trx, paymentId)
   if (options.packet && hashPublicationDefinition(json(packet)) !== hashPublicationDefinition(options.packet)) throw new Error('AR_OFFSET_BASIS_CHANGED')
+  if (payment.egcs_fc_aroverride) return packet
   if (compareMoney(packet.egcs_fc_netamount, zeroMoney(currency)) < 0) throw new Error('AR_OFFSET_EXCEEDS_GROSS')
   const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
   if (!owner) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')

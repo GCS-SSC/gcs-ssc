@@ -126,7 +126,7 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
               completed-success-key="agreement.closeout.completion.completed_success"
               @changed="refresh">
               <template #notices>
-                <UAlert color="warning" icon="i-lucide-lock" :title="t('agreement.closeout.lock_notice')" :description="t('agreement.closeout.lock_notice_help')" />
+                <CommonNotice tone="warning" icon="i-lucide-lock" :title="t('agreement.closeout.lock_notice')" :description="t('agreement.closeout.lock_notice_help')" />
               </template>
             </CommonCompletionWorkflowPreAction>
           </section>

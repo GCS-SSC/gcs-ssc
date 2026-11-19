@@ -379,11 +379,11 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
 
 <template>
   <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.forecasts-tab" data-scope-label-en="Agreements > Forecasts" data-scope-label-fr="Ententes > Prévisions" data-help-view="agreement.forecasts" data-help-label-en="Agreements — Forecasts" data-help-label-fr="Ententes — Prévisions" data-help-target="agreement.forecasts.content" data-help-kind="section">
-    <UAlert
+    <CommonNotice
       v-for="forecast in forecastsRequiringRevision"
       :key="forecast.id"
       class="mb-4"
-      color="warning"
+      tone="warning"
       icon="i-lucide-triangle-alert"
       :title="`${forecast.fiscal_year_display ?? t('common.unavailable')}, ${t('agreement.forecasts.version_label', { version: forecast.egcs_fc_version })}`"
       :description="t('agreement.budget_controls.forecast_revision_required')" />

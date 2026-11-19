@@ -2,7 +2,7 @@ import type { Selectable } from 'kysely'
 import type { AgreementActivityCustomFieldEvidence } from './schemas/agreement-activity-evidence'
 import type { PaymentEvidence } from './payment-evidence'
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
-import type { Agreement_Type, Currency_Codes, TransferPaymentStreamTable } from './database'
+import type { Agreement_Type, Currency_Codes, PaymentAROverride, TransferPaymentStreamTable } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
 import type { AccountReceivablePaymentCreditMemo } from './account-receivable'
 import type { AgreementRiskSource, SubmissionRisk } from './risk'
@@ -302,6 +302,7 @@ export interface FundingCaseAgreementPaymentRow extends FundingCaseAgreementPaym
   egcs_fc_grossamount?: Money
   egcs_fc_offsetamount?: Money
   egcs_fc_netamount?: Money
+  egcs_fc_aroverride?: PaymentAROverride
   egcs_fc_recoverycontrol?: 'allowed' | 'direct_repayment_hold' | 'recovery_pending'
   egcs_fc_creditmemos?: AccountReceivablePaymentCreditMemo[]
   commitment_type?: string | null

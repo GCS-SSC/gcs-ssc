@@ -14,6 +14,13 @@ export const RolePermissionSchema = z.object({
   access_level: z.enum(ROLE_ACCESS_LEVELS).nullable(),
   can_manage_assignments: z.boolean().default(false)
 }).superRefine((permission, context) => {
+  if (permission.subject === 'debt_management' && permission.access_level !== 'manager') {
+    context.addIssue({
+      code: 'custom',
+      path: ['access_level'],
+      message: 'validation.invalid_selection'
+    })
+  }
   if (permission.access_level === null && !permission.can_manage_assignments) {
     context.addIssue({
       code: 'custom',

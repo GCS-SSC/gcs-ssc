@@ -1114,6 +1114,7 @@ CREATE TABLE "Funding_Case_Agreement_Payment" (
   "egcs_fc_paymentamount" numeric NOT NULL,
   "egcs_fc_currency" currency_codes DEFAULT 'cad'::currency_codes NOT NULL,
   "egcs_fc_evidence" jsonb,
+  "egcs_fc_aroverride" jsonb,
   "egcs_fc_comment" text,
   "egcs_fc_status" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
@@ -1124,6 +1125,17 @@ CREATE TABLE "Funding_Case_Agreement_Payment" (
      AND jsonb_typeof(egcs_fc_evidence->'selection') = 'object'
      AND jsonb_typeof(egcs_fc_evidence->'financialInputs') = 'object'
      AND jsonb_typeof(egcs_fc_evidence->'commitmentBalances') = 'object') IS TRUE),
+  CONSTRAINT "fc_chk_paymentaroverride" CHECK (egcs_fc_aroverride IS NULL OR
+    (jsonb_typeof(egcs_fc_aroverride) = 'object'
+     AND jsonb_typeof(egcs_fc_aroverride->'actorId') = 'string'
+     AND egcs_fc_aroverride->>'actorId' ~ '^[1-9][0-9]*$'
+     AND jsonb_typeof(egcs_fc_aroverride->'reason') = 'string'
+     AND egcs_fc_aroverride->>'reason' ~ '[^[:space:]]'
+     AND jsonb_typeof(egcs_fc_aroverride->'enabledAt') = 'string'
+     AND egcs_fc_aroverride->>'enabledAt' <> ''
+     AND egcs_fc_aroverride->'payeeId' = to_jsonb(egcs_fc_applicantrecipient::text)
+     AND egcs_fc_aroverride->'currency' = to_jsonb(egcs_fc_currency::text)
+     AND egcs_fc_aroverride->'grossMinorUnits' = to_jsonb(trim_scale(egcs_fc_paymentamount)::text)) IS TRUE),
   CONSTRAINT "fc_unq_paymentidcommitment" UNIQUE (id, egcs_fc_fundingagreementcommitment),
   CONSTRAINT "fc_uq_payment_agreement" UNIQUE (id, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Payment_pkey" PRIMARY KEY (id),
@@ -1394,6 +1406,11 @@ CREATE FUNCTION ar_payment_control(payment_id bigint, agreement_id bigint, debto
 AS $function$
     DECLARE owner_agency bigint;
     BEGIN
+      IF EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Payment" payment
+        WHERE payment.id=payment_id AND payment.egcs_fc_fundingagreement=agreement_id
+          AND payment.egcs_fc_applicantrecipient=debtor_id AND payment.egcs_fc_aroverride IS NOT NULL) THEN
+        RETURN 'allowed';
+      END IF;
       SELECT program.egcs_tp_agency INTO owner_agency FROM "Funding_Case_Agreement_Profile" agreement
         JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream
         JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile WHERE agreement.id=agreement_id;
@@ -1607,11 +1624,17 @@ CREATE FUNCTION trg_fn_ar_payment_control()
 AS $function$
     DECLARE control text;
     BEGIN
+      IF TG_OP = 'UPDATE' AND (NEW.egcs_fc_aroverride IS DISTINCT FROM OLD.egcs_fc_aroverride
+        OR (OLD.egcs_fc_aroverride IS NOT NULL AND NEW.egcs_fc_fundingagreement IS DISTINCT FROM OLD.egcs_fc_fundingagreement)) THEN
+        RAISE EXCEPTION 'Payment AR override can only be selected on creation for its own Agreement' USING ERRCODE = '23514';
+      END IF;
       IF TG_OP = 'INSERT' OR (OLD.egcs_fc_applicantrecipient,OLD.egcs_fc_fundingagreementcommitment,OLD.egcs_fc_paymentamount,OLD.egcs_fc_periodstart,OLD.egcs_fc_periodend,OLD.egcs_fc_fiscalyear)
         IS DISTINCT FROM (NEW.egcs_fc_applicantrecipient,NEW.egcs_fc_fundingagreementcommitment,NEW.egcs_fc_paymentamount,NEW.egcs_fc_periodstart,NEW.egcs_fc_periodend,NEW.egcs_fc_fiscalyear) THEN
         IF NOT NEW._deleted THEN
-          control := ar_payment_control(NEW.id,NEW.egcs_fc_fundingagreement,NEW.egcs_fc_applicantrecipient);
-          IF control <> 'allowed' THEN RAISE EXCEPTION 'Payment recovery control: %',control USING ERRCODE = '23514'; END IF;
+          IF NEW.egcs_fc_aroverride IS NULL THEN
+            control := ar_payment_control(NEW.id,NEW.egcs_fc_fundingagreement,NEW.egcs_fc_applicantrecipient);
+            IF control <> 'allowed' THEN RAISE EXCEPTION 'Payment recovery control: %',control USING ERRCODE = '23514'; END IF;
+          END IF;
           IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" relation
             WHERE relation.egcs_fc_fundingagreement = NEW.egcs_fc_fundingagreement AND relation.egcs_fc_applicantrecipient = NEW.egcs_fc_applicantrecipient AND NOT relation._deleted) THEN
             RAISE EXCEPTION 'Payment payee must be one of its Agreement Proponents' USING ERRCODE = '23514';
@@ -2610,7 +2633,7 @@ AS $function$
         JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile
         WHERE payment.id=NEW.egcs_fc_payment AND payment.egcs_fc_applicantrecipient=pool.egcs_fc_applicantrecipient
           AND payment.egcs_fc_currency=pool.egcs_fc_currency AND program.egcs_tp_agency=pool.egcs_fc_agency
-          AND payment.egcs_fc_paymentamount>=NEW.egcs_fc_amount AND NOT payment._deleted) THEN
+          AND payment.egcs_fc_paymentamount>=NEW.egcs_fc_amount AND payment.egcs_fc_aroverride IS NULL AND NOT payment._deleted) THEN
         RAISE EXCEPTION 'Pool deduction requires matching Payment payee Agency currency and gross' USING ERRCODE='23514';
       END IF;
       IF TG_OP='INSERT' AND (NEW.egcs_fc_outcome<>'open' OR NEW.egcs_fc_amount<=0 OR NEW.egcs_fc_amount>greatest(ar_pool_net(pool.id)-coalesce((

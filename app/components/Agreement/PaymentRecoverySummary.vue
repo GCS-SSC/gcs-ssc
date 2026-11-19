@@ -9,7 +9,7 @@ import { hasPaymentOffset } from '~/utils/payment-offset-display'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 
-const { payment } = defineProps<{ payment: {
+const { payment, arOverride = false } = defineProps<{ payment: {
   egcs_fc_paymentamount: Money
   egcs_fc_grossamount?: Money
   egcs_fc_currency: string
@@ -17,7 +17,7 @@ const { payment } = defineProps<{ payment: {
   egcs_fc_netamount?: Money
   egcs_fc_recoverycontrol?: 'allowed' | 'direct_repayment_hold' | 'recovery_pending'
   egcs_fc_creditmemos?: AccountReceivablePaymentCreditMemo[]
-} }>()
+}, arOverride?: boolean }>()
 const { t, locale } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const amount = (value: Money | undefined) => formatAccountReceivableAmount(value, locale.value) ?? t('common.not_available')
@@ -51,7 +51,7 @@ const memoColumns = computed<TableColumnInput<AccountReceivablePaymentCreditMemo
 
 <template>
   <section :aria-label="t('agreement.payments.recovery_summary')" class="space-y-4">
-    <UAlert v-if="payment.egcs_fc_recoverycontrol === 'direct_repayment_hold'" color="warning" icon="i-lucide-lock-keyhole" :title="t('agreement.payments.hold_title')" :description="t('agreement.payments.hold_description')" />
+    <CommonNotice v-if="payment.egcs_fc_recoverycontrol === 'direct_repayment_hold'" tone="warning" icon="i-lucide-lock-keyhole" :title="t('agreement.payments.hold_title')" :description="t('agreement.payments.hold_description')" />
     <dl class="grid gap-4 border-y border-default py-4 text-sm sm:grid-cols-3">
       <div v-for="total in totals" :key="total.label">
         <dt class="text-muted">
@@ -131,7 +131,7 @@ const memoColumns = computed<TableColumnInput<AccountReceivablePaymentCreditMemo
     <p v-if="payment.egcs_fc_creditmemos?.length" class="text-sm text-muted" data-testid="payment-offset-approval-description">
       {{ t('agreement.payments.offset_approval_description') }}
     </p>
-    <p class="text-sm text-muted">
+    <p v-if="!arOverride" class="text-sm text-muted">
       {{ t('agreement.payments.offset_policy_description') }}
     </p>
   </section>

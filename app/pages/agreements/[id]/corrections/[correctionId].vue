@@ -310,7 +310,7 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
             </CommonSection>
           </section>
           <section v-else-if="selectedTab === 'completion'" data-help-view="casework.corrections.completion" data-help-target="casework.corrections.detail.completion" data-help-kind="section" class="space-y-6">
-            <UAlert v-if="dirty" color="warning" :title="t('correction.save_before_completion')" />
+            <CommonNotice v-if="dirty" tone="warning" :title="t('correction.save_before_completion')" />
             <CommonCompletionPanel :mutation-role-allowed="canAny('correction', 'update')" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-complete="correction.egcs_fc_canedit && completionReady && !dirty && !saving && status === 'success'" :can-work-workflow="correction.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="correction.completion.title" description-key="correction.completion.description" status-complete-key="correction.completion.status_complete" status-locked-key="correction.completion.status_locked" comment-placeholder-key="correction.completion.comment_placeholder" complete-action-key="correction.completion.complete" completed-success-key="correction.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.corrections.reviews" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-update="correction.egcs_fc_canedit" @changed="refreshPage" />
