@@ -1,3 +1,4 @@
+import { applyOfficialReviewClauses } from './review-agreement-clauses'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- Completion helpers expose typed contracts covered by focused runtime tests. */
 import type { H3Event } from 'h3'
@@ -144,6 +145,7 @@ const parseCommonReviewCompletionPayload = async (
 )
 
 const applyCommonReviewCompletionSideEffects = async (
+  event: H3Event,
   trx: Transaction<Database>,
   reviewId: string,
   actor: string,
@@ -188,6 +190,7 @@ const applyCommonReviewCompletionSideEffects = async (
     })
     return
   }
+  await applyOfficialReviewClauses(event, trx, reviewId)
   await transitionRuntimeItem(trx, {
     runtimeId: String(context.runtimeId),
     runtimeItemId: String(context.runtimeItemId),
@@ -342,7 +345,7 @@ export const executeCommonReviewCompletion = async (
       }
     }
 
-    await applyCommonReviewCompletionSideEffects(trx, reviewId, currentCommonUser.id, terminalState)
+    await applyCommonReviewCompletionSideEffects(event, trx, reviewId, currentCommonUser.id, terminalState)
 
     return { hookPayload: completionHookPayload, currentCommonUser }
   })

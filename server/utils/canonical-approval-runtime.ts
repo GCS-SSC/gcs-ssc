@@ -1,3 +1,4 @@
+import { applyOfficialReviewClauses } from './review-agreement-clauses'
 /* eslint-disable jsdoc/require-jsdoc -- canonical approval orchestration adapter */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
@@ -771,6 +772,9 @@ export const decideCanonicalApproval = async (
       reason: 'approval_sequence_advanced'
     })
     return { approvalRuntimeId: String(approval.runtimeId), approvalRuntimeState: 'awaiting_action' as const, routingSlipId: String(approval.routingSlipId) }
+  }
+  if (approval.entityType === 'commonreview' && approval.parentKind === 'review') {
+    await applyOfficialReviewClauses(event, trx, String(approval.entityId))
   }
   await propagateApprovalOutcome(trx, {
     runtimeId: String(approval.runtimeId),

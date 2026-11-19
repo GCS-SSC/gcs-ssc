@@ -21,6 +21,9 @@ const {
   isHeroCollapsed,
   heroName,
   sectionTabs,
+  showClauseRules,
+  agencyId,
+  schemaId,
   selectedSection,
   isSavingGeneral,
   isSavingSchema,
@@ -155,6 +158,21 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
               </AssessmentSchemaPageSection>
             </CommonDesignTimeEditorSections>
           </fieldset>
+
+          <AssessmentSchemaPageSection
+            v-if="showClauseRules"
+            section-id="assessment-clause-rules"
+            :title="t('review_clause_rules.title')"
+            role="tabpanel"
+            :aria-label="t('review_clause_rules.title')">
+            <AgencyReviewClauseRules
+              :key="schema.publicationVersionId ?? schemaId"
+              :agency-id="agencyId"
+              :schema-id="schemaId"
+              review-type="assessment"
+              :can-manage="canManagePublication"
+              :is-published="schema.publicationState === 'published'" />
+          </AssessmentSchemaPageSection>
         </CommonDesignTimeEditorShell>
       </div>
     </template>

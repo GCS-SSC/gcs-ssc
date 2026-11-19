@@ -16,6 +16,8 @@ CREATE TABLE "Funding_Case_Agreement_Clause" (
   egcs_fc_fundingagreement bigint NOT NULL,
   egcs_fc_clause bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
   egcs_fc_publicationversion bigint NOT NULL,
+  egcs_fc_protected boolean NOT NULL DEFAULT false,
+  egcs_fc_removedby bigint REFERENCES "Common_User"(id) ON DELETE RESTRICT,
   egcs_fc_publicationkind varchar(64) NOT NULL DEFAULT 'agency_clause' CHECK (egcs_fc_publicationkind = 'agency_clause'),
   _deleted boolean NOT NULL DEFAULT false,
   FOREIGN KEY (egcs_fc_publicationversion, egcs_fc_clause, egcs_fc_publicationkind)
@@ -23,6 +25,24 @@ CREATE TABLE "Funding_Case_Agreement_Clause" (
 );
 
 CREATE UNIQUE INDEX fc_uq_agreement_clause ON "Funding_Case_Agreement_Clause" (egcs_fc_fundingagreement, egcs_fc_clause) WHERE NOT _deleted;
+
+CREATE TABLE "Funding_Case_Agreement_Clause_Review" (
+  id bigserial PRIMARY KEY,
+  egcs_fc_selection bigint NOT NULL REFERENCES "Funding_Case_Agreement_Clause"(id) ON DELETE RESTRICT,
+  egcs_fc_review bigint NOT NULL REFERENCES "Common_Review"(id) ON DELETE RESTRICT,
+  egcs_fc_clause bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
+  egcs_fc_rule bigint NOT NULL REFERENCES "Agency_Review_Clause_Rule"(id) ON DELETE RESTRICT,
+  egcs_fc_result "Checklist_Result",
+  egcs_fc_outcome text,
+  egcs_fc_strategy text,
+  egcs_fc_protected boolean NOT NULL,
+  _deleted boolean NOT NULL DEFAULT false,
+  UNIQUE (egcs_fc_review, egcs_fc_rule),
+  CHECK ((egcs_fc_result IS NOT NULL AND egcs_fc_outcome IS NULL AND egcs_fc_strategy IS NULL)
+    OR (egcs_fc_result IS NULL AND egcs_fc_outcome IS NOT NULL AND egcs_fc_strategy IS NOT NULL))
+);
+CREATE INDEX fc_idx_agreement_clause_review_replay ON "Funding_Case_Agreement_Clause_Review" (egcs_fc_review, egcs_fc_clause);
+CREATE INDEX fc_idx_agreement_clause_review_selection ON "Funding_Case_Agreement_Clause_Review" (egcs_fc_selection);
 
 CREATE TABLE "Funding_Case_Agreement_Relationship" (
   id bigserial CONSTRAINT fc_pk_agreement_relationship PRIMARY KEY,

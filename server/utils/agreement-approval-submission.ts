@@ -71,7 +71,7 @@ export const assertAgreementApprovalSubmissionUnlocked = async (
   event: H3Event,
   trx: Kysely<Database> | Transaction<Database>,
   agreementId: string,
-  { excludedAmendmentId }: { excludedAmendmentId?: string } = {}
+  { excludedAmendmentId, reviewFinalization }: { excludedAmendmentId?: string, reviewFinalization?: boolean } = {}
 ): Promise<void> => {
   const activeRun = await trx.selectFrom('Common_Runtime')
     .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
@@ -102,7 +102,9 @@ export const assertAgreementApprovalSubmissionUnlocked = async (
     return await throwApiError(event, {
       statusCode: 409,
       code: 'AGREEMENT_APPROVAL_SUBMISSION_LOCKED',
-      key: 'apiErrors.workflow.approval_submission_locked'
+      key: reviewFinalization
+        ? 'apiErrors.agreement.clause_checklist_locked'
+        : 'apiErrors.workflow.approval_submission_locked'
     })
   }
 }

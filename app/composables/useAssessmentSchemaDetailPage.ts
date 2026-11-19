@@ -112,12 +112,17 @@ export const useAssessmentSchemaDetailPage = async () => {
     return getAssessmentHelperDefinitionsForEntityType(entityType)
   })
   const heroName = computed(() => getBilingualValue(schema.value, 'egcs_cn_name'))
+  const showClauseRules = computed(() => schema.value?.egcs_cn_entitytype === 'fundingcaseagreement'
+    && schema.value.publicationVersionId != null)
   const sectionTabs = computed<TranslatedTabItem[]>(() => [
     { key: 'agency.tabs.general', icon: 'i-lucide-info', value: 'schema-general' },
     { key: 'transfer_payment.scoring_matrix_record', icon: 'i-lucide-chart-column', value: 'schema-matrices' },
     { key: 'transfer_payment.assessment_sections', icon: 'i-lucide-layers', value: 'schema-sections' },
     { key: 'transfer_payment.outcomes', icon: 'i-lucide-shield-check', value: 'schema-outcomes' },
-    { key: 'transfer_payment.impactors', icon: 'i-lucide-zap', value: 'schema-impactors' }
+    { key: 'transfer_payment.impactors', icon: 'i-lucide-zap', value: 'schema-impactors' },
+    ...(showClauseRules.value
+      ? [{ key: 'review_clause_rules.title', value: 'assessment-clause-rules', icon: 'i-lucide-list-checks' }]
+      : [])
   ].map(item => ({ ...item, panelId: item.value })))
 
   /**
@@ -427,6 +432,9 @@ export const useAssessmentSchemaDetailPage = async () => {
     isHeroCollapsed,
     heroName,
     sectionTabs,
+    showClauseRules,
+    agencyId,
+    schemaId,
     selectedSection,
     isSavingGeneral,
     isSavingSchema,

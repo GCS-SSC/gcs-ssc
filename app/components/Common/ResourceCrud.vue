@@ -32,6 +32,7 @@ const {
   beforeSave,
   buildUpdatePayload,
   beforeDelete,
+  buildDeleteQuery,
   columns,
   bilingualColumns,
   buttonLabel,
@@ -72,7 +73,8 @@ const {
   beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   buildUpdatePayload?: (state: Partial<T>, original: T) => Partial<T>
-  beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
+  beforeDelete?: (id: string, shouldProceed: () => boolean, row: T) => Promise<boolean | undefined>
+  buildDeleteQuery?: (row: T) => URLSearchParams | undefined
   columns: TableColumnInput<T>[]
   bilingualColumns?: BilingualColumnConfig<T>[]
   helpSaveTarget?: string
@@ -161,6 +163,7 @@ const {
   beforeSave,
   buildUpdatePayload,
   beforeDelete,
+  buildDeleteQuery,
   buttonLabel,
   modalTitle,
   updateTitle,

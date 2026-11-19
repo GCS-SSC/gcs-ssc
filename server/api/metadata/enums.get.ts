@@ -17,6 +17,7 @@ import {
   TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_OUTPUT_FORMAT_ENUM,
   TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM
 } from '~~/shared/types/schemas/transfer-payment'
+import { CHECKLIST_RESULTS } from '~~/shared/types/schemas/checklist/checklist'
 import { ABILITIES } from '~~/shared/utils/abilities'
 
 const QuerySchema = z.object({
@@ -55,6 +56,7 @@ export default defineEventHandler(async event => {
     'agency_chart_of_account_kind',
     'account_receivable_recovery_method',
     'review_type',
+    'checklist_result',
     'monitor_action_type',
     'monitor_responsible_party',
     'follow_up_status',
@@ -79,6 +81,7 @@ export default defineEventHandler(async event => {
   }
 
   const staticEnumsByKey: Partial<Record<(typeof allowedEnums)[number], readonly string[]>> = {
+    checklist_result: CHECKLIST_RESULTS,
     correction_outcome: CORRECTION_OUTCOME_ENUM,
     agency_chart_of_account_kind: AGENCY_CHART_KIND_ENUM,
     account_receivable_recovery_method: ACCOUNT_RECEIVABLE_RECOVERY_METHOD_ENUM,

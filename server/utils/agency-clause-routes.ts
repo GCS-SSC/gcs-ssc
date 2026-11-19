@@ -9,6 +9,7 @@ import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { resolveCurrentCommonUser } from './additional-reviewer-runtime'
 import { withActiveAgencyMutationTransaction, withActiveAgencyReadTransaction } from './agency-auth'
+import { assertAgencyClauseHasNoActiveReviewRules } from './agency-review-clause-rules'
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { readValidatedBodyI18n } from './api-validate'
 import { authorize } from './authorize'
@@ -149,6 +150,7 @@ const runAgencyClauseRoute = async (event: H3Event, action: Action) => {
     if (publication.egcs_cn_state === 'retired') return await invalidPublicationState(event)
     if (body) {
       const { rows, ...draft } = body
+      if (!draft.egcs_ay_active) await assertAgencyClauseHasNoActiveReviewRules(event, trx, agencyId, clauseId)
       const updated = await trx.updateTable('Agency_Clause').set(draft).where('id', '=', clauseId)
         .returningAll().executeTakeFirstOrThrow()
       await saveRows(event, trx, clauseId, rows)
@@ -166,6 +168,7 @@ const runAgencyClauseRoute = async (event: H3Event, action: Action) => {
     const actor = await resolveCurrentCommonUser(event, trx)
     if (!actor) return await notFound(event, 'COMMON_USER_NOT_FOUND', 'apiErrors.admin_common.not_found')
     if (action === 'retire') {
+      await assertAgencyClauseHasNoActiveReviewRules(event, trx, agencyId, clauseId)
       return await retirePublication(trx, { publicationId: clauseId, kind: 'agency_clause', actorId: actor.id })
     }
     const rows = await selectRows(trx).where('egcs_ay_clause', '=', clauseId).execute()

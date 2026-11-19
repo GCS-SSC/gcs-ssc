@@ -116,10 +116,15 @@ const breadcrumbItems = computed(() => [
   },
   { label: title.value }
 ])
+const showClauseRules = computed(() => state.value?.egcs_cn_entitytype === 'fundingcaseagreement'
+  && state.value.publicationVersionId != null)
 const sectionTabs = computed(() => [
   { key: 'checklist_schema.general', value: 'checklist-general', icon: 'i-lucide-info' },
   { key: 'checklist_schema.sections', value: 'checklist-sections', icon: 'i-lucide-layers' },
-  { key: 'checklist_schema.rules', value: 'checklist-rules', icon: 'i-lucide-git-branch' }
+  { key: 'checklist_schema.rules', value: 'checklist-rules', icon: 'i-lucide-git-branch' },
+  ...(showClauseRules.value
+    ? [{ key: 'review_clause_rules.title', value: 'checklist-clause-rules', icon: 'i-lucide-list-checks' }]
+    : [])
 ].map(item => ({ ...item, panelId: item.value })))
 
 const toEditorDefinition = (value: ChecklistDefinition): EditorDefinition => ({
@@ -625,6 +630,20 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
               </CommonDesignTimeEditorSections>
             </fieldset>
           </UForm>
+
+          <AssessmentSchemaPageSection
+            v-if="showClauseRules"
+            section-id="checklist-clause-rules"
+            :title="t('review_clause_rules.title')"
+            role="tabpanel"
+            :aria-label="t('review_clause_rules.title')">
+            <AgencyReviewClauseRules
+              :agency-id="agencyId"
+              :schema-id="schemaId"
+              review-type="checklist"
+              :can-manage="canManagePublication"
+              :is-published="state.publicationState === 'published'" />
+          </AssessmentSchemaPageSection>
         </CommonDesignTimeEditorShell>
       </div>
     </template>

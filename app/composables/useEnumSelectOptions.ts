@@ -99,6 +99,8 @@ export const useEnumSelectOptions = (options: EnumSelectOptions) => {
           return countryDisplayNames.value?.of(val.toUpperCase()) ?? t(`enums.${translationNamespace.value}.${val}`)
         }
 
+        if (enumName.value === 'checklist_result') return t(`checklist.result.${val}`)
+
         return t(`enums.${translationNamespace.value}.${val}`)
       })(),
       value: val

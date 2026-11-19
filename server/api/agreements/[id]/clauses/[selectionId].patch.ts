@@ -1,7 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
-import { eligibleAgreementClauses } from '~~/server/utils/agreement-clauses'
+import { eligibleAgreementClauses, publishedAgencyClauses } from '~~/server/utils/agreement-clauses'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 
@@ -15,9 +15,15 @@ export default defineEventHandler(async event => {
   return await executeFreshAuthorizedAgreementWrite(event, db, id, scope, async (trx, current) => {
     const selection = await trx.selectFrom('Funding_Case_Agreement_Clause').select('egcs_fc_clause')
       .where('id', '=', selectionId).where('egcs_fc_fundingagreement', '=', id).where('_deleted', '=', false)
+      .select(eb => eb.exists(eb.selectFrom('Funding_Case_Agreement_Clause_Review')
+        .select('id').whereRef('egcs_fc_selection', '=', 'Funding_Case_Agreement_Clause.id')
+        .where('_deleted', '=', false)).as('fromReview'))
       .executeTakeFirst()
     if (!selection) return await notFound(event, 'CLAUSE_NOT_SELECTED', 'agreement.clauses.not_selected')
-    const version = await eligibleAgreementClauses(trx, current.streamId, current.agencyId)
+    const candidates = selection.fromReview
+      ? publishedAgencyClauses(trx, current.agencyId)
+      : eligibleAgreementClauses(trx, current.streamId, current.agencyId)
+    const version = await candidates
       .where('clause.id', '=', selection.egcs_fc_clause).select('version.id').executeTakeFirst()
     if (!version) return await throwApiError(event, { statusCode: 409, code: 'CLAUSE_NOT_AVAILABLE', key: 'agreement.clauses.unavailable' })
     return await trx.updateTable('Funding_Case_Agreement_Clause').set({ egcs_fc_publicationversion: version.id })

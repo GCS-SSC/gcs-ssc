@@ -330,6 +330,7 @@ export interface AuditDatabase {
 export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Catalog_Revision: AgencyCatalogRevisionTable
   Agency_Profile: AgencyProfileTable
+  Agency_Review_Clause_Rule: AgencyReviewClauseRuleTable
   Agency_Clause: AgencyClauseTable
   Agency_Clause_Text: AgencyClauseTextTable
   Agency_Custom_Field: AgencyCustomFieldTable
@@ -385,6 +386,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Approval_Submission: FundingCaseAgreementApprovalSubmissionTable
   Funding_Case_Agreement_Applicant_Recipient: FundingCaseAgreementApplicantRecipientTable
   Funding_Case_Agreement_Clause: FundingCaseAgreementClauseTable
+  Funding_Case_Agreement_Clause_Review: FundingCaseAgreementClauseReviewTable
   Funding_Case_Agreement_Relationship: FundingCaseAgreementRelationshipTable
   Funding_Case_Agreement_Address: FundingCaseAgreementAddressTable
   Funding_Case_Agreement_Budget_Fiscal_Year: FundingCaseAgreementBudgetFiscalYearTable
@@ -3051,12 +3053,39 @@ export interface AgencyProponentRelationshipTypeTable {
   _deleted: Generated<boolean>
 }
 
+export interface AgencyReviewClauseRuleTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_reviewschema: string
+  egcs_ay_result: Checklist_Result | null
+  egcs_ay_outcome: string | null
+  egcs_ay_strategy: string | null
+  egcs_ay_clause: string
+  egcs_ay_protected: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementClauseReviewTable {
+  id: Generated<string>
+  egcs_fc_selection: string
+  egcs_fc_review: string
+  egcs_fc_clause: string
+  egcs_fc_rule: string
+  egcs_fc_result: Checklist_Result | null
+  egcs_fc_outcome: string | null
+  egcs_fc_strategy: string | null
+  egcs_fc_protected: boolean
+  _deleted: Generated<boolean>
+}
+
 export interface FundingCaseAgreementClauseTable {
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_clause: string
   egcs_fc_publicationversion: string
   egcs_fc_publicationkind: Generated<'agency_clause'>
+  egcs_fc_protected: Generated<boolean>
+  egcs_fc_removedby: string | null
   _deleted: Generated<boolean>
 }
 

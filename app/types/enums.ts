@@ -17,6 +17,7 @@ export type EnumKey =
   | 'agency_chart_of_account_kind'
   | 'account_receivable_recovery_method'
   | 'review_type'
+  | 'checklist_result'
   | 'entity_type'
   | 'execution_entity_type'
   | 'transfer_payment_config_entity_type'

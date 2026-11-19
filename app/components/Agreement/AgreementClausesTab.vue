@@ -3,6 +3,7 @@ import type { ResourceCrudAction } from '~/composables/useResourceCrudState'
 import { useActionContext } from '~/composables/useActionContext'
 import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import { AgreementClauseSelectionSchema } from '~~/shared/types/schemas/agreement-clause'
+import type { Checklist_Result } from '~~/shared/types/database'
 
 const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
   agreementId: string
@@ -30,6 +31,16 @@ type ClauseSelection = {
   texts: { textEn: string; textFr: string; displayOrder: number }[]
   outOfDate: boolean
   canUpgrade: boolean
+  protected: boolean
+  reviewSources: {
+    applicationId: string
+    reviewId: string
+    reviewVersionId: string
+    name: { en: string; fr: string }
+    result: Checklist_Result | null
+    outcome: { en: string, fr: string } | null
+    strategy: { en: string, fr: string } | null
+  }[]
 } & Record<string, unknown>
 
 /**
@@ -59,13 +70,18 @@ const beforeSave = (_state: unknown, original: unknown, current: () => boolean) 
  * Rechecks Agreement access after the user confirms removal.
  * @param _id Selection identity captured by the resource table.
  * @param current Whether the table still owns this action.
+ * @param row Saved selection captured by the resource table.
  * @returns Whether the table can dispatch removal.
  */
-const beforeDelete = async (_id: string, current: () => boolean) => {
+const beforeDelete = async (_id: string, current: () => boolean, row: ClauseSelection) => {
   if (!await check('delete', 'clause', current)) return false
-  if (!await confirmDelete({ description: t('agreement.clauses.remove_confirm') }) || !current()) return false
+  const description = row.protected ? 'agreement.clauses.remove_protected_confirm' : 'agreement.clauses.remove_confirm'
+  if (!await confirmDelete({ description: t(description) }) || !current()) return false
   return await check('delete', 'clause', current)
 }
+
+const buildDeleteQuery = (row: ClauseSelection) =>
+  row.protected ? new URLSearchParams({ confirmed_protected: 'true' }) : undefined
 </script>
 
 <template>
@@ -91,6 +107,7 @@ const beforeDelete = async (_id: string, current: () => boolean) => {
     :before-open="beforeOpen"
     :before-save="beforeSave"
     :before-delete="beforeDelete"
+    :build-delete-query="buildDeleteQuery"
     :build-update-payload="() => ({})">
     <template #table="{ state, setSearch, setPagination, openCreate, openUpdate, deleteItem, retry }">
       <CommonClauseGroupTable
@@ -108,8 +125,44 @@ const beforeDelete = async (_id: string, current: () => boolean) => {
         @update:pagination="setPagination"
         @add="openCreate"
         @retry="retry">
+        <template #flags="{ group }">
+          <CommonStatusBadge v-if="group.protected" variant="warning" :label="t('agreement.clauses.protected')" />
+        </template>
         <template #actions="{ item }">
           <div v-if="item.kind === 'group'" class="flex items-center gap-2">
+            <UModal
+              v-if="item.group.reviewSources.length"
+              :title="t('agreement.clauses.sources')"
+              :description="locale === 'fr' ? item.group.nameFr : item.group.nameEn">
+              <UButton
+                icon="i-lucide-eye"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :aria-label="t('agreement.clauses.view_sources')" />
+              <template #body>
+                <ul class="divide-y divide-default">
+                  <li v-for="source in item.group.reviewSources" :key="source.applicationId" class="space-y-1 py-3 first:pt-0 last:pb-0">
+                    <p class="text-xs text-muted">
+                      {{ t('agreement.clauses.source_review_id', { id: source.reviewId }) }}
+                    </p>
+                    <template v-if="source.result">
+                      {{ t('agreement.clauses.review_source', {
+                        checklist: locale === 'fr' ? source.name.fr : source.name.en,
+                        result: t(`checklist.result.${source.result}`)
+                      }) }}
+                    </template>
+                    <template v-else-if="source.outcome && source.strategy">
+                      {{ t('agreement.clauses.assessment_source', {
+                        assessment: locale === 'fr' ? source.name.fr : source.name.en,
+                        outcome: locale === 'fr' ? source.outcome.fr : source.outcome.en,
+                        strategy: locale === 'fr' ? source.strategy.fr : source.strategy.en
+                      }) }}
+                    </template>
+                  </li>
+                </ul>
+              </template>
+            </UModal>
             <CommonActionButton
               v-if="canUpdate && item.group.canUpgrade"
               icon="i-lucide-refresh-cw"

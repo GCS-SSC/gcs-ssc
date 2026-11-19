@@ -1,3 +1,4 @@
+import { assertAgreementMappedReviewsComplete } from './review-agreement-clauses'
 import { applyAgreementApprovalFinancialNumber } from './agreement-financial-number-provider'
 import { canAdmitWorkflowForTarget } from './workflow-terminalization-admission'
 import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
@@ -1425,6 +1426,9 @@ const startWorkflowUnchecked = async (
         return locked ? { statusId: locked.status.statusId, terminal: locked.status.terminal } : null
       })()
   if (!targetStatus) return await badRequest(event, 'WORKFLOW_TARGET_TYPE_NOT_SUPPORTED', 'apiErrors.request.invalid_resource')
+  if (purpose === 'approval_submission' && context.entityType === 'fundingcaseagreement') {
+    await assertAgreementMappedReviewsComplete(event, trx, context.entityId)
+  }
   const existing = await trx.selectFrom('Common_Runtime')
     .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
     .selectAll('Common_Runtime')

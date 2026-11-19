@@ -35,7 +35,10 @@ type CatalogRow =
   | { kind: 'group', id: string, group: T, children: CatalogRow[] }
   | { kind: 'clause', id: string, group: T, clause: AgencyClauseText }
 
-defineSlots<{ actions(props: { item: CatalogRow }): unknown }>()
+defineSlots<{
+  actions(props: { item: CatalogRow }): unknown
+  flags?(props: { group: T }): unknown
+}>()
 
 const tableRows = computed<CatalogRow[]>(() => (totalRecords !== undefined
   ? items
@@ -122,6 +125,7 @@ watch(filtered, rows => {
         <CommonStatusBadge v-if="row.original.group.egcs_ay_active === false" variant="meta" :label="t('clauses.inactive')" />
         <CommonStatusBadge v-if="row.original.group.outOfDate" variant="warning" :label="t('agreement.clauses.out_of_date')" />
         <CommonStatusBadge v-if="row.original.group.publicationState === 'published' && row.original.group.hasUnpublishedChanges" variant="warning" :label="t('clauses.unpublished_changes')" />
+        <slot name="flags" :group="row.original.group" />
       </div>
     </template>
 

@@ -26,7 +26,8 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
   beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   buildUpdatePayload?: (state: Partial<T>, original: T) => Partial<T>
-  beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
+  beforeDelete?: (id: string, shouldProceed: () => boolean, row: T) => Promise<boolean | undefined>
+  buildDeleteQuery?: (row: T) => URLSearchParams | undefined
   buttonLabel?: MaybeRefOrGetter<string | undefined>
   modalTitle?: MaybeRefOrGetter<string | undefined>
   updateTitle?: MaybeRefOrGetter<string | undefined>
@@ -55,6 +56,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   beforeSave,
   buildUpdatePayload,
   beforeDelete,
+  buildDeleteQuery,
   buttonLabel,
   modalTitle,
   updateTitle,
@@ -336,6 +338,8 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     const requestedContext = context.value
     const isCurrentTarget = () => context.value.kind === 'active' && context.value === requestedContext && operation.isCurrent()
     const resolvedDeleteUrlBase = toValue(deleteUrlBase)
+    const resolveTarget = () => items.value.find(item => String(item.id) === id)
+    const row = resolveTarget()
     if (context.value.kind === 'disposed' || !resolvedDeleteUrlBase || isDeleting.value) {
       return
     }
@@ -343,11 +347,13 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     const token = {}
     deletion.value = { kind: 'pending', token }
     try {
-      const deleted = await confirmDeleteRequest(`${resolvedDeleteUrlBase}/${id}`, {
+      const query = row ? buildDeleteQuery?.(row)?.toString() : undefined
+      const deleteUrl = `${resolvedDeleteUrlBase}/${id}${query ? `?${query}` : ''}`
+      const deleted = await confirmDeleteRequest(deleteUrl, {
         operation,
-        target: { id, resolve: () => items.value.find(row => String(row.id) === id), eligible: deleteEligible },
+        target: { id, resolve: resolveTarget, eligible: deleteEligible },
         description: t(toValue(deleteConfirmKey)),
-        ...(beforeDelete ? { confirm: () => beforeDelete(id, () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase) } : {}),
+        ...(beforeDelete && row ? { confirm: () => beforeDelete(id, () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase, row) } : {}),
         shouldProceed: () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase
       })
       if (!deleted || !isCurrentTarget()) {
