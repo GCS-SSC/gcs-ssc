@@ -553,6 +553,7 @@ const formSession = useFormSession({
               selected-values-query-key="selected"
               value-key="id" label-en-key="label_en" label-fr-key="label_fr"
               :limit="100" :show-value-in-label="false" close-on-select
+              :auto-select-single="!selectedClaim.id"
               :query="selectedClaim.id ? { permission_action: 'update', claimId: selectedClaim.id } : { permission_action: 'create' }" />
           </UFormField>
           <UFormField :label="t('agreement.claims.fiscal_year')" name="egcs_fc_fiscalyear">

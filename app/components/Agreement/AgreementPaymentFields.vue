@@ -46,6 +46,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
         selected-values-query-key="selected_ids"
         value-key="id" label-en-key="label_en" label-fr-key="label_fr"
         :disabled="pending" :limit="100" :show-value-in-label="false" close-on-select
+        :auto-select-single="!state.id"
         :query="lookupQuery" @resolved-items="items => emit('resolved-items', 'egcs_fc_applicantrecipient', items)" />
     </UFormField>
 
