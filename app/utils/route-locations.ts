@@ -14,6 +14,7 @@ export const appRouteLocations = {
   login: () => ({ name: 'login' }),
   adminGwcoa: () => ({ name: 'admin-gwcoa' }),
   adminQueues: () => ({ name: 'admin-queues' }),
+  adminExtensions: () => ({ name: 'admin-extensions' }),
   adminAudit: () => ({ name: 'admin-audit' }),
   adminAccess: () => ({ name: 'admin-access' }),
   agencies: () => ({ name: 'agencies' }),

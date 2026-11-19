@@ -58,6 +58,9 @@ export default defineEventHandler(async event => {
   if (!extension || !('key' in extension)) {
     return extension
   }
+  if (extension.configurationScope === 'system') {
+    return await notFound(event, 'EXTENSION_NOT_FOUND', 'apiErrors.extensions.not_found')
+  }
   try {
     return await db.transaction().execute(async trx => {
       const authContext = await requireFreshAuthContext(event, trx)

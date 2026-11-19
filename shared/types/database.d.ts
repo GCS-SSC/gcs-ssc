@@ -308,6 +308,7 @@ export type Countries =
   | 'zw'
 
 export interface HostManagedExtensionsDatabase {
+  'extensions.system_enablement': ExtensionsSystemEnablementTable
   'extensions.agency_enablement': ExtensionsAgencyEnablementTable
   'extensions.agency_storage_selection': ExtensionsAgencyStorageSelectionTable
   'extensions.agency_notification_selection': ExtensionsAgencyNotificationSelectionTable
@@ -533,6 +534,11 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   role: RoleTable
   role_permission: RolePermissionTable
   role_transfer_payment_scope: RoleTransferPaymentScopeTable
+}
+
+export interface ExtensionsSystemEnablementTable {
+  extension_key: string
+  enabled: Generated<boolean>
 }
 
 export interface ExtensionsAgencyEnablementTable {

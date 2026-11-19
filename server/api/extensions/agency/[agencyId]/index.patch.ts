@@ -48,7 +48,7 @@ export default defineEventHandler(async event => {
   const body = await readValidatedBodyI18n(event, ExtensionToggleSchema)
   const extensions = await getRegisteredExtensions()
   const extension = extensions.find(item => item.key === body.extensionKey)
-  if (!extension) {
+  if (!extension || extension.configurationScope === 'system') {
     return await notFound(event, 'EXTENSION_NOT_FOUND', 'apiErrors.extensions.not_found')
   }
   const configurationAction = getExtensionConfigurationAction(extension)

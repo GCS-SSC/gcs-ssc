@@ -79,6 +79,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'scheduled-intake-import',
   'background-queue',
   'agency-only-configuration',
+  'system-extensions',
   'audit-ownership',
   'file-storage-provider',
   'notification-provider'
@@ -353,7 +354,8 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.codingAllocator), 'coding-allocator')
   addImpliedCapability(capabilities, definition.configurationAccess !== undefined, 'configuration-access')
   addImpliedCapability(capabilities, Boolean(definition.auditOwnership?.length), 'audit-ownership')
-  addImpliedCapability(capabilities, definition.configurationScope !== undefined, 'agency-only-configuration')
+  addImpliedCapability(capabilities, definition.configurationScope === 'agency', 'agency-only-configuration')
+  addImpliedCapability(capabilities, definition.configurationScope === 'system', 'system-extensions')
   addImpliedCapability(capabilities, Boolean(definition.fileStorageProvider), 'file-storage-provider')
   addImpliedCapability(capabilities, Boolean(definition.notificationProvider), 'notification-provider')
 
@@ -486,8 +488,36 @@ const validateFileStorageProviderDefinition = (definition: GcsExtensionDefinitio
   }
 }
 
+/** Rejects contributions the host cannot enable at the declared scope. */
+const validateExtensionConfigurationScope = (definition: GcsExtensionDefinition): void => {
+  const { admin, configurationScope, key } = definition
+  if (configurationScope !== undefined && configurationScope !== 'agency' && configurationScope !== 'system') {
+    throw new Error(`Extension ${key} configurationScope must be agency or system`)
+  }
+  if (configurationScope === 'agency' && (admin?.streamConfig || admin?.streamConfigPage)) {
+    throw new Error(`Extension ${key} agency-only configuration cannot declare stream editors`)
+  }
+  if (configurationScope !== 'system') {
+    if (admin?.systemWorkspace || definition.signedInSidebarModal) {
+      throw new Error(`Extension ${key} system workspaces and signed-in sidebar modals require system configuration`)
+    }
+    return
+  }
+  if (admin?.agency || admin?.agencyWorkspace || admin?.streamConfig || admin?.streamConfigPage
+    || definition.configurationAccess || definition.client || definition.runtime || definition.nitroPlugin
+    || definition.entities?.length || definition.agreementNumberProvider || definition.agreementFinancialNumberProvider
+    || definition.codingAllocator || definition.fileStorageProvider || definition.notificationProvider) {
+    throw new Error(`Extension ${key} system configuration cannot declare agency, stream or entity contributions`)
+  }
+  const workspace = admin?.systemWorkspace
+  if (workspace && (typeof workspace.path !== 'string' || !workspace.path.endsWith('.vue'))) {
+    throw new Error(`Extension ${key} system workspace requires a Vue component`)
+  }
+}
+
 /** Validates extension identity, bilingual naming, SDK compatibility, and host capabilities. */
 export const validateExtensionDefinition = (definition: GcsExtensionDefinition, extensionDir: string): void => {
+  validateExtensionConfigurationScope(definition)
   if (definition.codingAllocator && 'accountCatalog' in definition.codingAllocator) {
     throw new Error(`Extension ${definition.key} codingAllocator catalog overrides are unsupported; coding accounts must be available on the Stream`)
   }
@@ -508,12 +538,6 @@ export const validateExtensionDefinition = (definition: GcsExtensionDefinition, 
       }
       tabIds.add(tab.id)
     }
-  }
-  if (definition.configurationScope !== undefined && definition.configurationScope !== 'agency') {
-    throw new Error(`Extension ${definition.key} configurationScope must be agency`)
-  }
-  if (definition.configurationScope === 'agency' && (definition.admin?.streamConfig || definition.admin?.streamConfigPage)) {
-    throw new Error(`Extension ${definition.key} agency-only configuration cannot declare stream editors`)
   }
   if (definition.configurationAccess !== undefined
     && definition.configurationAccess !== 'contributor'
@@ -559,7 +583,7 @@ export const validateExtensionDefinition = (definition: GcsExtensionDefinition, 
     throw new Error(`Extension ${definition.key} signed-in sidebar modal requires a bilingual label, icon and Vue component`)
   }
   for (const [index, handler] of serverHandlers.entries()) {
-    validateServerHandlerRbac(handler, index)
+    validateServerHandlerRbac(handler, index, definition.configurationScope)
   }
   const seenLocalEntityTypes = new Set<string>()
   for (const [index, entity] of (definition.entities ?? []).entries()) {
@@ -638,22 +662,35 @@ const validateExtensionRouteParam = (
 /** Rejects server routes whose RBAC declaration conflicts with their path parameters. */
 const validateServerHandlerRbac = (
   handler: GcsExtensionServerHandlerDefinition,
-  index: number
+  index: number,
+  configurationScope: GcsExtensionDefinition['configurationScope']
 ) => {
+  const routeParams = getExtensionRouteParams(handler.route)
+  if (configurationScope === 'system' && (routeParams.has('agencyId') || routeParams.has('streamId'))) {
+    throw new Error(`Extension server handler ${index} system routes cannot use agencyId or streamId parameters`)
+  }
   if (!handler.rbac) {
     if (handler.auth !== 'manual') {
       throw new Error(`Extension server handler ${index} must define rbac or set auth: "manual"`)
     }
     return
   }
-  const routeParams = getExtensionRouteParams(handler.route)
   if (handler.auth === 'manual') {
     throw new Error(`Extension server handler ${index} cannot combine rbac with auth: "manual"`)
   }
   validateExtensionRbacRequirement(handler.rbac, `serverHandlers.${index}.rbac`)
-  const targetCount = Number('entity' in handler.rbac) + Number('stream' in handler.rbac) + Number('agency' in handler.rbac)
+  const targetCount = Number('global' in handler.rbac) + Number('entity' in handler.rbac) + Number('stream' in handler.rbac) + Number('agency' in handler.rbac)
   if (targetCount !== 1) {
     throw new Error(`Extension server handler ${index} must define exactly one RBAC target`)
+  }
+  if ('global' in handler.rbac) {
+    if (configurationScope !== 'system' || handler.rbac.global !== true || handler.rbac.subject !== 'system') {
+      throw new Error(`Extension server handler ${index} global RBAC requires system configuration and the system subject`)
+    }
+    return
+  }
+  if (configurationScope === 'system') {
+    throw new Error(`Extension server handler ${index} system routes require global RBAC or manual authorization`)
   }
   if ('entity' in handler.rbac) {
     if (!EXTENSION_ENTITY_TAB_TARGETS.has(handler.rbac.entity.target)) {
@@ -1022,7 +1059,7 @@ const resolveExtensionServerHandlers = async (
 ) => {
   validateExtensionServerHandlerRoutes(definition.key, definition.serverHandlers ?? [])
   return await Promise.all((definition.serverHandlers ?? []).map((handler, index) => {
-    validateServerHandlerRbac(handler, index)
+    validateServerHandlerRbac(handler, index, definition.configurationScope)
     return resolveServerHandler(extensionDir, definition.key, handler, index)
   }))
 }
@@ -1062,6 +1099,7 @@ const resolveExtensionAdmin = async (
 ) => ({
   agency: await resolveComponent(extensionDir, definition.admin?.agency, 'admin.agency.path'),
   agencyWorkspace: definition.admin?.agencyWorkspace,
+  systemWorkspace: await resolveComponent(extensionDir, definition.admin?.systemWorkspace, 'admin.systemWorkspace.path'),
   streamConfig: await resolveComponent(extensionDir, definition.admin?.streamConfig, 'admin.streamConfig.path'),
   streamConfigPage: await resolveComponent(extensionDir, definition.admin?.streamConfigPage, 'admin.streamConfigPage.path')
 })
@@ -1287,6 +1325,9 @@ const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClien
       ? withoutComponentPath(extension.admin.agency, componentName('ExtensionAgency', extension.key))
       : undefined,
     agencyWorkspace: extension.admin.agencyWorkspace,
+    systemWorkspace: extension.admin.systemWorkspace
+      ? withoutComponentPath(extension.admin.systemWorkspace, componentName('ExtensionSystemWorkspace', extension.key))
+      : undefined,
     streamConfig: extension.admin.streamConfig
       ? withoutComponentPath(extension.admin.streamConfig, componentName('ExtensionStreamConfig', extension.key))
       : undefined,
@@ -1546,6 +1587,7 @@ type ExtensionComponentDefinition = {
 
 const getExtensionComponentDefinitions = (extension: GcsResolvedExtension): ExtensionComponentDefinition[] => [
   extension.admin.agency,
+  extension.admin.systemWorkspace,
   extension.admin.streamConfig,
   extension.admin.streamConfigPage,
   ...extension.client.slots,
@@ -1595,6 +1637,9 @@ const buildExtensionComponentRegistry = (extensions: GcsResolvedExtension[]) => 
     }
     if (extension.admin.agency) {
       addComponentRegistryEntry(imports, componentEntries, 'ExtensionAgency', extension.key, extension.admin.agency.path)
+    }
+    if (extension.admin.systemWorkspace) {
+      addComponentRegistryEntry(imports, componentEntries, 'ExtensionSystemWorkspace', extension.key, extension.admin.systemWorkspace.path)
     }
     if (extension.admin.streamConfig) {
       addComponentRegistryEntry(imports, componentEntries, 'ExtensionStreamConfig', extension.key, extension.admin.streamConfig.path)

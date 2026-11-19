@@ -1,5 +1,6 @@
 import { classifyExtensionAuditInputs } from './audit-request'
 import { withAuditExecution } from './audit-context'
+import { lockSystemExtension } from './system-extension-enablement'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension dispatch helpers receive complete documentation. */
 import { getRouterParam, type H3Event } from 'h3'
 import { getMethod, getQuery, isError } from 'h3'
@@ -157,6 +158,8 @@ const prepareExtensionRbacContext = async (
   }
   const subject = resolveExtensionAuthorizationSubject(rbac.subject)
 
+  if ('global' in rbac) return
+
   if ('stream' in rbac) {
     const streamId = resolvedHandler.params[rbac.stream.param]
     if (!streamId) {
@@ -292,7 +295,7 @@ const createExtensionWriteAuthorization = (
   resolvedHandler: NonNullable<Awaited<ReturnType<typeof resolveExtensionServerHandler>>>
 ): GcsExtensionWriteAuthorization | undefined => {
   const rbac = resolvedHandler.routeDefinition.rbac
-  if (!rbac) {
+  if (!rbac || 'global' in rbac) {
     return undefined
   }
   const subject = resolveExtensionAuthorizationSubject(rbac.subject)
@@ -604,6 +607,35 @@ const handleExtensionDispatchError = async (
   throw error
 }
 
+const invokeExtensionHandler = async (
+  event: H3Event,
+  authContext: AuthContext,
+  extensionKey: string,
+  route: string,
+  handler: NonNullable<Awaited<ReturnType<typeof resolveExtensionServerHandler>>>
+) => {
+  const originalParams = event.context.params ?? {}
+  const originalAuthContext = event.context.$authContext
+  event.context.params = {
+    ...originalParams,
+    extensionKey,
+    route,
+    ...handler.params
+  }
+  event.context.$authContext = authContext
+
+  try {
+    return await withAuditExecution((event.context.gcsExtension?.stream?.agencyId ?? event.context.gcsExtension?.agency?.agencyId)
+      ? { type: 'agency', agencyId: (event.context.gcsExtension?.stream?.agencyId ?? event.context.gcsExtension?.agency?.agencyId)! }
+      : { type: 'global' }, async () => await handler.handler(event))
+  } catch (error: unknown) {
+    return await handleExtensionDispatchError(event, error)
+  } finally {
+    event.context.params = originalParams
+    event.context.$authContext = originalAuthContext
+  }
+}
+
 /** Resolves, authorizes, and invokes an extension server route with isolated route parameters. */
 const runExtensionServerRoute = async (
   event: H3Event,
@@ -616,6 +648,35 @@ const runExtensionServerRoute = async (
   }
   const handler = resolvedHandler as NonNullable<typeof resolvedHandler>
   classifyExtensionAuditInputs(event, handler.extension)
+
+  if (handler.extension.configurationScope === 'system') {
+    const db = event.context.$db
+    return await db.transaction().execute(async trx => {
+      const auth = await requireFreshAuthContext(event, trx)
+      const scope = { type: 'global' } as const
+      const { rbac } = handler.routeDefinition
+      if (rbac) {
+        await authorizeWithFreshAuthContext(event, auth, resolveExtensionAuthorizationSubject(rbac.subject), rbac.action, scope)
+      }
+      await lockSystemExtension(trx, extensionKey, 'shared')
+      const enabled = await trx.selectFrom('extensions.system_enablement')
+        .select('extension_key')
+        .where('extension_key', '=', extensionKey)
+        .where('enabled', '=', true)
+        .executeTakeFirst()
+      if (!enabled) throwExtensionDispatchError(403, 'EXTENSION_SYSTEM_DISABLED', 'apiErrors.extensions.system_disabled')
+
+      const originalExtensionContext = event.context.gcsExtension
+      event.context.$db = trx
+      event.context.gcsExtension = { extensionKey, config: {}, agencyConfig: {}, ...(rbac ? { authorizedScope: scope } : {}) }
+      try {
+        return await invokeExtensionHandler(event, auth, extensionKey, route, handler)
+      } finally {
+        event.context.$db = db
+        event.context.gcsExtension = originalExtensionContext
+      }
+    })
+  }
 
   await assertExtensionStreamEnabled(event, extensionKey, handler.params.streamId)
   if (!handler.params.streamId) {
@@ -645,26 +706,7 @@ const runExtensionServerRoute = async (
     }
   }
 
-  const originalParams = event.context.params ?? {}
-  const originalAuthContext = event.context.$authContext
-  event.context.params = {
-    ...originalParams,
-    extensionKey,
-    route,
-    ...handler.params
-  }
-  event.context.$authContext = authContext
-
-  try {
-    return await withAuditExecution((event.context.gcsExtension?.stream?.agencyId ?? event.context.gcsExtension?.agency?.agencyId)
-      ? { type: 'agency', agencyId: (event.context.gcsExtension?.stream?.agencyId ?? event.context.gcsExtension?.agency?.agencyId)! }
-      : { type: 'global' }, async () => await handler.handler(event))
-  } catch (error: unknown) {
-    return await handleExtensionDispatchError(event, error)
-  } finally {
-    event.context.params = originalParams
-    event.context.$authContext = originalAuthContext
-  }
+  return await invokeExtensionHandler(event, authContext, extensionKey, route, handler)
 }
 
 /** Localizes host dispatch failures without changing extension-owned errors or authorization. */

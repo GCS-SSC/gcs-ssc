@@ -37,13 +37,14 @@ const loadAgencyWorkspaces = async () => {
 }
 watch([() => route.fullPath, canLoadAgencyWorkspaces, permissionRevision], loadAgencyWorkspaces, { immediate: true })
 
-const { data: sidebarModals } = useResourceRequest<{ items: ExtensionSignedInSidebarItem[] }>({
+const systemExtensionRevision = useState('system-extension-revision', () => 0)
+const { data: sidebarModals, refresh: refreshSidebarModals } = useResourceRequest<{ items: ExtensionSignedInSidebarItem[] }>({
   identity: () => JSON.stringify([user.value?.id, permissionRevision.value, route.fullPath]),
   enabled: computed(() => Boolean(user.value)),
   refreshData: 'clear',
   failureData: 'clear',
   /**
-   * Discovers enabled sidebar destinations independently of agency read permissions.
+   * Discovers enabled system sidebar destinations for the signed-in account.
    * @param signal - Cancels discovery when the current session or route changes.
    * @returns Destinations for the active account.
    */
@@ -53,6 +54,7 @@ const { data: sidebarModals } = useResourceRequest<{ items: ExtensionSignedInSid
     return await response.json() as { items: ExtensionSignedInSidebarItem[] }
   }
 })
+watch(systemExtensionRevision, () => void refreshSidebarModals())
 const extensionModals = computed(() => {
   const lang = locale.value === 'fr' ? 'fr' : 'en'
   return (sidebarModals.value?.items ?? []).flatMap(item => {
@@ -110,6 +112,7 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
       collapsible
       resizable
       :ui="{
+        body: 'min-h-0 overflow-hidden',
         footer: 'border-t border-zinc-200 dark:border-zinc-800 p-4',
         header: 'p-4 border-b border-zinc-200 dark:border-zinc-800'
       }"
@@ -129,50 +132,52 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
       <template #default="{ collapsed }">
         <div class="bg-primary pointer-events-none absolute top-0 left-0 h-full w-1 opacity-80" />
 
-        <UDashboardSearchButton
-          :collapsed="collapsed"
-          :label="t('global_search.button')"
-          :aria-label="t('global_search.button')"
-          class="hover:ring-primary mb-6 bg-white ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-zinc-800" />
+        <div class="-mx-1 -mt-1 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-1 pt-1 pb-2">
+          <UDashboardSearchButton
+            :collapsed="collapsed"
+            :label="t('global_search.button')"
+            :aria-label="t('global_search.button')"
+            class="hover:ring-primary mb-6 shrink-0 bg-white ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-zinc-800" />
 
-        <CommonNavigationMenu
-          :label="t('nav.main_navigation')"
-          :collapsed="collapsed"
-          :items="items[0]"
-          type="single"
-          orientation="vertical"
-          :ui="{
-            link: `font-black uppercase tracking-widest text-xs py-3 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg transition-colors data-[active]:text-primary dark:data-[active]:text-blue-300 data-[active]:bg-primary/5 data-[active]:before:bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
-          }">
-          <template #item-leading="{ item, active, ui }">
-            <span
-              v-if="active"
-              aria-hidden="true"
-              data-slot="linkBackground"
-              class="pointer-events-none absolute inset-x-0 inset-y-px -z-1 rounded-md bg-elevated" />
-            <UIcon
-              v-if="item.icon"
-              :name="item.icon"
-              data-slot="linkLeadingIcon"
-              :class="ui.linkLeadingIcon({ class: item.ui?.linkLeadingIcon, active, disabled: !!item.disabled })" />
-          </template>
-        </CommonNavigationMenu>
+          <CommonNavigationMenu
+            :label="t('nav.main_navigation')"
+            :collapsed="collapsed"
+            :items="items[0]"
+            class="shrink-0"
+            type="single"
+            orientation="vertical"
+            :ui="{
+              link: `font-black uppercase tracking-widest text-xs py-3 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg transition-colors data-[active]:text-primary dark:data-[active]:text-blue-300 data-[active]:bg-primary/5 data-[active]:before:bg-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
+            }">
+            <template #item-leading="{ item, active, ui }">
+              <span
+                v-if="active"
+                aria-hidden="true"
+                data-slot="linkBackground"
+                class="pointer-events-none absolute inset-x-0 inset-y-px -z-1 rounded-md bg-elevated" />
+              <UIcon
+                v-if="item.icon"
+                :name="item.icon"
+                data-slot="linkLeadingIcon"
+                :class="ui.linkLeadingIcon({ class: item.ui?.linkLeadingIcon, active, disabled: !!item.disabled })" />
+            </template>
+          </CommonNavigationMenu>
 
-        <CommonNavigationMenu
-          :label="t('nav.secondary_navigation')"
-          :collapsed="collapsed"
-          :items="items[1]"
-          orientation="vertical"
-          class="mt-auto"
-          :ui="{
-            link: `font-black uppercase tracking-widest text-xs py-2 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg opacity-60 hover:opacity-100 transition-opacity`
-          }" />
-        <div v-if="extensionModals.length" class="flex flex-col gap-2">
+          <CommonNavigationMenu
+            :label="t('nav.secondary_navigation')"
+            :collapsed="collapsed"
+            :items="items[1]"
+            orientation="vertical"
+            class="mt-auto shrink-0"
+            :ui="{
+              link: `font-black uppercase tracking-widest text-xs py-2 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg opacity-60 hover:opacity-100 transition-opacity`
+            }" />
+        </div>
+        <div v-if="extensionModals.length" class="flex shrink-0 flex-col gap-2">
           <component
             :is="modal.component"
             v-for="modal in extensionModals"
-            :key="`${user?.id}:${modal.key}:${modal.agencyId}`"
-            :agency-id="modal.agencyId"
+            :key="`${user?.id}:${modal.key}`"
             data-field-container="The sidebar contribution opens an extension modal with its own form.">
             <UButton
               :icon="modal.icon"

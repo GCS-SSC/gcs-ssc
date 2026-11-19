@@ -20,7 +20,7 @@ export default defineEventHandler(async event => {
     return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid_id')
   }
 
-  const extensions = await getRegisteredExtensions()
+  const extensions = (await getRegisteredExtensions()).filter(extension => extension.configurationScope !== 'system')
   return await db.transaction().setIsolationLevel('repeatable read').execute(async trx => {
     const auth = await requireFreshAuthContext(event, trx)
     await authorizeWithFreshAuthContext(event, auth, 'agency', 'read', scope)

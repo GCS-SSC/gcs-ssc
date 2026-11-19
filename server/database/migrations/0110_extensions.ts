@@ -8,6 +8,11 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 CREATE SCHEMA "extensions";
 
+CREATE TABLE "extensions"."system_enablement" (
+  "extension_key" character varying(120) PRIMARY KEY,
+  "enabled" boolean DEFAULT false NOT NULL
+);
+
 CREATE SEQUENCE "extensions"."agency_enablement_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "extensions"."agency_storage_selection_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;

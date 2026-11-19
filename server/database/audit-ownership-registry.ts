@@ -262,6 +262,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'audit.capture_policy': { kind: 'actor-agencies', whenActorMissing: 'maintenance-global' },
   'audit.change_event': { kind: 'stored-audience' },
   'audit.security_audit_event': { kind: 'stored-audience' },
+  'extensions.system_enablement': global('System extension enablement applies to the whole application'),
   'extensions.agency_enablement': agency('agency_id'),
   'extensions.agency_storage_selection': agency('agency_id'),
   'extensions.agency_notification_selection': agency('agency_id'),

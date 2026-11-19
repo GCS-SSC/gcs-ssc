@@ -66,6 +66,7 @@ export const useNavigationCatalog = (workspaces: MaybeRefOrGetter<ExtensionAgenc
     add('access', 'audit.access', 'i-lucide-eye', appRouteLocations.adminAccess(), { category: 'administration', order: 45 }, canAny('audit', 'read', ['global', 'agency']))
     add('common', 'admin_common.resources.gwcoa', 'i-lucide-database', appRouteLocations.adminGwcoa(), { category: 'administration', order: 50 }, can('system', 'read', { type: 'global' }))
     add('queues', 'queues.title', 'i-lucide-list-restart', appRouteLocations.adminQueues(), { category: 'administration', order: 60 }, can('system', 'read', { type: 'global' }))
+    add('extensions', 'extensions.tab', 'i-lucide-puzzle', appRouteLocations.adminExtensions(), { category: 'administration', order: 70 }, can('system', 'read', { type: 'global' }))
     return entries
   })
   const items = computed<NavigationMenuItem[][]>(() => {

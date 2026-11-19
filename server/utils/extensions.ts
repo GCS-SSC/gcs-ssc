@@ -7,6 +7,7 @@ import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-loc
 import { assertPaymentMutationRecoveryAllowed } from './payment-recovery-controls'
 import { publishExtensionAuditOwnership } from '../database/extension-audit-ownership'
 import { reconcileAuditCapture } from './audit-runtime'
+import { listEnabledSystemExtensionKeys } from './system-extension-enablement'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension runtime APIs receive complete documentation. */
 import { createHash } from 'node:crypto'
 import { createError, type H3Event } from 'h3'
@@ -1259,7 +1260,7 @@ export const runExtensionMigrations = async (
   return results ?? []
 }
 
-/** Applies migrations only for extensions enabled for at least one agency. */
+/** Applies migrations for system extensions and extensions enabled for at least one Agency. */
 export const runEnabledExtensionMigrations = async (
   db: Kysely<Database>,
   extensions: GcsRegisteredExtension[]
@@ -1275,12 +1276,12 @@ export const runEnabledExtensionMigrations = async (
     .distinct()
     .execute()
   const enabledKeys = new Set(enabledRows.map(row => row.extension_key))
+  const enabledSystemKeys = await listEnabledSystemExtensionKeys(db)
   const results: Array<{ extensionKey: string; results: MigrationResult[] }> = []
 
   for (const extension of extensions) {
-    if (!enabledKeys.has(extension.key)) {
-      continue
-    }
+    const keys = extension.configurationScope === 'system' ? enabledSystemKeys : enabledKeys
+    if (!keys.has(extension.key)) continue
 
     results.push({
       extensionKey: extension.key,

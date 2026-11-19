@@ -23,9 +23,20 @@ export interface ExtensionSignedInSidebarItem {
   key: string
   label: { en: string; fr: string }
   icon: string
-  agencyId: string
   componentName: string
 }
+
+export interface ExtensionSystemRegistryItem {
+  key: string
+  name: { en: string; fr: string }
+  description?: { en: string; fr: string }
+  enabled: boolean
+  workspaceComponentName?: string
+}
+
+export const ExtensionSystemToggleSchema = z.strictObject({
+  enabled: z.boolean()
+})
 
 export const AgencyNotificationProviderSelectionSchema = z.object({
   providerKey: ExtensionKeySchema
