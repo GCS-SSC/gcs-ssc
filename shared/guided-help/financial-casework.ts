@@ -465,7 +465,7 @@ export const financialCaseworkLedger: TargetLedger = {
         { key: 'casework.claims.detail.reconciliation', label: { en: 'Reconciliation', fr: 'Rapprochement' }, kind: 'section' },
         { key: 'casework.claims.detail.claims-new-reconcile-with-context', label: { en: 'Create a new reconciliation for this claim', fr: 'Créer un nouveau rapprochement pour cette demande de remboursement' }, kind: 'button' },
         { key: 'casework.claims.detail.claims-cancel-reconcile', label: { en: 'Cancel reconciliation', fr: 'Annuler le rapprochement' }, kind: 'button' },
-        { key: 'casework.claims.detail.claims-save-reconcile', label: { en: 'Save reconciliation', fr: 'Enregistrer le rapprochement' }, kind: 'button' }
+        { key: 'casework.claims.detail.claims-reconcile-all-amounts', label: { en: 'Reconcile all amounts', fr: 'Rapprocher tous les montants' }, kind: 'button' }
       ]
     },
     {
@@ -832,7 +832,7 @@ export const financialCaseworkLedger: TargetLedger = {
       key: 'casework.claim-reconciliations.reconciliation',
       label: { en: 'Claim reconciliation — Read-only access', fr: 'Rapprochement de demande — Accès en lecture seule' },
       targets: [
-        { key: 'casework.claim-reconciliations.detail.claims-save-reconcile', label: { en: 'Save reconciliation', fr: 'Enregistrer le rapprochement' }, kind: 'button' },
+        { key: 'casework.claim-reconciliations.detail.claims-reconcile-all-amounts', label: { en: 'Reconcile all amounts', fr: 'Rapprocher tous les montants' }, kind: 'button' },
         { key: 'casework.claim-reconciliations.detail.claims-cancel-reconcile', label: { en: 'Cancel reconciliation', fr: 'Annuler le rapprochement' }, kind: 'button' },
 
         { key: 'casework.claim-reconciliations.reconciliation.content', label: { en: 'Screen content', fr: 'Contenu de l’écran' }, kind: 'section' }]

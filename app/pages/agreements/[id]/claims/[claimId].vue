@@ -30,7 +30,7 @@ import type {
   FundingCaseAgreementClaimReconcileRow,
   FundingCaseAgreementClaimReconcileLineItemRow
 } from '~~/shared/types/funding-case-agreement-ui'
-import { compareMoney, formatMoneyText, parseMoney, zeroMoney, subtractMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
+import { addMoney, compareMoney, formatMoneyText, parseMoney, zeroMoney, subtractMoney, sumMoney, type Money, type MoneyInput } from '~~/shared/utils/money'
 
 type ClaimSubmissionTableRow = {
   id: string
@@ -989,8 +989,12 @@ const saveSubmission = async () => {
     const existing = activeClaimLineItems.value.find(item => String(item.id) === target.claimLineId)
     let didMutate = false
     if (existing && compareMoney(existing.egcs_fc_amount, amount) !== 0) {
+      const totalAmount = claimFundingMode.value === 'manual'
+        ? addMoney(existing.egcs_fc_totalamount, subtractMoney(amount, existing.egcs_fc_amount))
+        : undefined
       await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', {
         egcs_fc_amount: amount,
+        ...(totalAmount ? { egcs_fc_totalamount: totalAmount } : {}),
         egcs_fc_description: existing.egcs_fc_description
       })
       didMutate = true
@@ -1649,6 +1653,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                           @click="cancelReconciliation" />
                         <UButton
                           v-if="canUpdateReconcileRole"
+                          data-help-target="casework.claims.detail.claims-reconcile-all-amounts"
                           type="button"
                           icon="i-lucide-list-checks"
                           :label="t('agreement.claims.reconcile_all_amounts')"

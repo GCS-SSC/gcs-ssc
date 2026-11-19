@@ -10,10 +10,11 @@ export const useReconcileAllAmounts = () => {
   const { t } = useI18n()
 
   return async (id: string, isCurrent: () => boolean): Promise<boolean> => {
+    const route = `/api/claim-reconciliations/${id}/lines/reconcile-all` as const
     let confirmation: string | null = null
 
     while (isCurrent()) {
-      const result: ReconcileAllResult = await $fetch<ReconcileAllResult>(`/api/claim-reconciliations/${id}/lines/reconcile-all`, {
+      const result: ReconcileAllResult = await $fetch<ReconcileAllResult, typeof route>(route, {
         method: 'POST',
         body: { confirmation }
       })

@@ -661,7 +661,8 @@ const start = async (selection?: { setupId: string, chooserSession: number | nul
   if (!operation?.canDispatch() || status.value !== 'success') return
   const chooserOpening = selection?.chooserSession ?? null
   const ownsOpening = () => chooserOpening === null || chooserSession.isCurrentSession(chooserOpening)
-  const completeHelp = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, helpStartTarget, 'save-success', helpContext.value)
+  const initialStartTarget = hasTerminalResult.value ? undefined : helpStartTarget
+  const completeHelp = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, initialStartTarget, 'save-success', helpContext.value)
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
@@ -885,7 +886,6 @@ const handleApprovalChanged = async () => {
     </div>
     <div v-if="status === 'success' && purpose === 'risk_rating' && hasTerminalResult && activeWorkflowTab !== 'previous' && canShowParentAction && (roleVisibleActions || data?.canStart)" class="flex justify-end">
       <UButton
-        :data-help-target="helpStartTarget"
         :icon="workflowStartIcon"
         :label="workflowStartLabel"
         :loading="isStarting || isLoadingAvailable"

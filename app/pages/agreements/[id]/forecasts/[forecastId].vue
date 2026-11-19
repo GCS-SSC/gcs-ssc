@@ -7,7 +7,7 @@ import { useActionContext, type CapturedActionContext } from '~/composables/useA
 import { useStatusCatalog } from '~/composables/useStatusCatalog'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
-import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ExpandedState, Updater } from '@tanstack/vue-table'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -114,7 +114,7 @@ const draftFundingAmounts: Ref<Record<string, Money | null>> = ref({})
 const draftTotalAmounts: Ref<Record<string, Money>> = ref({})
 const monthlyEditorRow: Ref<ForecastBreakdownTableRow | null> = ref(null)
 const monthlyEditorOpen = ref(false)
-let monthlyEditorOwner: CapturedActionContext | null = null
+const monthlyEditorOwner: Ref<CapturedActionContext | null> = shallowRef(null)
 const monthlyEditorAmounts: Ref<Record<number, MoneyInput>> = ref({})
 const monthlyEditorOriginal: Ref<Record<number, MoneyInput>> = ref({})
 let monthlyEditorAttempted: Partial<Record<number, Money>> = {}
@@ -302,8 +302,8 @@ const openMonthlyEditor = (row: ForecastBreakdownTableRow) => {
     warnPrerequisite(toast.localized('agreement.forecasts.historical_budget_line_read_only'))
     return
   }
-  monthlyEditorOwner = breakdownAction.capture()
-  if (!monthlyEditorOwner) return
+  monthlyEditorOwner.value = breakdownAction.capture()
+  if (!monthlyEditorOwner.value) return
   monthlyEditorRow.value = row
   monthlyEditorEditableMonths.value = MONTH_KEYS.map((_key, month) => month)
     .filter(month => canEditForecastRowAmount(row, month))
@@ -313,7 +313,7 @@ const openMonthlyEditor = (row: ForecastBreakdownTableRow) => {
   monthlyEditorOpen.value = true
 }
 const isMonthlyEditorMonthEditable = (row: ForecastBreakdownTableRow, month: number) =>
-  !isSavingBreakdown.value && Boolean(monthlyEditorOwner?.isCurrent()) && (breakdownReloadRequired.value && !overview.value
+  !isSavingBreakdown.value && Boolean(monthlyEditorOwner.value?.isCurrent()) && (breakdownReloadRequired.value && !overview.value
     ? isAssigned.value && canEditForecastBreakdown.value && monthlyEditorEditableMonths.value.includes(month)
     : canEditForecastRowAmount(row, month))
 
@@ -335,7 +335,7 @@ const selectMonthlyAmount = async (event: FocusEvent) => {
 const applyMonthlyEditor = async () => {
   const row = monthlyEditorRow.value
   if (isSavingBreakdown.value || !monthlyEditorOpen.value || !row || MONTH_KEYS.some((_key, month) => isMonthlyEditorAmountInvalid(month))) return
-  const owner = monthlyEditorOwner
+  const owner = monthlyEditorOwner.value
   if (!owner?.canDispatch()) return
   const amounts = MONTH_KEYS.map((_key, month) => ({
     month,
@@ -1077,6 +1077,8 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                   <UFormField
                     v-if="canUpdateForecast && !activeForecast?.isCompleted"
                     data-field-scope="agreements.forecasts.completion"
+                    data-scope-label-en="Agreements > Forecasts > Completion"
+                    data-scope-label-fr="Ententes > Prévisions > Achèvement"
                     name="comments"
                     :label="t('assessment.completion.comment')">
                     <CommonTextarea

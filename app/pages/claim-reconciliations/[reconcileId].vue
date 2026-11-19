@@ -415,6 +415,7 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
                     @update:model-value="saveFinalState" />
                   <UButton
                     v-if="canUpdateRole"
+                    data-help-target="casework.claim-reconciliations.detail.claims-reconcile-all-amounts"
                     icon="i-lucide-list-checks"
                     :label="t('agreement.claims.reconcile_all_amounts')"
                     :loading="pendingWrite === 'all'"

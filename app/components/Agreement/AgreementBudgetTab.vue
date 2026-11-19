@@ -1513,7 +1513,12 @@ const formatSignedBudgetDifference = (value: Money) => {
                 {{ t('agreement.budget.english') }}
               </legend>
 
-              <UFormField v-if="!hideCostSubsection" :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection">
+              <UFormField
+                v-if="!hideCostSubsection"
+                :label="t('agreement.budget.cost_subsection')"
+                name="egcs_fc_costsubsection"
+                data-field-label-en="Cost subsection (English)"
+                data-field-label-fr="Sous-section de coûts (anglais)">
                 <template #label>
                   {{ t('agreement.budget.cost_subsection') }}
                   <CommonEitherLanguage v-if="requiresSubsection" fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
@@ -1526,7 +1531,11 @@ const formatSignedBudgetDifference = (value: Money) => {
                   class="w-full" />
               </UFormField>
 
-              <UFormField :label="t('common.description')" name="egcs_fc_description">
+              <UFormField
+                :label="t('common.description')"
+                name="egcs_fc_description"
+                data-field-label-en="Description (English)"
+                data-field-label-fr="Description (anglais)">
                 <template #label>
                   {{ t('common.description') }}
                   <CommonEitherLanguage fields="egcs_fc_description egcs_fc_description_fr" />
@@ -1545,7 +1554,12 @@ const formatSignedBudgetDifference = (value: Money) => {
                 {{ t('agreement.budget.french') }}
               </legend>
 
-              <UFormField v-if="!hideCostSubsection" :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection_fr">
+              <UFormField
+                v-if="!hideCostSubsection"
+                :label="t('agreement.budget.cost_subsection')"
+                name="egcs_fc_costsubsection_fr"
+                data-field-label-en="Cost subsection (French)"
+                data-field-label-fr="Sous-section de coûts (français)">
                 <template #label>
                   {{ t('agreement.budget.cost_subsection') }}
                   <CommonEitherLanguage v-if="requiresSubsection" fields="egcs_fc_costsubsection egcs_fc_costsubsection_fr" />
@@ -1558,7 +1572,12 @@ const formatSignedBudgetDifference = (value: Money) => {
                   class="w-full" />
               </UFormField>
 
-              <UFormField :label="t('common.description')" name="egcs_fc_description_fr" data-ui-target="agreement.budget-tab.line_item_description_fr">
+              <UFormField
+                :label="t('common.description')"
+                name="egcs_fc_description_fr"
+                data-ui-target="agreement.budget-tab.line_item_description_fr"
+                data-field-label-en="Description (French)"
+                data-field-label-fr="Description (français)">
                 <template #label>
                   {{ t('common.description') }}
                   <CommonEitherLanguage fields="egcs_fc_description egcs_fc_description_fr" />
