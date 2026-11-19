@@ -44,6 +44,15 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
     const control = shallowRef<ComponentPublicInstance | null>(null)
     const isRequired = computed(() => props.required === undefined ? inherited?.value ?? false : booleanAttribute(props.required))
     const isEnabled = computed(() => !form?.disabled.value && !booleanAttribute(props.disabled) && !booleanAttribute(props.readonly))
+    // Model text also arrives through attrs. Keep that change independent of the binding identity.
+    const textBinding = computed(() => {
+      if (attrs.type !== undefined && attrs.type !== 'text') return null
+      const handlers = attrs['onUpdate:modelValue']
+      return typeof handlers === 'function'
+        || (Array.isArray(handlers) && handlers.length > 0 && handlers.every(handler => typeof handler === 'function'))
+        ? handlers
+        : null
+    })
     let bilingualElement: HTMLElement | undefined
     const bilingual = options.bilingualText
       ? useBilingualFieldControl(
@@ -60,13 +69,8 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
             /** Checks model handlers and native disabled/read-only state without tracking the component ref.
              * @returns Whether the actual text control accepts a draft update.
              */
-            isEditable: () => {
-              const handlers = attrs['onUpdate:modelValue']
-              const hasHandler = typeof handlers === 'function'
-                || (Array.isArray(handlers) && handlers.length > 0 && handlers.every(handler => typeof handler === 'function'))
-              return isEnabled.value && (attrs.type === undefined || attrs.type === 'text') && hasHandler
-                && (!bilingualElement || (!bilingualElement.matches(':disabled') && !bilingualElement.hasAttribute('readonly')))
-            },
+            isEditable: () => isEnabled.value && textBinding.value !== null
+              && (!bilingualElement || (!bilingualElement.matches(':disabled') && !bilingualElement.hasAttribute('readonly'))),
             setText: value => {
               const handlers = attrs['onUpdate:modelValue']
               for (const handler of Array.isArray(handlers) ? handlers : [handlers]) (handler as (value: string) => void)(value)
