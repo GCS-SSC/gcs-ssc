@@ -1,3 +1,4 @@
+import { paginateExtensionRegistry } from '~~/server/utils/extension-registry-pagination'
 import { defineEventHandler, getRouterParam } from 'h3'
 import type { Scope } from '~~/shared/utils/scopes'
 import type { ExtensionAgencyRegistryItem } from '~~/shared/types/schemas/extensions'
@@ -68,16 +69,13 @@ export default defineEventHandler(async event => {
     }))
 
     return {
-      items,
-      total: items.length,
+      ...await paginateExtensionRegistry(event, items),
       stats: {
         total: items.length,
         active: items.filter(item => item.enabled).length,
         selectedStorageProvider: storageSelection?.provider_key ?? null,
         selectedNotificationProvider: notificationSelection?.provider_key ?? null
-      },
-      page: 1,
-      limit: items.length || 10
+      }
     }
   })
 })

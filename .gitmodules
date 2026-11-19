@@ -55,3 +55,7 @@
 	path = extensions/gcs-ssc-gcnotify
 	url = https://github.com/GCS-SSC/gcs-ssc-gcnotify.git
 	branch = main
+[submodule "extensions/gcs-feedback"]
+	path = extensions/gcs-feedback
+	url = https://github.com/GCS-SSC/gcs-feedback.git
+	branch = main

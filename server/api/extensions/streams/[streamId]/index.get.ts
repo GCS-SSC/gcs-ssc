@@ -1,3 +1,4 @@
+import { paginateExtensionRegistry } from '~~/server/utils/extension-registry-pagination'
 import { defineEventHandler, getRouterParam } from 'h3'
 import type { ExtensionStreamRegistryItem } from '~~/shared/types/schemas/extensions'
 import { authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
@@ -65,14 +66,11 @@ export default defineEventHandler(async event => {
       })
 
     return {
-      items,
-      total: items.length,
+      ...await paginateExtensionRegistry(event, items),
       stats: {
         total: items.length,
         active: items.filter(item => item.streamEnabled).length
-      },
-      page: 1,
-      limit: items.length || 10
+      }
     }
   })
 })

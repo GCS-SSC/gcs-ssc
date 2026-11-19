@@ -19,6 +19,14 @@ export const ExtensionKeySchema = z
   .max(120)
   .regex(/^[a-z][a-z0-9-]*$/, { error: 'validation.invalid_extension_key' })
 
+export interface ExtensionSignedInSidebarItem {
+  key: string
+  label: { en: string; fr: string }
+  icon: string
+  agencyId: string
+  componentName: string
+}
+
 export const AgencyNotificationProviderSelectionSchema = z.object({
   providerKey: ExtensionKeySchema
 })

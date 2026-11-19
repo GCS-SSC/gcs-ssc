@@ -258,7 +258,7 @@ const selectNotificationProvider = async (item: ExtensionAgencyRegistryItem) => 
       </template>
     </UAlert>
 
-    <div v-else-if="items.length === 0" class="text-sm text-zinc-500 dark:text-zinc-400">
+    <div v-else-if="totalRecords === 0" class="text-sm text-zinc-500 dark:text-zinc-400">
       {{ t('extensions.none_available') }}
     </div>
 

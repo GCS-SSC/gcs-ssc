@@ -4,10 +4,11 @@ import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import type { ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
+import type { ExtensionAgencyWorkspaceListItem, ExtensionSignedInSidebarItem } from '~~/shared/types/schemas/extensions'
+import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import { useNavigationCatalog } from '~/composables/useNavigationCatalog'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const abilityHelpers = useCan()
@@ -35,6 +36,30 @@ const loadAgencyWorkspaces = async () => {
   }
 }
 watch([() => route.fullPath, canLoadAgencyWorkspaces, permissionRevision], loadAgencyWorkspaces, { immediate: true })
+
+const { data: sidebarModals } = useResourceRequest<{ items: ExtensionSignedInSidebarItem[] }>({
+  identity: () => JSON.stringify([user.value?.id, permissionRevision.value, route.fullPath]),
+  enabled: computed(() => Boolean(user.value)),
+  refreshData: 'clear',
+  failureData: 'clear',
+  /**
+   * Discovers enabled sidebar destinations independently of agency read permissions.
+   * @param signal - Cancels discovery when the current session or route changes.
+   * @returns Destinations for the active account.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl('/api/extensions/sidebar-modals'), { signal })
+    if (!response.ok) throw new Error('Extension sidebar modal discovery failed')
+    return await response.json() as { items: ExtensionSignedInSidebarItem[] }
+  }
+})
+const extensionModals = computed(() => {
+  const lang = locale.value === 'fr' ? 'fr' : 'en'
+  return (sidebarModals.value?.items ?? []).flatMap(item => {
+    const component = getGcsExtensionComponent(item.componentName)
+    return component ? [{ ...item, label: item.label[lang], component }] : []
+  })
+})
 
 const { items, pages } = useNavigationCatalog(agencyWorkspaces)
 const userDisplayName = computed(() => {
@@ -142,10 +167,27 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
           :ui="{
             link: `font-black uppercase tracking-widest text-xs py-2 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg opacity-60 hover:opacity-100 transition-opacity`
           }" />
+        <div v-if="extensionModals.length" class="flex flex-col gap-2">
+          <component
+            :is="modal.component"
+            v-for="modal in extensionModals"
+            :key="`${user?.id}:${modal.key}:${modal.agencyId}`"
+            :agency-id="modal.agencyId"
+            data-field-container="The sidebar contribution opens an extension modal with its own form.">
+            <UButton
+              :icon="modal.icon"
+              :label="collapsed ? undefined : modal.label"
+              :aria-label="modal.label"
+              :title="collapsed ? modal.label : undefined"
+              :square="collapsed"
+              variant="soft"
+              block />
+          </component>
+        </div>
       </template>
 
       <template #footer="{ collapsed }">
-        <div class="flex w-full flex-col gap-4">
+        <div class="w-full">
           <UDropdownMenu
             :items="userMenuItems"
             :content="{ align: 'center', collisionPadding: 12 }"

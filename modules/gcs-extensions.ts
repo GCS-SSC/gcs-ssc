@@ -47,6 +47,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'agency-config',
   'agency-workspace',
   'agency-workspace-navigation',
+  'signed-in-sidebar-modal',
   'stream-config-modal',
   'stream-config-page',
   'entity-tabs',
@@ -329,6 +330,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.admin?.agency), 'agency-config')
   addImpliedCapability(capabilities, Boolean(definition.admin?.agencyWorkspace), 'agency-workspace')
   addImpliedCapability(capabilities, Boolean(definition.admin?.agencyWorkspace), 'agency-workspace-navigation')
+  addImpliedCapability(capabilities, Boolean(definition.signedInSidebarModal), 'signed-in-sidebar-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfig), 'stream-config-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfigPage), 'stream-config-page')
   addImpliedCapability(capabilities, (definition.client?.tabs ?? []).length > 0, 'entity-tabs')
@@ -343,7 +345,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, (definition.migrations ?? []).length > 0, 'migrations')
   addImpliedCapability(capabilities, Boolean(definition.runtime), 'runtime-resolution')
   addImpliedCapability(capabilities, (definition.assets ?? []).length > 0, 'public-assets')
-  addImpliedCapability(capabilities, Boolean(definition.admin || definition.client), 'extension-ui')
+  addImpliedCapability(capabilities, Boolean(definition.admin || definition.client || definition.signedInSidebarModal), 'extension-ui')
   addImpliedCapability(capabilities, Boolean(definition.nitroPlugin), 'extension-lifecycle-hooks')
   addImpliedCapability(capabilities, (definition.entities ?? []).length > 0, 'lifecycle-entities')
   addImpliedCapability(capabilities, Boolean(definition.agreementNumberProvider), 'agreement-number-provider')
@@ -548,6 +550,14 @@ export const validateExtensionDefinition = (definition: GcsExtensionDefinition, 
   }
   const serverHandlers = definition.serverHandlers ?? []
   validateExtensionServerHandlerRoutes(definition.key, serverHandlers)
+  const modal = definition.signedInSidebarModal
+  if (modal && (
+    !modal.label?.en?.trim() || !modal.label?.fr?.trim()
+    || !/^i-[a-z0-9]+(?:-[a-z0-9]+)+$/.test(modal.icon)
+    || typeof modal.path !== 'string' || !modal.path.endsWith('.vue')
+  )) {
+    throw new Error(`Extension ${definition.key} signed-in sidebar modal requires a bilingual label, icon and Vue component`)
+  }
   for (const [index, handler] of serverHandlers.entries()) {
     validateServerHandlerRbac(handler, index)
   }
@@ -1162,6 +1172,12 @@ const resolveExtensionDirectory = async (
 
   return {
     key: definition.key,
+    signedInSidebarModal: definition.signedInSidebarModal
+      ? {
+          ...definition.signedInSidebarModal,
+          path: await assertContainedPath(canonicalExtensionDir, definition.signedInSidebarModal.path, 'signedInSidebarModal.path')
+        }
+      : undefined,
     configurationAccess: definition.configurationAccess,
     configurationScope: definition.configurationScope,
     auditOwnership: definition.auditOwnership ? defineGcsAuditOwnership(definition.auditOwnership) : undefined,
@@ -1254,6 +1270,13 @@ const withoutComponentPath = <T extends { path: string }>(
 /** Builds browser-safe extension metadata with stable generated component names. */
 const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClientExtensionManifest => ({
   key: extension.key,
+  signedInSidebarModal: extension.signedInSidebarModal
+    ? {
+        label: extension.signedInSidebarModal.label,
+        icon: extension.signedInSidebarModal.icon,
+        componentName: componentName('ExtensionSidebarModal', extension.key)
+      }
+    : undefined,
   configurationAccess: extension.configurationAccess,
   configurationScope: extension.configurationScope,
   name: extension.name,
@@ -1567,6 +1590,9 @@ const buildExtensionComponentRegistry = (extensions: GcsResolvedExtension[]) => 
   const componentEntries: string[] = []
 
   for (const extension of extensions) {
+    if (extension.signedInSidebarModal) {
+      addComponentRegistryEntry(imports, componentEntries, 'ExtensionSidebarModal', extension.key, extension.signedInSidebarModal.path)
+    }
     if (extension.admin.agency) {
       addComponentRegistryEntry(imports, componentEntries, 'ExtensionAgency', extension.key, extension.admin.agency.path)
     }

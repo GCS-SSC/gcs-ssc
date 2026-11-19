@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { getPaginationRowModel } from '@tanstack/table-core'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
 import { useResourceRequest } from '~/composables/useResourceRequest'
@@ -43,6 +42,14 @@ const agencies = computed(() => workspace.value?.agencies.filter(agency => {
   const term = search.value.trim().toLocaleLowerCase()
   return !term || [agency.nameEn, agency.nameFr].some(name => name.toLocaleLowerCase().includes(term))
 }) ?? [])
+const visibleAgencies = computed(() => {
+  const { pageIndex, pageSize } = pagination.value
+  const start = pageIndex * pageSize
+  return agencies.value.slice(start, start + pageSize)
+})
+watch([search, extensionKey], () => {
+  pagination.value.pageIndex = 0
+})
 const columns: TableColumnInput<Agency>[] = [
   { id: 'name', headerKey: 'agency.name_en' },
   { id: 'actions', headerKey: 'common.actions' }
@@ -70,9 +77,8 @@ const columns: TableColumnInput<Agency>[] = [
         <CommonResourceLayout
           v-if="workspace"
           v-model:search="search" v-model:pagination="pagination" table-id="extensions.agencies" layout="page"
-          :data="agencies" :columns="columns" :total-records="agencies.length"
+          :data="visibleAgencies" :columns="columns" :total-records="agencies.length"
           :loading="status === 'pending'" :request-status="status"
-          :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
           :show-button="false" @retry="refresh">
           <template #name-cell="{ row }">
             <CommonBilingualName
