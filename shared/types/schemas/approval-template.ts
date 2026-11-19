@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import { SYSTEM_LIFECYCLE, type PublicationState } from '../../constants/system-lifecycle'
 import {
+  ApprovalAttachmentTypeIdsSchema,
   createApprovalTemplateCertificationBaseSchema,
   createApprovalTemplateStepBaseSchema,
   validateApprovalTemplateCertifications,
@@ -87,6 +88,8 @@ export const ApprovalTemplateStepPatchSchema = ApprovalTemplateStepBaseSchema
   .extend({
     id: RequiredId().optional(),
     egcs_cn_requiregroupdetails: z.boolean().optional(),
+    egcs_cn_allowattachments: z.boolean().optional(),
+    egcs_cn_attachmenttypeids: ApprovalAttachmentTypeIdsSchema.optional(),
     certifications: z.array(ApprovalTemplateCertificationPatchSchema).optional(),
     _deleted: z.boolean().optional()
   })
@@ -106,6 +109,8 @@ const ApprovalTemplateBaseSchema = z.object({
   egcs_cn_name_en: RequiredString(),
   egcs_cn_name_fr: RequiredString(),
   egcs_cn_allowadditionalapprovals: z.boolean().default(false),
+  egcs_cn_additionalallowattachments: z.boolean().default(false),
+  egcs_cn_additionalattachmenttypeids: ApprovalAttachmentTypeIdsSchema.default([]),
   egcs_cn_defaultaddedapprovalname_en: RequiredString().optional(),
   egcs_cn_defaultaddedapprovalname_fr: RequiredString().optional(),
   egcs_cn_allowaddedapprovalnamechanges: z.boolean().default(false),
@@ -164,6 +169,8 @@ export const ApprovalTemplatePatchSchema = ApprovalTemplateBaseSchema
   .partial()
   .extend({
     egcs_cn_allowadditionalapprovals: z.boolean().optional(),
+    egcs_cn_additionalallowattachments: z.boolean().optional(),
+    egcs_cn_additionalattachmenttypeids: ApprovalAttachmentTypeIdsSchema.optional(),
     egcs_cn_allowaddedapprovalnamechanges: z.boolean().optional(),
     egcs_cn_allowaddedapprovalcertificationchanges: z.boolean().optional(),
     steps: z.array(ApprovalTemplateStepPatchSchema).optional(),

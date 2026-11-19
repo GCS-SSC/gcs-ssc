@@ -16,6 +16,8 @@ export const createApprovalTemplateEditorStep = (
   egcs_cn_defaultuser: step?.egcs_cn_defaultuser ?? '',
   egcs_cn_defaultgroup: step?.egcs_cn_defaultgroup ?? '',
   egcs_cn_requiregroupdetails: step?.egcs_cn_requiregroupdetails ?? false,
+  egcs_cn_allowattachments: step?.egcs_cn_allowattachments ?? false,
+  egcs_cn_attachmenttypeids: [...(step?.egcs_cn_attachmenttypeids ?? [])],
   egcs_cn_approvertitle: step?.egcs_cn_approvertitle ?? '',
   certifications: (step?.certifications ?? []).map(item => createApprovalTemplateEditorCertification(item)),
   _key: nanoid()

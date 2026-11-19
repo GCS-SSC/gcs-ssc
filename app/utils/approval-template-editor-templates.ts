@@ -18,6 +18,8 @@ export const createApprovalTemplateEditorTemplate = (
   egcs_cn_name_en: approvalTemplate.egcs_cn_name_en,
   egcs_cn_name_fr: approvalTemplate.egcs_cn_name_fr,
   egcs_cn_allowadditionalapprovals: approvalTemplate.egcs_cn_allowadditionalapprovals,
+  egcs_cn_additionalallowattachments: approvalTemplate.egcs_cn_additionalallowattachments ?? false,
+  egcs_cn_additionalattachmenttypeids: [...(approvalTemplate.egcs_cn_additionalattachmenttypeids ?? [])],
   egcs_cn_defaultaddedapprovalname_en: approvalTemplate.egcs_cn_defaultaddedapprovalname_en,
   egcs_cn_defaultaddedapprovalname_fr: approvalTemplate.egcs_cn_defaultaddedapprovalname_fr,
   egcs_cn_allowaddedapprovalnamechanges: approvalTemplate.egcs_cn_allowaddedapprovalnamechanges,

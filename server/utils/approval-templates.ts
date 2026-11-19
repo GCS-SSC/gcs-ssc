@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
 import { readPublicationMetadataBatch } from './system-publication'
+import { publishedAttachmentPolicy, publishedStepAttachmentPolicy } from './approval-template-versioning'
 import type { Database } from '~~/shared/types/database'
 import type {
   ApprovalTemplate,
@@ -26,6 +27,8 @@ type ApprovalStepRow = {
   egcs_cn_defaultuser?: string | number | null
   egcs_cn_defaultgroup?: string | number | null
   egcs_cn_requiregroupdetails?: boolean
+  egcs_cn_allowattachments?: boolean
+  egcs_cn_attachmenttypeids?: string[]
   egcs_cn_approvertitle: string
 }
 
@@ -79,6 +82,8 @@ type ApprovalTemplateStepInput = {
   egcs_cn_defaultuser?: string | null
   egcs_cn_defaultgroup?: string | null
   egcs_cn_requiregroupdetails?: boolean
+  egcs_cn_allowattachments?: boolean
+  egcs_cn_attachmenttypeids?: string[]
   egcs_cn_approvertitle?: string
   certifications?: ApprovalTemplateCertificationInput[]
 }
@@ -201,6 +206,8 @@ export const listApprovalTemplates = async (
       egcs_cn_name_en: template.egcs_cn_name_en,
       egcs_cn_name_fr: template.egcs_cn_name_fr,
       egcs_cn_allowadditionalapprovals: template.egcs_cn_allowadditionalapprovals,
+      egcs_cn_additionalallowattachments: template.egcs_cn_additionalallowattachments ?? false,
+      egcs_cn_additionalattachmenttypeids: template.egcs_cn_additionalattachmenttypeids ?? [],
       egcs_cn_defaultaddedapprovalname_en: template.egcs_cn_defaultaddedapprovalname_en ?? undefined,
       egcs_cn_defaultaddedapprovalname_fr: template.egcs_cn_defaultaddedapprovalname_fr ?? undefined,
       egcs_cn_allowaddedapprovalnamechanges: template.egcs_cn_allowaddedapprovalnamechanges,
@@ -226,6 +233,8 @@ export const listApprovalTemplates = async (
         egcs_cn_defaultuser: step.egcs_cn_defaultuser ? String(step.egcs_cn_defaultuser) : null,
         egcs_cn_defaultgroup: step.egcs_cn_defaultgroup ? String(step.egcs_cn_defaultgroup) : null,
         egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails ?? false,
+        egcs_cn_allowattachments: step.egcs_cn_allowattachments ?? false,
+        egcs_cn_attachmenttypeids: step.egcs_cn_attachmenttypeids ?? [],
         egcs_cn_approvertitle: step.egcs_cn_approvertitle,
         certifications: (certificationsByStepId.get(String(step.id)) ?? []).map(certification => ({
           id: String(certification.id),
@@ -249,6 +258,7 @@ export const listApprovalTemplates = async (
       descriptionEn: item.egcs_cn_description_en,
       descriptionFr: item.egcs_cn_description_fr,
       allowAdditionalApprovals: item.egcs_cn_allowadditionalapprovals,
+      ...publishedAttachmentPolicy(item),
       ...(item.egcs_cn_defaultaddedapprovalname_en
         ? { defaultAddedApprovalNameEn: item.egcs_cn_defaultaddedapprovalname_en }
         : {}),
@@ -275,6 +285,7 @@ export const listApprovalTemplates = async (
         ...(step.egcs_cn_defaultuser ? { defaultUser: step.egcs_cn_defaultuser } : {}),
         ...(step.egcs_cn_defaultgroup ? { defaultGroup: step.egcs_cn_defaultgroup } : {}),
         ...(step.egcs_cn_defaultgroup && step.egcs_cn_requiregroupdetails ? { requireGroupDetails: true } : {}),
+        ...publishedStepAttachmentPolicy(step),
         certifications: step.certifications.map(certification => ({
           optional: certification.egcs_cn_optional === true,
           certificationEn: certification.egcs_cn_certification_en,
@@ -404,6 +415,8 @@ export const mergeApprovalTemplatePatch = (
     egcs_cn_name_en: patch.egcs_cn_name_en ?? existing.egcs_cn_name_en,
     egcs_cn_name_fr: patch.egcs_cn_name_fr ?? existing.egcs_cn_name_fr,
     egcs_cn_allowadditionalapprovals: patch.egcs_cn_allowadditionalapprovals ?? existing.egcs_cn_allowadditionalapprovals,
+    egcs_cn_additionalallowattachments: patch.egcs_cn_additionalallowattachments ?? existing.egcs_cn_additionalallowattachments,
+    egcs_cn_additionalattachmenttypeids: patch.egcs_cn_additionalattachmenttypeids ?? existing.egcs_cn_additionalattachmenttypeids,
     egcs_cn_defaultaddedapprovalname_en: patch.egcs_cn_defaultaddedapprovalname_en ?? existing.egcs_cn_defaultaddedapprovalname_en,
     egcs_cn_defaultaddedapprovalname_fr: patch.egcs_cn_defaultaddedapprovalname_fr ?? existing.egcs_cn_defaultaddedapprovalname_fr,
     egcs_cn_allowaddedapprovalnamechanges: patch.egcs_cn_allowaddedapprovalnamechanges ?? existing.egcs_cn_allowaddedapprovalnamechanges,
@@ -656,6 +669,8 @@ const getApprovalTemplateWriteValues = (
   egcs_cn_name_en: input.payload.egcs_cn_name_en ?? '',
   egcs_cn_name_fr: input.payload.egcs_cn_name_fr ?? '',
   egcs_cn_allowadditionalapprovals: input.payload.egcs_cn_allowadditionalapprovals ?? false,
+  egcs_cn_additionalallowattachments: input.payload.egcs_cn_additionalallowattachments ?? false,
+  egcs_cn_additionalattachmenttypeids: input.payload.egcs_cn_additionalattachmenttypeids ?? [],
   egcs_cn_defaultaddedapprovalname_en: input.payload.egcs_cn_defaultaddedapprovalname_en,
   egcs_cn_defaultaddedapprovalname_fr: input.payload.egcs_cn_defaultaddedapprovalname_fr,
   egcs_cn_allowaddedapprovalnamechanges: input.payload.egcs_cn_allowaddedapprovalnamechanges ?? false,
@@ -700,6 +715,8 @@ const getApprovalStepWriteValues = (
   egcs_cn_defaultuser: step.egcs_cn_defaultuser ?? null,
   egcs_cn_defaultgroup: step.egcs_cn_defaultgroup ?? null,
   egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails ?? false,
+  egcs_cn_allowattachments: step.egcs_cn_allowattachments ?? false,
+  egcs_cn_attachmenttypeids: step.egcs_cn_attachmenttypeids ?? [],
   egcs_cn_approvertitle: step.egcs_cn_approvertitle ?? '',
   egcs_cn_approvaltemplate: templateId,
   _deleted: false
@@ -725,6 +742,8 @@ const saveApprovalStep = async (
       ...(step.egcs_cn_defaultuser === undefined ? {} : { egcs_cn_defaultuser: step.egcs_cn_defaultuser }),
       ...(step.egcs_cn_defaultgroup === undefined ? {} : { egcs_cn_defaultgroup: step.egcs_cn_defaultgroup }),
       ...(step.egcs_cn_requiregroupdetails === undefined ? {} : { egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails }),
+      ...(step.egcs_cn_allowattachments === undefined ? {} : { egcs_cn_allowattachments: step.egcs_cn_allowattachments }),
+      ...(step.egcs_cn_attachmenttypeids === undefined ? {} : { egcs_cn_attachmenttypeids: step.egcs_cn_attachmenttypeids }),
       ...(step.egcs_cn_approvertitle === undefined ? {} : { egcs_cn_approvertitle: step.egcs_cn_approvertitle })
     }
 

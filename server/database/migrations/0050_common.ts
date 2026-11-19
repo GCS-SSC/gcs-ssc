@@ -175,6 +175,9 @@ CREATE TABLE "Common_Address" (
 );
 
 CREATE TABLE "Common_Approval" (
+  "egcs_cn_allowattachments" boolean NOT NULL DEFAULT false,
+  "egcs_cn_attachmenttypeids" text[] NOT NULL DEFAULT '{}',
+  "egcs_cn_attachmentrevision" bigint NOT NULL DEFAULT 0,
   "id" bigint DEFAULT nextval('"Common_Approval_id_seq"'::regclass) NOT NULL,
   "egcs_cn_runtimeitem" bigint NOT NULL,
   "egcs_cn_sequence" numeric NOT NULL,
@@ -193,7 +196,6 @@ CREATE TABLE "Common_Approval" (
   "egcs_cn_isadded" boolean NOT NULL,
   "egcs_cn_approvalvalue" boolean,
   "egcs_cn_approvaldate" timestamp with time zone,
-  "egcs_cn_attachment" bigint,
   "egcs_cn_comment" text,
   "egcs_cn_defaultgroup" bigint,
   "egcs_cn_assignedgroup" bigint,
@@ -207,6 +209,20 @@ CREATE TABLE "Common_Approval" (
 
 CREATE UNIQUE INDEX cn_idx_approvalroutingslipsequence ON "Common_Approval" USING btree (egcs_cn_routingslip, egcs_cn_sequence);
 
+CREATE TABLE "Common_Approval_Attachment" (
+  id bigserial PRIMARY KEY,
+  egcs_cn_approval bigint NOT NULL REFERENCES "Common_Approval"(id) ON DELETE RESTRICT,
+  egcs_cn_attachment bigint NOT NULL UNIQUE,
+  egcs_cn_uploadedby bigint NOT NULL,
+  egcs_cn_typename_en text NOT NULL,
+  egcs_cn_typename_fr text NOT NULL,
+  egcs_cn_submitted boolean NOT NULL DEFAULT false,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT cn_chk_approval_attachment_live_evidence CHECK (NOT (egcs_cn_submitted AND _deleted))
+);
+
+CREATE INDEX cn_idx_approval_attachment_step ON "Common_Approval_Attachment" (egcs_cn_approval) WHERE _deleted = false;
+
 CREATE TABLE "Common_Approval_Certification" (
   "id" bigint DEFAULT nextval('"Common_Approval_Certification_id_seq"'::regclass) NOT NULL,
   "egcs_cn_optional" boolean NOT NULL,
@@ -218,6 +234,8 @@ CREATE TABLE "Common_Approval_Certification" (
 );
 
 CREATE TABLE "Common_Approval_Step" (
+  "egcs_cn_allowattachments" boolean NOT NULL DEFAULT false,
+  "egcs_cn_attachmenttypeids" text[] NOT NULL DEFAULT '{}',
   "id" bigint DEFAULT nextval('"Common_Approval_Step_id_seq"'::regclass) NOT NULL,
   "egcs_cn_sequence" integer NOT NULL,
   "egcs_cn_description_en" text NOT NULL,
@@ -239,6 +257,8 @@ CREATE UNIQUE INDEX cn_idx_approvalstepapprovaltemplatenameen ON "Common_Approva
 CREATE UNIQUE INDEX cn_idx_approvalstepapprovaltemplatenamefr ON "Common_Approval_Step" USING btree (egcs_cn_approvaltemplate, egcs_cn_name_fr) WHERE (_deleted = false);
 
 CREATE TABLE "Common_Approval_Template" (
+  "egcs_cn_additionalallowattachments" boolean NOT NULL DEFAULT false,
+  "egcs_cn_additionalattachmenttypeids" text[] NOT NULL DEFAULT '{}',
   "id" bigint NOT NULL,
   "egcs_cn_description_en" text NOT NULL,
   "egcs_cn_description_fr" text NOT NULL,
@@ -916,6 +936,8 @@ CREATE UNIQUE INDEX cn_idx_reviewsetupreviewsetorder ON "Common_Review_Setup" US
 CREATE UNIQUE INDEX cn_idx_reviewsetupreviewsetschema ON "Common_Review_Setup" USING btree (egcs_cn_reviewset, egcs_cn_reviewschema) WHERE (_deleted = false);
 
 CREATE TABLE "Common_Routing_Slip" (
+  "egcs_cn_additionalallowattachments" boolean NOT NULL DEFAULT false,
+  "egcs_cn_additionalattachmenttypeids" text[] NOT NULL DEFAULT '{}',
   "id" bigint DEFAULT nextval('"Common_Routing_Slip_id_seq"'::regclass) NOT NULL,
   "egcs_cn_entitytype" character varying(128) NOT NULL,
   "egcs_cn_entityid" bigint NOT NULL,
@@ -2328,6 +2350,94 @@ AS $function$
           OLD.id, OLD.egcs_cn_approvalvalue;
       END IF;
 
+      RETURN NEW;
+    END;
+    $function$;
+
+CREATE FUNCTION discard_approval_attachment_drafts(approval_ids bigint[])
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM "Common_Approval_Attachment"
+        WHERE egcs_cn_approval = ANY(approval_ids) AND NOT _deleted AND NOT egcs_cn_submitted
+      ) THEN RETURN; END IF;
+      WITH discarded AS (
+        UPDATE "Common_Approval_Attachment"
+        SET _deleted = true
+        WHERE egcs_cn_approval = ANY(approval_ids) AND NOT _deleted AND NOT egcs_cn_submitted
+        RETURNING egcs_cn_attachment
+      ), objects AS (
+        UPDATE "Common_Attachment" a
+        SET _deleted = true
+        FROM discarded d, "Common_Attachment_Types" t
+        WHERE a.id = d.egcs_cn_attachment AND t.id = a.egcs_cn_attachmenttype
+        RETURNING a.egcs_cn_provider, a.egcs_cn_providerobjectid, a.egcs_cn_providerlocator, t.egcs_cn_agency
+      )
+      INSERT INTO storage_cleanup_outbox (provider_key, agency_id, purpose, object_id, locator)
+        SELECT egcs_cn_provider, egcs_cn_agency, 'attachment', egcs_cn_providerobjectid, egcs_cn_providerlocator
+        FROM objects;
+    END;
+    $function$;
+
+CREATE FUNCTION trg_fn_sync_approval_attachments()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW.egcs_cn_assigneduser IS DISTINCT FROM OLD.egcs_cn_assigneduser
+        OR NEW.egcs_cn_assignedgroup IS DISTINCT FROM OLD.egcs_cn_assignedgroup THEN
+        PERFORM discard_approval_attachment_drafts(ARRAY[OLD.id]);
+        NEW.egcs_cn_attachmentrevision := OLD.egcs_cn_attachmentrevision + 1;
+      ELSIF NEW.egcs_cn_approvalvalue IS NOT NULL AND OLD.egcs_cn_approvalvalue IS NULL THEN
+        UPDATE "Common_Approval_Attachment" SET egcs_cn_submitted = true
+        WHERE egcs_cn_approval = OLD.id AND NOT _deleted
+          AND egcs_cn_uploadedby = COALESCE(OLD.egcs_cn_assigneduser, OLD.egcs_cn_defaultuser);
+      END IF;
+      RETURN NEW;
+    END;
+    $function$;
+
+CREATE FUNCTION trg_fn_discard_terminal_approval_drafts()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    DECLARE approval_ids bigint[];
+    BEGIN
+      SELECT ARRAY(
+        SELECT a.id
+        FROM "Common_Approval" a
+        JOIN "Common_Runtime_Item" step ON step.id = a.egcs_cn_runtimeitem
+        WHERE a.egcs_cn_approvalvalue IS NULL
+          AND CASE WHEN TG_TABLE_NAME = 'Common_Runtime'
+            THEN step.egcs_cn_runtime = NEW.id
+            ELSE step.id = NEW.id OR step.egcs_cn_parentruntimeitem = NEW.id END
+          AND EXISTS (
+            SELECT 1 FROM "Common_Approval_Attachment" file
+            WHERE file.egcs_cn_approval = a.id AND NOT file._deleted AND NOT file.egcs_cn_submitted
+          )
+      ) INTO approval_ids;
+      IF cardinality(approval_ids) > 0 THEN
+        PERFORM discard_approval_attachment_drafts(approval_ids);
+      END IF;
+      RETURN NEW;
+    END;
+    $function$;
+
+CREATE FUNCTION trg_fn_lock_approval_attachment_evidence()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF OLD.egcs_cn_submitted OR TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'Approval attachment evidence is immutable' USING ERRCODE = '23514';
+      END IF;
+      IF (NEW.egcs_cn_approval, NEW.egcs_cn_attachment, NEW.egcs_cn_uploadedby, NEW.egcs_cn_typename_en, NEW.egcs_cn_typename_fr)
+        IS DISTINCT FROM
+        (OLD.egcs_cn_approval, OLD.egcs_cn_attachment, OLD.egcs_cn_uploadedby, OLD.egcs_cn_typename_en, OLD.egcs_cn_typename_fr) THEN
+        RAISE EXCEPTION 'Approval attachment context is immutable' USING ERRCODE = '23514';
+      END IF;
       RETURN NEW;
     END;
     $function$;
@@ -4052,7 +4162,9 @@ ALTER TABLE "Common_Approval" ADD CONSTRAINT "Common_Approval_egcs_cn_assignedgr
 
 ALTER TABLE "Common_Approval" ADD CONSTRAINT "Common_Approval_egcs_cn_assigneduser_fkey" FOREIGN KEY (egcs_cn_assigneduser) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Approval" ADD CONSTRAINT "Common_Approval_egcs_cn_attachment_fkey" FOREIGN KEY (egcs_cn_attachment) REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Approval_Attachment" ADD CONSTRAINT cn_fk_approval_attachment FOREIGN KEY (egcs_cn_attachment) REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Common_Approval_Attachment" ADD CONSTRAINT cn_fk_approval_attachment_uploader FOREIGN KEY (egcs_cn_uploadedby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Approval" ADD CONSTRAINT "Common_Approval_egcs_cn_defaultgroup_fkey" FOREIGN KEY (egcs_cn_defaultgroup) REFERENCES "Common_Group"(id) ON DELETE RESTRICT;
 
@@ -4394,6 +4506,19 @@ CREATE TRIGGER trg_validate_added_approval_runtime_step BEFORE INSERT ON "Common
 CREATE TRIGGER trg_validate_approval_runtime_item BEFORE INSERT OR UPDATE ON "Common_Approval" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_approval_runtime_item();
 
 CREATE TRIGGER trg_validate_claimant_approval_evidence BEFORE UPDATE OF egcs_cn_approvalvalue ON "Common_Approval" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_claimant_approval_evidence();
+
+CREATE TRIGGER trg_sync_approval_attachments BEFORE UPDATE OF egcs_cn_assigneduser, egcs_cn_assignedgroup, egcs_cn_approvalvalue ON "Common_Approval" FOR EACH ROW EXECUTE FUNCTION trg_fn_sync_approval_attachments();
+
+CREATE TRIGGER trg_lock_approval_attachment_evidence BEFORE UPDATE OR DELETE ON "Common_Approval_Attachment" FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_approval_attachment_evidence();
+
+CREATE TRIGGER trg_discard_terminal_approval_drafts AFTER UPDATE OF egcs_cn_state ON "Common_Runtime" FOR EACH ROW
+  WHEN (OLD.egcs_cn_state IS DISTINCT FROM NEW.egcs_cn_state AND NEW.egcs_cn_state IN ('succeeded', 'approved', 'unsuccessful', 'denied', 'cancelled', 'failed'))
+  EXECUTE FUNCTION trg_fn_discard_terminal_approval_drafts();
+
+CREATE TRIGGER trg_discard_terminal_approval_drafts AFTER UPDATE OF egcs_cn_state ON "Common_Runtime_Item" FOR EACH ROW
+  WHEN (OLD.egcs_cn_state IS DISTINCT FROM NEW.egcs_cn_state AND NEW.egcs_cn_state IN ('succeeded', 'approved', 'unsuccessful', 'denied', 'cancelled', 'failed')
+        AND NEW.egcs_cn_kind IN ('approval_step', 'routing_slip'))
+  EXECUTE FUNCTION trg_fn_discard_terminal_approval_drafts();
 
 CREATE TRIGGER trg_lock_approval_certification_evidence BEFORE DELETE OR UPDATE ON "Common_Approval_Certification" FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_approval_certification_evidence();
 

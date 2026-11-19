@@ -24,6 +24,24 @@ export default defineEventHandler(async event => {
     if (definition.steps.length === 0) {
       return await badRequest(event, 'APPROVAL_TEMPLATE_STEPS_REQUIRED', 'validation.approval_template_steps_required')
     }
+    const attachmentPolicies = definition.steps.filter(step => step.allowAttachments).map(step => step.attachmentTypeIds ?? [])
+    if (definition.additionalAllowAttachments) attachmentPolicies.push(definition.additionalAttachmentTypeIds ?? [])
+    if (attachmentPolicies.some(ids => ids.length === 0)) {
+      return await badRequest(event, 'APPROVAL_TEMPLATE_ATTACHMENT_TYPES_REQUIRED', 'validation.approval_template_attachment_types_required')
+    }
+    const attachmentTypeIds = [...new Set(attachmentPolicies.flat())]
+    if (attachmentTypeIds.length > 0) {
+      const activeTypes = await trx.selectFrom('Common_Attachment_Types').select('id')
+        .where('egcs_cn_agency', '=', agencyId)
+        .where('_deleted', '=', false)
+        .where('id', 'in', attachmentTypeIds)
+        .orderBy('id')
+        .forShare()
+        .execute()
+      if (activeTypes.length !== attachmentTypeIds.length) {
+        return await badRequest(event, 'APPROVAL_TEMPLATE_ATTACHMENT_TYPES_INVALID', 'validation.approval_template_attachment_types_invalid')
+      }
+    }
     await publishApprovalTemplate(trx, template, actor.id)
     return await getApprovalTemplate(trx, templateId)
   })

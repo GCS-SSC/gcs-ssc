@@ -18,6 +18,8 @@ const buildApprovalTemplateBody = (state: ApprovalTemplate & { id?: string }) =>
   egcs_cn_description_en: state.egcs_cn_description_en,
   egcs_cn_description_fr: state.egcs_cn_description_fr,
   egcs_cn_allowadditionalapprovals: state.egcs_cn_allowadditionalapprovals,
+  egcs_cn_additionalallowattachments: state.egcs_cn_additionalallowattachments,
+  egcs_cn_additionalattachmenttypeids: state.egcs_cn_additionalattachmenttypeids,
   egcs_cn_defaultaddedapprovalname_en: state.egcs_cn_defaultaddedapprovalname_en,
   egcs_cn_defaultaddedapprovalname_fr: state.egcs_cn_defaultaddedapprovalname_fr,
   egcs_cn_allowaddedapprovalnamechanges: state.egcs_cn_allowaddedapprovalnamechanges,

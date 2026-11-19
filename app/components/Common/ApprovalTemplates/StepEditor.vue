@@ -10,9 +10,10 @@ import type { ApprovalTemplateEditorStep } from '~/types/approval-template-edito
 const open = defineModel<boolean>('open', { default: false })
 const step = defineModel<ApprovalTemplateEditorStep | null>('step', { required: true })
 
-const { mode, approvalTemplateId, actionContext } = defineProps<{
+const { mode, approvalTemplateId, actionContext, agencyId } = defineProps<{
   mode: 'create' | 'edit'
   approvalTemplateId: string
+  agencyId?: string
   actionContext: ActionContext
 }>()
 
@@ -62,7 +63,7 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
       <UForm v-if="step" v-bind="formSession" :state="validationState" :validate="validate" class="flex h-full flex-col">
         <div class="flex-1 overflow-y-auto p-6 lg:p-8">
           <div class="mx-auto w-full max-w-6xl space-y-8 pb-12">
-            <CommonApprovalTemplatesStepFields v-model:step="step" :approval-template-id="approvalTemplateId" />
+            <CommonApprovalTemplatesStepFields v-model:step="step" :approval-template-id="approvalTemplateId" :agency-id="agencyId" />
           </div>
         </div>
 

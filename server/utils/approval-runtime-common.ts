@@ -37,7 +37,7 @@ export type RuntimeApprovalRow = {
   egcs_cn_isadded: boolean
   egcs_cn_approvalvalue: boolean | null | undefined
   egcs_cn_approvaldate: string | Date | null | undefined
-  egcs_cn_attachment: string | null | undefined
+  egcs_cn_allowattachments?: boolean
   egcs_cn_comment: string | null | undefined
   default_user_name: string | null
   default_user_position_title: string | null
@@ -139,7 +139,7 @@ export const getRuntimeApprovals = async (
       'Common_Approval.egcs_cn_isadded as egcs_cn_isadded',
       'Common_Approval.egcs_cn_approvalvalue as egcs_cn_approvalvalue',
       'Common_Approval.egcs_cn_approvaldate as egcs_cn_approvaldate',
-      'Common_Approval.egcs_cn_attachment as egcs_cn_attachment',
+      'Common_Approval.egcs_cn_allowattachments as egcs_cn_allowattachments',
       'Common_Approval.egcs_cn_comment as egcs_cn_comment',
       'DefaultUser.egcs_cn_name as default_user_name',
       'DefaultUser.egcs_cn_positiontitle as default_user_position_title',
@@ -170,7 +170,6 @@ export const getRuntimeApprovals = async (
     egcs_cn_assigneduser: normalizeId(approval.egcs_cn_assigneduser),
     egcs_cn_assignedgroup: normalizeId(approval.egcs_cn_assignedgroup),
     egcs_cn_onbehalf: normalizeId(approval.egcs_cn_onbehalf),
-    egcs_cn_attachment: normalizeId(approval.egcs_cn_attachment),
     onbehalf_name_en: approval.onbehalf_name_en ?? null,
     onbehalf_name_fr: approval.onbehalf_name_fr ?? null,
     onbehalf_require_actual: approval.onbehalf_require_actual ?? null,
@@ -340,7 +339,7 @@ export const buildRuntimeApprovalSteps = ({
     egcs_cn_isadded: approval.egcs_cn_isadded,
     egcs_cn_approvalvalue: approval.egcs_cn_approvalvalue,
     egcs_cn_approvaldate: formatApprovalDate(approval.egcs_cn_approvaldate),
-    egcs_cn_attachment: approval.egcs_cn_attachment,
+    egcs_cn_allowattachments: approval.egcs_cn_allowattachments ?? false,
     egcs_cn_comment: approval.egcs_cn_comment ?? '',
     runtimeItemId: approval.runtimeItemId,
     runtimeState: approval.runtimeState,
@@ -640,6 +639,8 @@ export const addRuntimeApprovalStep = async (
       egcs_cn_requiregroupdetails: body.egcs_cn_assignedgroup ? body.egcs_cn_requiregroupdetails : false,
       egcs_cn_assigneduser: body.egcs_cn_assigneduser,
       egcs_cn_assignedgroup: body.egcs_cn_assignedgroup,
+      egcs_cn_allowattachments: routingSlip.egcs_cn_additionalallowattachments ?? false,
+      egcs_cn_attachmenttypeids: routingSlip.egcs_cn_additionalattachmenttypeids ?? [],
       egcs_cn_isadded: true
     })
     .returningAll()

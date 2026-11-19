@@ -8,11 +8,13 @@ import { useCrudModalPending } from '~/composables/useCrudModal'
 import { computed, effectScope, onBeforeUnmount, ref, shallowReactive, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import { approvalAttachmentUrl } from '~/components/Common/Approvals/attachments'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import { AttachmentMetadataBaseSchema } from '~~/shared/types/schemas'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
+import type { AttachmentSource } from '~~/shared/types/attachment-source'
 
 type JsonObject = Record<string, unknown>
 
@@ -35,6 +37,7 @@ interface AttachmentItem {
   provider_metadata?: JsonObject | null
   provider_metadata_component_name?: string | null
   provider_metadata_mutability?: 'upload-only' | 'editable' | null
+  source?: AttachmentSource
   can_update_role?: boolean
   can_delete_role?: boolean
   can_update?: boolean
@@ -143,6 +146,7 @@ const rowActionKey = (id: string) => `${requestUrl.value}\u0000${id}`
 watch([items, status, requestUrl], () => {
   if (status.value !== 'success') return
   for (const item of items.value) {
+    if (item.source?.kind === 'approval') continue
     const key = rowActionKey(item.id)
     if (rowActions.has(key)) continue
     const requestedUrl = requestUrl.value
@@ -200,6 +204,7 @@ const columns: TableColumnInput<AttachmentItem>[] = [
   { accessorKey: 'mime_type', headerKey: 'attachments.mime_type' },
   { id: 'size', headerKey: 'attachments.size' },
   { id: 'uploaded', headerKey: 'attachments.uploaded' },
+  { id: 'source', headerKey: 'attachments.source' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -213,6 +218,8 @@ const formatSize = (value: string | number): string => {
   if (bytes < 1024 * 1024) return `${format(bytes / 1024)} KB`
   return `${format(bytes / (1024 * 1024))} MB`
 }
+const getUploaderName = (item: AttachmentItem) => item.uploaded_by_name ?? item.uploader_name ?? t('common.not_available')
+
 const formatUploadedAt = (value: string): string => formatDate(value) || t('common.not_available')
 
 const cloneJsonObject = (value: JsonObject): JsonObject => JSON.parse(JSON.stringify(value)) as JsonObject
@@ -237,7 +244,7 @@ const openUpload = () => {
 }
 
 const openEdit = (item: AttachmentItem) => {
-  if (status.value !== 'success') return
+  if (status.value !== 'success' || item.source?.kind === 'approval') return
   if (item.can_update !== true) {
     warnPrerequisite()
     return
@@ -438,9 +445,15 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
 
 const download = async (item: AttachmentItem) => {
   if (status.value !== 'success') return
+  const acceptedItem = items.value.find(row => row.id === item.id)
+  if (!acceptedItem) return
+  const { source } = acceptedItem
+  const path = source?.kind === 'approval'
+    ? `${approvalAttachmentUrl(source.approvalId, source.attachmentId)}/download`
+    : withAgency(`${baseUrl.value}/${item.id}/download`)
   const generation = identityGeneration
   try {
-    const responseValue = await fetch(getClientRequestUrl(withAgency(`${baseUrl.value}/${item.id}/download`)))
+    const responseValue = await fetch(getClientRequestUrl(path))
     if (!responseValue.ok) await throwFetchResponseError(responseValue)
     const blob = await responseValue.blob()
     if (generation !== identityGeneration) return
@@ -458,7 +471,7 @@ const download = async (item: AttachmentItem) => {
 const remove = async (item: AttachmentItem) => {
   if (status.value !== 'success' || isDeletingAttachment(item.id)) return
   const acceptedItem = items.value.find(row => row.id === item.id)
-  if (!acceptedItem?.can_delete_role) return
+  if (!acceptedItem?.can_delete_role || acceptedItem.source?.kind === 'approval') return
   if (acceptedItem.can_delete !== true) {
     warnPrerequisite()
     return
@@ -550,16 +563,90 @@ const retryAttachmentList = async () => {
         {{ formatSize(row.original.file_size) }}
       </template>
       <template #uploaded-cell="{ row }">
-        <div>{{ row.original.uploaded_by_name ?? row.original.uploader_name ?? t('common.not_available') }}</div>
+        <div>{{ getUploaderName(row.original) }}</div>
         <div class="text-xs text-muted">
           {{ formatUploadedAt(row.original.uploaded_at) }}
         </div>
       </template>
+      <template #source-cell="{ row }">
+        <template v-if="status === 'success'">
+          <CommonRecordSource
+            v-if="row.original.source?.kind === 'approval'"
+            :key="rowActionKey(row.original.id)"
+            :label="t('attachments.source_approval')"
+            :button-label="t('attachments.view_approval_source', { name: getAttachmentLabel(row.original) })"
+            :title="t('attachments.approval_source_title')"
+            :description="getAttachmentLabel(row.original)">
+            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('workflow.title') }}
+                </dt>
+                <dd><CommonBilingualName :name-en="row.original.source.workflowNameEn" :name-fr="row.original.source.workflowNameFr" /></dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('workflow.attempt') }}
+                </dt>
+                <dd>{{ row.original.source.attempt }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('workflow.step') }}
+                </dt>
+                <dd><CommonBilingualName :name-en="row.original.source.stepNameEn" :name-fr="row.original.source.stepNameFr" /></dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('assessment.approvals.decision') }}
+                </dt>
+                <dd><CommonLifecycleBadge engine="runtime" :state="row.original.source.approved ? 'approved' : 'denied'" /></dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('assessment.approvals.approver_name') }}
+                </dt>
+                <dd>{{ row.original.source.approverName || t('common.not_available') }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('assessment.approvals.decision_date') }}
+                </dt>
+                <dd>{{ row.original.source.decidedAt ? formatUploadedAt(row.original.source.decidedAt) : t('common.not_available') }}</dd>
+              </div>
+            </dl>
+          </CommonRecordSource>
+          <CommonRecordSource
+            v-else
+            :key="`${rowActionKey(row.original.id)}:direct`"
+            :label="t('attachments.source_entity')"
+            :button-label="t('attachments.view_direct_source', { name: getAttachmentLabel(row.original) })"
+            :title="t('attachments.source_entity')"
+            :description="getAttachmentLabel(row.original)">
+            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('attachments.source_uploaded_by') }}
+                </dt>
+                <dd>{{ getUploaderName(row.original) }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('attachments.source_uploaded_at') }}
+                </dt>
+                <dd>{{ formatUploadedAt(row.original.uploaded_at) }}</dd>
+              </div>
+            </dl>
+          </CommonRecordSource>
+        </template>
+      </template>
       <template #actions-cell="{ row }">
         <div v-if="status === 'success'" class="flex items-center justify-end gap-1">
           <CommonActionButton icon="i-lucide-download" color="neutral" variant="ghost" :aria-label="`${t('common.download')}: ${getAttachmentLabel(row.original)}`" @click="download(row.original)" />
-          <CommonActionButton v-if="row.original.can_update_role" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
-          <CommonActionButton v-if="row.original.can_delete_role" :loading="isDeletingAttachment(row.original.id)" :disabled="isDeletingAttachment(row.original.id)" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
+          <template v-if="row.original.source?.kind !== 'approval'">
+            <CommonActionButton v-if="row.original.can_update_role" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
+            <CommonActionButton v-if="row.original.can_delete_role" :loading="isDeletingAttachment(row.original.id)" :disabled="isDeletingAttachment(row.original.id)" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
+          </template>
         </div>
       </template>
     </CommonResourceLayout>

@@ -301,7 +301,7 @@ watch(selectedSection, value => {
                   :title="t('approval_templates.additional_approvals.title')"
                   role="tabpanel"
                   :aria-label="t('approval_templates.additional_approvals.title')">
-                  <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" />
+                  <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" :agency-id="props.agencyId" />
                 </AssessmentSchemaPageSection>
 
                 <AssessmentSchemaPageSection
@@ -322,6 +322,7 @@ watch(selectedSection, value => {
                     ref="stepsTableRef"
                     v-model:steps="state.steps"
                     :approval-template-id="props.templateId"
+                    :agency-id="props.agencyId"
                     :action-context="writeContext"
                     @save="saveTemplate" />
                 </AssessmentSchemaPageSection>

@@ -5,6 +5,8 @@ import { createAdditionalApprovalCertificationEditor } from '~/utils/approval-te
 
 type AdditionalApprovalPolicyEditorState = {
   egcs_cn_allowadditionalapprovals: boolean
+  egcs_cn_additionalallowattachments: boolean
+  egcs_cn_additionalattachmenttypeids: string[]
   egcs_cn_defaultaddedapprovalname_en?: string
   egcs_cn_defaultaddedapprovalname_fr?: string
   egcs_cn_allowaddedapprovalnamechanges: boolean
@@ -13,7 +15,7 @@ type AdditionalApprovalPolicyEditorState = {
 }
 
 const state = defineModel<AdditionalApprovalPolicyEditorState>('state', { required: true })
-const { compact = false } = defineProps<{ compact?: boolean }>()
+const { compact = false, agencyId } = defineProps<{ compact?: boolean; agencyId?: string }>()
 
 const { t } = useI18n()
 
@@ -103,6 +105,14 @@ const moveCertification = (index: number, direction: -1 | 1) => {
           <USwitch v-model="state.egcs_cn_allowaddedapprovalcertificationchanges" data-field-label-en="Allow certification changes" data-field-label-fr="Autoriser la modification des attestations" data-ui-target="common.approval-templates.additional-approvals-fields.state.egcs_cn_allowaddedapprovalcertificationchanges" />
         </label>
       </div>
+
+      <CommonApprovalTemplatesAttachmentPolicyFields
+        v-if="agencyId"
+        v-model:allowed="state.egcs_cn_additionalallowattachments"
+        v-model:type-ids="state.egcs_cn_additionalattachmenttypeids"
+        :agency-id="agencyId"
+        allowed-name="egcs_cn_additionalallowattachments"
+        type-ids-name="egcs_cn_additionalattachmenttypeids" />
 
       <section class="space-y-4" aria-labelledby="template-additional-certifications-heading">
         <div class="flex items-center justify-between gap-4">

@@ -31,6 +31,8 @@ const PublishedApprovalEvidenceSchema = z.strictObject({
   descriptionEn: z.string(),
   descriptionFr: z.string(),
   allowAdditionalApprovals: z.boolean(),
+  additionalAllowAttachments: z.literal(true).optional(),
+  additionalAttachmentTypeIds: z.array(PositivePostgresBigintIdSchema).optional(),
   defaultAddedApprovalNameEn: z.string().optional(),
   defaultAddedApprovalNameFr: z.string().optional(),
   allowAddedApprovalNameChanges: z.boolean(),
@@ -53,6 +55,8 @@ const PublishedApprovalEvidenceSchema = z.strictObject({
     defaultUser: PositivePostgresBigintIdSchema.optional(),
     defaultGroup: PositivePostgresBigintIdSchema.optional(),
     requireGroupDetails: z.boolean().optional(),
+    allowAttachments: z.literal(true).optional(),
+    attachmentTypeIds: z.array(PositivePostgresBigintIdSchema).optional(),
     certifications: z.array(z.strictObject({
       optional: z.boolean(),
       certificationEn: z.string(),

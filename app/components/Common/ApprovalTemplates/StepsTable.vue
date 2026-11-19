@@ -10,7 +10,7 @@ import { createApprovalTemplateEditorStep } from '~/utils/approval-template-edit
 const steps = defineModel<ApprovalTemplateEditorStep[]>('steps', {
   default: () => []
 })
-const { approvalTemplateId, actionContext } = defineProps<{ approvalTemplateId: string; actionContext: ActionContext }>()
+const { approvalTemplateId, actionContext, agencyId } = defineProps<{ approvalTemplateId: string; actionContext: ActionContext; agencyId?: string }>()
 const emit = defineEmits<{ save: [] }>()
 
 const { t, locale } = useI18n()
@@ -126,6 +126,7 @@ defineExpose({
       v-model:step="draftStep"
       :mode="editorMode"
       :approval-template-id="approvalTemplateId"
+      :agency-id="agencyId"
       :action-context="actionContext"
       @save="saveDraft"
       @cancel="resetEditor" />

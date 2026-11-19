@@ -106,7 +106,7 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
           <CommonTextarea v-model="state.egcs_cn_description_fr" :rows="3" />
         </UFormField>
 
-        <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" compact />
+        <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" :agency-id="agencyId" compact />
 
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" class="cursor-default" @click="open = false" />

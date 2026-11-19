@@ -373,8 +373,7 @@ export const CommonApprovalCreateSchema = z.object({
   egcs_cn_approvalpositiontitle: z.string().optional(),
   egcs_cn_isadded: z.boolean({ error: 'validation.is_added_required' }),
   egcs_cn_approvalvalue: z.boolean({ error: 'validation.approval_value_required' }).optional(),
-  egcs_cn_approvaldate: z.coerce.date().optional(),
-  egcs_cn_attachment: IdSchema.optional()
+  egcs_cn_approvaldate: z.coerce.date().optional()
 })
 export const CommonApprovalPatchSchema = CommonApprovalCreateSchema.partial()
 

@@ -31,6 +31,8 @@ export const buildApprovalTemplateDetailPayload = (
   egcs_cn_name_en: state.egcs_cn_name_en,
   egcs_cn_name_fr: state.egcs_cn_name_fr,
   egcs_cn_allowadditionalapprovals: state.egcs_cn_allowadditionalapprovals,
+  egcs_cn_additionalallowattachments: state.egcs_cn_additionalallowattachments,
+  egcs_cn_additionalattachmenttypeids: state.egcs_cn_additionalattachmenttypeids,
   egcs_cn_defaultaddedapprovalname_en: state.egcs_cn_defaultaddedapprovalname_en,
   egcs_cn_defaultaddedapprovalname_fr: state.egcs_cn_defaultaddedapprovalname_fr,
   egcs_cn_allowaddedapprovalnamechanges: state.egcs_cn_allowaddedapprovalnamechanges,
@@ -60,6 +62,8 @@ export const buildApprovalTemplateDetailPayload = (
       egcs_cn_defaultuser: step.egcs_cn_defaultuser || null,
       egcs_cn_defaultgroup: step.egcs_cn_defaultgroup || null,
       egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails,
+      egcs_cn_allowattachments: step.egcs_cn_allowattachments,
+      egcs_cn_attachmenttypeids: step.egcs_cn_attachmenttypeids,
       egcs_cn_approvertitle: step.egcs_cn_approvertitle,
       certifications: step.certifications
         .toSorted((left, right) => left.egcs_cn_order - right.egcs_cn_order)

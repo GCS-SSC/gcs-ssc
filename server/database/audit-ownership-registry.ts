@@ -86,6 +86,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
     { table: 'public.Funding_Case_Agreement_Address', column: 'egcs_fc_address' }
   ] },
   'public.Common_Approval': parent('egcs_cn_routingslip', 'public.Common_Routing_Slip'),
+  'public.Common_Approval_Attachment': parent('egcs_cn_approval', 'public.Common_Approval'),
   'public.Common_Approval_Certification': parent('egcs_cn_approval', 'public.Common_Approval'),
   'public.Common_Approval_Step': parent('egcs_cn_approvaltemplate', 'public.Common_Approval_Template'),
   'public.Common_Approval_Template': parent('egcs_cn_agency', 'public.Agency_Profile'),
@@ -96,7 +97,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Common_Assessment_Schema': parent('egcs_cn_reviewschema', 'public.Common_Review_Schema'),
   'public.Common_Attachment': { kind: 'references', links: [
     { table: 'public.Common_Entity_Attachment', column: 'egcs_cn_attachment' },
-    { table: 'public.Common_Approval', column: 'egcs_cn_attachment' },
+    { table: 'public.Common_Approval_Attachment', column: 'egcs_cn_attachment' },
     { table: 'public.Funding_Case_Agreement_Generated_Document', column: 'egcs_fc_generatedattachment' },
     { table: 'public.Agency_Document_Template', column: 'egcs_ay_templateattachment_en' },
     { table: 'public.Agency_Document_Template', column: 'egcs_ay_templateattachment_fr' }

@@ -225,6 +225,8 @@ export const materializeCanonicalApprovalRuntime = async (
     egcs_cn_name_fr: input.nameFr,
     egcs_cn_approvaltemplate: version.publicationId,
     egcs_cn_allowadditionalapprovals: version.definition.allowAdditionalApprovals,
+    egcs_cn_additionalallowattachments: version.definition.additionalAllowAttachments ?? false,
+    egcs_cn_additionalattachmenttypeids: version.definition.additionalAttachmentTypeIds ?? [],
     egcs_cn_defaultaddedapprovalname_en: version.definition.defaultAddedApprovalNameEn,
     egcs_cn_defaultaddedapprovalname_fr: version.definition.defaultAddedApprovalNameFr,
     egcs_cn_allowaddedapprovalnamechanges: version.definition.allowAddedApprovalNameChanges,
@@ -255,6 +257,8 @@ export const materializeCanonicalApprovalRuntime = async (
       egcs_cn_defaultuser: step.defaultUser,
       egcs_cn_defaultgroup: step.defaultGroup,
       egcs_cn_requiregroupdetails: step.requireGroupDetails === true,
+      egcs_cn_allowattachments: step.allowAttachments ?? false,
+      egcs_cn_attachmenttypeids: step.attachmentTypeIds ?? [],
       egcs_cn_assigneduser: step.defaultUser,
       egcs_cn_assignedgroup: step.defaultGroup,
       egcs_cn_isadded: false
@@ -489,7 +493,6 @@ const persistDecisionEvidence = async (
     egcs_cn_approvalpositiontitle: positionTitle ?? sql`null`,
     egcs_cn_approvaldate: approvalDate,
     egcs_cn_comment: body.egcs_cn_comment ?? sql`null`,
-    egcs_cn_attachment: sql`null`,
     egcs_cn_approvalvalue: approvalValue
   }).where('id', '=', approvalId).executeTakeFirstOrThrow()
 }
@@ -831,8 +834,7 @@ export const reassignCanonicalApproval = async (
     egcs_cn_approvername: sql`null`,
     egcs_cn_approvalpositiontitle: sql`null`,
     egcs_cn_approvaldate: sql`null`,
-    egcs_cn_comment: sql`null`,
-    egcs_cn_attachment: sql`null`
+    egcs_cn_comment: sql`null`
   }).where('id', '=', approvalId).executeTakeFirstOrThrow()
   if (approval.approvalState === 'awaiting_action'
     && (approval.egcs_cn_assigneduser !== (body.egcs_cn_assigneduser ?? null)

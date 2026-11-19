@@ -1,5 +1,6 @@
-import { defineEventHandler } from 'h3'
+import { defineEventHandler, setResponseHeader } from 'h3'
 import { sql } from 'kysely'
+import type { AttachmentSource } from '~~/shared/types/attachment-source'
 import { AttachmentListQuerySchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorizeAttachmentTarget, getAttachmentTargetSubject } from '~~/server/utils/attachment-target'
@@ -14,36 +15,45 @@ import type { GcsFileStorageProviderManagedMetadataAdapter } from '@gcs-ssc/exte
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { runBoundedExtensionOperation } from '~~/server/utils/extension-admission'
 import { canAccessCreditMemoTargetScopes } from '~~/server/utils/credit-memo-scope-authority'
+import {
+  getReadableAttachmentRoutingSlips,
+  selectSubmittedApprovalAttachments,
+  submittedApprovalAttachmentQuery
+} from '~~/server/utils/entity-approval-attachment-list'
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 export default defineEventHandler(async event => {
   const target = await getAttachmentRouteTarget(event)
   const query = await getValidatedQueryI18n(event, AttachmentListQuerySchema)
-  const { auth, resolved } = await authorizeAttachmentTarget(event, target, 'read')
-  const db = event.context.$db
-  const offset = (query.page - 1) * query.limit
-  let base = db.selectFrom('Common_Entity_Attachment')
-    .innerJoin('Common_Attachment', 'Common_Attachment.id', 'Common_Entity_Attachment.egcs_cn_attachment')
-    .innerJoin('Common_Attachment_Types', 'Common_Attachment_Types.id', 'Common_Attachment.egcs_cn_attachmenttype')
-    .innerJoin('Common_User', 'Common_User.id', 'Common_Entity_Attachment.egcs_cn_uploadedby')
-    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
-    .where('Common_Entity_Attachment.egcs_cn_entitytype', '=', target.entityType)
-    .where('Common_Entity_Attachment.egcs_cn_entityid', '=', target.entityId)
-    .where('Common_Entity_Attachment._deleted', '=', false)
-    .where('Common_Attachment._deleted', '=', false)
-    .where('Common_Attachment_Types.egcs_cn_agency', '=', resolved.agencyId)
-  if (query.attachmentTypeId) base = base.where('Common_Attachment.egcs_cn_attachmenttype', '=', query.attachmentTypeId)
-  if (query.search) {
-    const search = `%${escapeLikePattern(query.search)}%`
-    base = base.where(eb => eb.or([
-      eb('Common_Attachment.egcs_cn_name_en', 'ilike', search),
-      eb('Common_Attachment.egcs_cn_name_fr', 'ilike', search),
-      eb('Common_Attachment.egcs_cn_description_en', 'ilike', search),
-      eb('Common_Attachment.egcs_cn_description_fr', 'ilike', search)
-    ]))
-  }
-  const [items, count] = await Promise.all([
-    base.select([
-      'Common_Entity_Attachment.id',
+  setResponseHeader(event, 'Cache-Control', 'private, no-store')
+  const { auth, resolved, items, count } = await executeFreshReadSnapshot(event, async db => {
+    const { auth, resolved } = await authorizeAttachmentTarget(event, target, 'read')
+    const offset = (query.page - 1) * query.limit
+    let base = db.selectFrom('Common_Entity_Attachment')
+      .innerJoin('Common_Attachment', 'Common_Attachment.id', 'Common_Entity_Attachment.egcs_cn_attachment')
+      .innerJoin('Common_Attachment_Types', 'Common_Attachment_Types.id', 'Common_Attachment.egcs_cn_attachmenttype')
+      .innerJoin('Common_User', 'Common_User.id', 'Common_Entity_Attachment.egcs_cn_uploadedby')
+      .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
+      .where('Common_Entity_Attachment.egcs_cn_entitytype', '=', target.entityType)
+      .where('Common_Entity_Attachment.egcs_cn_entityid', '=', target.entityId)
+      .where('Common_Entity_Attachment._deleted', '=', false)
+      .where('Common_Attachment._deleted', '=', false)
+      .where('Common_Attachment_Types.egcs_cn_agency', '=', resolved.agencyId)
+    if (query.attachmentTypeId) base = base.where('Common_Attachment.egcs_cn_attachmenttype', '=', query.attachmentTypeId)
+    if (query.search) {
+      const search = `%${escapeLikePattern(query.search)}%`
+      base = base.where(eb => eb.or([
+        eb('Common_Attachment.egcs_cn_name_en', 'ilike', search),
+        eb('Common_Attachment.egcs_cn_name_fr', 'ilike', search),
+        eb('Common_Attachment.egcs_cn_description_en', 'ilike', search),
+        eb('Common_Attachment.egcs_cn_description_fr', 'ilike', search)
+      ]))
+    }
+    const submitted = submittedApprovalAttachmentQuery(db, target, resolved.agencyId, query)
+    const readableSlips = await getReadableAttachmentRoutingSlips(event, submitted, resolved.agencyId)
+    const combined = base.select([
+      sql<string>`"Common_Entity_Attachment".id::text`.as('id'),
+      'Common_Entity_Attachment.id as sort_id',
       'Common_Entity_Attachment.egcs_cn_attachment as attachment_id',
       'Common_Entity_Attachment.egcs_cn_createdat as uploaded_at',
       'Common_Entity_Attachment.egcs_cn_updatedat as updated_at',
@@ -63,13 +73,18 @@ export default defineEventHandler(async event => {
       'Common_Attachment.egcs_cn_metadatacontractversion as metadata_contract_version',
       'Common_Attachment_Types.egcs_cn_name_en as attachment_type_name_en',
       'Common_Attachment_Types.egcs_cn_name_fr as attachment_type_name_fr',
-      'user.name as uploaded_by_name'
+      'user.name as uploaded_by_name',
+      sql<AttachmentSource>`jsonb_build_object('kind', 'direct')`.as('source')
+    ]).unionAll(selectSubmittedApprovalAttachments(submitted, readableSlips))
+    const page = db.selectFrom(combined.as('attachments'))
+    const [items, count] = await Promise.all([
+      page.selectAll().orderBy('uploaded_at', 'desc').orderBy('sort_id', 'desc').orderBy('id', 'desc')
+        .limit(query.limit).offset(offset).execute(),
+      page.select(sql<number>`count(*)::int`.as('count')).executeTakeFirstOrThrow()
     ])
-      .orderBy('Common_Entity_Attachment.egcs_cn_createdat', 'desc')
-      .orderBy('Common_Entity_Attachment.id', 'desc')
-      .limit(query.limit).offset(offset).execute(),
-    base.clearSelect().select(sql<number>`count(*)::int`.as('count')).executeTakeFirstOrThrow()
-  ])
+    return { auth, resolved, items, count }
+  }, { authorization: 'snapshot' })
+  const db = event.context.$db
 
   const scope = resolved.creditMemoContext?.scope ?? resolved.fundingCaseScope?.scope ?? resolved.agreementContext?.scope
     ?? { type: 'agency' as const, agencyId: resolved.agencyId }
@@ -110,6 +125,18 @@ export default defineEventHandler(async event => {
     return resolution
   }
   const decoratedItems = await Promise.all(items.map(async item => {
+    const { provider_object_id: _objectId, provider_locator: _locator, sort_id: _sortId, source, ...publicItem } = item
+    if (source.kind === 'approval') return {
+      ...publicItem,
+      source,
+      provider_metadata: null,
+      provider_metadata_component_name: null,
+      provider_metadata_mutability: null,
+      can_update_role: false,
+      can_delete_role: false,
+      can_update: false,
+      can_delete: false
+    }
     const declaration = providers.get(item.provider_id)?.fileStorageProvider?.metadata
     const compatibleDeclaration = declaration?.contractVersion === item.metadata_contract_version ? declaration : null
     let providerMetadata = readNamespacedProviderMetadata(item.provider_id, item.provider_metadata)
@@ -141,9 +168,9 @@ export default defineEventHandler(async event => {
         })
       }
     }
-    const { provider_object_id: _objectId, provider_locator: _locator, ...publicItem } = item
     return {
       ...publicItem,
+      source,
       provider_metadata: providerMetadata,
       provider_metadata_component_name: compatibleDeclaration?.component.componentName ?? null,
       provider_metadata_mutability: compatibleDeclaration?.mutability ?? null,

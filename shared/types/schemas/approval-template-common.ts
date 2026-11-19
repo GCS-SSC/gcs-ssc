@@ -1,5 +1,9 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { z } from 'zod'
+import { PositivePostgresBigintIdSchema } from './common'
+
+export const ApprovalAttachmentTypeIdsSchema = z.array(PositivePostgresBigintIdSchema)
+  .refine(ids => new Set(ids).size === ids.length, { error: 'validation.duplicate' })
 
 type StepSequenceItem = {
   egcs_cn_sequence?: number
@@ -65,6 +69,8 @@ export const createApprovalTemplateStepBaseSchema = <TCertificationSchema extend
   egcs_cn_defaultuser: requiredId().nullable().optional(),
   egcs_cn_defaultgroup: requiredId().nullable().optional(),
   egcs_cn_requiregroupdetails: z.boolean().default(false),
+  egcs_cn_allowattachments: z.boolean().default(false),
+  egcs_cn_attachmenttypeids: ApprovalAttachmentTypeIdsSchema.default([]),
   egcs_cn_approvertitle: requiredString(),
   certifications: z.array(certificationSchema).default([])
 })

@@ -1,10 +1,18 @@
 import { defineEventHandler, getRouterParam } from 'h3'
-import { PaginationSchema } from '~~/shared/types/schemas'
+import { z } from 'zod'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { withActiveAgencyReadTransaction } from '~~/server/utils/agency-auth'
 import { fetchAgencyScopedList } from '~~/server/utils/agency-scoped-list'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+
+const QuerySchema = PaginationSchema.extend({
+  selectedIds: z.union([
+    PositivePostgresBigintIdSchema,
+    z.array(PositivePostgresBigintIdSchema).max(100, { error: 'validation.max_items' })
+  ]).transform(value => Array.isArray(value) ? value : [value]).optional()
+})
 
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId')
@@ -14,7 +22,7 @@ export default defineEventHandler(async event => {
   }
 
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
-  const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
+  const { page, limit, search, selectedIds } = await getValidatedQueryI18n(event, QuerySchema)
   const offset = (page - 1) * limit
 
   return await withActiveAgencyReadTransaction(event, agencyId, async trx => {
@@ -22,7 +30,7 @@ export default defineEventHandler(async event => {
       .selectFrom('Common_Attachment_Types')
       .where('egcs_cn_agency', '=', agencyId)
       .where('_deleted', '=', false)
-    let baseQuery = scopedQuery
+    let baseQuery = selectedIds ? scopedQuery.where('id', 'in', selectedIds) : scopedQuery
 
     if (search) {
       const escapedSearch = escapeLikePattern(search)

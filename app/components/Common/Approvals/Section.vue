@@ -5,7 +5,11 @@ import { useActionContext } from '~/composables/useActionContext'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
+import { useConfirmDeleteRequest } from '~/composables/useConfirmDeleteRequest'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
 import type { FetchError } from 'ofetch'
@@ -24,6 +28,7 @@ import CommonApprovalsActionModal from '~/components/Common/Approvals/ActionModa
 import CommonApprovalsAddStepModal from '~/components/Common/Approvals/AddStepModal.vue'
 import CommonApprovalsReassignModal from '~/components/Common/Approvals/ReassignModal.vue'
 import CommonApprovalsViewPopover from '~/components/Common/Approvals/ViewPopover.vue'
+import { approvalAttachmentUrl, approvalAttachmentsUrl, loadApprovalAttachments } from './attachments'
 import type {
   ApprovalLookupBehalfType,
   AddApprovalModalState,
@@ -344,6 +349,7 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
     egcs_cn_defaultuser: step.egcs_cn_defaultuser,
     egcs_cn_defaultgroup: step.egcs_cn_defaultgroup,
     egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails,
+    egcs_cn_allowattachments: step.egcs_cn_allowattachments,
     claimant_matches_default: step.claimant_matches_default,
     egcs_cn_assigneduser: step.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: step.egcs_cn_assignedgroup,
@@ -374,6 +380,96 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
 
   return stepRows
 }))
+
+const selectedApprovalId = computed(() => selectedActionStep.value?.id ?? '')
+const actionAttachmentStep = computed(() => tableRows.value.find(row =>
+  row.rowKind === 'step' && row.stepId === selectedApprovalId.value
+))
+const actionAttachmentsEnabled = computed(() => actionAttachmentStep.value?.egcs_cn_allowattachments === true)
+const attachmentContext = useActionContext({
+  identity: [entityIdentity, selectedApprovalId, () => actionAttachmentStep.value?.egcs_cn_assigneduser],
+  authority: () => actionAttachmentsEnabled.value && actionAttachmentStep.value?.can_action === true
+})
+const attachmentReadIdentity = computed(() => `${actionModal.captureSession()}:${attachmentContext.version.value}`)
+const {
+  data: actionAttachmentCollection,
+  status: actionAttachmentStatus,
+  refresh: refreshActionAttachments
+} = useResourceRequest({
+  identity: attachmentReadIdentity,
+  enabled: () => isActionModalOpen.value && attachmentContext.capture() !== null,
+  initial: 'deferred',
+  failureData: 'clear',
+  load: signal => loadApprovalAttachments(selectedApprovalId.value, signal)
+})
+const pendingAttachmentWrites = ref(new Set<string>())
+const isWritingActionAttachments = computed(() => pendingAttachmentWrites.value.has(selectedApprovalId.value))
+const actionAttachmentsBlockDecision = computed(() => isWritingActionAttachments.value
+  || (actionAttachmentsEnabled.value
+    && (actionAttachmentStatus.value !== 'success' || actionAttachmentCollection.value?.canUpload !== true)))
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+
+/**
+ * Keeps the pending write on the owning approval and settles readback on the live collection.
+ * @param write
+ */
+const writeActionAttachment = async (
+  write: (approvalId: string, operation: NonNullable<ReturnType<typeof attachmentContext.capture>>) => Promise<boolean>
+) => {
+  if (isSubmittingAction.value || isWritingActionAttachments.value || actionAttachmentStatus.value !== 'success'
+    || !actionAttachmentCollection.value?.canUpload) return
+  const session = actionModal.captureSession()
+  const operation = attachmentContext.capture()
+  if (session === null || !operation?.canDispatch()) return
+  const approvalId = selectedApprovalId.value
+  pendingAttachmentWrites.value.add(approvalId)
+  try {
+    if (await write(approvalId, operation) && operation.isCurrent()) await refreshActionAttachments()
+  } catch (error: unknown) {
+    if (operation.isCurrent() && actionModal.isCurrentSession(session)) {
+      showError(error)
+      await refreshActionAttachments()
+    }
+  } finally {
+    pendingAttachmentWrites.value.delete(approvalId)
+  }
+}
+
+/**
+ * @param input
+ * @param input.file
+ * @param input.attachmentTypeId
+ */
+const uploadActionAttachment = (input: { file: File; attachmentTypeId: string }) => {
+  if (!actionAttachmentCollection.value?.types.some(type => type.id === input.attachmentTypeId)) return
+  void writeActionAttachment(async approvalId => {
+    const body = new FormData()
+    body.set('file', input.file)
+    body.set('attachmentTypeId', input.attachmentTypeId)
+    const response = await fetch(getClientRequestUrl(approvalAttachmentsUrl(approvalId)), { method: 'POST', body })
+    if (!response.ok) await throwFetchResponseError(response)
+    return true
+  })
+}
+
+/** @param attachmentId */
+const removeActionAttachment = (attachmentId: string) => {
+  const target = actionAttachmentCollection.value?.items.find(item => item.id === attachmentId)
+  if (!target) return
+  void writeActionAttachment((approvalId, operation) => confirmDeleteRequest(
+    approvalAttachmentUrl(approvalId, attachmentId),
+    {
+      operation,
+      description: t('attachments.remove_named', { name: target.filename }),
+      confirmLabel: t('common.remove'),
+      target: {
+        id: attachmentId,
+        resolve: () => actionAttachmentCollection.value?.items.find(item => item.id === attachmentId),
+        eligible: () => actionAttachmentCollection.value?.canUpload === true
+      }
+    }
+  ))
+}
 
 const filteredRows = computed(() => {
   const searchTerm = search.value.trim().toLocaleLowerCase()
@@ -592,7 +688,7 @@ const openActionModal = (row: ApprovalTableRow) => {
  * @param force Whether a completed submission may force the modal closed.
  */
 const closeActionModal = (force = false) => {
-  if (isSubmittingAction.value && !force) {
+  if ((isSubmittingAction.value || isWritingActionAttachments.value) && !force) {
     return
   }
 
@@ -979,7 +1075,7 @@ const denyDisabled = computed(() => {
  * @param decision
  */
 const submitAction = async (decision: 'approve' | 'deny') => {
-  if (!selectedActionState.value || !selectedActionStep.value || isSubmittingAction.value) {
+  if (!selectedActionState.value || !selectedActionStep.value || isSubmittingAction.value || actionAttachmentsBlockDecision.value) {
     return
   }
 
@@ -1193,6 +1289,7 @@ const submitReassign = async () => {
                 egcs_cn_name_en: row.original.stepNameEn,
                 egcs_cn_name_fr: row.original.stepNameFr,
                 egcs_cn_defaultuser: row.original.egcs_cn_defaultuser,
+                egcs_cn_allowattachments: row.original.egcs_cn_allowattachments,
                 egcs_cn_defaultgroup: row.original.egcs_cn_defaultgroup,
                 egcs_cn_assigneduser: row.original.egcs_cn_assigneduser,
                 egcs_cn_assignedgroup: row.original.egcs_cn_assignedgroup,
@@ -1279,14 +1376,22 @@ const submitReassign = async () => {
       :catalog-choices-loading="checkingCatalog || behalfTypeStatus === 'pending'"
       :catalog-choices-failed="catalogCheckFailed || behalfTypeStatus === 'error'"
       :requires-actual="requiresActual"
-      :approve-disabled="approveDisabled"
-      :deny-disabled="denyDisabled"
+      :approve-disabled="approveDisabled || actionAttachmentsBlockDecision"
+      :deny-disabled="denyDisabled || actionAttachmentsBlockDecision"
       :is-submitting-action="isSubmittingAction"
+      :show-attachments="actionAttachmentsEnabled"
+      :attachment-opening="attachmentReadIdentity"
+      :attachment-collection="actionAttachmentCollection"
+      :attachment-status="actionAttachmentStatus"
+      :is-writing-attachments="isWritingActionAttachments"
       :default-approver-display="defaultApproverDisplay"
       :assigned-approver-display="assignedApproverDisplay"
       :assigned-approver-position-title="assignedApproverPositionTitle"
       @update:open="handleActionModalOpenUpdate"
       @check-catalog="checkBehalfTypes"
+      @retry-attachments="refreshActionAttachments"
+      @upload-attachment="uploadActionAttachment"
+      @remove-attachment="removeActionAttachment"
       @close="closeActionModal"
       @submit="submitAction" />
 

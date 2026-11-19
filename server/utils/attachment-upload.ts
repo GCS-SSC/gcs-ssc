@@ -23,7 +23,7 @@ const rejectOversized = async (event: H3Event, parts?: MultiPartData[]): Promise
   }
 }
 
-export const readAttachmentUpload = async (event: H3Event): Promise<AttachmentUploadPayload> => {
+const readAttachmentMultipart = async (event: H3Event) => {
   await rejectOversized(event)
   let parts: MultiPartData[] | undefined
   try {
@@ -59,6 +59,26 @@ export const readAttachmentUpload = async (event: H3Event): Promise<AttachmentUp
   for (const part of parts) {
     if (!part.filename && part.name) fields[part.name] = part.data.toString('utf8')
   }
+  return {
+    fields,
+    file: {
+      filename: file.filename,
+      contentType: file.type || 'application/octet-stream',
+      bytes: Buffer.from(file.data)
+    }
+  }
+}
+
+const ApprovalAttachmentUploadMetadataSchema = AttachmentUploadMetadataSchema.pick({ attachmentTypeId: true })
+
+export const readApprovalAttachmentUpload = async (event: H3Event) => {
+  const { fields, file } = await readAttachmentMultipart(event)
+  const { attachmentTypeId } = await parseI18n(event, ApprovalAttachmentUploadMetadataSchema, fields)
+  return { file, attachmentTypeId }
+}
+
+export const readAttachmentUpload = async (event: H3Event): Promise<AttachmentUploadPayload> => {
+  const { fields, file } = await readAttachmentMultipart(event)
   if (typeof fields.providerMetadata === 'string') {
     try {
       fields.providerMetadata = JSON.parse(fields.providerMetadata)
@@ -68,10 +88,6 @@ export const readAttachmentUpload = async (event: H3Event): Promise<AttachmentUp
   }
   return {
     metadata: await parseI18n(event, AttachmentUploadMetadataSchema, fields),
-    file: {
-      filename: file.filename!,
-      contentType: file.type || 'application/octet-stream',
-      bytes: Buffer.from(file.data)
-    }
+    file
   }
 }

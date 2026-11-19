@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useActionContext } from '~/composables/useActionContext'
+import { useResourceRequest } from '~/composables/useResourceRequest'
+import { loadApprovalAttachments } from './attachments'
+import CommonApprovalsAttachmentFiles from './AttachmentFiles.vue'
 import type { ApprovalStepItem } from './types'
 
 const {
@@ -12,6 +16,20 @@ const {
 
 const { t, locale } = useI18n()
 const { formatDate } = useDateHelpers()
+const open = ref(false)
+const showAttachments = computed(() => step.egcs_cn_allowattachments === true && step.egcs_cn_approvalvalue !== null)
+const attachmentContext = useActionContext({
+  identity: [() => step.id, () => step.runtimeItemId],
+  authority: showAttachments
+})
+const { data: attachments, status: attachmentStatus, refresh: retryAttachments } = useResourceRequest({
+  identity: () => String(attachmentContext.version.value),
+  enabled: () => open.value && showAttachments.value,
+  initial: 'deferred',
+  refreshData: 'clear',
+  failureData: 'clear',
+  load: signal => loadApprovalAttachments(step.id, signal)
+})
 
 /**
  * Resolves bilingual approval text using the active locale with fallback.
@@ -81,7 +99,7 @@ const certificationStatus = (value: boolean | null) => {
 </script>
 
 <template>
-  <UPopover>
+  <UPopover v-model:open="open">
     <CommonActionButton
       icon="i-lucide-eye"
       color="neutral"
@@ -190,6 +208,27 @@ const certificationStatus = (value: boolean | null) => {
           </div>
           <p class="text-sm whitespace-pre-wrap text-zinc-900 dark:text-zinc-50">
             {{ commentDisplay }}
+          </p>
+        </div>
+
+        <div v-if="showAttachments" class="space-y-2">
+          <h5 class="text-sm font-semibold">
+            {{ t('attachments.title') }}
+          </h5>
+          <div v-if="attachmentStatus === 'pending'" role="status" class="text-sm text-muted">
+            {{ t('common.loading') }}
+          </div>
+          <CommonErrorNotice v-else-if="attachmentStatus === 'error'" :title="t('attachments.load_failed')">
+            <template #actions>
+              <UButton type="button" :label="t('common.retry')" @click="retryAttachments" />
+            </template>
+          </CommonErrorNotice>
+          <CommonApprovalsAttachmentFiles
+            v-else-if="attachments?.items.length"
+            :approval-id="step.id"
+            :items="attachments.items" />
+          <p v-else-if="attachmentStatus === 'success'" class="text-sm text-muted">
+            {{ t('common.none') }}
           </p>
         </div>
 

@@ -8,7 +8,7 @@ import type {
 import { createApprovalTemplateEditorCertification } from '~/utils/approval-template-editor-certifications'
 
 const step = defineModel<ApprovalTemplateEditorStep>('step', { required: true })
-const { approvalTemplateId } = defineProps<{ approvalTemplateId: string }>()
+const { approvalTemplateId, agencyId } = defineProps<{ approvalTemplateId: string; agencyId?: string }>()
 
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
@@ -101,6 +101,14 @@ const selectedGroup = computed({
         <USwitch v-model="step.egcs_cn_requiregroupdetails" />
       </UFormField>
     </div>
+
+    <CommonApprovalTemplatesAttachmentPolicyFields
+      v-if="agencyId"
+      v-model:allowed="step.egcs_cn_allowattachments"
+      v-model:type-ids="step.egcs_cn_attachmenttypeids"
+      :agency-id="agencyId"
+      allowed-name="step.egcs_cn_allowattachments"
+      type-ids-name="step.egcs_cn_attachmenttypeids" />
 
     <AssessmentSchemaAccordionSection :title="t('admin_common.resources.certifications')" default-open>
       <div class="space-y-4">

@@ -478,6 +478,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Routing_Slip: CommonRoutingSlipTable
   Common_Notification: CommonNotificationTable
   Common_Approval: CommonApprovalTable
+  Common_Approval_Attachment: CommonApprovalAttachmentTable
   Common_Approval_Certification: CommonApprovalCertificationTable
   Common_Assessment_Outcome: CommonAssessmentOutcomeTable
   Common_Assessment_Custom_Outcome: CommonAssessmentCustomOutcomeTable
@@ -1166,6 +1167,8 @@ export interface CommonCertificationTable {
 }
 
 export interface CommonApprovalTemplateTable {
+  egcs_cn_additionalallowattachments: Generated<boolean>
+  egcs_cn_additionalattachmenttypeids: Generated<string[]>
   id: Generated<string>
   egcs_cn_publicationkind: Generated<'approval_template'>
   egcs_cn_agency: string
@@ -1182,6 +1185,8 @@ export interface CommonApprovalTemplateTable {
 }
 
 export interface CommonApprovalStepTable {
+  egcs_cn_allowattachments: Generated<boolean>
+  egcs_cn_attachmenttypeids: Generated<string[]>
   id: Generated<string>
   egcs_cn_sequence: number
   egcs_cn_description_en: string
@@ -1197,6 +1202,8 @@ export interface CommonApprovalStepTable {
 }
 
 export interface CommonRoutingSlipTable {
+  egcs_cn_additionalallowattachments: Generated<boolean>
+  egcs_cn_additionalattachmenttypeids: Generated<string[]>
   id: Generated<string>
   egcs_cn_entitytype: Entity_Type
   egcs_cn_entityid: string
@@ -1213,6 +1220,9 @@ export interface CommonRoutingSlipTable {
 }
 
 export interface CommonApprovalTable {
+  egcs_cn_allowattachments: Generated<boolean>
+  egcs_cn_attachmenttypeids: Generated<string[]>
+  egcs_cn_attachmentrevision: Generated<string>
   id: Generated<string>
   egcs_cn_runtimeitem: string
   egcs_cn_sequence: DecimalColumn
@@ -1233,8 +1243,18 @@ export interface CommonApprovalTable {
   egcs_cn_isadded: boolean
   egcs_cn_approvalvalue?: boolean
   egcs_cn_approvaldate?: Date
-  egcs_cn_attachment?: string
   egcs_cn_comment?: string
+}
+
+export interface CommonApprovalAttachmentTable {
+  id: Generated<string>
+  egcs_cn_approval: string
+  egcs_cn_attachment: string
+  egcs_cn_uploadedby: string
+  egcs_cn_typename_en: string
+  egcs_cn_typename_fr: string
+  egcs_cn_submitted: Generated<boolean>
+  _deleted: Generated<boolean>
 }
 
 export interface CommonApprovalCertificationTable {

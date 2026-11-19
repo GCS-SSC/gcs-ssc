@@ -7,6 +7,19 @@ import type { Database, JsonValue } from '~~/shared/types/database'
 type ApprovalTemplateRow = Selectable<Database['Common_Approval_Template']>
 type ReadDbClient = Kysely<Database> | Transaction<Database>
 
+export const publishedAttachmentPolicy = (template: Pick<ApprovalTemplateRow,
+  'egcs_cn_allowadditionalapprovals' | 'egcs_cn_additionalallowattachments' | 'egcs_cn_additionalattachmenttypeids'
+>): Pick<PublishedApprovalTemplate, 'additionalAllowAttachments' | 'additionalAttachmentTypeIds'> =>
+  template.egcs_cn_allowadditionalapprovals && template.egcs_cn_additionalallowattachments
+    ? { additionalAllowAttachments: true, additionalAttachmentTypeIds: template.egcs_cn_additionalattachmenttypeids }
+    : {}
+
+export const publishedStepAttachmentPolicy = (step: Pick<Selectable<Database['Common_Approval_Step']>,
+  'egcs_cn_allowattachments' | 'egcs_cn_attachmenttypeids'
+>): Pick<PublishedApprovalTemplate['steps'][number], 'allowAttachments' | 'attachmentTypeIds'> => step.egcs_cn_allowattachments
+  ? { allowAttachments: true, attachmentTypeIds: step.egcs_cn_attachmenttypeids }
+  : {}
+
 export type PublishedApprovalTemplate = {
   templateId: string
   nameEn: string
@@ -14,6 +27,8 @@ export type PublishedApprovalTemplate = {
   descriptionEn: string
   descriptionFr: string
   allowAdditionalApprovals: boolean
+  additionalAllowAttachments?: true
+  additionalAttachmentTypeIds?: string[]
   defaultAddedApprovalNameEn?: string
   defaultAddedApprovalNameFr?: string
   allowAddedApprovalNameChanges: boolean
@@ -36,6 +51,8 @@ export type PublishedApprovalTemplate = {
     defaultUser?: string
     defaultGroup?: string
     requireGroupDetails?: boolean
+    allowAttachments?: true
+    attachmentTypeIds?: string[]
     certifications: Array<{ optional: boolean, certificationEn: string, certificationFr: string }>
   }>
 }
@@ -62,6 +79,7 @@ export const buildApprovalTemplateConfiguration = async (
     descriptionEn: template.egcs_cn_description_en,
     descriptionFr: template.egcs_cn_description_fr,
     allowAdditionalApprovals: template.egcs_cn_allowadditionalapprovals,
+    ...publishedAttachmentPolicy(template),
     ...(template.egcs_cn_defaultaddedapprovalname_en
       ? { defaultAddedApprovalNameEn: template.egcs_cn_defaultaddedapprovalname_en }
       : {}),
@@ -88,6 +106,7 @@ export const buildApprovalTemplateConfiguration = async (
       ...(step.egcs_cn_defaultuser ? { defaultUser: String(step.egcs_cn_defaultuser) } : {}),
       ...(step.egcs_cn_defaultgroup ? { defaultGroup: String(step.egcs_cn_defaultgroup) } : {}),
       ...(step.egcs_cn_defaultgroup && step.egcs_cn_requiregroupdetails ? { requireGroupDetails: true } : {}),
+      ...publishedStepAttachmentPolicy(step),
       certifications: certifications
         .filter(item => String(item.egcs_cn_approvalstep) === String(step.id))
         .map(item => ({

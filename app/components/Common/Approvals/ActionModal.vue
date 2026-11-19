@@ -3,6 +3,8 @@
 import { computed, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ActionModalState, ApprovalLookupBehalfType, ApprovalStepItem } from './types'
+import type { ApprovalAttachments } from './attachments'
+import CommonApprovalsAttachmentFiles from './AttachmentFiles.vue'
 
 const {
   step,
@@ -13,6 +15,11 @@ const {
   approveDisabled,
   denyDisabled,
   isSubmittingAction,
+  showAttachments = false,
+  attachmentOpening = '',
+  attachmentCollection = null,
+  attachmentStatus = 'idle',
+  isWritingAttachments = false,
   defaultApproverDisplay,
   assignedApproverDisplay,
   assignedApproverPositionTitle
@@ -25,6 +32,11 @@ const {
   approveDisabled: boolean
   denyDisabled: boolean
   isSubmittingAction: boolean
+  showAttachments?: boolean
+  attachmentOpening?: string
+  attachmentCollection?: ApprovalAttachments | null
+  attachmentStatus?: 'idle' | 'pending' | 'success' | 'error'
+  isWritingAttachments?: boolean
   defaultApproverDisplay: string
   assignedApproverDisplay: string
   assignedApproverPositionTitle: string
@@ -35,6 +47,9 @@ const open = defineModel<boolean>('open', { required: true })
 
 const emit = defineEmits<{
   'check-catalog': []
+  'retry-attachments': []
+  'upload-attachment': [input: { file: File; attachmentTypeId: string }]
+  'remove-attachment': [attachmentId: string]
   'close': []
   'submit': [decision: 'approve' | 'deny']
 }>()
@@ -42,9 +57,32 @@ const emit = defineEmits<{
 const { locale, t } = useI18n()
 const requirementHelpId = `approval-requirement-${useId()}`
 const denialAttempted: Ref<boolean> = ref(false)
+const attachmentTypeId: Ref<string | null | undefined> = ref(undefined)
 watch(open, isOpen => {
-  if (!isOpen) denialAttempted.value = false
+  if (!isOpen) {
+    denialAttempted.value = false
+    attachmentTypeId.value = undefined
+  }
 })
+watch(() => attachmentOpening, () => {
+  attachmentTypeId.value = undefined
+})
+watch(() => attachmentCollection?.types, types => {
+  if (types && !types.some(type => type.id === attachmentTypeId.value)) attachmentTypeId.value = undefined
+})
+const attachmentInputsDisabled = computed(() => isSubmittingAction || isWritingAttachments)
+
+/** @param event - File input change event. */
+const selectAttachmentFile = (event: Event) => {
+  const input = event.target
+  if (!(input instanceof HTMLInputElement)) return
+  const file = input.files?.item(0)
+  const typeId = attachmentTypeId.value
+  input.value = ''
+  if (file && typeId && !attachmentInputsDisabled.value) {
+    emit('upload-attachment', { file, attachmentTypeId: typeId })
+  }
+}
 const denialCommentError = computed(() => denialAttempted.value && !state.value?.egcs_cn_comment.trim()
   ? t('validation.comment_required')
   : undefined)
@@ -123,7 +161,7 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
 <template>
   <UModal
     v-model:open="open"
-    :dismissible="!isSubmittingAction"
+    :dismissible="!isSubmittingAction && !isWritingAttachments"
     :title="t('assessment.approvals.action_step')"
     :description="t('assessment.approvals.action_step_description')" data-field-exclude="Runtime approval actions are outside configurable field help.">
     <template #body>
@@ -232,12 +270,68 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
           </UFormField>
         </div>
 
+        <div v-if="showAttachments" :key="attachmentOpening" class="space-y-3 border-t border-default pt-4">
+          <h3 class="text-sm font-semibold">
+            {{ t('attachments.title') }}
+          </h3>
+          <div v-if="isWritingAttachments || attachmentStatus === 'pending'" role="status" class="text-sm text-muted">
+            {{ t('common.loading') }}
+          </div>
+          <CommonErrorNotice v-if="attachmentStatus === 'error'" :title="t('attachments.load_failed')">
+            <template #actions>
+              <UButton type="button" :label="t('common.retry')" @click="emit('retry-attachments')" />
+            </template>
+          </CommonErrorNotice>
+          <UAlert
+            v-if="attachmentStatus === 'idle' || attachmentCollection?.canUpload === false"
+            color="warning"
+            :title="t('assessment.approvals.attachment_draft_unavailable')" />
+          <template v-if="attachmentCollection">
+            <CommonApprovalsAttachmentFiles
+              v-if="attachmentCollection.items.length"
+              :approval-id="step.id"
+              :items="attachmentCollection.items"
+              :can-remove="attachmentCollection.canUpload"
+              :disabled="attachmentInputsDisabled"
+              @remove="emit('remove-attachment', $event)" />
+            <template v-if="attachmentCollection.canUpload">
+              <div v-if="attachmentCollection.types.length" class="space-y-3">
+                <p class="text-sm text-muted">
+                  {{ t('assessment.approvals.attachment_draft_help') }}
+                </p>
+                <UFormField name="attachmentTypeId" :label="t('attachments.type')">
+                  <CommonBilingualSelectMenu
+                    v-model="attachmentTypeId"
+                    :items="attachmentCollection.types"
+                    label-en-key="nameEn"
+                    label-fr-key="nameFr"
+                    :disabled="attachmentInputsDisabled" />
+                </UFormField>
+                <UFormField
+                  name="file"
+                  :label="t('attachments.upload')"
+                  :help="attachmentTypeId ? undefined : t('assessment.approvals.attachment_type_first')">
+                  <UInput
+                    type="file"
+                    class="w-full"
+                    :disabled="attachmentInputsDisabled || !attachmentTypeId"
+                    @change="selectAttachmentFile" />
+                </UFormField>
+              </div>
+              <UAlert
+                v-else
+                color="warning"
+                :title="t('assessment.approvals.attachment_types_unavailable')" />
+            </template>
+          </template>
+        </div>
+
         <div class="flex justify-end gap-3">
           <UButton
             color="neutral"
             variant="ghost"
             class="cursor-default"
-            :disabled="isSubmittingAction"
+            :disabled="isSubmittingAction || isWritingAttachments"
             @click="emit('close')">
             {{ t('common.cancel') }}
           </UButton>

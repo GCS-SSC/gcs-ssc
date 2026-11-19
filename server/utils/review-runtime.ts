@@ -1047,6 +1047,8 @@ export const cloneDeniedRuntimeReview = async (
       egcs_cn_name_fr: sourceSlip.egcs_cn_name_fr,
       egcs_cn_approvaltemplate: String(sourceSlip.egcs_cn_approvaltemplate),
       egcs_cn_allowadditionalapprovals: sourceSlip.egcs_cn_allowadditionalapprovals,
+      egcs_cn_additionalallowattachments: sourceSlip.egcs_cn_additionalallowattachments,
+      egcs_cn_additionalattachmenttypeids: sourceSlip.egcs_cn_additionalattachmenttypeids,
       egcs_cn_defaultaddedapprovalname_en: sourceSlip.egcs_cn_defaultaddedapprovalname_en,
       egcs_cn_defaultaddedapprovalname_fr: sourceSlip.egcs_cn_defaultaddedapprovalname_fr,
       egcs_cn_allowaddedapprovalnamechanges: sourceSlip.egcs_cn_allowaddedapprovalnamechanges,
@@ -1089,6 +1091,8 @@ export const cloneDeniedRuntimeReview = async (
         egcs_cn_defaultuser: sourceApproval.egcs_cn_defaultuser,
         egcs_cn_defaultgroup: sourceApproval.egcs_cn_defaultgroup,
         egcs_cn_requiregroupdetails: sourceApproval.egcs_cn_requiregroupdetails,
+        egcs_cn_allowattachments: sourceApproval.egcs_cn_allowattachments,
+        egcs_cn_attachmenttypeids: sourceApproval.egcs_cn_attachmenttypeids,
         egcs_cn_assigneduser: sourceApproval.egcs_cn_defaultuser,
         egcs_cn_assignedgroup: sourceApproval.egcs_cn_defaultgroup,
         egcs_cn_isadded: sourceApproval.egcs_cn_isadded

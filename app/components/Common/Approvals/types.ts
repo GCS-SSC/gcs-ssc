@@ -42,6 +42,7 @@ export type ApprovalStepItem = {
   egcs_cn_defaultuser: string
   egcs_cn_defaultgroup?: string | null
   egcs_cn_requiregroupdetails?: boolean
+  egcs_cn_allowattachments?: boolean
   claimant_matches_default?: boolean
   egcs_cn_assigneduser: string | null
   egcs_cn_assignedgroup?: string | null
@@ -123,6 +124,7 @@ export type ApprovalTableRow = {
   assignedApproverLabel: string
   sequence: number
   egcs_cn_defaultuser: string
+  egcs_cn_allowattachments?: boolean
   egcs_cn_defaultgroup?: string | null
   egcs_cn_requiregroupdetails?: boolean
   claimant_matches_default?: boolean
