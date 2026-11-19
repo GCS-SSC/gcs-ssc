@@ -1,6 +1,8 @@
-import { sql, type Kysely } from 'kysely'
+import { expressionBuilder, sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+
+const expressions = expressionBuilder<never>()
 
 /** Stable public identifier for a budget fiscal-year row across version copies. */
 export const budgetFiscalYearStableId = sql<string>`COALESCE(
@@ -19,8 +21,13 @@ export const budgetLineItemStableId = sql<string>`COALESCE(
  * @param column Qualified reference to the original English budget column.
  * @returns English text when present, otherwise the French translation.
  */
-export const budgetLineDisplayText = (column: `${string}.egcs_fc_${'costsubsection' | 'description'}`) =>
-  sql<string | null>`COALESCE(NULLIF(BTRIM(${sql.ref(column)}), ''), ${sql.ref(`${column}_fr`)})`
+export const budgetLineDisplayText = (column: `${string}.egcs_fc_${'costsubsection' | 'description'}`) => {
+  const trimmed = expressions.fn<string | null>('pg_catalog.btrim', [sql.ref(column)])
+  return expressions.fn<string | null>('coalesce', [
+    expressions.fn<string | null>('nullif', [trimmed, expressions.val('')]),
+    sql.ref(`${column}_fr`)
+  ])
+}
 
 /**
  * Resolves retained physical identities but always validates a live current counterpart.

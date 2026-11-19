@@ -53,7 +53,8 @@ const unsupported = (value: unknown, mode: 'read' | 'write' = 'read', subqueries
     return unsupported(current.parameters, mode, subqueries)
   }
   if (current.kind === 'FunctionNode' || current.kind === 'AggregateFunctionNode') {
-    return !pureFunctions.has(String(current.func).toLowerCase())
+    const catalogTrim = mode === 'read' && current.kind === 'FunctionNode' && current.func === 'pg_catalog.btrim'
+    return (!catalogTrim && !pureFunctions.has(String(current.func).toLowerCase()))
       || Object.entries(current).some(([key, value]) => key !== 'func' && unsupported(value, mode, subqueries))
   }
   if (['SelectQueryNode', 'RawNode', 'OverNode'].includes(String(current.kind))) return true
