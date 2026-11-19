@@ -161,7 +161,7 @@ const loadRelatedDocumentRecipients = async (
     ]))
     .select([
       'Type.egcs_ay_code as forwardCode',
-      'Type.egcs_ay_inverse_code as inverseCode',
+      'Type.egcs_ay_inversecode as inverseCode',
       'Link.egcs_ar_proponent as sourceId',
       'Recipient.egcs_ar_legalname_en as legalNameEn',
       'Recipient.egcs_ar_legalname_fr as legalNameFr'

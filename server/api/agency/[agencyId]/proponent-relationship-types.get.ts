@@ -36,9 +36,9 @@ export default defineEventHandler(async event => {
           eb('egcs_ay_name_en', 'ilike', `%${escapedSearch}%`),
           eb('egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`),
           eb('egcs_ay_code', 'ilike', `%${escapedSearch}%`),
-          eb('egcs_ay_inverse_name_en', 'ilike', `%${escapedSearch}%`),
-          eb('egcs_ay_inverse_name_fr', 'ilike', `%${escapedSearch}%`),
-          eb('egcs_ay_inverse_code', 'ilike', `%${escapedSearch}%`)
+          eb('egcs_ay_inversename_en', 'ilike', `%${escapedSearch}%`),
+          eb('egcs_ay_inversename_fr', 'ilike', `%${escapedSearch}%`),
+          eb('egcs_ay_inversecode', 'ilike', `%${escapedSearch}%`)
         ])
       )
     }

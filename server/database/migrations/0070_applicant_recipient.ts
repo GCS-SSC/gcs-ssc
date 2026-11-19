@@ -338,7 +338,7 @@ BEGIN
     END IF;
   END IF;
 
-  SELECT egcs_ay_inverse_code INTO inverse_code
+  SELECT egcs_ay_inversecode INTO inverse_code
     FROM "Agency_Proponent_Relationship_Type" WHERE id = NEW.egcs_ar_relationshiptype
     AND egcs_ay_organizationagency = NEW.egcs_ar_agency AND NOT _deleted FOR SHARE;
   IF NOT FOUND THEN

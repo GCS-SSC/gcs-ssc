@@ -20,9 +20,9 @@ const columns: TableColumnInput<AgencyProponentRelationshipTypeItem>[] = [
 ]
 
 const initialNewItem = {
-  egcs_ay_inverse_code: null,
-  egcs_ay_inverse_name_en: null,
-  egcs_ay_inverse_name_fr: null
+  egcs_ay_inversecode: null,
+  egcs_ay_inversename_en: null,
+  egcs_ay_inversename_fr: null
 }
 
 /**
@@ -32,9 +32,9 @@ const initialNewItem = {
  */
 const setDirectional = (state: Partial<AgencyProponentRelationshipTypeItem>, directional: boolean) => {
   const inverseValue = directional ? '' : null
-  state.egcs_ay_inverse_code = inverseValue
-  state.egcs_ay_inverse_name_en = inverseValue
-  state.egcs_ay_inverse_name_fr = inverseValue
+  state.egcs_ay_inversecode = inverseValue
+  state.egcs_ay_inversename_en = inverseValue
+  state.egcs_ay_inversename_fr = inverseValue
 }
 
 const action: ResourceCrudAction = {
@@ -70,12 +70,12 @@ const action: ResourceCrudAction = {
     </template>
 
     <template #inverse_role-cell="{ row }">
-      <template v-if="row.original.egcs_ay_inverse_code">
+      <template v-if="row.original.egcs_ay_inversecode">
         <CommonBilingualName
-          :name-en="row.original.egcs_ay_inverse_name_en ?? ''"
-          :name-fr="row.original.egcs_ay_inverse_name_fr ?? ''" />
+          :name-en="row.original.egcs_ay_inversename_en ?? ''"
+          :name-fr="row.original.egcs_ay_inversename_fr ?? ''" />
         <p class="text-muted font-mono text-xs">
-          {{ row.original.egcs_ay_inverse_code }}
+          {{ row.original.egcs_ay_inversecode }}
         </p>
       </template>
       <span v-else>{{ t('agency.proponent_relationship_type.same_role') }}</span>
@@ -85,7 +85,7 @@ const action: ResourceCrudAction = {
       <UCheckbox
         v-if="!state.id"
         data-field-exclude="Controls which role fields the unsaved form shows"
-        :model-value="state.egcs_ay_inverse_code !== null"
+        :model-value="state.egcs_ay_inversecode !== null"
         :label="t('agency.proponent_relationship_type.directional')"
         :description="t('agency.proponent_relationship_type.directional_description')"
         @update:model-value="value => setDirectional(state, value === true)" />
@@ -106,21 +106,27 @@ const action: ResourceCrudAction = {
           <UInput v-model="state.egcs_ay_name_fr" class="w-full" />
         </UFormField>
       </fieldset>
-      <fieldset v-if="state.egcs_ay_inverse_code !== null" class="space-y-4">
+      <fieldset v-if="state.egcs_ay_inversecode !== null" class="space-y-4">
         <legend class="font-semibold">
           {{ t('agency.proponent_relationship_type.inverse_role') }}
         </legend>
         <UFormField
           :label="t('agency.proponent_relationship_type.code')"
-          name="egcs_ay_inverse_code"
+          name="egcs_ay_inversecode"
           :required="!state.id">
-          <UInput v-model="state.egcs_ay_inverse_code" :readonly="Boolean(state.id)" class="w-full" />
+          <UInput v-model="state.egcs_ay_inversecode" :readonly="Boolean(state.id)" class="w-full" />
         </UFormField>
-        <UFormField :label="t('agency.name_en')" name="egcs_ay_inverse_name_en" required>
-          <UInput v-model="state.egcs_ay_inverse_name_en" class="w-full" />
+        <UFormField :label="t('agency.name_en')" name="egcs_ay_inversename_en" required>
+          <UInput
+            :model-value="state.egcs_ay_inversename_en ?? undefined"
+            class="w-full"
+            @update:model-value="state.egcs_ay_inversename_en = $event" />
         </UFormField>
-        <UFormField :label="t('agency.name_fr')" name="egcs_ay_inverse_name_fr" required>
-          <UInput v-model="state.egcs_ay_inverse_name_fr" class="w-full" />
+        <UFormField :label="t('agency.name_fr')" name="egcs_ay_inversename_fr" required>
+          <UInput
+            :model-value="state.egcs_ay_inversename_fr ?? undefined"
+            class="w-full"
+            @update:model-value="state.egcs_ay_inversename_fr = $event" />
         </UFormField>
       </fieldset>
     </template>

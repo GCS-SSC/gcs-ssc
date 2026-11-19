@@ -31,11 +31,11 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
     'egcs_ay_name_en as label_en',
     'egcs_ay_name_fr as label_fr',
     'egcs_ay_code as code'
-  ]).unionAll(types.where('egcs_ay_inverse_code', 'is not', null).select(eb => [
+  ]).unionAll(types.where('egcs_ay_inversecode', 'is not', null).select(eb => [
     sql<string>`id::text || ':reverse'`.as('id'),
-    eb.fn.coalesce('egcs_ay_inverse_name_en', 'egcs_ay_name_en').as('label_en'),
-    eb.fn.coalesce('egcs_ay_inverse_name_fr', 'egcs_ay_name_fr').as('label_fr'),
-    eb.fn.coalesce('egcs_ay_inverse_code', 'egcs_ay_code').as('code')
+    eb.fn.coalesce('egcs_ay_inversename_en', 'egcs_ay_name_en').as('label_en'),
+    eb.fn.coalesce('egcs_ay_inversename_fr', 'egcs_ay_name_fr').as('label_fr'),
+    eb.fn.coalesce('egcs_ay_inversecode', 'egcs_ay_code').as('code')
   ]))
   let query = db.selectFrom(roles.as('roles'))
   if (selected_ids) query = query.where('id', 'in', Array.isArray(selected_ids) ? selected_ids : [selected_ids])

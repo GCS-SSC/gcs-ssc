@@ -135,31 +135,31 @@ const AgencyProponentRelationshipTypeBaseSchema = z.object({
   egcs_ay_code: ProponentRelationshipCodeSchema,
   egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
   egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
-  egcs_ay_inverse_code: ProponentRelationshipCodeSchema.nullable().default(null),
-  egcs_ay_inverse_name_en: AgencyLabelSchema('validation.name_en_required').nullable().default(null),
-  egcs_ay_inverse_name_fr: AgencyLabelSchema('validation.name_fr_required').nullable().default(null)
+  egcs_ay_inversecode: ProponentRelationshipCodeSchema.nullable().default(null),
+  egcs_ay_inversename_en: AgencyLabelSchema('validation.name_en_required').nullable().default(null),
+  egcs_ay_inversename_fr: AgencyLabelSchema('validation.name_fr_required').nullable().default(null)
 })
 
 export const AgencyProponentRelationshipTypeSchema = AgencyProponentRelationshipTypeBaseSchema.superRefine((value, context) => {
-  const inverseFields = ['egcs_ay_inverse_code', 'egcs_ay_inverse_name_en', 'egcs_ay_inverse_name_fr'] as const
+  const inverseFields = ['egcs_ay_inversecode', 'egcs_ay_inversename_en', 'egcs_ay_inversename_fr'] as const
   if (inverseFields.every(field => value[field] === null)) return
 
   for (const field of inverseFields) {
     if (value[field] === null) context.addIssue({ code: 'custom', path: [field], message: 'validation.required' })
   }
-  if (value.egcs_ay_inverse_code === value.egcs_ay_code) {
-    context.addIssue({ code: 'custom', path: ['egcs_ay_inverse_code'], message: 'validation.distinct_proponent_relationship_codes' })
+  if (value.egcs_ay_inversecode === value.egcs_ay_code) {
+    context.addIssue({ code: 'custom', path: ['egcs_ay_inversecode'], message: 'validation.distinct_proponent_relationship_codes' })
   }
 })
 
 export const AgencyProponentRelationshipTypePatchSchema = AgencyProponentRelationshipTypeBaseSchema.pick({
   egcs_ay_name_en: true,
   egcs_ay_name_fr: true,
-  egcs_ay_inverse_name_en: true,
-  egcs_ay_inverse_name_fr: true
+  egcs_ay_inversename_en: true,
+  egcs_ay_inversename_fr: true
 }).partial().extend({
-  egcs_ay_inverse_name_en: AgencyLabelSchema('validation.name_en_required').nullable().optional(),
-  egcs_ay_inverse_name_fr: AgencyLabelSchema('validation.name_fr_required').nullable().optional()
+  egcs_ay_inversename_en: AgencyLabelSchema('validation.name_en_required').nullable().optional(),
+  egcs_ay_inversename_fr: AgencyLabelSchema('validation.name_fr_required').nullable().optional()
 })
 
 export type AgencyProponentRelationshipTypeItem = WithId<z.infer<typeof AgencyProponentRelationshipTypeSchema>>

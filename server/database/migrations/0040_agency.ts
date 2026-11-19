@@ -36,13 +36,13 @@ CREATE TABLE "Agency_Proponent_Relationship_Type" (
   egcs_ay_code varchar(255) NOT NULL,
   egcs_ay_name_en varchar(255) NOT NULL,
   egcs_ay_name_fr varchar(255) NOT NULL,
-  egcs_ay_inverse_code varchar(255),
-  egcs_ay_inverse_name_en varchar(255),
-  egcs_ay_inverse_name_fr varchar(255),
+  egcs_ay_inversecode varchar(255),
+  egcs_ay_inversename_en varchar(255),
+  egcs_ay_inversename_fr varchar(255),
   _deleted boolean NOT NULL DEFAULT false,
   CONSTRAINT ay_uq_proponent_reltype_owner UNIQUE (id, egcs_ay_organizationagency),
   CONSTRAINT ay_uq_proponent_reltype_code UNIQUE (egcs_ay_organizationagency, egcs_ay_code),
-  CONSTRAINT ay_uq_proponent_reltype_inverse_code UNIQUE (egcs_ay_organizationagency, egcs_ay_inverse_code),
+  CONSTRAINT ay_uq_proponent_reltype_inverse_code UNIQUE (egcs_ay_organizationagency, egcs_ay_inversecode),
   CONSTRAINT ay_chk_proponent_reltype_code CHECK (
     egcs_ay_code ~ '^[a-z][a-z0-9_]*$' AND egcs_ay_code NOT IN ('constructor', 'prototype')
   ),
@@ -50,12 +50,12 @@ CREATE TABLE "Agency_Proponent_Relationship_Type" (
     length(btrim(egcs_ay_name_en)) > 0 AND length(btrim(egcs_ay_name_fr)) > 0
   ),
   CONSTRAINT ay_chk_proponent_reltype_inverse CHECK (
-    num_nonnulls(egcs_ay_inverse_code, egcs_ay_inverse_name_en, egcs_ay_inverse_name_fr) IN (0, 3)
-    AND (egcs_ay_inverse_code IS NULL OR (
-      egcs_ay_inverse_code ~ '^[a-z][a-z0-9_]*$'
-      AND egcs_ay_inverse_code NOT IN (egcs_ay_code, 'constructor', 'prototype')
-      AND length(btrim(egcs_ay_inverse_name_en)) > 0
-      AND length(btrim(egcs_ay_inverse_name_fr)) > 0
+    num_nonnulls(egcs_ay_inversecode, egcs_ay_inversename_en, egcs_ay_inversename_fr) IN (0, 3)
+    AND (egcs_ay_inversecode IS NULL OR (
+      egcs_ay_inversecode ~ '^[a-z][a-z0-9_]*$'
+      AND egcs_ay_inversecode NOT IN (egcs_ay_code, 'constructor', 'prototype')
+      AND length(btrim(egcs_ay_inversename_en)) > 0
+      AND length(btrim(egcs_ay_inversename_fr)) > 0
     ))
   )
 );
@@ -527,8 +527,8 @@ BEGIN
       SELECT 1 FROM "Agency_Proponent_Relationship_Type"
       WHERE egcs_ay_organizationagency = NEW.egcs_ay_organizationagency
         AND (
-          egcs_ay_code IN (NEW.egcs_ay_code, NEW.egcs_ay_inverse_code)
-          OR egcs_ay_inverse_code IN (NEW.egcs_ay_code, NEW.egcs_ay_inverse_code)
+          egcs_ay_code IN (NEW.egcs_ay_code, NEW.egcs_ay_inversecode)
+          OR egcs_ay_inversecode IN (NEW.egcs_ay_code, NEW.egcs_ay_inversecode)
         )
     ) THEN
       RAISE EXCEPTION USING ERRCODE = '23505', CONSTRAINT = 'ay_uq_proponent_reltype_code',
@@ -539,7 +539,7 @@ BEGIN
 
   IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency
     OR NEW.egcs_ay_code IS DISTINCT FROM OLD.egcs_ay_code
-    OR NEW.egcs_ay_inverse_code IS DISTINCT FROM OLD.egcs_ay_inverse_code THEN
+    OR NEW.egcs_ay_inversecode IS DISTINCT FROM OLD.egcs_ay_inversecode THEN
     RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_proponent_reltype_identity',
       MESSAGE = 'Proponent relationship type ownership and codes are immutable';
   END IF;

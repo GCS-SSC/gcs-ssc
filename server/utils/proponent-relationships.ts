@@ -72,14 +72,14 @@ export const listProponentRelationships = async (event: H3Event) => {
         'agency.egcs_ay_name_en as agency_name_en', 'agency.egcs_ay_name_fr as agency_name_fr'
       ])
       .select(eb => {
-        const reversed = eb.and([eb('link.egcs_ar_relatedproponent', '=', id), eb('type.egcs_ay_inverse_code', 'is not', null)])
+        const reversed = eb.and([eb('link.egcs_ar_relatedproponent', '=', id), eb('type.egcs_ay_inversecode', 'is not', null)])
         return [
           reversed.as('egcs_ar_reversed'),
-          eb.case().when(reversed).then(eb.fn.coalesce('type.egcs_ay_inverse_name_en', 'type.egcs_ay_name_en'))
+          eb.case().when(reversed).then(eb.fn.coalesce('type.egcs_ay_inversename_en', 'type.egcs_ay_name_en'))
             .else(eb.ref('type.egcs_ay_name_en')).end().as('relationship_name_en'),
-          eb.case().when(reversed).then(eb.fn.coalesce('type.egcs_ay_inverse_name_fr', 'type.egcs_ay_name_fr'))
+          eb.case().when(reversed).then(eb.fn.coalesce('type.egcs_ay_inversename_fr', 'type.egcs_ay_name_fr'))
             .else(eb.ref('type.egcs_ay_name_fr')).end().as('relationship_name_fr'),
-          eb.case().when(reversed).then(eb.fn.coalesce('type.egcs_ay_inverse_code', 'type.egcs_ay_code'))
+          eb.case().when(reversed).then(eb.fn.coalesce('type.egcs_ay_inversecode', 'type.egcs_ay_code'))
             .else(eb.ref('type.egcs_ay_code')).end().as('relationship_code')
         ]
       })
@@ -138,7 +138,7 @@ export const lookupRelatedProponents = async (event: H3Event) => {
 }
 
 const requireRelationshipType = async (event: H3Event, db: Transaction<Database>, agencyId: string, typeId: string) => {
-  const type = await db.selectFrom('Agency_Proponent_Relationship_Type').select('egcs_ay_inverse_code')
+  const type = await db.selectFrom('Agency_Proponent_Relationship_Type').select('egcs_ay_inversecode')
     .where('id', '=', typeId).where('egcs_ay_organizationagency', '=', agencyId).where('_deleted', '=', false)
     .forShare().executeTakeFirst()
   if (!type) return await invalidRelationship(event)
@@ -171,7 +171,7 @@ export const createProponentRelationship = async (event: H3Event) => {
         return await invalidRelationship(event)
       }
       const type = await requireRelationshipType(event, trx, agencyId, typeId)
-      if (reversed && !type.egcs_ay_inverse_code) return await invalidRelationship(event)
+      if (reversed && !type.egcs_ay_inversecode) return await invalidRelationship(event)
       return await trx.insertInto('Applicant_Recipient_Relationship').values({
         egcs_ar_agency: agencyId, egcs_ar_relationshiptype: typeId,
         ...getRelationshipEndpoints(id, otherProponentId, reversed)
@@ -213,14 +213,14 @@ export const mutateProponentRelationship = async (event: H3Event, action: 'updat
       }
       const typeId = patch.egcs_ar_relationshiptype ?? link.egcs_ar_relationshiptype
       const type = await requireRelationshipType(event, trx, link.egcs_ar_agency, typeId)
-      if (patch.egcs_ar_reversed && !type.egcs_ay_inverse_code) return await invalidRelationship(event)
-      if (type.egcs_ay_inverse_code && patch.egcs_ar_reversed === undefined && typeId !== link.egcs_ar_relationshiptype) {
+      if (patch.egcs_ar_reversed && !type.egcs_ay_inversecode) return await invalidRelationship(event)
+      if (type.egcs_ay_inversecode && patch.egcs_ar_reversed === undefined && typeId !== link.egcs_ar_relationshiptype) {
         const previous = await requireRelationshipType(event, trx, link.egcs_ar_agency, link.egcs_ar_relationshiptype)
-        if (!previous.egcs_ay_inverse_code) {
+        if (!previous.egcs_ay_inversecode) {
           return await badRequest(event, 'PROPONENT_RELATIONSHIP_ROLE_REQUIRED', 'apiErrors.applicant_recipient.relationship_role_required')
         }
       }
-      const reversed = Boolean(type.egcs_ay_inverse_code) && (patch.egcs_ar_reversed ?? link.egcs_ar_relatedproponent === id)
+      const reversed = Boolean(type.egcs_ay_inversecode) && (patch.egcs_ar_reversed ?? link.egcs_ar_relatedproponent === id)
       await query.set({
         egcs_ar_relationshiptype: typeId,
         ...getRelationshipEndpoints(id, otherProponentId, reversed)

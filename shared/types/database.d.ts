@@ -2982,9 +2982,9 @@ export interface AgencyProponentRelationshipTypeTable {
   egcs_ay_code: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
-  egcs_ay_inverse_code: string | null
-  egcs_ay_inverse_name_en: string | null
-  egcs_ay_inverse_name_fr: string | null
+  egcs_ay_inversecode: string | null
+  egcs_ay_inversename_en: string | null
+  egcs_ay_inversename_fr: string | null
   _deleted: Generated<boolean>
 }
 
