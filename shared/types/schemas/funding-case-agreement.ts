@@ -898,6 +898,10 @@ export const FundingCaseAgreementClaimReconcileLineItemBulkSaveSchema = z.object
 
 export type FundingCaseAgreementClaimReconcileLineItemBulkSave = z.infer<typeof FundingCaseAgreementClaimReconcileLineItemBulkSaveSchema>
 
+export const FundingCaseAgreementClaimReconcileAllSchema = z.object({
+  confirmation: z.string().regex(/^[a-f0-9]{64}$/, { error: 'validation.invalid_selection' }).nullable()
+}).strict()
+
 const OptionalDate = () => z.preprocess(
   value => {
     if (value === null || value === undefined || value === '') {

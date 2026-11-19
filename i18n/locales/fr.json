@@ -3204,6 +3204,8 @@
       "new_reconcile": "Nouveau rapprochement",
       "new_reconcile_with_context": "Créer un nouveau rapprochement pour cette demande de remboursement",
       "save_reconcile": "Enregistrer le rapprochement",
+      "reconcile_all_amounts": "Rapprocher tous les montants",
+      "reconcile_all_overwrite": "Cette action remplacera le montant rapproché enregistré pour {count} ligne. Continuer? | Cette action remplacera les montants rapprochés enregistrés pour {count} lignes. Continuer?",
       "saved_reconcile": "Rapprochement de demande de remboursement enregistré avec succès",
       "cancel_reconcile": "Annuler le rapprochement",
       "cancel_reconcile_confirmation": "Annuler ce rapprochement? Son dossier, ses lignes, ses affectations et l’historique du processus resteront disponibles aux fins d’audit.",

@@ -3204,6 +3204,8 @@
       "new_reconcile": "New reconciliation",
       "new_reconcile_with_context": "Create a new reconciliation for this claim",
       "save_reconcile": "Save reconciliation",
+      "reconcile_all_amounts": "Reconcile all amounts",
+      "reconcile_all_overwrite": "This will replace the saved reconciled amount on {count} line. Continue? | This will replace the saved reconciled amounts on {count} lines. Continue?",
       "saved_reconcile": "Claim reconciliation saved successfully",
       "cancel_reconcile": "Cancel reconciliation",
       "cancel_reconcile_confirmation": "Cancel this reconciliation? Its record, lines, assignments, and workflow history will remain available for audit.",

@@ -1,5 +1,6 @@
 import { assertAgreementCurrency, assertCurrencyMoneyValues, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported claim helpers are intentionally documented by their descriptive names. */
+import { createHash } from 'node:crypto'
 import { getRouterParam, type H3Event } from 'h3'
 import { sql, type Insertable, type Kysely, type Selectable, type Transaction } from 'kysely'
 import type {
@@ -44,7 +45,7 @@ import {
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { compareMoney, parseMoney } from '~~/shared/utils/money'
+import { addMoney, compareMoney, isPersistableMoney, maxMoney, parseMoney, subtractMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
@@ -1426,6 +1427,133 @@ const compareDatabaseIds = (left: string, right: string): number => {
   const leftId = BigInt(left)
   const rightId = BigInt(right)
   return leftId < rightId ? -1 : leftId > rightId ? 1 : 0
+}
+
+type ReconcileAllAmountsResult =
+  | { kind: 'saved', changedCount: number }
+  | { kind: 'confirmation-required', overwriteCount: number, confirmation: string }
+
+export const reconcileAllAgreementClaimAmounts = async (
+  event: H3Event,
+  db: Kysely<Database>,
+  agreementId: string,
+  initialContext: AgreementScopeContext,
+  reconcileId: string,
+  confirmation: string | null
+) => {
+  try {
+    return await executeAgreementClaimMutation(
+      event,
+      db,
+      agreementId,
+      initialContext,
+      [{ type: 'claimReconcile', id: reconcileId }],
+      async trx => {
+        const reconcile = await assertAgreementClaimReconcileEditable(event, trx, agreementId, reconcileId)
+        if (!hasKey(reconcile, 'egcs_fc_fundingagreementclaim')) return reconcile
+
+        const claimId = String(reconcile.egcs_fc_fundingagreementclaim)
+        const currency = await assertAgreementCurrency(event, trx, agreementId)
+        const zero = zeroMoney(currency)
+        const claimLines = await trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
+          .leftJoin('Funding_Case_Agreement_Claim_Reconcile_Line_Item as current_line', join => join
+            .onRef('current_line.egcs_fc_lineitem', '=', 'Funding_Case_Agreement_Claim_Line_Item.id')
+            .on('current_line.egcs_fc_fundingagreementclaimreconcile', '=', reconcileId)
+            .on('current_line._deleted', '=', false))
+          .select([
+            'Funding_Case_Agreement_Claim_Line_Item.id as claimLineId',
+            'current_line.id as reconcileLineId',
+            databaseMoneyText(sql.ref('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_amount')).as('submitted'),
+            databaseMoneyText(sql.ref('current_line.egcs_fc_reconciled')).as('reconciled')
+          ])
+          .where('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim', '=', claimId)
+          .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false)
+          .orderBy('Funding_Case_Agreement_Claim_Line_Item.id')
+          .execute()
+
+        const siblings = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
+          .select('id')
+          .where('egcs_fc_fundingagreementclaim', '=', claimId)
+          .where('id', '!=', reconcileId)
+          .where('_deleted', '=', false)
+          .execute()
+        const successfulIds = (await Promise.all(siblings.map(async ({ id }) =>
+          await hasPositiveCompletionTerminus(trx, 'fundingclaimreconcile', String(id)) ? String(id) : null
+        ))).filter(id => id !== null)
+        const priorLines = successfulIds.length === 0
+          ? []
+          : await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
+              .select([
+                'egcs_fc_lineitem as claimLineId',
+                databaseMoneyText(sql.ref('egcs_fc_reconciled')).as('amount')
+              ])
+              .where('egcs_fc_fundingagreementclaimreconcile', 'in', successfulIds)
+              .where('egcs_fc_fundingagreementclaim', '=', claimId)
+              .where('_deleted', '=', false)
+              .execute()
+        const priorAmounts = new Map<string, Money>()
+        for (const line of priorLines) {
+          const id = String(line.claimLineId)
+          priorAmounts.set(id, addMoney(priorAmounts.get(id) ?? zero, parseDatabaseMoney(line.amount, currency)))
+        }
+
+        const changes = claimLines.flatMap(line => {
+          const claimLineId = String(line.claimLineId)
+          const submitted = parseDatabaseMoney(line.submitted, currency)
+          const remaining = maxMoney([zero, subtractMoney(submitted, priorAmounts.get(claimLineId) ?? zero)], currency)
+          const saved = line.reconciled == null ? null : parseDatabaseMoney(line.reconciled, currency)
+          if (compareMoney(saved ?? zero, remaining) === 0) return []
+          const reconcileLineId = line.reconcileLineId == null ? null : String(line.reconcileLineId)
+          return [{ claimLineId, reconcileLineId, remaining, saved }]
+        })
+        if (changes.some(line => !isPersistableMoney(line.remaining))) {
+          return await badRequest(event, 'INVALID_CURRENCY_AMOUNT', 'validation.invalid_number')
+        }
+        const overwriteCount = changes.filter(line => line.saved !== null).length
+        if (overwriteCount > 0) {
+          // The same snapshot must still be current when the user confirms.
+          const expectedConfirmation = createHash('sha256')
+            .update(JSON.stringify([reconcileId, changes]))
+            .digest('hex')
+          if (confirmation !== expectedConfirmation) {
+            return {
+              kind: 'confirmation-required',
+              overwriteCount,
+              confirmation: expectedConfirmation
+            } satisfies ReconcileAllAmountsResult
+          }
+        }
+
+        for (const line of changes) {
+          const amount = databaseMoneyValue(line.remaining)
+          if (line.reconcileLineId == null) {
+            await trx.insertInto('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
+              .values({
+                egcs_fc_fundingagreementclaimreconcile: reconcileId,
+                egcs_fc_lineitem: line.claimLineId,
+                egcs_fc_reconciled: amount
+              })
+              .executeTakeFirstOrThrow()
+          } else {
+            await trx.updateTable('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
+              .set({ egcs_fc_reconciled: amount })
+              .where('id', '=', String(line.reconcileLineId))
+              .where('egcs_fc_fundingagreementclaimreconcile', '=', reconcileId)
+              .where('_deleted', '=', false)
+              .executeTakeFirstOrThrow()
+          }
+        }
+        if (changes.length > 0) {
+          await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'reconciliation', id: reconcileId })
+          await syncAgreementClaimReconcileEditingStatus(trx, reconcileId)
+        }
+        return { kind: 'saved', changedCount: changes.length } satisfies ReconcileAllAmountsResult
+      }
+    )
+  } catch (error: unknown) {
+    await throwIfAgreementUniqueConstraintError(event, error)
+    throw error
+  }
 }
 
 export const saveAgreementClaimReconcileLineItemsBulk = async (

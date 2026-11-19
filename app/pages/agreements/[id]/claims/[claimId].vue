@@ -3,11 +3,11 @@ import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
-import { FundingCaseAgreementClaimLineItemBaseSchema } from '~~/shared/types/schemas/funding-case-agreement'
+import { FundingCaseAgreementClaimLineItemBaseSchema, FundingCaseAgreementClaimReconcileLineItemBaseSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
-import { computed, onScopeDispose, ref, shallowReactive, triggerRef, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
@@ -18,6 +18,7 @@ import AgreementClaimReconciliationLinesTable from '~/components/Agreement/Agree
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { useActionContext } from '~/composables/useActionContext'
 import { useFormSession } from '~/composables/useFormSession'
+import { useReconcileAllAmounts } from '~/composables/useReconcileAllAmounts'
 import { useExtensionEntityTabs } from '~/composables/useExtensionEntityTabs'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
@@ -135,9 +136,6 @@ const fundingEditorProgramAmount: Ref<MoneyInput> = ref(undefined)
 const fundingEditorTotalAmount: Ref<MoneyInput> = ref(undefined)
 const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: MoneyInput }>> = ref([])
 const isSavingFunding: Ref<boolean> = ref(false)
-const draftReconciledAmounts: Ref<Record<string, MoneyInput>> = ref({})
-const draftSampledAmounts: Ref<Record<string, MoneyInput>> = ref({})
-const draftRationales: Ref<Record<string, string>> = ref({})
 const draftAllocations: Ref<Record<string, string | null>> = ref({})
 const submissionSearch: Ref<string> = ref('')
 const submissionPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
@@ -147,24 +145,39 @@ const submissionPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
 const selectedReconcileId: Ref<string | null> = ref(null)
 const isSavingSubmission: Ref<boolean> = ref(false)
 const allocatingClaimLineId: Ref<string | null> = ref(null)
-const isSavingReconcileFinal: Ref<boolean> = ref(false)
 const isStartingReconcile: Ref<boolean> = ref(false)
 const isWithdrawingClaim: Ref<boolean> = ref(false)
 const isCancellingClaim: Ref<boolean> = ref(false)
 const isCancellingReconcile: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
 const selectedReconcileDetail: Ref<ReconciliationEditorDetail | null> = ref(null)
+const selectedReconcileReadError = ref(false)
 const selectedReconcileRole: Ref<{ id: string, allowed: boolean } | null> = ref(null)
-const isSavingReconcile: Ref<boolean> = ref(false)
-const draftReconcileIsFinal: Ref<boolean> = ref(false)
-const reconcileLineModal = useCrudModal<AgreementClaimReconciliationTableLine, AgreementClaimReconciliationTableLine>({
-  updateState: line => ({ ...line })
+type ReconciliationWrite = { kind: 'idle' | 'line' | 'bulk' } | { kind: 'final', value: boolean }
+const reconciliationWrite: Ref<ReconciliationWrite> = ref({ kind: 'idle' })
+const reconcileAll = useReconcileAllAmounts()
+type ReconciliationLineDraft = AgreementClaimReconciliationTableLine & {
+  egcs_fc_reconciled: MoneyInput
+  egcs_fc_sampled: MoneyInput
+  egcs_fc_rationale: string
+}
+const reconcileLineModal = useCrudModal<AgreementClaimReconciliationTableLine, ReconciliationLineDraft>({
+  updateState: line => ({
+    ...line,
+    egcs_fc_reconciled: line.reconciledAmount,
+    egcs_fc_sampled: line.sampledAmount,
+    egcs_fc_rationale: line.rationale
+  })
 })
+const validateReconcileLine = createValidator(FundingCaseAgreementClaimReconcileLineItemBaseSchema.pick({
+  egcs_fc_reconciled: true,
+  egcs_fc_sampled: true,
+  egcs_fc_rationale: true
+}))
 const selectedReconcileLine = reconcileLineModal.selected
 const isReconcileLineModalOpen = reconcileLineModal.isOpen
 const reconcileLinePending = useCrudModalPending(reconcileLineModal.captureSession)
 const isSavingReconcileLine = reconcileLinePending.isPending
-const pendingReconcilePlans = shallowReactive(new Set<string>())
 let reconcileDetailGeneration = 0
 let claimPageState: 'active' | 'disposed' = 'active'
 const disposeClaimPage = () => {
@@ -411,7 +424,11 @@ const guardReconcileAction = (warning: LocalizedToastText | undefined): boolean 
   }
   return true
 }
-const canCreateReconcileLineItems = canUpdateReconcileRole
+const reconcileActionContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.claimId, () => activeReconcile.value?.id],
+  authority: canUpdateReconcileRole,
+  eligible: () => isCurrentPage() && !isReconcileActionPending.value && !reconcileEditPrerequisiteWarning.value
+})
 const showReconcileCompletion = computed(() => Boolean(activeReconcile.value))
 const hasLoadError = computed(() =>
   Boolean(profileError.value)
@@ -528,11 +545,6 @@ const submissionUpdateContext = useActionContext({
   eligible: () => ownsSubmissionAdmission() && hasSelectedSubmissionLine()
 })
 
-const canEditReconcileLineItem = (claimLineId: string): boolean => {
-  const existing = reconcileLineByClaimLineId.value.get(claimLineId)
-  return existing ? canUpdateReconcileRole.value : canCreateReconcileLineItems.value
-}
-
 const zeroAmount = () => zeroMoney(getCurrency())
 const readDraftMoney = (value: MoneyInput): Money => {
   try {
@@ -542,16 +554,19 @@ const readDraftMoney = (value: MoneyInput): Money => {
   }
 }
 const totalSubmitted = computed(() => sumMoney(activeClaimLineItems.value.map(line => line.egcs_fc_amount), getCurrency()))
-const totalReconciled = computed(() => sumMoney(activeClaimLineItems.value.map(line => readDraftMoney(getDraftReconciledAmount(String(line.id)))), getCurrency()))
+const totalReconciled = computed(() => sumMoney(reconciliationTableLines.value.map(line => readDraftMoney(line.reconciledAmount)), getCurrency()))
 const totalReconciledAll = computed(() => sumMoney(reconcileLineItems.value
   .filter((line: FundingCaseAgreementClaimReconcileLineItemRow) => successfulReconcileIds.value.has(String(line.egcs_fc_fundingagreementclaimreconcile)))
   .filter((line: FundingCaseAgreementClaimReconcileLineItemRow) => activeClaimLineIds.value.has(String(line.egcs_fc_lineitem)))
   .map(line => line.egcs_fc_reconciled), getCurrency()))
-const totalSampled = computed(() => sumMoney(activeClaimLineItems.value.map(line => readDraftMoney(getDraftSampledAmount(String(line.id)))), getCurrency()))
+const totalSampled = computed(() => sumMoney(reconciliationTableLines.value.map(line => readDraftMoney(line.sampledAmount)), getCurrency()))
+const selectedReconcileLinesByClaimLineId = computed(() => new Map(
+  selectedReconcileDetail.value?.lines.map(line => [line.claim_line_id, line])
+))
 const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[]>(() => activeClaimLineItems.value.map(line => {
   const id = String(line.id)
-  const persisted = reconcileLineByClaimLineId.value.get(id)
-  const selectedDraftAmount = getDraftReconciledAmount(id)
+  const persisted = selectedReconcileLinesByClaimLineId.value.get(id) ?? reconcileLineByClaimLineId.value.get(id)
+  const reconciledAmount = persisted?.egcs_fc_reconciled ?? zeroAmount()
   return {
     id,
     name: line.egcs_fc_submittedlineitem?.trim()
@@ -560,11 +575,11 @@ const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[
     costCategory: line.egcs_fc_submittedcostcategory?.trim() || getCostCategoryLabel(line),
     costSubsection: getCostSubsectionLabel(line.egcs_fc_submittedcostsubsection || line.egcs_fc_costsubsection),
     submittedAmount: line.egcs_fc_amount,
-    reconciledAmount: selectedDraftAmount,
-    sampledAmount: getDraftSampledAmount(id),
-    balance: getProjectedReconciliationLineBalance(id, line.egcs_fc_amount, readDraftMoney(selectedDraftAmount)),
-    rationale: getDraftRationale(id) || persisted?.egcs_fc_rationale || '',
-    editable: canEditReconcileLineItem(id)
+    reconciledAmount,
+    sampledAmount: persisted?.egcs_fc_sampled ?? undefined,
+    balance: getProjectedReconciliationLineBalance(id, line.egcs_fc_amount, reconciledAmount),
+    rationale: persisted?.egcs_fc_rationale ?? '',
+    editable: canUpdateReconcileRole.value
   }
 }))
 const balanceAll = computed(() => subtractMoney(totalSubmitted.value, totalReconciledAll.value))
@@ -583,6 +598,7 @@ const loadSelectedReconcileDetail = async (reconcile: FundingCaseAgreementClaimR
   if (!isCurrentPage()) return
   const generation = ++reconcileDetailGeneration
   selectedReconcileDetail.value = null
+  selectedReconcileReadError.value = false
   if (!reconcile) return
 
   try {
@@ -590,35 +606,19 @@ const loadSelectedReconcileDetail = async (reconcile: FundingCaseAgreementClaimR
     if (!isCurrentPage() || generation !== reconcileDetailGeneration || String(detail.reconciliation.id) !== String(activeReconcile.value?.id)) return
     selectedReconcileDetail.value = detail
     selectedReconcileRole.value = { id: String(detail.reconciliation.id), allowed: detail.can_update_role }
-    draftReconciledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_reconciled ?? zeroAmount()]))
-    draftSampledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_sampled ?? undefined]))
-    draftRationales.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_rationale ?? '']))
   } catch (error: unknown) {
-    if (isCurrentPage() && generation === reconcileDetailGeneration) showError(error)
+    if (isCurrentPage() && generation === reconcileDetailGeneration) {
+      selectedReconcileReadError.value = true
+      showError(error)
+    }
   }
 }
 
-watch(activeReconcile, async reconcile => {
-  await loadSelectedReconcileDetail(reconcile)
-}, { immediate: true })
-
-watch(() => activeReconcile.value?.id, () => {
-  draftReconcileIsFinal.value = activeReconcile.value?.egcs_fc_isfinal === true
-}, { immediate: true })
-
-watch(activeReconcileLineItems, () => {
-  const nextReconciled: Record<string, MoneyInput> = {}
-  const nextSampled: Record<string, MoneyInput> = {}
-  const nextRationales: Record<string, string> = {}
-  for (const claimLine of activeClaimLineItems.value) {
-    const existing = reconcileLineByClaimLineId.value.get(String(claimLine.id))
-    nextReconciled[String(claimLine.id)] = existing?.egcs_fc_reconciled ?? zeroAmount()
-    nextSampled[String(claimLine.id)] = existing?.egcs_fc_sampled ?? undefined
-    nextRationales[String(claimLine.id)] = existing?.egcs_fc_rationale ?? ''
-  }
-  draftReconciledAmounts.value = nextReconciled
-  draftSampledAmounts.value = nextSampled
-  draftRationales.value = nextRationales
+const { user: reconciliationActor, permissionRevision: reconciliationPermissionRevision } = useAuth()
+watch([() => activeReconcile.value?.id, () => reconciliationActor.value?.id, reconciliationPermissionRevision], () => {
+  selectedReconcileRole.value = null
+  reconcileLineModal.close()
+  return loadSelectedReconcileDetail()
 }, { immediate: true })
 
 watch(activeUnallocatedClaimLineItems, lines => {
@@ -686,11 +686,6 @@ const claimHeroBadges = computed(() => activeClaim.value
   : []
 )
 
-const getDraftReconciledAmount = (claimLineId: string) => Object.hasOwn(draftReconciledAmounts.value, claimLineId)
-  ? draftReconciledAmounts.value[claimLineId]
-  : zeroAmount()
-const getDraftSampledAmount = (claimLineId: string) => draftSampledAmounts.value[claimLineId]
-const getDraftRationale = (claimLineId: string) => draftRationales.value[claimLineId] ?? ''
 const setDraftAllocation = (claimLineId: string, value: string | number | null | undefined) => {
   draftAllocations.value = { ...draftAllocations.value, [claimLineId]: value === null || value === undefined ? null : String(value) }
 }
@@ -744,16 +739,10 @@ const selectedReconcileLineBalance = computed(() => selectedReconcileLine.value
   ? getProjectedReconciliationLineBalance(
       selectedReconcileLine.value.id,
       selectedReconcileLine.value.submittedAmount,
-      readDraftMoney(selectedReconcileLine.value.reconciledAmount)
+      readDraftMoney(selectedReconcileLine.value.egcs_fc_reconciled)
     )
   : zeroAmount()
 )
-
-const updateSelectedReconciledAmount = (value: MoneyInput): void => {
-  if (!selectedReconcileLine.value) return
-  selectedReconcileLine.value.reconciledAmount = value
-  triggerRef(selectedReconcileLine)
-}
 
 const submissionColumns = computed<TableColumnInput<ClaimSubmissionTableRow>[]>(() => [
   { id: COST_CATEGORY_GROUP_COLUMN_ID, accessorKey: COST_CATEGORY_GROUP_COLUMN_ID, headerKey: 'agreement.claims.cost_category' },
@@ -932,9 +921,11 @@ const getSubmissionGroupedTotal = (row: GroupedClaimSubmissionRow, key: 'submitt
   sumMoney(getSubmissionLeafRows(row).map(leafRow => leafRow.original[key]), getCurrency())
 
 const isReconcileMutationPending = computed(() =>
-  isSavingReconcile.value || isSavingReconcileFinal.value || isSavingReconcileLine.value || isCancellingReconcile.value
+  reconciliationWrite.value.kind !== 'idle' || isCancellingReconcile.value
 )
-const isReconcilePlanPending = computed(() => Boolean(activeReconcile.value && pendingReconcilePlans.has(String(activeReconcile.value.id))))
+
+const isReconcileLineActionPending = computed(() => isReconcileActionPending.value || isSavingReconcileLine.value
+  || (isReconcileMutationPending.value && reconciliationWrite.value.kind !== 'line'))
 
 const selectReconcile = (reconcileId: string | number) => {
   if (isReconcileMutationPending.value) return
@@ -955,6 +946,9 @@ const getReconcileBalance = (reconcile: FundingCaseAgreementClaimReconcileRow) =
 )
 
 const activeReconcileIsFinal = computed(() => activeReconcile.value?.egcs_fc_isfinal === true)
+const reconcileFinalCheckboxValue = computed(() => reconciliationWrite.value.kind === 'final'
+  ? reconciliationWrite.value.value
+  : activeReconcileIsFinal.value)
 const otherFinalReconcile = computed(() =>
   activeClaimReconciles.value.find((reconcile: FundingCaseAgreementClaimReconcileRow) =>
     reconcile.egcs_fc_isfinal === true && String(reconcile.id) !== String(activeReconcile.value?.id)
@@ -1120,70 +1114,53 @@ const startReconcile = async () => {
   }
 }
 
-const setActiveReconcileFinal = (value: boolean | 'indeterminate') => {
-  if (!activeReconcile.value || !canEditActiveReconcileFinal.value || value === 'indeterminate') {
-    return
-  }
-
+const setActiveReconcileFinal = async (value: boolean | 'indeterminate') => {
+  const reconcile = activeReconcile.value
+  if (!reconcile || !canEditActiveReconcileFinal.value || value === 'indeterminate' || value === activeReconcileIsFinal.value) return
   if (!guardReconcileAction(reconcileEditPrerequisiteWarning.value
     ?? (value && otherFinalReconcile.value ? toast.localized('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return
-  draftReconcileIsFinal.value = value
+  const context = reconcileActionContext.capture()
+  if (!context?.canDispatch()) return
+
+  reconciliationWrite.value = { kind: 'final', value }
+  try {
+    await sendJson(`/api/claim-reconciliations/${reconcile.id}`, 'PATCH', { egcs_fc_isfinal: value })
+    if (!isCurrentPage()) return
+    await refreshReconcileWorkspace()
+  } catch (error: unknown) {
+    if (context.isCurrent()) showError(error)
+  } finally {
+    reconciliationWrite.value = { kind: 'idle' }
+  }
 }
 
-const saveReconcile = async (showSuccess = true): Promise<boolean> => {
-  if (!isCurrentPage()) return false
+const reconcileAllAmounts = async () => {
   const reconcile = activeReconcile.value
-  const detail = selectedReconcileDetail.value
-  if (!reconcile || !detail || isReconcileMutationPending.value || isReconcilePlanPending.value
-    || !guardReconcileAction(reconcileEditPrerequisiteWarning.value
-      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? toast.localized('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return false
+  if (!reconcile || isReconcileMutationPending.value || isReconcileLineModalOpen.value
+    || !guardReconcileAction(reconcileEditPrerequisiteWarning.value)) return
+  const context = reconcileActionContext.capture()
+  if (!context?.canDispatch()) return
 
-  const desiredIsFinal = draftReconcileIsFinal.value
-  let lineRequests: Array<{
-    line: ReconciliationEditorLine
-    body: { egcs_fc_reconciled: Money, egcs_fc_sampled: Money | null, egcs_fc_rationale: string | null }
-  }>
+  reconciliationWrite.value = { kind: 'bulk' }
   try {
-    lineRequests = detail.lines.map(line => ({
-      line,
-      body: {
-        egcs_fc_reconciled: parseMoney(getDraftReconciledAmount(line.claim_line_id)),
-        egcs_fc_sampled: parseOptionalMoneyInput(getDraftSampledAmount(line.claim_line_id)),
-        egcs_fc_rationale: getDraftRationale(line.claim_line_id) || null
-      }
-    }))
-  } catch (error: unknown) {
-    if (isCurrentPage()) showError(error)
-    return false
-  }
-  isSavingReconcile.value = true
-  try {
-    await sendJson(`/api/claim-reconciliations/${reconcile.id}/lines/bulk`, 'PATCH', {
-      lines: lineRequests.map(({ line, body }) => ({
-        claim_line_id: line.claim_line_id,
-        reconcile_line_id: line.reconcile_line_id,
-        ...body
-      })),
-      egcs_fc_isfinal: desiredIsFinal
+    const changed = await reconcileAll(String(reconcile.id), context.canDispatch)
+    if (!changed || !isCurrentPage()) return
+    await refreshReconcileWorkspace()
+    if (isCurrentPage() && context.isCurrent()) toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized('agreement.claims.saved_reconcile'),
+      color: 'success'
     })
-    if (!isCurrentPage()) return false
-    await refreshPage()
-    if (!isCurrentPage()) return false
-    await loadSelectedReconcileDetail()
-    if (!isCurrentPage()) return false
-    if (showSuccess) toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_reconcile'), color: 'success' })
-    return true
   } catch (error: unknown) {
-    if (isCurrentPage()) showError(error)
-    return false
+    if (context.isCurrent()) showError(error)
   } finally {
-    isSavingReconcile.value = false
+    reconciliationWrite.value = { kind: 'idle' }
   }
 }
 
 const openReconcileLineEditor = (line: AgreementClaimReconciliationTableLine) => {
   if (!isCurrentPage()) return
-  if (line.editable && (isReconcileMutationPending.value || !guardReconcileAction(reconcileEditPrerequisiteWarning.value))) return
+  if (line.editable && (isReconcileLineActionPending.value || !guardReconcileAction(reconcileEditPrerequisiteWarning.value))) return
   reconcileLineModal.openUpdate(line)
 }
 
@@ -1191,51 +1168,52 @@ const saveReconcileLine = async () => {
   if (!isCurrentPage()) return
   const line = selectedReconcileLine.value
   const reconcile = activeReconcile.value
-  const detailLine = selectedReconcileDetail.value?.lines.find(item => item.claim_line_id === line?.id)
-  const detail = selectedReconcileDetail.value
+  const detailLine = selectedReconcileLinesByClaimLineId.value.get(line?.id ?? '')
   const session = reconcileLineModal.captureSession()
-  if (!line || !reconcile || !detail || !detailLine || isReconcileMutationPending.value || isReconcilePlanPending.value || !reconcileLineModal.isCurrentSession(session)
-    || !guardReconcileAction(reconcileEditPrerequisiteWarning.value
-      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? toast.localized('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))
-    || !reconcileLinePending.begin(session)) return
-  const desiredIsFinal = draftReconcileIsFinal.value
-  const reconcileId = String(reconcile.id)
-  pendingReconcilePlans.add(reconcileId)
+  if (!line || !reconcile || !detailLine || isReconcileMutationPending.value || !reconcileLineModal.isCurrentSession(session)
+    || !guardReconcileAction(reconcileEditPrerequisiteWarning.value)) return
+  const context = reconcileActionContext.capture()
+  if (!context?.canDispatch() || !reconcileLinePending.begin(session)) return
+  reconciliationWrite.value = { kind: 'line' }
 
   try {
-    const lines = detail.lines.map(item => item.claim_line_id === line.id
-      ? {
-          claim_line_id: item.claim_line_id,
-          reconcile_line_id: item.reconcile_line_id,
-          egcs_fc_reconciled: parseMoney(line.reconciledAmount),
-          egcs_fc_sampled: parseOptionalMoneyInput(line.sampledAmount),
-          egcs_fc_rationale: line.rationale.trim() || null
-        }
-      : {
-          claim_line_id: item.claim_line_id,
-          reconcile_line_id: item.reconcile_line_id,
-          egcs_fc_reconciled: parseMoney(getDraftReconciledAmount(item.claim_line_id)),
-          egcs_fc_sampled: parseOptionalMoneyInput(getDraftSampledAmount(item.claim_line_id)),
-          egcs_fc_rationale: getDraftRationale(item.claim_line_id) || null
-        })
-    await sendJson(`/api/claim-reconciliations/${reconcile.id}/lines/bulk`, 'PATCH', {
-      lines,
-      egcs_fc_isfinal: desiredIsFinal
-    })
+    const base = `/api/claim-reconciliations/${reconcile.id}/lines`
+    const amounts = {
+      egcs_fc_reconciled: parseMoney(line.egcs_fc_reconciled),
+      egcs_fc_sampled: parseOptionalMoneyInput(line.egcs_fc_sampled),
+      egcs_fc_rationale: line.egcs_fc_rationale.trim() || null
+    }
+    if (detailLine.reconcile_line_id) {
+      await sendJson(`${base}/${detailLine.reconcile_line_id}`, 'PATCH', amounts)
+    } else {
+      await sendJson(base, 'POST', {
+        ...amounts,
+        egcs_fc_fundingagreementclaimreconcile: String(reconcile.id),
+        egcs_fc_lineitem: detailLine.claim_line_id
+      })
+    }
     if (!isCurrentPage()) return
-    await refreshPage()
-    if (!isCurrentPage()) return
-    await loadSelectedReconcileDetail()
-    if (!isCurrentPage()) return
-    if (!reconcileLineModal.closeSession(session)) return
-    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_reconcile_line'), color: 'success' })
+    try {
+      await refreshReconcileWorkspace()
+    } catch (error: unknown) {
+      if (context.isCurrent()) showError(error)
+    }
+    if (isCurrentPage() && context.isCurrent() && reconcileLineModal.closeSession(session)) {
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_reconcile_line'), color: 'success' })
+    }
   } catch (error: unknown) {
-    if (isCurrentPage() && reconcileLineModal.isCurrentSession(session)) showError(error)
+    if (context.isCurrent() && reconcileLineModal.isCurrentSession(session)) showError(error)
   } finally {
-    pendingReconcilePlans.delete(reconcileId)
+    reconciliationWrite.value = { kind: 'idle' }
     reconcileLinePending.end(session)
   }
 }
+const reconcileLineFormSession = useFormSession({
+  owner: reconcileLineModal,
+  action: { kind: 'remote', context: reconcileActionContext },
+  submit: saveReconcileLine,
+  onDenied: () => guardReconcileAction(reconcileEditPrerequisiteWarning.value)
+})
 const refreshReconcileWorkspace = async () => {
   await refreshPage()
   await loadSelectedReconcileDetail()
@@ -1669,20 +1647,20 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                           :loading="isCancellingReconcile"
                           :disabled="isCancellingReconcile || isReconcileActionPending"
                           @click="cancelReconciliation" />
-                        <CommonSaveButton
+                        <UButton
                           v-if="canUpdateReconcileRole"
-                          data-help-target="casework.claims.detail.claims-save-reconcile"
                           type="button"
-                          :label="t('agreement.claims.save_reconcile')"
-                          :loading="isSavingReconcile"
-                          :disabled="isSavingReconcile || isReconcilePlanPending || isReconcileActionPending"
-                          @click="saveReconcile" />
+                          icon="i-lucide-list-checks"
+                          :label="t('agreement.claims.reconcile_all_amounts')"
+                          :loading="reconciliationWrite.kind === 'bulk'"
+                          :disabled="isReconcileMutationPending || isReconcileActionPending || isReconcileLineModalOpen"
+                          @click="reconcileAllAmounts" />
                       </div>
                     </div>
                     <div class="rounded-sm border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
                       <UCheckbox
                         data-ui-target="agreements.claims.claims.mark_reconcile_final"
-                        :model-value="draftReconcileIsFinal"
+                        :model-value="reconcileFinalCheckboxValue"
                         :label="t('agreement.claims.mark_reconcile_final')"
                         :description="t('agreement.claims.mark_reconcile_final_description')"
                         :disabled="!canEditActiveReconcileFinal"
@@ -1691,6 +1669,15 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                         {{ t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.id }) }}
                       </p>
                     </div>
+                    <UAlert
+                      v-if="selectedReconcileReadError"
+                      color="error"
+                      :title="t('common.resource_table_load_failed')"
+                      :description="t('common.resource_table_load_failed_description')">
+                      <template #actions>
+                        <UButton type="button" :label="t('common.retry')" @click="loadSelectedReconcileDetail()" />
+                      </template>
+                    </UAlert>
                     <AgreementClaimReconciliationLinesTable
                       v-if="profile.egcs_fc_currency"
                       :currency="profile.egcs_fc_currency"
@@ -1701,7 +1688,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                       :total-reconciled="totalReconciled"
                       :total-sampled="totalSampled"
                       edit-mode="action"
-                      :action-pending="isReconcileActionPending || isReconcileMutationPending"
+                      :action-pending="isReconcileLineActionPending"
                       @edit="openReconcileLineEditor" />
                   </div>
                 </CommonSection>
@@ -1745,7 +1732,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                       :action-role-allowed="canUpdateReconcileRole"
                       :action-prerequisite-warning="reconcileWorkflowPrerequisiteWarning"
                       :refresh-key="approvalsRefreshKey"
-                      @changed="refreshPage" />
+                      @changed="refreshReconcileWorkspace" />
                   </div>
                 </CommonSection>
                 <div v-else class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -1810,7 +1797,12 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
       :description="selectedReconcileLine.name"
       :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <form data-testid="reconcile-line-form" class="space-y-5" @submit.prevent="saveReconcileLine">
+        <UForm
+          v-bind="reconcileLineFormSession"
+          data-testid="reconcile-line-form"
+          :state="selectedReconcileLine"
+          :validate="validateReconcileLine"
+          class="space-y-5">
           <p v-if="selectedReconcileLine.description && selectedReconcileLine.description !== selectedReconcileLine.name" class="text-sm text-muted">
             {{ selectedReconcileLine.description }}
           </p>
@@ -1829,26 +1821,27 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField data-ui-target="agreements.claims.claims.reconciled_amount" :label="t('agreement.claims.reconciled_amount')" required>
+            <UFormField data-ui-target="agreements.claims.claims.reconciled_amount" :label="t('agreement.claims.reconciled_amount')" name="egcs_fc_reconciled" required>
               <CommonCurrencyInput
-                v-model="selectedReconcileLine.reconciledAmount"
+                v-model="selectedReconcileLine.egcs_fc_reconciled"
                 :currency="profile?.egcs_fc_currency"
                 :disabled="!selectedReconcileLine.editable || isSavingReconcileLine"
-                class="w-full"
-                @update:model-value="updateSelectedReconciledAmount" />
+                required
+                aria-required="true"
+                class="w-full" />
             </UFormField>
-            <UFormField data-ui-target="agreements.claims.claims.sampled_amount" :label="t('agreement.claims.sampled_amount')">
+            <UFormField data-ui-target="agreements.claims.claims.sampled_amount" :label="t('agreement.claims.sampled_amount')" name="egcs_fc_sampled">
               <CommonCurrencyInput
-                v-model="selectedReconcileLine.sampledAmount"
+                v-model="selectedReconcileLine.egcs_fc_sampled"
                 :currency="profile?.egcs_fc_currency"
                 :disabled="!selectedReconcileLine.editable || isSavingReconcileLine"
                 class="w-full" />
             </UFormField>
           </div>
 
-          <UFormField data-ui-target="agreements.claims.claims.rationale" :label="t('agreement.claims.rationale')">
+          <UFormField data-ui-target="agreements.claims.claims.rationale" :label="t('agreement.claims.rationale')" name="egcs_fc_rationale">
             <CommonTextarea
-              v-model="selectedReconcileLine.rationale"
+              v-model="selectedReconcileLine.egcs_fc_rationale"
               :rows="6"
               :placeholder="t('agreement.claims.rationale_for', { name: selectedReconcileLine.name })"
               :readonly="!selectedReconcileLine.editable"
@@ -1871,9 +1864,9 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               type="submit"
               :label="t('common.save')"
               :loading="isSavingReconcileLine"
-              :disabled="isSavingReconcileLine || isReconcilePlanPending || isReconcileActionPending" />
+              :disabled="isReconcileMutationPending || isReconcileActionPending" />
           </div>
-        </form>
+        </UForm>
       </template>
     </UModal>
     <UModal v-if="profile?.egcs_fc_currency" v-model:open="fundingEditorOpen" data-help-view="casework.claims.detail.funding-editor-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t(fundingEditorClearOnly ? 'agreement.funding_sources.clear' : 'agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
