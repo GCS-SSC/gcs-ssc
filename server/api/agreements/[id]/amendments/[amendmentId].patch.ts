@@ -31,7 +31,7 @@ export default defineEventHandler(async event => {
     const amendment = await assertDraftAgreementAmendment(event, trx, agreementId, amendmentId)
     if (!('id' in amendment)) return amendment
     const riskWorkflowManaged = await isRiskRatingWorkflowManaged(trx, {
-      streamId: currentContext.streamId, entityType: 'fundingcaseamendment'
+      streamId: currentContext.streamId, entityType: 'fundingcaseamendment', entityId: amendmentId
     })
     if (riskWorkflowManaged && (Object.hasOwn(body, 'egcs_fc_changerisk') || Object.hasOwn(body, 'egcs_fc_proposedriskscore'))) {
       return await badRequest(event, 'AMENDMENT_RISK_WORKFLOW_MANAGED', 'apiErrors.agreement.amendment_risk_workflow_managed')
@@ -165,6 +165,7 @@ export default defineEventHandler(async event => {
       egcs_fc_name_fr: body.egcs_fc_name_fr,
       egcs_fc_changerisk: riskWorkflowManaged ? true : body.egcs_fc_changerisk,
       egcs_fc_proposedriskscore: body.egcs_fc_proposedriskscore,
+      egcs_fc_riskratingruntime: Object.hasOwn(body, 'egcs_fc_proposedriskscore') ? null : undefined,
       egcs_fc_proposedtitle_en: proposedTitle?.egcs_fc_proposedtitle_en ?? null,
       egcs_fc_proposedtitle_fr: proposedTitle?.egcs_fc_proposedtitle_fr ?? null,
       egcs_fc_proposedauthorizedassistancestartdate: durationEnabled && proposedStartDate ? dateOnlySql(proposedStartDate) : null,

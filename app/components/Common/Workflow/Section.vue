@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useActionContext } from '~/composables/useActionContext'
+import { useModalSession } from '~/composables/useModalSession'
 import { copyQuestionnaireResponses, QuestionnaireMutationResultSchema } from '~/utils/questionnaire-runtime'
 import { useResourceRequest } from '~/composables/useResourceRequest'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
@@ -67,7 +68,7 @@ type RuntimeApplicableWorkflow = {
   hasUnpublishedChanges: boolean
   publicationDefinition: JsonValue
 }
-type AvailableStandardWorkflow = {
+type AvailableWorkflow = {
   workflowSetupId: string
   name_en: string
   name_fr: string
@@ -112,8 +113,9 @@ type RuntimeResponse = {
   canRetry?: boolean
   canCancel?: boolean
   canStart?: boolean
+  availableWorkflowCount?: number
   startBlocker?: {
-    reason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_frozen'
+    reason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_frozen' | 'risk_rating_source_stale'
     runtimeId?: string
     purpose?: Workflow_Purpose
     name_en?: string
@@ -210,11 +212,12 @@ const isResuming = computed(() => mutation.value.kind === 'pending' && mutation.
 const selectedStepId: Ref<string | null> = ref(null)
 const activeWorkflowTab: Ref<string> = ref('current')
 const selectedAttemptId: Ref<string | null> = ref(null)
-const isChooserOpen: Ref<boolean> = ref(false)
+const chooserSession = useModalSession()
+const isChooserOpen = chooserSession.isOpen
 const selectedWorkflowSetupId: Ref<string | null> = ref(null)
-const availableRequest = useResourceRequest<AvailableStandardWorkflow[]>({
+const availableRequest = useResourceRequest<AvailableWorkflow[]>({
   identity: () => `${entityType}:${entityId}:${purpose}:${approvalOnly}`,
-  enabled: () => purpose === 'standard',
+  enabled: () => purpose === 'standard' || purpose === 'risk_rating',
   trigger: 'refresh',
   refreshData: 'clear',
   failureData: 'clear',
@@ -223,9 +226,10 @@ const availableRequest = useResourceRequest<AvailableStandardWorkflow[]>({
       const requestUrl = getClientRequestUrl('/api/workflows/available')
       requestUrl.searchParams.set('entityType', entityType)
       requestUrl.searchParams.set('entityId', entityId)
+      if (purpose === 'risk_rating') requestUrl.searchParams.set('purpose', purpose)
       const response = await fetch(requestUrl, { signal })
       if (!response.ok) await throwFetchResponseError(response)
-      const payload = await response.json() as { items?: AvailableStandardWorkflow[] } | AvailableStandardWorkflow[]
+      const payload = await response.json() as { items?: AvailableWorkflow[] } | AvailableWorkflow[]
       return Array.isArray(payload) ? payload : payload.items ?? []
     } catch (failure) {
       if (!signal.aborted) showError(failure)
@@ -237,6 +241,9 @@ const availableWorkflows = computed(() => availableRequest.data.value ?? [])
 const availableWorkflowsStatus = computed(() => availableRequest.state.value.kind === 'disposed' ? 'idle' : availableRequest.status.value)
 const isLoadingAvailable = computed(() => availableWorkflowsStatus.value === 'pending')
 const clearAvailable = availableRequest.reset
+watch(isChooserOpen, open => {
+  if (!open) clearAvailable()
+}, { flush: 'sync' })
 const endpoint = computed(() => `/api/workflows/${approvalOnly ? 'approval-runtime' : 'runtime'}?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}${selectedAttemptId.value ? `&runtimeId=${selectedAttemptId.value}` : ''}`)
 const { data, refresh, status, error = ref(undefined) } = await useFetch<RuntimeResponse, Error, string>(endpoint)
 const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}:${approvalOnly}`)
@@ -280,7 +287,7 @@ watch(runtimeIdentity, () => {
   activeWorkflowTab.value = 'current'
   isChooserOpen.value = false
   selectedWorkflowSetupId.value = null
-  if (mutation.value.kind !== 'disposed') mutation.value = { kind: 'idle' }
+  if (mutation.value.kind === 'pending' && mutation.value.action !== 'start') mutation.value = { kind: 'idle' }
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
   runtimeIdentityGeneration += 1
@@ -354,14 +361,19 @@ type PublishedApprovalReference = {
   definition: PublishedApprovalPreview
 }
 const applicableWorkflow = computed(() => data.value?.applicable?.workflow ?? null)
+const riskWorkflowChoice = computed(() => purpose === 'risk_rating' && (data.value?.availableWorkflowCount ?? 0) > 1)
+const previewWorkflow = computed(() => riskWorkflowChoice.value ? null : applicableWorkflow.value)
 const showPreActionReport = computed(() => purpose !== 'standard'
   && !data.value?.current
-  && (Boolean(applicableWorkflow.value) || showPreActionWhenUnconfigured))
-const preActionTitle = computed(() => applicableWorkflow.value
-  ? (locale.value === 'fr' ? applicableWorkflow.value.egcs_cn_name_fr : applicableWorkflow.value.egcs_cn_name_en)
-  : preActionTitleKey ? t(preActionTitleKey) : '')
-const preActionDescription = computed(() => applicableWorkflow.value
-  ? (locale.value === 'fr' ? applicableWorkflow.value.egcs_cn_description_fr : applicableWorkflow.value.egcs_cn_description_en)
+  && (Boolean(applicableWorkflow.value) || riskWorkflowChoice.value || showPreActionWhenUnconfigured))
+const preActionTitle = computed(() => {
+  const workflow = previewWorkflow.value
+  if (workflow) return locale.value === 'fr' ? workflow.egcs_cn_name_fr : workflow.egcs_cn_name_en
+  if (riskWorkflowChoice.value) return t('workflow.choose_risk_workflow')
+  return preActionTitleKey ? t(preActionTitleKey) : ''
+})
+const preActionDescription = computed(() => previewWorkflow.value
+  ? (locale.value === 'fr' ? previewWorkflow.value.egcs_cn_description_fr : previewWorkflow.value.egcs_cn_description_en)
   : preActionDescriptionKey ? t(preActionDescriptionKey) : '')
 const selectedAvailableWorkflow = computed(() => availableWorkflows.value.find(item => item.workflowSetupId === selectedWorkflowSetupId.value) ?? null)
 const loadAvailableWorkflows = async () => {
@@ -370,6 +382,14 @@ const loadAvailableWorkflows = async () => {
 }
 const roleVisibleActions = computed(() => actionRoleAllowed !== undefined)
 const canShowParentAction = computed(() => actionRoleAllowed ?? canEdit)
+const startActionContext = useActionContext({
+  identity: [runtimeIdentity],
+  authority: canShowParentAction,
+  eligible: () => canEdit && activeWorkflowTab.value === 'current' && data.value?.canStart === true
+})
+watch(startActionContext.version, () => {
+  isChooserOpen.value = false
+}, { flush: 'sync' })
 const snapshotStartBlocker = (): LocalizedToastText => {
   const blocker = data.value?.startBlocker
   if (!blocker) return toast.localized('workflow.action_prerequisite_unavailable')
@@ -397,8 +417,8 @@ const guardParentAction = (action: 'start' | 'retry' | 'cancel') => {
   return true
 }
 const openChooser = async () => {
-  if (isLoadingAvailable.value || !guardParentAction('start')) return
-  selectedWorkflowSetupId.value = null
+  if (isMutationPending.value || isLoadingAvailable.value || !guardParentAction('start')
+    || !startActionContext.capture()?.canDispatch()) return
   isChooserOpen.value = true
   await loadAvailableWorkflows()
 }
@@ -411,7 +431,7 @@ const workflowStartLabel = computed(() => purpose === 'risk_rating'
 const workflowStartIcon = computed(() => purpose === 'risk_rating'
   ? 'i-lucide-gauge'
   : 'i-lucide-message-square-quote')
-const previewConfiguration = computed(() => applicableWorkflow.value?.publicationDefinition as PublishedWorkflowPreview | undefined)
+const previewConfiguration = computed(() => previewWorkflow.value?.publicationDefinition as PublishedWorkflowPreview | undefined)
 const workflowPreview = computed(() => {
   const configuration = previewConfiguration.value
   if (!Array.isArray(configuration?.members)) return []
@@ -631,12 +651,13 @@ watch([() => data.value?.current?.runtimeId, () => selectedRecommendation.value?
 watch(selectedRecommendation, () => {
   if (!recommendationEditor.isPending.value && !recommendationEditor.isDirty.value && !hasRecommendationConflict.value) replaceRecommendationDraft()
 })
-const start = async () => {
+const start = async (selection?: { setupId: string, chooserSession: number | null }) => {
   if (mutation.value.kind !== 'idle' || !guardParentAction('start')) return
-  if (purpose === 'standard' && (
-    availableWorkflowsStatus.value !== 'success'
-    || selectedAvailableWorkflow.value?.eligible !== true
-  )) return
+  if (purpose === 'standard' && !selection) return
+  const operation = startActionContext.capture()
+  if (!operation?.canDispatch() || status.value !== 'success') return
+  const chooserOpening = selection?.chooserSession ?? null
+  const ownsOpening = () => chooserOpening === null || chooserSession.isCurrentSession(chooserOpening)
   const completeHelp = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, helpStartTarget, 'save-success', helpContext.value)
   const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
@@ -649,21 +670,47 @@ const start = async () => {
         entityType,
         entityId,
         purpose,
-        ...(purpose === 'standard' ? { workflowSetupId: selectedWorkflowSetupId.value } : {})
+        ...(selection ? { workflowSetupId: selection.setupId } : {})
       })
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!isCurrentRuntimeIdentity(generation)) return
-    isChooserOpen.value = false
+    if (!isCurrentRuntimeIdentity(generation) || !operation.isCurrent()) return
+    if (ownsOpening()) isChooserOpen.value = false
     await refresh()
-    if (!isCurrentRuntimeIdentity(generation)) return
+    if (!isCurrentRuntimeIdentity(generation) || !operation.isCurrent()) return
     completeHelp()
     invalidate()
     emit('changed')
   } catch (error) {
-    if (isCurrentRuntimeIdentity(generation)) showError(error)
+    if (isCurrentRuntimeIdentity(generation) && operation.isCurrent() && ownsOpening()) showError(error)
   } finally {
     settleMutation(generation)
+  }
+}
+const startSelectedWorkflow = async () => {
+  const selected = selectedAvailableWorkflow.value
+  const opening = chooserSession.captureSession()
+  if (opening === null || availableWorkflowsStatus.value !== 'success' || !selected?.eligible) return
+  await start({ setupId: selected.workflowSetupId, chooserSession: opening })
+}
+const startPrimaryWorkflow = async () => {
+  if (purpose !== 'risk_rating') return await start()
+  if (isMutationPending.value || isLoadingAvailable.value || !guardParentAction('start')) return
+  const operation = startActionContext.capture()
+  if (!operation?.canDispatch()) return
+  selectedWorkflowSetupId.value = null
+  if (!await availableRequest.refresh() || !operation.canDispatch()) return
+  if (availableWorkflows.value.length > 1) {
+    isChooserOpen.value = true
+    return
+  }
+  if (availableWorkflows.value.length === 1) {
+    // The server checks that the choice is still unambiguous inside the start transaction.
+    return await start()
+  }
+  await refresh()
+  if (operation.isCurrent()) {
+    toast.add({ title: toast.localized('common.unavailable'), description: snapshotStartBlocker(), color: 'warning' })
   }
 }
 const retry = async () => {
@@ -835,14 +882,19 @@ const handleApprovalChanged = async () => {
     </div>
     <div v-if="status === 'success' && purpose === 'risk_rating' && hasTerminalResult && activeWorkflowTab !== 'previous' && canShowParentAction && (roleVisibleActions || data?.canStart)" class="flex justify-end">
       <UButton
-        v-if="hasTerminalResult"
         :data-help-target="helpStartTarget"
         :icon="workflowStartIcon"
         :label="workflowStartLabel"
-        :loading="isStarting"
-        :disabled="isMutationPending"
-        @click="start" />
+        :loading="isStarting || isLoadingAvailable"
+        :disabled="isMutationPending || isLoadingAvailable"
+        @click="startPrimaryWorkflow" />
     </div>
+    <UAlert
+      v-if="status === 'success' && purpose === 'risk_rating' && activeWorkflowTab !== 'previous' && !hasActiveWorkflow && !data?.canStart && startBlockerDescription && data?.startBlocker?.reason !== 'risk_rating_frozen'"
+      color="warning"
+      icon="i-lucide-triangle-alert"
+      :title="t('workflow.risk_workflow_unavailable')"
+      :description="startBlockerDescription" />
     <UAlert
       v-if="purpose === 'standard' && !hasActiveWorkflow && data?.activeWorkflowPurpose"
       color="warning"
@@ -948,7 +1000,7 @@ const handleApprovalChanged = async () => {
     </UAlert>
     <CommonPreActionReport
       v-else-if="showWorkflowContent && showPreActionReport"
-      :show-header="Boolean(applicableWorkflow) || preActionShowHeader"
+      :show-header="Boolean(previewWorkflow) || preActionShowHeader"
       :title="preActionTitle"
       :description="preActionDescription">
       <template v-if="$slots['pre-action-action'] || (canShowParentAction && (roleVisibleActions || data?.canStart))" #action>
@@ -961,7 +1013,7 @@ const handleApprovalChanged = async () => {
           :loading="isStarting"
           :disabled="isMutationPending"
           class="cursor-default"
-          @click="start" />
+          @click="startPrimaryWorkflow" />
       </template>
 
       <template v-if="$slots['pre-action-notices']" #notices>
@@ -1187,7 +1239,11 @@ const handleApprovalChanged = async () => {
       {{ t(purpose === 'approval_submission' ? 'workflow.approval_not_configured' : 'workflow.not_configured') }}
     </p>
 
-    <UModal v-model:open="isChooserOpen" :title="t('workflow.add_workflow')" :description="t('workflow.add_workflow_description')" :ui="{ content: 'sm:max-w-4xl' }">
+    <UModal
+      v-model:open="isChooserOpen"
+      :title="t(purpose === 'risk_rating' ? 'workflow.choose_risk_workflow' : 'workflow.add_workflow')"
+      :description="t(purpose === 'risk_rating' ? 'workflow.choose_risk_workflow_description' : 'workflow.add_workflow_description')"
+      :ui="{ content: 'sm:max-w-4xl' }">
       <template #body>
         <div class="space-y-6">
           <div v-if="isLoadingAvailable" class="h-24 animate-pulse rounded-sm bg-muted" />
@@ -1213,6 +1269,7 @@ const handleApprovalChanged = async () => {
               class="rounded-md border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-70"
               :class="selectedWorkflowSetupId === workflow.workflowSetupId ? 'border-primary bg-primary/5' : workflow.eligible ? 'border-default hover:border-primary/60' : 'border-default bg-muted/40'"
               :disabled="!workflow.eligible"
+              :aria-pressed="selectedWorkflowSetupId === workflow.workflowSetupId"
               :aria-describedby="workflow.ineligibleReason ? `workflow-ineligible-${workflow.workflowSetupId}` : undefined"
               @click="selectedWorkflowSetupId = workflow.workflowSetupId">
               <span class="flex items-start justify-between gap-3">
@@ -1240,7 +1297,7 @@ const handleApprovalChanged = async () => {
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <UButton color="neutral" variant="outline" :label="t('common.cancel')" @click="isChooserOpen = false" />
-          <UButton icon="i-lucide-play" :label="t('workflow.start')" :loading="isStarting" :disabled="availableWorkflowsStatus !== 'success' || !selectedAvailableWorkflow?.eligible || isMutationPending" @click="start" />
+          <UButton icon="i-lucide-play" :label="t('workflow.start')" :loading="isStarting" :disabled="availableWorkflowsStatus !== 'success' || !selectedAvailableWorkflow?.eligible || isMutationPending" @click="startSelectedWorkflow" />
         </div>
       </template>
     </UModal>

@@ -16,89 +16,106 @@ type RiskDb = Kysely<Database> | Transaction<Database>
 const readTarget = async (db: RiskDb, target: RiskTarget) => {
   const amendment = target.entityType === 'fundingcaseamendment'
     ? await db.selectFrom('Funding_Case_Agreement_Amendment').select([
-        'egcs_fc_fundingagreement', 'egcs_fc_changerisk', 'egcs_fc_proposedriskscore'
+        'egcs_fc_fundingagreement', 'egcs_fc_changerisk', 'egcs_fc_proposedriskscore', 'egcs_fc_riskratingruntime'
       ]).where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
     : null
   const agreement = await db.selectFrom('Funding_Case_Agreement_Profile')
-    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore'])
+    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_riskratingruntime'])
     .where('id', '=', amendment ? String(amendment.egcs_fc_fundingagreement) : target.entityId)
     .where('_deleted', '=', false).executeTakeFirstOrThrow()
   return { amendment, agreement, streamId: String(agreement.egcs_fc_transferpaymentstream) }
 }
 
-const resolveRiskDecision = async (
-  db: RiskDb, target: RiskTarget, lockRows: boolean
+const readLinkedRiskWorkflow = async (db: RiskDb, target: RiskTarget, streamId: string, setupId: string) => {
+  const row = await db.selectFrom('Transfer_Payment_Stream_Workflow as link')
+    .innerJoin('Common_Workflow_Setup as setup', 'setup.id', 'link.egcs_tp_workflow')
+    .innerJoin('Common_Publication as publication', 'publication.id', 'setup.id')
+    .innerJoin('Common_Publication_Version as version', 'version.id', 'publication.egcs_cn_currentversion')
+    .select(['setup.id', 'version.id as versionId', 'version.egcs_cn_definition as definition'])
+    .where('link.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('setup.id', '=', setupId)
+    .where('link._deleted', '=', false).where('setup._deleted', '=', false)
+    .where('publication._deleted', '=', false).where('publication.egcs_cn_state', '=', 'published')
+    .where('publication.egcs_cn_kind', '=', 'workflow_setup').executeTakeFirst()
+  if (!row) return undefined
+  const { entityType, purpose } = readPublishedWorkflowConfiguration(row.definition)
+  return entityType === target.entityType && purpose === 'risk_rating' ? row : undefined
+}
+
+const successfulRiskRuns = (db: RiskDb, target: RiskTarget) => db.selectFrom('Common_Runtime as runtime')
+  .innerJoin('Common_Workflow_Run as run', 'run.id', 'runtime.id')
+  .select([
+    'runtime.id', 'runtime.egcs_cn_sourcepublication', 'runtime.egcs_cn_sourcepublicationversion',
+    'runtime.egcs_cn_state', 'runtime.egcs_cn_completedat', 'run.egcs_cn_routing'
+  ])
+  .where('runtime.egcs_cn_kind', '=', 'workflow').where('runtime.egcs_cn_purpose', '=', 'risk_rating')
+  .where('runtime.egcs_cn_entitytype', '=', target.entityType).where('runtime.egcs_cn_entityid', '=', target.entityId)
+  .where('runtime.egcs_cn_state', 'in', ['succeeded', 'approved']).where('runtime._deleted', '=', false)
+  .orderBy('runtime.egcs_cn_completedat', 'desc').orderBy('runtime.id', 'desc')
+
+const matchesRiskScope = (
+  value: unknown, streamId: string, selections?: Awaited<ReturnType<typeof captureAmendmentRiskSelections>>
 ) => {
+  const routing = value as WorkflowRoutingEvidence | null
+  return routing?.riskRatingMapping?.streamId === streamId
+    && (!selections || matchAmendmentRiskSelections(routing.amendmentRiskSelections, selections))
+}
+
+export const getConfiguredRiskWorkflowSuccess = async (
+  db: RiskDb, target: RiskTarget, setupId: string, streamId: string,
+  selections?: Awaited<ReturnType<typeof captureAmendmentRiskSelections>>
+) => {
+  const scope = target.entityType === 'fundingcaseamendment'
+    ? selections ?? await captureAmendmentRiskSelections(db, target.entityId)
+    : undefined
+  const attempts = await successfulRiskRuns(db, target).where('runtime.egcs_cn_sourcepublication', '=', setupId).execute()
+  return attempts.find(attempt => matchesRiskScope(attempt.egcs_cn_routing, streamId, scope))
+}
+
+const resolveRiskDecision = async (db: RiskDb, target: RiskTarget) => {
   const { amendment, agreement, streamId } = await readTarget(db, target)
   const policy = await readStreamRiskPolicy(db, streamId, target.entityType)
   const required = policy.enabled
-  let selected: { id: string, versionId: string } | undefined
-  if (required && policy.setupId) {
-    let query = db.selectFrom('Transfer_Payment_Stream_Workflow as link')
-      .innerJoin('Common_Workflow_Setup as setup', 'setup.id', 'link.egcs_tp_workflow')
-      .innerJoin('Common_Publication as publication', 'publication.id', 'setup.id')
-      .innerJoin('Common_Publication_Version as version', 'version.id', 'publication.egcs_cn_currentversion')
-      .select(['setup.id', 'version.id as versionId', 'version.egcs_cn_definition as definition'])
-      .where('link.egcs_tp_transferpaymentstream', '=', streamId)
-      .where('setup.id', '=', policy.setupId)
-      .where('link._deleted', '=', false).where('setup._deleted', '=', false)
-      .where('publication._deleted', '=', false).where('publication.egcs_cn_state', '=', 'published')
-      .where('publication.egcs_cn_kind', '=', 'workflow_setup')
-    if (lockRows) query = query.forUpdate(['link', 'setup', 'publication', 'version'])
-    const row = await query.executeTakeFirst()
-    if (row) {
-      const definition = readPublishedWorkflowConfiguration(row.definition)
-      if (definition.entityType === target.entityType && definition.purpose === 'risk_rating') selected = row
-    }
-  }
-  let successful = db.selectFrom('Common_Runtime as runtime')
-    .innerJoin('Common_Workflow_Run as run', 'run.id', 'runtime.id')
-    .select([
-      'runtime.id', 'runtime.egcs_cn_sourcepublication', 'runtime.egcs_cn_sourcepublicationversion',
-      'runtime.egcs_cn_state', 'runtime.egcs_cn_completedat', 'run.egcs_cn_routing'
-    ])
-    .where('runtime.egcs_cn_kind', '=', 'workflow').where('runtime.egcs_cn_purpose', '=', 'risk_rating')
-    .where('runtime.egcs_cn_entitytype', '=', target.entityType).where('runtime.egcs_cn_entityid', '=', target.entityId)
-    .where('runtime.egcs_cn_state', 'in', ['succeeded', 'approved']).where('runtime._deleted', '=', false)
-    .orderBy('runtime.egcs_cn_completedat', 'desc').orderBy('runtime.id', 'desc')
-  if (selected) successful = successful.where('runtime.egcs_cn_sourcepublication', '=', selected.id)
-  if (lockRows) successful = successful.forUpdate(['runtime', 'run'])
-  const candidate = !required || selected ? await successful.executeTakeFirst() : undefined
-  const routing = candidate?.egcs_cn_routing as WorkflowRoutingEvidence | null | undefined
-  const sameStream = routing?.riskRatingMapping?.streamId === streamId
-  const selectionsCurrent = !amendment
-    || (!required && !routing?.amendmentRiskSelections)
-    || (sameStream && matchAmendmentRiskSelections(routing.amendmentRiskSelections, await captureAmendmentRiskSelections(db, target.entityId)))
-  const applicable = sameStream && selectionsCurrent ? candidate : undefined
+  const selected = required && policy.setupId ? await readLinkedRiskWorkflow(db, target, streamId, policy.setupId) : undefined
+  const selections = amendment ? await captureAmendmentRiskSelections(db, target.entityId) : undefined
+  const success = selected && await getConfiguredRiskWorkflowSuccess(db, target, selected.id, streamId, selections)
   const proposal = amendment ? amendment.egcs_fc_proposedriskscore : agreement.egcs_fc_riskscore
-  const score = proposal === null ? null : parseSafeDecimal(String(proposal))
-  const calculation = applicable ? await resolveLatestRiskRating(db, { ...target, runtimeId: String(applicable.id) }) : null
-  const calculationSource = calculation?.mappedRating?.score === score
+  const score = proposal == null ? null : parseSafeDecimal(String(proposal))
+  const runtimeId = amendment ? amendment.egcs_fc_riskratingruntime : agreement.egcs_fc_riskratingruntime
+  const useRating = !amendment || required || amendment.egcs_fc_changerisk
+  const run = runtimeId && useRating
+    ? await successfulRiskRuns(db, target).where('runtime.id', '=', runtimeId).executeTakeFirst()
+    : undefined
+  const sourceLinked = run && (run.egcs_cn_sourcepublication === selected?.id
+    || await readLinkedRiskWorkflow(db, target, streamId, run.egcs_cn_sourcepublication))
+  const calculation = run && sourceLinked && matchesRiskScope(run.egcs_cn_routing, streamId, selections)
+    ? await resolveLatestRiskRating(db, { ...target, runtimeId: run.id })
+    : null
+  const calculationSource = calculation?.mappedRating && calculation.mappedRating.score === score
     ? { ...calculation, completedAt: calculation.completedAt ? new Date(calculation.completedAt).toISOString() : null }
     : null
-  const success = required && !calculationSource ? undefined : applicable
-  const manualRating = !required && amendment?.egcs_fc_changerisk && score !== null
+  const manualRating = !required && amendment?.egcs_fc_changerisk && !runtimeId && score !== null
     ? await db.selectFrom('Transfer_Payment_Stream_Risk_Rating').select('id')
         .where('egcs_tp_transferpaymentstream', '=', streamId)
         .where('egcs_tp_riskscore', '=', String(score)).where('_deleted', '=', false).execute()
     : []
-  const hasManualRating = manualRating.length === 1
-    || Boolean(calculationSource)
   const blocker = required && !success
     ? 'risk_workflow_required'
-    : !required && amendment?.egcs_fc_changerisk && (score === null || !hasManualRating)
-        ? 'risk_score_required'
-        : null
+    : useRating && (required || runtimeId) && !calculationSource
+      ? 'risk_rating_source_stale'
+      : !required && amendment?.egcs_fc_changerisk && !calculationSource && manualRating.length !== 1
+          ? 'risk_score_required'
+          : null
   const readiness: RiskReadiness = {
     ready: blocker === null, required, workflowManaged: required,
-    setupId: selected ? String(selected.id) : null,
-    publicationVersionId: selected ? String(selected.versionId) : null,
-    successfulRuntimeId: success ? String(success.id) : null,
+    setupId: selected?.id ?? null,
+    publicationVersionId: selected?.versionId ?? null,
+    successfulRuntimeId: success?.id ?? null,
     blocker,
     evidence: success
       ? {
-          runtimeId: String(success.id), setupId: String(success.egcs_cn_sourcepublication),
-          publicationVersionId: String(success.egcs_cn_sourcepublicationversion),
+          runtimeId: success.id, setupId: success.egcs_cn_sourcepublication,
+          publicationVersionId: success.egcs_cn_sourcepublicationversion,
           state: success.egcs_cn_state as 'succeeded' | 'approved',
           completedAt: success.egcs_cn_completedat ? new Date(success.egcs_cn_completedat).toISOString() : null
         }
@@ -108,17 +125,19 @@ const resolveRiskDecision = async (
 }
 
 export const getRiskReadiness = async (
-  db: RiskDb, target: RiskTarget, { lockRows = false }: { lockRows?: boolean } = {}
-): Promise<RiskReadiness> => (await resolveRiskDecision(db, target, lockRows)).readiness
+  db: RiskDb, target: RiskTarget
+): Promise<RiskReadiness> => (await resolveRiskDecision(db, target)).readiness
 
 export const readSubmissionRisk = async (
   db: RiskDb, target: RiskTarget, { lockRows = false }: { lockRows?: boolean } = {}
 ): Promise<SubmissionRisk> => {
-  const { readiness, amendment, streamId, score, calculationSource } = await resolveRiskDecision(db, target, lockRows)
-  const enabled = amendment ? readiness.workflowManaged || amendment.egcs_fc_changerisk : readiness.workflowManaged
-  // A workflow-managed proposal applies only with its captured calculation.
-  const apply = Boolean(amendment && enabled && score !== null
-    && (!readiness.workflowManaged || calculationSource))
+  const { readiness, amendment, streamId, score, calculationSource } = await resolveRiskDecision(db, target)
+  const enabled = amendment ? readiness.workflowManaged || amendment.egcs_fc_changerisk : readiness.workflowManaged || Boolean(calculationSource)
+  const stream = amendment
+    ? await db.selectFrom('Transfer_Payment_Stream').select('egcs_tp_applyamendmentrisktotheagreement')
+        .where('id', '=', streamId).executeTakeFirstOrThrow()
+    : null
+  const apply = Boolean(stream?.egcs_tp_applyamendmentrisktotheagreement && enabled && score !== null)
   let rating = calculationSource?.mappedRating ?? null
   if (!rating && score !== null) {
     let ratingQuery = db.selectFrom('Transfer_Payment_Stream_Risk_Rating')
@@ -143,7 +162,11 @@ export const captureSubmissionRisk = async (
   const { blocker } = risk.readiness
   if (blocker) return await throwApiError(event, {
     statusCode: 409,
-    code: blocker === 'risk_score_required' ? 'RISK_SCORE_REQUIRED' : 'RISK_WORKFLOW_REQUIRED',
+    code: {
+      risk_score_required: 'RISK_SCORE_REQUIRED',
+      risk_workflow_required: 'RISK_WORKFLOW_REQUIRED',
+      risk_rating_source_stale: 'RISK_RATING_SOURCE_STALE'
+    }[blocker],
     key: `apiErrors.workflow.${blocker}`
   })
   if (risk.apply && !risk.rating) return await throwApiError(event, {

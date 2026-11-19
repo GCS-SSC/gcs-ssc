@@ -270,8 +270,8 @@ const patchValidatedAgreementProfile = async (
     || (current.egcs_fc_riskscore !== null && current.egcs_fc_riskscore !== undefined
       && validated.egcs_fc_riskscore !== null && validated.egcs_fc_riskscore !== undefined
       && Number(validated.egcs_fc_riskscore) === Number(current.egcs_fc_riskscore))
-  const riskWorkflowManaged = streamChanged || (includesRiskScore && !echoesCurrentRiskScore)
-    ? await isAgreementRiskRatingWorkflowManaged(db, nextStreamId)
+  const riskWorkflowManaged = streamChanged || includesRiskScore
+    ? await isAgreementRiskRatingWorkflowManaged(db, nextStreamId, agreementId)
     : false
   if (!streamChanged && riskWorkflowManaged && includesRiskScore
     && !echoesCurrentRiskScore) {
@@ -287,7 +287,7 @@ const patchValidatedAgreementProfile = async (
   else delete sanitized.egcs_fc_financialsystemnumber
   if (riskWorkflowManaged) delete sanitized.egcs_fc_riskscore
   if (streamChanged) sanitized.egcs_fc_riskscore = null
-  if (includesRiskScore && !echoesCurrentRiskScore) {
+  if (Object.hasOwn(sanitized, 'egcs_fc_riskscore') && !streamChanged) {
     const riskScoreError = await validateAgreementProfileRiskScore(event, db, agreementId, nextStreamId, sanitized)
     if (riskScoreError) return riskScoreError
   }
@@ -297,7 +297,10 @@ const patchValidatedAgreementProfile = async (
 
   const subtypeChanged = String(current.egcs_fc_agreementsubtype) !== subtypeContext.id
   const agreementType = streamChanged || subtypeChanged ? subtypeContext.agreementType : current.egcs_fc_agreementtype
-  const values = mapAgreementWriteValues(sanitized, agreementType)
+  const values = {
+    ...mapAgreementWriteValues(sanitized, agreementType),
+    ...(Object.hasOwn(sanitized, 'egcs_fc_riskscore') ? { egcs_fc_riskratingruntime: null, egcs_fc_riskratingamendment: null } : {})
+  }
   const stored = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields').where('id', '=', agreementId).executeTakeFirstOrThrow()
   values.egcs_fc_customfields = await mergeAgreementCustomFields(
     event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields ?? {}

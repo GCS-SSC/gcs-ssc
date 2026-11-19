@@ -1333,6 +1333,8 @@ export interface FundingCaseAgreementProfileTable {
   egcs_fc_holdback: GeneratedDecimalColumn
   egcs_fc_holdbackbasis: string
   egcs_fc_riskscore?: NullableDecimalColumn
+  egcs_fc_riskratingruntime: Generated<string | null>
+  egcs_fc_riskratingamendment: Generated<string | null>
   egcs_fc_status: StatusId
   egcs_fc_authorizedassistancestartdate: Date
   egcs_fc_authorizedassistanceenddate: Date
@@ -1421,6 +1423,7 @@ export interface FundingCaseAgreementAmendmentTable {
   egcs_fc_isopen: Generated<boolean>
   egcs_fc_changerisk: Generated<boolean>
   egcs_fc_proposedriskscore: NullableDecimalColumn
+  egcs_fc_riskratingruntime: Generated<string | null>
   egcs_fc_proposedauthorizedassistancestartdate?: Date | null
   egcs_fc_proposedauthorizedassistanceenddate?: Date | null
   egcs_fc_proposedtitle_en?: string | null
@@ -2345,6 +2348,7 @@ export interface TransferPaymentStreamTable {
   egcs_tp_agreementriskenabled: Generated<boolean>
   egcs_tp_agreementriskworkflow: Generated<string | null>
   egcs_tp_amendmentriskenabled: Generated<boolean>
+  egcs_tp_applyamendmentrisktotheagreement: Generated<boolean>
   egcs_tp_amendmentriskworkflow: Generated<string | null>
   egcs_tp_requireconsistentproponenttype: Generated<boolean>
   egcs_tp_budgetfundingmode: Generated<TransferPaymentBudgetFundingMode>

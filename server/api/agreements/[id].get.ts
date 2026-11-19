@@ -6,6 +6,7 @@ import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { hasAgreementRiskRatingRuns, isAgreementRiskRatingWorkflowManaged, resolveLatestAgreementRiskRating, resolveAgreementRiskSource } from '~~/server/utils/agreement-risk-rating'
 import { readAssignedAgencyCustomFieldDefinitions, validatePersistedAgreementCustomFieldSelections } from '~~/server/utils/agreement-custom-fields'
 import { isAgreementFinancialNumberProviderError, resolveAgreementFinancialNumberPolicy } from '~~/server/utils/agreement-financial-number-provider'
+import { hasLinkedRiskRatingWorkflow } from '~~/server/utils/workflow-runtime'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 // eslint-disable-next-line local/require-authorize -- executeFreshReadSnapshot rebuilds auth before the in-snapshot authorization.
@@ -148,7 +149,8 @@ export default defineEventHandler(async event => {
       ...agreementWithState,
       egcs_fc_holdback: parseSafeDecimal(String(agreementWithState.egcs_fc_holdback)),
       egcs_fc_riskscore: agreementWithState.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(agreementWithState.egcs_fc_riskscore)),
-      risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, String(agreement.egcs_fc_transferpaymentstream)),
+      risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, agreementContext.streamId, id),
+      risk_rating_available: await hasLinkedRiskRatingWorkflow(db, agreementContext.streamId, 'fundingcaseagreement'),
       has_risk_rating_runs: await hasAgreementRiskRatingRuns(db, id),
       latest_risk_rating_run: await resolveLatestAgreementRiskRating(db, id),
       risk_source: await resolveAgreementRiskSource(db, id, agreement.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(agreement.egcs_fc_riskscore))),

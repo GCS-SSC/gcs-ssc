@@ -66,7 +66,8 @@ export default defineEventHandler(async event => {
       }
       return await startWorkflow(event, trx, currentContext, currentUserId, {
         purpose: body.purpose,
-        selectedSetup
+        selectedSetup,
+        ...(body.purpose === 'risk_rating' && body.workflowSetupId ? { riskWorkflowSetupId: body.workflowSetupId } : {})
       })
     }
     run = extensionRuntime
@@ -88,6 +89,13 @@ export default defineEventHandler(async event => {
       })
     }
     throw error
+  }
+  if (!run && body.purpose === 'risk_rating' && body.workflowSetupId) {
+    return await throwApiError(event, {
+      statusCode: 409,
+      code: 'WORKFLOW_SETUP_UNPUBLISHED',
+      key: 'apiErrors.workflow.setup_unpublished'
+    })
   }
   if (!run) return await badRequest(event, 'WORKFLOW_SETUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
   return {

@@ -18,14 +18,20 @@ const {
   agreementId,
   namePrefix = '',
   numberGenerated = false,
+  canKeepRatingAsManual = false,
+  manualRatingPending = false,
   financialNumberPolicy
 } = defineProps<{
   permissionAction: 'create' | 'update'
   agreementId?: string
   namePrefix?: string
   numberGenerated?: boolean
+  canKeepRatingAsManual?: boolean
+  manualRatingPending?: boolean
   financialNumberPolicy?: AgreementFinancialNumberPolicy
 }>()
+
+const emit = defineEmits<{ riskSelection: [] }>()
 
 const model = defineModel<FundingCaseAgreementProfileForm>('model', {
   default: () => ({
@@ -600,7 +606,8 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
             }"
           :disabled="!selectedStreamId || riskWorkflowManaged || riskManagementStatus !== 'success'"
           :placeholder="t('agreement.risk_score_placeholder')"
-          searchable />
+          searchable
+          @update:model-value="emit('riskSelection')" />
         <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.risk_score_placeholder')" />
         <div
           v-if="hasRiskManagementError"
@@ -622,6 +629,15 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
         <p v-else-if="riskManagementStatus === 'success' && riskWorkflowManaged" class="mt-1 text-sm text-muted">
           {{ t('agreement.risk_rating_managed_help') }}
         </p>
+        <UButton
+          v-else-if="canKeepRatingAsManual && riskManagementStatus === 'success' && riskScoreSelection !== undefined"
+          color="neutral"
+          variant="soft"
+          size="xs"
+          class="mt-2"
+          :disabled="manualRatingPending"
+          :label="t(manualRatingPending ? 'agreement.manual_risk_rating_pending' : 'agreement.keep_manual_risk_rating')"
+          @click="emit('riskSelection')" />
       </UFormField>
 
       <div class="md:col-span-2">

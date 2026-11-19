@@ -17,6 +17,8 @@ import { lockAssignableGroup } from './groups'
 import {
   captureAmendmentRiskSelections, captureRiskRatingMapping, matchAmendmentRiskSelections, readStreamRiskPolicy, resolveRiskRatingAgreementId
 } from './agreement-risk-rating'
+import { getConfiguredRiskWorkflowSuccess } from './risk-readiness'
+import type { RiskTarget } from '~~/shared/types/risk'
 import { hashPublicationDefinition } from './system-publication'
 import { captureWorkflowRouting } from './workflow-routing'
 import { WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing-contract'
@@ -125,6 +127,7 @@ export type StartWorkflowOptions = {
   retryRuntimeId?: string
   purpose?: Workflow_Purpose
   selectedSetup?: WorkflowSetupSelection
+  riskWorkflowSetupId?: string
 }
 type WorkflowTerminalState = Extract<RuntimeState, 'succeeded' | 'approved' | 'unsuccessful' | 'denied' | 'cancelled' | 'failed'>
 
@@ -443,18 +446,23 @@ const applyRiskRatingEffect = async (
   }
   const band = mapping.bands.toSorted((left, right) => left.maximumScore - right.maximumScore).find(candidate => assessmentScore <= candidate.maximumScore)
   if (!band) return await fail('risk_rating_score_out_of_range')
-  const policy = await readStreamRiskPolicy(trx, lockedStreamId, entityType)
-  if (!policy.enabled || policy.setupId !== String(run.egcs_cn_sourcepublication)) return await fail('risk_rating_policy_changed')
+  const sourceSetupId = String(run.egcs_cn_sourcepublication)
+  const available = await resolveStreamWorkflowSetups(trx, entityType, [lockedStreamId], 'risk_rating', {
+    lockRows: false, setupIds: [sourceSetupId]
+  })
+  if (available.length === 0) return await fail('risk_rating_workflow_unavailable')
+  const restrictedSetupId = await resolveRiskSetupRestriction(trx, { ...target, entityType }, lockedStreamId)
+  if (restrictedSetupId && restrictedSetupId !== sourceSetupId) return await fail('risk_rating_policy_changed')
   if (entityType === 'fundingcaseamendment' && !matchAmendmentRiskSelections(
     evidence.amendmentRiskSelections, await captureAmendmentRiskSelections(trx, target.entityId)
   )) return await fail('risk_rating_selections_changed')
   if (run.egcs_cn_entitytype === 'fundingcaseamendment') {
     await trx.updateTable('Funding_Case_Agreement_Amendment')
-      .set({ egcs_fc_changerisk: true, egcs_fc_proposedriskscore: band.riskScore })
+      .set({ egcs_fc_changerisk: true, egcs_fc_proposedriskscore: band.riskScore, egcs_fc_riskratingruntime: String(run.id) })
       .where('id', '=', String(run.egcs_cn_entityid)).where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false).executeTakeFirstOrThrow()
   } else {
-    await trx.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_riskscore: band.riskScore })
+    await trx.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_riskscore: band.riskScore, egcs_fc_riskratingruntime: String(run.id), egcs_fc_riskratingamendment: null })
       .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   }
   return true
@@ -850,36 +858,14 @@ const resolveCreditMemoWorkflowSetups = async (
   })
 }
 
-export const resolveActiveWorkflowSetup = async (
+const resolveStreamWorkflowSetups = async (
   db: DbClient,
-  context: ReviewRuntimeEntityContext,
-  purpose: Workflow_Purpose = 'standard',
-  lockRows = false
-): Promise<WorkflowSetupSelection | null> => {
-  if (context.entityType === 'fundingcaseaccountreceivablecreditmemo') {
-    return (await resolveCreditMemoWorkflowSetups(db, context, purpose, { lockRows }))[0] ?? null
-  }
-  const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
-  const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
-  if (streamIds.length === 0) return null
-  let riskSetupId: string | null = null
-  if (purpose === 'risk_rating') {
-    const { entityType } = context
-    if (entityType !== 'fundingcaseagreement' && entityType !== 'fundingcaseamendment') return null
-    const policy = await readStreamRiskPolicy(db, streamIds[0]!, entityType)
-    if (!policy.enabled || !policy.setupId) return null
-    riskSetupId = policy.setupId
-  }
-  const opportunityId = context.entityType === 'fundingcaseintake'
-    ? scopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
-    : null
-  if (context.entityType === 'fundingcaseintake' && !opportunityId) return null
-  const opportunityWorkflowIds = opportunityId
-    ? (await db.selectFrom('Funding_Opportunity_Workflow').select('egcs_fo_workflowsetup')
-        .where('egcs_fo_fundingopportunity', '=', opportunityId).where('_deleted', '=', false).execute())
-        .map(row => String(row.egcs_fo_workflowsetup))
-    : null
-  if (opportunityWorkflowIds && opportunityWorkflowIds.length === 0) return null
+  entityType: ReviewRuntimeEntityContext['entityType'],
+  streamIds: string[],
+  purpose: Workflow_Purpose,
+  { lockRows, setupIds }: { lockRows: boolean, setupIds?: string[] }
+): Promise<WorkflowSetupSelection[]> => {
+  if (streamIds.length === 0 || setupIds?.length === 0) return []
   let query = db.selectFrom('Common_Workflow_Setup')
     .innerJoin('Transfer_Payment_Stream_Workflow', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
@@ -893,14 +879,14 @@ export const resolveActiveWorkflowSetup = async (
       'Common_Publication_Version.egcs_cn_definition as publicationDefinition'
     ])
     .where('Common_Workflow_Setup._deleted', '=', false)
-    .$if(opportunityWorkflowIds !== null, qb => qb.where('Common_Workflow_Setup.id', 'in', opportunityWorkflowIds ?? []))
+    .$if(setupIds !== undefined, qb => qb.where('Common_Workflow_Setup.id', 'in', setupIds ?? []))
     .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
     .where('Transfer_Payment_Stream_Workflow.egcs_tp_transferpaymentstream', 'in', streamIds)
     .where('Transfer_Payment_Stream_Workflow._deleted', '=', false)
     .orderBy('Common_Publication_Version.egcs_cn_version', 'desc')
-  if (riskSetupId !== null) query = query.where('Common_Workflow_Setup.id', '=', riskSetupId)
+    .orderBy('Common_Workflow_Setup.id')
   if (lockRows) query = query.forUpdate([
     'Common_Workflow_Setup',
     'Common_Publication',
@@ -908,21 +894,81 @@ export const resolveActiveWorkflowSetup = async (
     'Transfer_Payment_Stream_Workflow'
   ])
   const rows = await query.execute()
-  const row = rows.find(candidate => {
-    const configuration = readPublishedWorkflowConfiguration(candidate.publicationDefinition)
-    return configuration.entityType === context.entityType && (configuration.purpose ?? 'standard') === purpose
+  return rows.flatMap(row => {
+    const definition = readPublishedWorkflowConfiguration(row.publicationDefinition)
+    if (definition.entityType !== entityType || (definition.purpose ?? 'standard') !== purpose) return []
+    return [{
+      ...applyPublishedWorkflowConfiguration(row, definition),
+      publicationId: String(row.publicationId),
+      publicationState: row.publicationState,
+      publicationVersionId: String(row.publicationVersionId),
+      publicationVersion: Number(row.publicationVersion),
+      hasUnpublishedChanges: false,
+      publicationDefinition: definition
+    }]
   })
-  if (!row) return null
-  const definition = readPublishedWorkflowConfiguration(row.publicationDefinition)
-  return {
-    ...applyPublishedWorkflowConfiguration(row, definition),
-    publicationId: String(row.publicationId),
-    publicationState: row.publicationState,
-    publicationVersionId: String(row.publicationVersionId),
-    publicationVersion: Number(row.publicationVersion),
-    hasUnpublishedChanges: false,
-    publicationDefinition: definition
+}
+
+/**
+ * Determines whether the Stream has a published workflow for this risk target.
+ * @param db Database connection or protected read snapshot.
+ * @param streamId Exact owning Stream.
+ * @param entityType Risk target type.
+ * @returns Whether the risk workflow workspace has configuration to show.
+ */
+export const hasLinkedRiskRatingWorkflow = async (db: DbClient, streamId: string, entityType: RiskTarget['entityType']): Promise<boolean> =>
+  (await resolveStreamWorkflowSetups(db, entityType, [streamId], 'risk_rating', { lockRows: false })).length > 0
+
+const resolveRiskSetupRestriction = async (db: DbClient, target: RiskTarget, streamId: string) => {
+  const policy = await readStreamRiskPolicy(db, streamId, target.entityType)
+  if (!policy.enabled || !policy.setupId) return undefined
+  const success = await getConfiguredRiskWorkflowSuccess(db, target, policy.setupId, streamId)
+  return success ? undefined : policy.setupId
+}
+
+/**
+ * Lists live published risk workflows available for this exact target and its current prerequisite.
+ * @param db Database connection or authorized write transaction.
+ * @param context Exact workflow target context.
+ * @param lockRows Whether to lock the selected publication records.
+ * @returns Risk workflow catalogue before status and permission checks.
+ */
+export const resolvePublishedRiskWorkflowSetups = async (
+  db: DbClient,
+  context: ReviewRuntimeEntityContext,
+  lockRows = false
+): Promise<WorkflowSetupSelection[]> => {
+  const { entityType, entityId } = context
+  if (entityType !== 'fundingcaseagreement' && entityType !== 'fundingcaseamendment') return []
+  const scopes = await resolveReviewRuntimeSetupScopes(db, context, lockRows)
+  const streamId = scopes.find(scope => scope.scopeType === 'transferpaymentstream')?.scopeId
+  if (!streamId) return []
+  const setupId = await resolveRiskSetupRestriction(db, { entityType, entityId }, streamId)
+  return await resolveStreamWorkflowSetups(db, entityType, [streamId], 'risk_rating', { lockRows, setupIds: setupId ? [setupId] : undefined })
+}
+
+export const resolveActiveWorkflowSetup = async (
+  db: DbClient,
+  context: ReviewRuntimeEntityContext,
+  purpose: Workflow_Purpose = 'standard',
+  lockRows = false
+): Promise<WorkflowSetupSelection | null> => {
+  if (context.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    return (await resolveCreditMemoWorkflowSetups(db, context, purpose, { lockRows }))[0] ?? null
   }
+  if (purpose === 'risk_rating') return (await resolvePublishedRiskWorkflowSetups(db, context, lockRows))[0] ?? null
+  const scopes = await resolveReviewRuntimeSetupScopes(db, context, lockRows)
+  const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
+  const opportunityId = context.entityType === 'fundingcaseintake'
+    ? scopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
+    : null
+  if (context.entityType === 'fundingcaseintake' && !opportunityId) return null
+  const setupIds = opportunityId
+    ? (await db.selectFrom('Funding_Opportunity_Workflow').select('egcs_fo_workflowsetup')
+        .where('egcs_fo_fundingopportunity', '=', opportunityId).where('_deleted', '=', false).execute())
+        .map(row => String(row.egcs_fo_workflowsetup))
+    : undefined
+  return (await resolveStreamWorkflowSetups(db, context.entityType, streamIds, purpose, { lockRows, setupIds }))[0] ?? null
 }
 
 /**
@@ -1002,8 +1048,8 @@ export const resolveRetryableWorkflowSetup = async (
   lockRows = false,
   purpose: Workflow_Purpose = 'standard'
 ): Promise<WorkflowSetupSelection | null> => {
-  const selectedRiskSetup = purpose === 'risk_rating' ? await resolveActiveWorkflowSetup(db, context, purpose, lockRows) : null
-  if (purpose === 'risk_rating' && !selectedRiskSetup) return null
+  const riskSetups = purpose === 'risk_rating' ? await resolvePublishedRiskWorkflowSetups(db, context, lockRows) : null
+  if (riskSetups?.length === 0) return null
   let runQuery = db.selectFrom('Common_Runtime')
     .leftJoin('Common_Runtime as Successor_Runtime', join => join
       .onRef('Successor_Runtime.egcs_cn_previousruntime', '=', 'Common_Runtime.id')
@@ -1034,7 +1080,7 @@ export const resolveRetryableWorkflowSetup = async (
     .where('Common_Publication_Version.egcs_cn_kind', '=', 'workflow_setup')
     .whereRef('Common_Publication_Version.egcs_cn_publication', '=', 'Common_Runtime.egcs_cn_sourcepublication')
     .whereRef('Common_Publication_Version.egcs_cn_version', '=', 'Common_Runtime.egcs_cn_sourceversion')
-  if (selectedRiskSetup) runQuery = runQuery.where('Common_Runtime.egcs_cn_sourcepublication', '=', String(selectedRiskSetup.id))
+  if (riskSetups) runQuery = runQuery.where('Common_Runtime.egcs_cn_sourcepublication', 'in', riskSetups.map(setup => String(setup.id)))
   runQuery = runtimeId
     ? runQuery
         .where('Common_Runtime.id', '=', runtimeId)
@@ -1328,7 +1374,8 @@ const startWorkflowUnchecked = async (
     retrySetupId,
     retryRuntimeId,
     purpose = 'standard',
-    selectedSetup
+    selectedSetup,
+    riskWorkflowSetupId
   } = options
   const entityDefinition = await resolveEntityTypeLifecycleDefinition(trx, context.entityType)
   const purposeSupported = entityDefinition && (
@@ -1354,12 +1401,14 @@ const startWorkflowUnchecked = async (
   if (selectedSetup && context.entityType === 'fundingcaseintake' && !retry
     && (!selectedIntakeSetup || String(selectedIntakeSetup.id) !== String(selectedSetup.id)
       || selectedIntakeSetup.publicationVersionId !== selectedSetup.publicationVersionId)) return null
-  const setup = (purpose === 'risk_rating' ? undefined : selectedSetup) ?? (retry
-    ? await resolveRetryableWorkflowSetup(trx, context, retryRuntimeId, true, purpose)
-    : purpose === 'standard'
-      ? null
-      : await resolveActiveWorkflowSetup(trx, context, purpose, true))
-  if (!setup || (retry && String(setup.id) !== retrySetupId)) return null
+  const isNewRiskRun = purpose === 'risk_rating' && !retry
+  let setup: WorkflowSetupSelection | null = null
+  if (!isNewRiskRun) {
+    setup = retry
+      ? await resolveRetryableWorkflowSetup(trx, context, retryRuntimeId, true, purpose)
+      : selectedSetup ?? (purpose === 'standard' ? null : await resolveActiveWorkflowSetup(trx, context, purpose, true))
+    if (!setup || (retry && String(setup.id) !== retrySetupId)) return null
+  }
   const targetStatus = isBusinessStatusEntityType(context.entityType)
     ? await lockBusinessStatus(trx, context.entityType, context.entityId, 'workflow')
     : await (async () => {
@@ -1394,6 +1443,18 @@ const startWorkflowUnchecked = async (
       key: 'apiErrors.workflow.active_workflow'
     })
   }
+  if (isNewRiskRun) {
+    const candidates = await resolvePublishedRiskWorkflowSetups(trx, context, true)
+    if (riskWorkflowSetupId) {
+      setup = candidates.find(candidate => String(candidate.id) === riskWorkflowSetupId) ?? null
+    } else {
+      const eligible = candidates.filter(candidate => targetStatus.statusId
+        && isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus.statusId))
+      if (eligible.length > 1) return await badRequest(event, 'WORKFLOW_SETUP_REQUIRED', 'validation.workflow_setup_required')
+      setup = eligible[0] ?? candidates[0] ?? null
+    }
+  }
+  if (!setup) return null
   if (!targetStatus.statusId
     || !isWorkflowStartStatusAllowed(setup.egcs_cn_allowedstartstatuses, targetStatus.statusId)) {
     return await throwApiError(event, {

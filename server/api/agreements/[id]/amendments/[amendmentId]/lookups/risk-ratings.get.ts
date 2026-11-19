@@ -43,7 +43,7 @@ export default defineEventHandler(async event => {
     return {
       ...buildListRouteResponse(items.map(toRiskRatingDto), count, count, page, limit),
       workflow_managed: await isRiskRatingWorkflowManaged(db, {
-        streamId: context.streamId, entityType: 'fundingcaseamendment'
+        streamId: context.streamId, entityType: 'fundingcaseamendment', entityId: amendmentId
       })
     }
   })

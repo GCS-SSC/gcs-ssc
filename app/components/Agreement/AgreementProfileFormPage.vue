@@ -23,6 +23,7 @@ const {
   compact = false,
   pending = false,
   numberMode = 'manual',
+  canKeepRatingAsManual = false,
   financialNumberPolicy
 } = defineProps<{
   submitLabel: string
@@ -33,6 +34,7 @@ const {
   agreementId?: string
   compact?: boolean
   pending?: boolean
+  canKeepRatingAsManual?: boolean
   numberMode?: 'manual' | 'generated' | null
   financialNumberPolicy?: AgreementFinancialNumberPolicy
 }>()
@@ -40,7 +42,8 @@ const {
 const model = defineModel<FundingCaseAgreementProfileForm>('model', { required: true })
 
 const emit = defineEmits<{
-  (event: 'submit' | 'cancel'): void
+  (event: 'submit', riskSelectionChanged: boolean, acknowledgeRiskSelection: () => void): void
+  (event: 'cancel'): void
 }>()
 
 const { createValidator } = useZodI18n()
@@ -61,8 +64,16 @@ const validationState = computed(() => financialNumberPolicy?.value === undefine
   : { ...model.value, egcs_fc_financialsystemnumber: financialNumberPolicy.value })
 
 const formSession = ref(0)
+const riskSelection = ref(0)
+let nextRiskSelection = 0
+
+/** Records an explicit rating selection, including a deliberate same-score save. */
+const recordRiskSelection = () => {
+  riskSelection.value = ++nextRiskSelection
+}
 watch(() => [editorSession, permissionAction, agreementId], () => {
   formSession.value += 1
+  riskSelection.value = 0
 }, { flush: 'sync' })
 const formBinding = useFormSession({
   owner: {
@@ -70,7 +81,13 @@ const formBinding = useFormSession({
     isCurrentSession: session => session === formSession.value
   },
   action: { kind: 'remote', context: () => actionContext },
-  submit: () => emit('submit')
+  /** Submits the current rating selection and acknowledges only that selection. */
+  submit: () => {
+    const selection = riskSelection.value
+    emit('submit', selection !== 0, () => {
+      if (riskSelection.value === selection) riskSelection.value = 0
+    })
+  }
 })
 const form = shallowRef<(ComponentPublicInstance & Pick<Form<FormSchema>, 'loading'>) | null>(null)
 const submissionOwner = computed<{ submit: typeof formBinding.value.onSubmit | undefined }>(() => {
@@ -117,7 +134,10 @@ const renderedFormBinding = computed(() => {
           :agreement-id="agreementId"
           :permission-action="permissionAction"
           :financial-number-policy="financialNumberPolicy"
-          :number-generated="permissionAction === 'create' && numberMode === 'generated'" />
+          :can-keep-rating-as-manual="canKeepRatingAsManual"
+          :manual-rating-pending="riskSelection !== 0"
+          :number-generated="permissionAction === 'create' && numberMode === 'generated'"
+          @risk-selection="recordRiskSelection" />
 
         <AgreementFieldsAgreementApplicantRecipientsField
           v-if="permissionAction === 'create'"

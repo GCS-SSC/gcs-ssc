@@ -422,6 +422,7 @@ CREATE TABLE "Funding_Case_Agreement_Amendment" (
   "egcs_fc_isopen" boolean DEFAULT true NOT NULL,
   "egcs_fc_changerisk" boolean DEFAULT false NOT NULL,
   "egcs_fc_proposedriskscore" numeric(8,2),
+  "egcs_fc_riskratingruntime" bigint,
   "egcs_fc_proposedtitle_en" character varying(255),
   "egcs_fc_proposedtitle_fr" character varying(255),
   CONSTRAINT fc_chk_amendmentproposedtitle CHECK (
@@ -1153,6 +1154,8 @@ CREATE TABLE "Funding_Case_Agreement_Profile" (
   "egcs_fc_holdback" numeric(5,2) DEFAULT 10 NOT NULL,
   "egcs_fc_holdbackbasis" bigint NOT NULL,
   "egcs_fc_riskscore" numeric(8,2),
+  "egcs_fc_riskratingruntime" bigint,
+  "egcs_fc_riskratingamendment" bigint,
   "egcs_fc_status" bigint NOT NULL,
   "egcs_fc_authorizedassistancestartdate" date NOT NULL,
   "egcs_fc_authorizedassistanceenddate" date NOT NULL,
@@ -1162,6 +1165,7 @@ CREATE TABLE "Funding_Case_Agreement_Profile" (
   CONSTRAINT "fc_chk_customfields_object" CHECK ((jsonb_typeof(egcs_fc_customfields) = 'object'::text)),
   CONSTRAINT "fc_chk_profileauthorizedassistance" CHECK ((egcs_fc_authorizedassistanceenddate >= egcs_fc_authorizedassistancestartdate)),
   CONSTRAINT "fc_chk_profileholdback" CHECK (((egcs_fc_holdback >= (0)::numeric) AND (egcs_fc_holdback <= (100)::numeric))),
+  CONSTRAINT "fc_chk_profilerisksource" CHECK (egcs_fc_riskratingruntime IS NULL OR egcs_fc_riskratingamendment IS NULL),
   CONSTRAINT "fc_chk_profileriskscore" CHECK (((egcs_fc_riskscore IS NULL) OR (egcs_fc_riskscore >= (0)::numeric)))
 );
 
@@ -3179,6 +3183,12 @@ ALTER TABLE "Funding_Case_Agreement_Address" ADD CONSTRAINT "Funding_Case_Agreem
 ALTER TABLE "Funding_Case_Agreement_Address" ADD CONSTRAINT "Funding_Case_Agreement_Address_egcs_fc_addresstype_fkey" FOREIGN KEY (egcs_fc_addresstype) REFERENCES "Agency_Address_Type"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Address" ADD CONSTRAINT "Funding_Case_Agreement_Address_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Funding_Case_Agreement_Amendment" ADD CONSTRAINT "fc_fk_amendment_riskratingruntime" FOREIGN KEY (egcs_fc_riskratingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "fc_fk_agreement_riskratingruntime" FOREIGN KEY (egcs_fc_riskratingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "fc_fk_agreement_riskratingamendment" FOREIGN KEY (egcs_fc_riskratingamendment) REFERENCES "Funding_Case_Agreement_Amendment"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Amendment" ADD CONSTRAINT "Funding_Case_Agreement_Amendment_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 

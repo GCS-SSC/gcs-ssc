@@ -77,6 +77,7 @@ export const prepareAgreementStreamLookupRoute = async (
     offset: (page - 1) * limit,
     escapedSearch: search ? escapeLikePattern(search) : '',
     streamId: stream_id,
+    agreementId: agreementContext ? agreement_id : undefined,
     permissionAction: permission_action,
     streamScope: streamContext.scope,
     agreementContext

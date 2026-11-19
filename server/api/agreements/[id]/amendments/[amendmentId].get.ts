@@ -8,6 +8,7 @@ import { resolveBusinessStatusProtection } from '~~/server/utils/business-status
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { hasRiskRatingRuns, isRiskRatingWorkflowManaged, resolveLatestRiskRating } from '~~/server/utils/agreement-risk-rating'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { hasLinkedRiskRatingWorkflow } from '~~/server/utils/workflow-runtime'
 import { resolveAgreementActivityDuration } from '~~/server/utils/agreement-activity'
 
 export default defineEventHandler(async event => {
@@ -41,9 +42,13 @@ export default defineEventHandler(async event => {
       resolveBusinessStatusProtection(db, 'fundingcaseamendment', amendmentId)
     ])
     const riskTarget = { entityType: 'fundingcaseamendment' as const, entityId: amendmentId }
-    const [riskManaged, riskHistory, latestRiskRating] = await Promise.all([
-      isRiskRatingWorkflowManaged(db, { entityType: 'fundingcaseamendment', streamId: context.streamId }),
-      hasRiskRatingRuns(db, riskTarget), resolveLatestRiskRating(db, riskTarget)
+    const [riskManaged, riskHistory, latestRiskRating, riskAvailable] = await Promise.all([
+      isRiskRatingWorkflowManaged(db, { ...riskTarget, streamId: context.streamId }),
+      hasRiskRatingRuns(db, riskTarget),
+      amendment.egcs_fc_riskratingruntime
+        ? resolveLatestRiskRating(db, { ...riskTarget, runtimeId: amendment.egcs_fc_riskratingruntime })
+        : null,
+      hasLinkedRiskRatingWorkflow(db, context.streamId, riskTarget.entityType)
     ])
     const completed = Boolean(amendmentsWithState[0]?.isCompleted)
     const actor = await requireAuthContext(event)
@@ -55,7 +60,7 @@ export default defineEventHandler(async event => {
       risk_workflow_managed: riskManaged,
       has_risk_rating_runs: riskHistory,
       latest_risk_rating_run: latestRiskRating,
-      risk_rating_available: riskManaged || riskHistory,
+      risk_rating_available: riskAvailable || riskHistory,
       amendment_types: types,
       amendment_type_ids: types.map(type => String(type.id)),
       amendment_subtypes: subtypes,

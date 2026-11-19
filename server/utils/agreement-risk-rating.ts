@@ -134,22 +134,29 @@ export const matchAmendmentRiskSelections = (
  * @param target Stream and risk-enabled entity type.
  * @param target.streamId Owning Stream identity.
  * @param target.entityType Exact risk-enabled entity type.
+ * @param target.entityId Exact existing target identity when checking active runs.
  * @returns Whether scoring is workflow-managed.
  */
 export const isRiskRatingWorkflowManaged = async (
   db: DbClient,
-  target: { streamId: string, entityType: RiskRatingTarget['entityType'] }
+  target: { streamId: string, entityType: RiskRatingTarget['entityType'], entityId?: string }
 ): Promise<boolean> => (await readStreamRiskPolicy(db, target.streamId, target.entityType)).enabled
+  || Boolean(target.entityId && await db.selectFrom('Common_Runtime').select('id')
+    .where('egcs_cn_entitytype', '=', target.entityType).where('egcs_cn_entityid', '=', target.entityId)
+    .where('egcs_cn_kind', '=', 'workflow').where('egcs_cn_purpose', '=', 'risk_rating')
+    .where('egcs_cn_state', 'in', ['pending', 'active', 'awaiting_action', 'paused'])
+    .where('_deleted', '=', false).executeTakeFirst())
 
 /**
  * Checks whether Agreement risk scoring is workflow-managed.
  * @param db Database connection.
  * @param streamId Stream identity.
+ * @param entityId Agreement identity when checking an existing record.
  * @returns Whether scoring is workflow-managed.
  */
 export const isAgreementRiskRatingWorkflowManaged = async (
-  db: DbClient, streamId: string
-): Promise<boolean> => await isRiskRatingWorkflowManaged(db, { streamId, entityType: 'fundingcaseagreement' })
+  db: DbClient, streamId: string, entityId?: string
+): Promise<boolean> => await isRiskRatingWorkflowManaged(db, { streamId, entityType: 'fundingcaseagreement', entityId })
 
 /**
  * Protects a rating used by a current live link or an active or retryable attempt.
@@ -295,29 +302,34 @@ export const hasAgreementRiskRatingRuns = async (db: DbClient, agreementId: stri
  * @returns Current source and retained bilingual calculation details.
  */
 export const resolveAgreementRiskSource = async (db: DbClient, agreementId: string, currentScore: number | null): Promise<AgreementRiskSource> => {
-  const direct = await resolveLatestAgreementRiskRating(db, agreementId)
+  const source = await db.selectFrom('Funding_Case_Agreement_Profile')
+    .select(['egcs_fc_riskratingruntime', 'egcs_fc_riskratingamendment'])
+    .where('id', '=', agreementId).executeTakeFirst()
+  const direct = source?.egcs_fc_riskratingruntime
+    ? await resolveLatestRiskRating(db, { entityType: 'fundingcaseagreement', entityId: agreementId, runtimeId: source.egcs_fc_riskratingruntime })
+    : null
+  if (direct?.mappedRating?.score === currentScore) {
+    return { kind: 'workflow', runtimeId: direct.runtimeId, workflowName: direct.workflowName,
+      calculationSource: { ...direct, completedAt: direct.completedAt ? new Date(direct.completedAt).toISOString() : null }, rating: direct.mappedRating }
+  }
+  if (!source?.egcs_fc_riskratingamendment) return { kind: 'manual' }
   const revisions = await db.selectFrom('Funding_Case_Agreement_Revision as revision')
     .innerJoin('Funding_Case_Agreement_Approval_Submission as submission', 'submission.id', 'revision.egcs_fc_approvalsubmission')
     .innerJoin('Funding_Case_Agreement_Amendment as amendment', 'amendment.id', 'revision.egcs_fc_amendment')
     .select(['revision.egcs_fc_approvedat', 'revision.egcs_fc_amendment', 'amendment.egcs_fc_amendmentnumber', 'submission.egcs_fc_packet'])
     .where('revision.egcs_fc_fundingagreement', '=', agreementId).where('revision._deleted', '=', false)
+    .where('revision.egcs_fc_amendment', '=', source.egcs_fc_riskratingamendment)
     .orderBy('revision.egcs_fc_approvedat', 'desc').orderBy('revision.id', 'desc').execute()
   const amendmentRisk = revisions.flatMap(row => {
     const packet = row.egcs_fc_packet as unknown as { schemaVersion?: number, risk?: SubmissionRisk }
     return packet.schemaVersion === 4 && packet.risk?.apply ? [{ row, risk: packet.risk }] : []
   })[0]
-  const amendmentIsLatest = amendmentRisk && (!direct?.completedAt
-    || new Date(amendmentRisk.row.egcs_fc_approvedat).getTime() >= new Date(direct.completedAt).getTime())
-  if (amendmentIsLatest && amendmentRisk.risk.proposedScore === currentScore) {
+  if (amendmentRisk?.risk.proposedScore === currentScore) {
     return { kind: 'amendment' as const, amendmentId: String(amendmentRisk.row.egcs_fc_amendment),
       amendmentNumber: amendmentRisk.row.egcs_fc_amendmentnumber,
       approvedAt: new Date(amendmentRisk.row.egcs_fc_approvedat).toISOString(),
       workflowName: amendmentRisk.risk.calculationSource?.workflowName ?? null,
       calculationSource: amendmentRisk.risk.calculationSource, rating: amendmentRisk.risk.rating }
-  }
-  if (!amendmentIsLatest && direct?.mappedRating?.score === currentScore) {
-    return { kind: 'workflow' as const, runtimeId: direct.runtimeId, workflowName: direct.workflowName,
-      calculationSource: { ...direct, completedAt: direct.completedAt ? new Date(direct.completedAt).toISOString() : null }, rating: direct.mappedRating }
   }
   return { kind: 'manual' as const }
 }

@@ -100,6 +100,7 @@ export const TransferPaymentStreamRiskManagementFields = z.object({
   egcs_tp_agreementriskenabled: z.boolean(),
   egcs_tp_agreementriskworkflow: PositivePostgresBigintIdSchema.nullable().meta({ formRequired: false }),
   egcs_tp_amendmentriskenabled: z.boolean(),
+  egcs_tp_applyamendmentrisktotheagreement: z.boolean(),
   egcs_tp_amendmentriskworkflow: PositivePostgresBigintIdSchema.nullable().meta({ formRequired: false })
 }).strict()
 

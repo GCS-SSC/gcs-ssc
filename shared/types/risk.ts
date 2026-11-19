@@ -12,7 +12,7 @@ export type RiskReadiness = {
   setupId: string | null
   publicationVersionId: string | null
   successfulRuntimeId: string | null
-  blocker: 'risk_workflow_required' | 'risk_score_required' | null
+  blocker: 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_source_stale' | null
   evidence: {
     runtimeId: string
     setupId: string

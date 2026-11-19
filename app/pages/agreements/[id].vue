@@ -15,6 +15,7 @@ import type { Ref } from 'vue'
 import type { RouteParamsGeneric } from 'vue-router'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { AgreementFinancialNumberPolicy, FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
+import type { AgreementRiskSource } from '~~/shared/types/risk'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
@@ -73,8 +74,10 @@ type AgreementDetailForm = FundingCaseAgreementProfileForm & {
 type AgreementDetailProfile = FundingCaseAgreementProfileRow & {
   financialNumberPolicy?: AgreementFinancialNumberPolicy
   financialNumberPolicyUnavailable?: boolean
+  risk_rating_available?: boolean
   risk_workflow_managed?: boolean
   has_risk_rating_runs?: boolean
+  risk_source?: AgreementRiskSource
   latest_risk_rating_run?: {
     runtimeId: string
     status: RuntimeState
@@ -363,8 +366,10 @@ watch(profile, value => {
 
 /**
  * Saves agreement changes from the inline edit view and refreshes the detail page.
+ * @param riskSelectionChanged Whether staff explicitly selected or cleared a manual rating.
+ * @param acknowledgeRiskSelection Settles the submitted rating selection without resetting newer edits.
  */
-const submit = async () => {
+const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: () => void) => {
   if (!selectedProfile.value || isSaving.value) {
     return
   }
@@ -395,6 +400,8 @@ const submit = async () => {
       body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
       const policy = profile.value?.financialNumberPolicy
       if (policy?.readOnly || policy?.value !== undefined) delete body.egcs_fc_financialsystemnumber
+      if (!riskSelectionChanged) delete body.egcs_fc_riskscore
+      else body.egcs_fc_riskscore ??= null
 
       stage = 'writing'
       const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
@@ -405,6 +412,7 @@ const submit = async () => {
       if (!response.ok) await throwFetchResponseError(response)
 
       if (!proceed()) return
+      acknowledgeRiskSelection?.()
       mutations.acceptCommittedDraft(token)
       if (!await refreshProfile() || !proceed()) return
       mutations.applyMutationRefresh(token, { apply: () => hydrateProfile(profile.value) })
@@ -472,6 +480,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               permission-action="update"
               :agreement-id="id"
               :financial-number-policy="profile.financialNumberPolicy"
+              :can-keep-rating-as-manual="profile.risk_source?.kind === 'workflow' || profile.risk_source?.kind === 'amendment'"
               :pending="isSaving"
               @submit="submit"
               @cancel="cancel" />
@@ -626,7 +635,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               </section>
               <section data-help-target="agreement.risk-rating.workflow" data-help-kind="section">
                 <CommonWorkflowSection
-                  v-if="profile.risk_workflow_managed || profile.has_risk_rating_runs"
+                  v-if="profile.risk_rating_available || profile.risk_workflow_managed || profile.has_risk_rating_runs"
                   entity-type="fundingcaseagreement"
                   :entity-id="id"
                   purpose="risk_rating"

@@ -55,6 +55,6 @@ export default defineEventHandler(async event => {
 
   return {
     ...buildListRouteResponse(items.map(toRiskRatingDto), countResult, countResult, lookup.page, lookup.limit),
-    workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, lookup.streamId)
+    workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, lookup.streamId, lookup.agreementId)
   }
 })

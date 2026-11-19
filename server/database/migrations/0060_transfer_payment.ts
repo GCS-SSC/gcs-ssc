@@ -257,6 +257,7 @@ CREATE TABLE "Transfer_Payment_Stream" (
   "egcs_tp_agreementriskenabled" boolean DEFAULT false NOT NULL,
   "egcs_tp_agreementriskworkflow" bigint,
   "egcs_tp_amendmentriskenabled" boolean DEFAULT false NOT NULL,
+  "egcs_tp_applyamendmentrisktotheagreement" boolean DEFAULT false NOT NULL,
   "egcs_tp_amendmentriskworkflow" bigint,
   CONSTRAINT tp_chk_agreementriskworkflow CHECK (egcs_tp_agreementriskenabled = (egcs_tp_agreementriskworkflow IS NOT NULL)),
   CONSTRAINT tp_chk_amendmentriskworkflow CHECK (egcs_tp_amendmentriskenabled = (egcs_tp_amendmentriskworkflow IS NOT NULL)),

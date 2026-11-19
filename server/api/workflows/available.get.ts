@@ -8,10 +8,12 @@ import {
 } from '~~/server/utils/completion-runtime'
 import {
   isWorkflowStartStatusAllowed,
+  resolvePublishedRiskWorkflowSetups,
   resolvePublishedStandardWorkflowSetups,
   resolveWorkflowTargetStatus
 } from '~~/server/utils/workflow-runtime'
 import { WorkflowSourceSchema } from '~~/shared/types/schemas/workflow'
+import { resolveCompletionEvidenceId } from '~~/server/utils/completion-runtime-core'
 import { resolveEntityTypeLifecycleDefinition } from '~~/server/utils/entity-type-registry'
 import {
   authorizeExtensionLifecycleRead,
@@ -31,9 +33,14 @@ export default defineEventHandler(async event => {
   else await authorizeWorkflowOwnerRead(event, context)
 
   const definition = await resolveEntityTypeLifecycleDefinition(event.context.$db, context.entityType)
-  if (definition?.standardWorkflow !== 'explicit') return { items: [] }
+  const risk = query.purpose === 'risk_rating'
+  if (risk ? definition?.riskRating !== 'explicit' : query.purpose !== 'standard' || definition?.standardWorkflow !== 'explicit') return { items: [] }
+  if (risk && context.entityType === 'fundingcaseamendment'
+    && await resolveCompletionEvidenceId(event.context.$db, context.entityType, context.entityId)) return { items: [] }
   const [setups, coreProtection, active] = await Promise.all([
-    resolvePublishedStandardWorkflowSetups(event.context.$db, context),
+    risk
+      ? resolvePublishedRiskWorkflowSetups(event.context.$db, context)
+      : resolvePublishedStandardWorkflowSetups(event.context.$db, context),
     isBusinessStatusEntityType(context.entityType)
       ? resolveBusinessStatusProtection(event.context.$db, context.entityType, context.entityId)
       : null,
@@ -51,35 +58,34 @@ export default defineEventHandler(async event => {
     ?? await resolveWorkflowTargetStatus(event.context.$db, context.entityType, context.entityId)
   const targetTerminal = extensionRuntime?.lockedEntity.status?.terminal ?? coreProtection?.terminal ?? false
   const targetEligible = Boolean(targetStatus && !targetTerminal && !active)
-  return {
-    items: await Promise.all(setups.map(async setup => {
-      const targetOpen = await canAdmitWorkflowForTarget(event.context.$db, context, setup, { statusId: targetStatus, terminal: targetTerminal })
-      const statusAllowed = Boolean(targetStatus)
-        && isWorkflowStartStatusAllowed(setup.egcs_cn_allowedstartstatuses, targetStatus!)
-      const eligible = targetEligible && targetOpen && statusAllowed
-      const ineligibleReason = eligible
-        ? null
-        : active
-          ? 'active_workflow' as const
-          : !targetOpen
-              ? 'closed_target' as const
-              : targetTerminal
-                ? 'terminal_status' as const
-                : !targetStatus
-                    ? 'unsupported' as const
-                    : 'status_ineligible' as const
+  const items = await Promise.all(setups.map(async setup => {
+    const targetOpen = await canAdmitWorkflowForTarget(event.context.$db, context, setup, { statusId: targetStatus, terminal: targetTerminal })
+    const statusAllowed = Boolean(targetStatus)
+      && isWorkflowStartStatusAllowed(setup.egcs_cn_allowedstartstatuses, targetStatus!)
+    const eligible = targetEligible && targetOpen && statusAllowed
+    const ineligibleReason = eligible
+      ? null
+      : active
+        ? 'active_workflow' as const
+        : !targetOpen
+            ? 'closed_target' as const
+            : targetTerminal
+              ? 'terminal_status' as const
+              : !targetStatus
+                  ? 'unsupported' as const
+                  : 'status_ineligible' as const
 
-      return {
-        workflowSetupId: String(setup.id),
-        name_en: setup.egcs_cn_name_en,
-        name_fr: setup.egcs_cn_name_fr,
-        description_en: setup.egcs_cn_description_en,
-        description_fr: setup.egcs_cn_description_fr,
-        version: setup.publicationVersion,
-        definition: setup.publicationDefinition,
-        eligible,
-        ineligibleReason
-      }
-    }))
-  }
+    return {
+      workflowSetupId: String(setup.id),
+      name_en: setup.egcs_cn_name_en,
+      name_fr: setup.egcs_cn_name_fr,
+      description_en: setup.egcs_cn_description_en,
+      description_fr: setup.egcs_cn_description_fr,
+      version: setup.publicationVersion,
+      definition: setup.publicationDefinition,
+      eligible,
+      ineligibleReason
+    }
+  }))
+  return { items: risk ? items.filter(item => item.eligible) : items }
 })

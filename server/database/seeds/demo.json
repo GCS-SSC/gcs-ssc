@@ -68806,6 +68806,7 @@
       "egcs_tp_requireclaimfundingbreakdown": false,
       "egcs_tp_agreementriskenabled": true,
       "egcs_tp_agreementriskworkflow": "10389",
+      "egcs_tp_applyamendmentrisktotheagreement": true,
       "egcs_tp_amendmentriskenabled": false,
       "egcs_tp_amendmentriskworkflow": null
     },
@@ -68829,6 +68830,7 @@
       "egcs_tp_requireclaimfundingbreakdown": false,
       "egcs_tp_agreementriskenabled": true,
       "egcs_tp_agreementriskworkflow": "10420",
+      "egcs_tp_applyamendmentrisktotheagreement": true,
       "egcs_tp_amendmentriskenabled": false,
       "egcs_tp_amendmentriskworkflow": null
     },
@@ -68852,6 +68854,7 @@
       "egcs_tp_requireclaimfundingbreakdown": false,
       "egcs_tp_agreementriskenabled": true,
       "egcs_tp_agreementriskworkflow": "10449",
+      "egcs_tp_applyamendmentrisktotheagreement": true,
       "egcs_tp_amendmentriskenabled": true,
       "egcs_tp_amendmentriskworkflow": "10452"
     }

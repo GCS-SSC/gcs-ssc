@@ -8,6 +8,7 @@ import {
   getWorkflowRuntime,
   isWorkflowStartStatusAllowed,
   resolveActiveWorkflowSetup,
+  resolvePublishedRiskWorkflowSetups,
   resolvePublishedStandardWorkflowSetups,
   resolveWorkflowTargetStatus
 } from '~~/server/utils/workflow-runtime'
@@ -51,7 +52,9 @@ export default defineEventHandler(async event => {
   const [setups, coreProtection, completionId, entityDefinition] = await Promise.all([
     query.purpose === 'standard'
       ? resolvePublishedStandardWorkflowSetups(event.context.$db, context)
-      : resolveActiveWorkflowSetup(event.context.$db, context, query.purpose).then(item => item ? [item] : []),
+      : query.purpose === 'risk_rating'
+        ? resolvePublishedRiskWorkflowSetups(event.context.$db, context)
+        : resolveActiveWorkflowSetup(event.context.$db, context, query.purpose).then(item => item ? [item] : []),
     isBusinessStatusEntityType(context.entityType)
       ? resolveBusinessStatusProtection(event.context.$db, context.entityType, context.entityId)
       : null,
@@ -71,7 +74,6 @@ export default defineEventHandler(async event => {
     context,
     { statusId: targetStatus, terminal: targetTerminal }
   )
-  const setup = setups[0] ?? null
   const activeTargetRuntime = await event.context.$db.selectFrom('Common_Runtime')
     .select(['id', 'egcs_cn_purpose', 'egcs_cn_sourcepublication'])
     .where('egcs_cn_kind', '=', 'workflow')
@@ -98,10 +100,12 @@ export default defineEventHandler(async event => {
   const targetOpen = context.isOpen !== false || (await Promise.all(setups.map(candidate =>
     canAdmitWorkflowForTarget(event.context.$db, context, candidate, { statusId: targetStatus, terminal: targetTerminal })
   ))).some(Boolean)
-  const canStart = !riskFrozen && riskReadiness?.ready !== false && Boolean(purposeCanStart) && targetOpen && !targetTerminal && !hasActiveRuntime && Boolean(
-    targetStatus
-    && setups.some(candidate => isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus))
-  )
+  const eligibleSetups = targetStatus
+    ? setups.filter(candidate => isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus))
+    : []
+  const canStart = !riskFrozen && riskReadiness?.ready !== false && Boolean(purposeCanStart)
+    && targetOpen && !targetTerminal && !hasActiveRuntime && eligibleSetups.length > 0
+  const setup = (query.purpose === 'risk_rating' ? eligibleSetups[0] : undefined) ?? setups[0] ?? null
   const startBlocker = canStart
     ? null
     : activeTargetRuntime
@@ -185,6 +189,7 @@ export default defineEventHandler(async event => {
     reviews,
     riskReadiness,
     canStart,
+    availableWorkflowCount: canStart ? eligibleSetups.length : 0,
     startBlocker,
     activeWorkflowPurpose: activeTargetRuntime?.egcs_cn_purpose ?? null,
     canResumeOwners,

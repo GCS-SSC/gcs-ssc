@@ -53,6 +53,7 @@ export default defineEventHandler(async event => {
         'Transfer_Payment_Stream.egcs_tp_agreementriskenabled',
         'Transfer_Payment_Stream.egcs_tp_agreementriskworkflow',
         'Transfer_Payment_Stream.egcs_tp_amendmentriskenabled',
+        'Transfer_Payment_Stream.egcs_tp_applyamendmentrisktotheagreement',
         'Transfer_Payment_Stream.egcs_tp_amendmentriskworkflow',
         'Transfer_Payment_Stream.egcs_tp_budgetfundingmode',
         'Transfer_Payment_Stream.egcs_tp_hidecostcategory',

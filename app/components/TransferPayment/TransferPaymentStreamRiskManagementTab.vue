@@ -32,11 +32,12 @@ const { createValidator } = useZodI18n()
 const validate = createValidator(TransferPaymentStreamRiskManagementSchema)
 const formOwner = useModalSession()
 formOwner.isOpen.value = true
-/** @returns The four persisted controls from the Stream detail record. */
+/** @returns The persisted controls from the Stream detail record. */
 const readSettings = (): TransferPaymentStreamRiskManagement => ({
   egcs_tp_agreementriskenabled: stream.egcs_tp_agreementriskenabled,
   egcs_tp_agreementriskworkflow: stream.egcs_tp_agreementriskworkflow,
   egcs_tp_amendmentriskenabled: stream.egcs_tp_amendmentriskenabled,
+  egcs_tp_applyamendmentrisktotheagreement: stream.egcs_tp_applyamendmentrisktotheagreement,
   egcs_tp_amendmentriskworkflow: stream.egcs_tp_amendmentriskworkflow
 })
 const draft = ref(readSettings())
@@ -56,6 +57,7 @@ watch(() => [
   stream.egcs_tp_agreementriskenabled,
   stream.egcs_tp_agreementriskworkflow,
   stream.egcs_tp_amendmentriskenabled,
+  stream.egcs_tp_applyamendmentrisktotheagreement,
   stream.egcs_tp_amendmentriskworkflow
 ], () => {
   draft.value = readSettings()
@@ -143,6 +145,14 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
           aria-required="true"
           class="w-full"
           @update:model-value="value => { draft.egcs_tp_amendmentriskworkflow = value ?? null }" />
+      </UFormField>
+    </div>
+    <div class="border-t border-default pt-5">
+      <UFormField
+        name="egcs_tp_applyamendmentrisktotheagreement"
+        :label="t('transfer_payment.risk_management.apply_amendment_rating')"
+        :description="t('transfer_payment.risk_management.apply_amendment_rating_help')">
+        <USwitch v-model="draft.egcs_tp_applyamendmentrisktotheagreement" />
       </UFormField>
     </div>
     <UAlert v-if="errorText" role="alert" color="error" icon="i-lucide-circle-alert" :title="t('transfer_payment.risk_management.save_failed')" :description="errorText" />

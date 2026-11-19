@@ -41,7 +41,7 @@ export default defineEventHandler(async event => {
             'egcs_tp_parentstream', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_active',
             'egcs_tp_budgetfundingmode', 'egcs_tp_requireforecastfundingbreakdown', 'egcs_tp_requireclaimfundingbreakdown',
             'egcs_tp_agreementriskenabled', 'egcs_tp_agreementriskworkflow',
-            'egcs_tp_amendmentriskenabled', 'egcs_tp_amendmentriskworkflow'
+            'egcs_tp_amendmentriskenabled', 'egcs_tp_amendmentriskworkflow', 'egcs_tp_applyamendmentrisktotheagreement'
           ])
           .where('id', '=', streamId)
           .where('egcs_tp_transferpaymentprofile', '=', profileId)
@@ -95,6 +95,8 @@ export default defineEventHandler(async event => {
               ? current.egcs_tp_agreementriskworkflow
               : validated.egcs_tp_agreementriskworkflow,
             egcs_tp_amendmentriskenabled: validated.egcs_tp_amendmentriskenabled ?? current.egcs_tp_amendmentriskenabled,
+            egcs_tp_applyamendmentrisktotheagreement: validated.egcs_tp_applyamendmentrisktotheagreement
+              ?? current.egcs_tp_applyamendmentrisktotheagreement,
             egcs_tp_amendmentriskworkflow: validated.egcs_tp_amendmentriskworkflow === undefined
               ? current.egcs_tp_amendmentriskworkflow
               : validated.egcs_tp_amendmentriskworkflow

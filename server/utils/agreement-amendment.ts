@@ -534,7 +534,7 @@ export const promoteApprovedAgreementAmendment = async (
   }
   if (risk?.apply && risk.proposedScore !== null) {
     await trx.updateTable('Funding_Case_Agreement_Profile')
-      .set({ egcs_fc_riskscore: risk.proposedScore })
+      .set({ egcs_fc_riskscore: risk.proposedScore, egcs_fc_riskratingruntime: null, egcs_fc_riskratingamendment: context.amendmentId })
       .where('id', '=', context.agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   }
   return true
