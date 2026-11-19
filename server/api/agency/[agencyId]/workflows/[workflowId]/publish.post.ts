@@ -58,6 +58,9 @@ export default defineEventHandler(async event => {
         workflowStatuses: plan.statuses
       })
     } catch (error: unknown) {
+      if (getDatabaseConstraintName(error) === 'tp_chk_streamriskworkflow') {
+        return await throwApiError(event, { statusCode: 409, code: 'STREAM_RISK_WORKFLOW_IN_USE', key: 'apiErrors.workflow.stream_risk_workflow_in_use' })
+      }
       if (getDatabaseConstraintName(error) === 'tp_idx_streamworkflow_specialpurpose') {
         return await throwApiError(event, { statusCode: 409, code: 'WORKFLOW_LINK_EXISTS', key: 'apiErrors.request.invalid_resource' })
       }

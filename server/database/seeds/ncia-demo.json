@@ -22442,8 +22442,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 368,
@@ -22458,8 +22457,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 369,
@@ -22474,8 +22472,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 372,
@@ -22490,8 +22487,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 373,
@@ -22506,8 +22502,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 374,
@@ -22522,8 +22517,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 375,
@@ -22538,8 +22532,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 376,
@@ -22554,8 +22547,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 377,
@@ -22570,8 +22562,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 378,
@@ -22586,8 +22577,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 379,
@@ -22602,8 +22592,7 @@
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 380,
@@ -22618,8 +22607,7 @@
       "egcs_cn_cancellationstatus": 399,
       "egcs_cn_executionfailurestatus": 400,
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 381,
@@ -22634,8 +22622,7 @@
       "egcs_cn_cancellationstatus": 399,
       "egcs_cn_executionfailurestatus": 400,
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 382,
@@ -22650,8 +22637,7 @@
       "egcs_cn_cancellationstatus": 399,
       "egcs_cn_executionfailurestatus": 400,
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 383,
@@ -22666,8 +22652,7 @@
       "egcs_cn_cancellationstatus": 390,
       "egcs_cn_executionfailurestatus": 390,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 389,
@@ -22682,8 +22667,7 @@
       "egcs_cn_cancellationstatus": 382,
       "egcs_cn_executionfailurestatus": 382,
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": 392,
@@ -22698,7 +22682,6 @@
       "egcs_cn_description_fr": "Recueillir les détails du projet de salle communautaire.",
       "egcs_cn_publicationkind": "workflow_setup",
       "egcs_cn_cancellationstatus": 382,
-      "egcs_cn_riskratingrequired": false,
       "egcs_cn_executionfailurestatus": 382
     },
     {
@@ -22714,8 +22697,7 @@
       "egcs_cn_cancellationstatus": 399,
       "egcs_cn_executionfailurestatus": 400,
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     }
   ],
   "Common_Workflow_Setup_Allowed_Start_Status": [
@@ -30323,7 +30305,11 @@
       "egcs_tp_active": true,
       "_deleted": false,
       "egcs_tp_requireforecastfundingbreakdown": false,
-      "egcs_tp_requireclaimfundingbreakdown": false
+      "egcs_tp_requireclaimfundingbreakdown": false,
+      "egcs_tp_agreementriskenabled": true,
+      "egcs_tp_agreementriskworkflow": "389",
+      "egcs_tp_amendmentriskenabled": false,
+      "egcs_tp_amendmentriskworkflow": null
     }
   ],
   "Transfer_Payment_Stream_Budget": [

@@ -52,7 +52,6 @@ export default defineEventHandler(async event => {
       egcs_cn_description_en: values.egcs_cn_description_en ?? current.egcs_cn_description_en,
       egcs_cn_description_fr: values.egcs_cn_description_fr ?? current.egcs_cn_description_fr,
       egcs_cn_purpose: values.egcs_cn_purpose ?? current.egcs_cn_purpose,
-      egcs_cn_riskratingrequired: values.egcs_cn_riskratingrequired ?? current.egcs_cn_riskratingrequired,
       egcs_cn_allowedstartstatuses: nextAllowedStatuses,
       egcs_cn_cancellationstatus: values.egcs_cn_cancellationstatus ?? current.egcs_cn_cancellationstatus,
       egcs_cn_executionfailurestatus: values.egcs_cn_executionfailurestatus ?? current.egcs_cn_executionfailurestatus,

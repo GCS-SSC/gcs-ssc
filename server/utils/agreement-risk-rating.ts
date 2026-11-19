@@ -85,48 +85,71 @@ export const resolveRiskRatingAgreementId = async (db: DbClient, target: RiskRat
 }
 
 /**
- * Checks immutable Stream links and exact active attempts for workflow-managed scoring.
+ * Reads the owning Stream's independent risk policy for the exact entity type.
  * @param db Database connection.
- * @param target Stream and exact target identity when available.
+ * @param streamId Owning Stream identity.
+ * @param entityType Risk-enabled entity type.
+ * @returns Enabled state and selected Workflow Setup identity.
+ */
+export const readStreamRiskPolicy = async (db: DbClient, streamId: string, entityType: RiskRatingTarget['entityType']) => {
+  const stream = await db.selectFrom('Transfer_Payment_Stream').select([
+    'egcs_tp_agreementriskenabled', 'egcs_tp_agreementriskworkflow',
+    'egcs_tp_amendmentriskenabled', 'egcs_tp_amendmentriskworkflow'
+  ]).where('id', '=', streamId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  return entityType === 'fundingcaseagreement'
+    ? { enabled: stream.egcs_tp_agreementriskenabled, setupId: stream.egcs_tp_agreementriskworkflow }
+    : { enabled: stream.egcs_tp_amendmentriskenabled, setupId: stream.egcs_tp_amendmentriskworkflow }
+}
+
+/**
+ * Captures the saved selection identities, so removing and adding back a selection also invalidates a run.
+ * @param db Database connection.
+ * @param amendmentId Exact Amendment identity.
+ * @returns Canonically ordered identities of its live selection rows.
+ */
+export const captureAmendmentRiskSelections = async (db: DbClient, amendmentId: string) => {
+  const types = await db.selectFrom('Funding_Case_Agreement_Amendment_Type').select('id')
+    .where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).orderBy('id').execute()
+  const subtypes = await db.selectFrom('Funding_Case_Agreement_Amendment_Subtype').select('id')
+    .where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).orderBy('id').execute()
+  return { typeSelectionIds: types.map(row => String(row.id)), subtypeSelectionIds: subtypes.map(row => String(row.id)) }
+}
+
+/**
+ * Checks that the current Amendment selections match the attempt's captured evidence.
+ * @param captured Workflow evidence from the original attempt.
+ * @param current Amendment selections as currently saved.
+ * @returns Whether both sets of selection identities match exactly.
+ */
+export const matchAmendmentRiskSelections = (
+  captured: WorkflowRoutingEvidence['amendmentRiskSelections'],
+  current: Awaited<ReturnType<typeof captureAmendmentRiskSelections>>
+): boolean => captured !== undefined
+  && JSON.stringify(captured.typeSelectionIds) === JSON.stringify(current.typeSelectionIds)
+  && JSON.stringify(captured.subtypeSelectionIds) === JSON.stringify(current.subtypeSelectionIds)
+
+/**
+ * Checks whether Stream policy controls the target's scoring.
+ * @param db Database connection.
+ * @param target Stream and risk-enabled entity type.
  * @param target.streamId Owning Stream identity.
  * @param target.entityType Exact risk-enabled entity type.
- * @param target.entityId Exact entity identity for active-attempt protection.
- * @returns Whether scoring is controlled by a published or active risk workflow.
+ * @returns Whether scoring is workflow-managed.
  */
 export const isRiskRatingWorkflowManaged = async (
   db: DbClient,
-  target: { streamId: string, entityType: RiskRatingTarget['entityType'], entityId?: string }
-): Promise<boolean> => {
-  const links = await db.selectFrom('Transfer_Payment_Stream_Workflow as link')
-    .innerJoin('Common_Workflow_Setup as setup', 'setup.id', 'link.egcs_tp_workflow')
-    .innerJoin('Common_Publication as publication', 'publication.id', 'setup.id')
-    .innerJoin('Common_Publication_Version as version', 'version.id', 'publication.egcs_cn_currentversion')
-    .select('version.egcs_cn_definition')
-    .where('link.egcs_tp_transferpaymentstream', '=', target.streamId)
-    .where('link._deleted', '=', false).where('setup._deleted', '=', false)
-    .where('publication.egcs_cn_state', '=', 'published').where('publication._deleted', '=', false).execute()
-  if (links.some(row => {
-    const definition = readPublishedWorkflowConfiguration(row.egcs_cn_definition)
-    return definition.entityType === target.entityType && definition.purpose === 'risk_rating'
-  })) return true
-  if (!target.entityId) return false
-  return Boolean(await db.selectFrom('Common_Runtime').select('id')
-    .where('egcs_cn_kind', '=', 'workflow').where('egcs_cn_entitytype', '=', target.entityType)
-    .where('egcs_cn_entityid', '=', target.entityId).where('egcs_cn_purpose', '=', 'risk_rating')
-    .where('egcs_cn_state', 'in', ['pending', 'active', 'awaiting_action', 'paused'])
-    .where('_deleted', '=', false).executeTakeFirst())
-}
+  target: { streamId: string, entityType: RiskRatingTarget['entityType'] }
+): Promise<boolean> => (await readStreamRiskPolicy(db, target.streamId, target.entityType)).enabled
 
 /**
  * Checks whether Agreement risk scoring is workflow-managed.
  * @param db Database connection.
  * @param streamId Stream identity.
- * @param agreementId Optional exact Agreement identity for active-attempt protection.
  * @returns Whether scoring is workflow-managed.
  */
 export const isAgreementRiskRatingWorkflowManaged = async (
-  db: DbClient, streamId: string, agreementId?: string
-): Promise<boolean> => await isRiskRatingWorkflowManaged(db, { streamId, entityType: 'fundingcaseagreement', entityId: agreementId })
+  db: DbClient, streamId: string
+): Promise<boolean> => await isRiskRatingWorkflowManaged(db, { streamId, entityType: 'fundingcaseagreement' })
 
 /**
  * Protects a rating used by a current live link or an active or retryable attempt.

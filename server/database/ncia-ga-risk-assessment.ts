@@ -140,10 +140,14 @@ const upgrade = async (db: Transaction<Database>): Promise<void> => {
   if (currentLink?.workflowId !== originalWorkflow.id || currentLink.hash !== originalRiskWorkflowHash) return
   if (await hasPendingWorkflowSetupChanges(db, originalWorkflow)) return
   if (!await validateWorkflowRiskRatingMappingForStream(db, String(stream.id), workflowPlan.definition)) return
-  await db.updateTable('Transfer_Payment_Stream_Workflow').set({ _deleted: true }).where('id', '=', currentLink.id).execute()
   await db.insertInto('Transfer_Payment_Stream_Workflow').values({
     egcs_tp_transferpaymentstream: stream.id, egcs_tp_workflow: workflow.id
   }).execute()
+  await db.updateTable('Transfer_Payment_Stream')
+    .set({ egcs_tp_agreementriskenabled: true, egcs_tp_agreementriskworkflow: workflow.id })
+    .where('id', '=', stream.id).execute()
+  await db.updateTable('Transfer_Payment_Stream_Workflow')
+    .set({ _deleted: true }).where('id', '=', currentLink.id).execute()
 }
 
 const isTransaction = (db: Kysely<Database>): db is Transaction<Database> => db.isTransaction

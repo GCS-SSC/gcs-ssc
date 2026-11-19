@@ -5991,8 +5991,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10368",
@@ -6007,8 +6006,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10369",
@@ -6023,8 +6021,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10372",
@@ -6039,8 +6036,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10373",
@@ -6055,8 +6051,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10374",
@@ -6071,8 +6066,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10375",
@@ -6087,8 +6081,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10376",
@@ -6103,8 +6096,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10377",
@@ -6119,8 +6111,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10378",
@@ -6135,8 +6126,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10379",
@@ -6151,8 +6141,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10380",
@@ -6167,8 +6156,7 @@
       "egcs_cn_cancellationstatus": "10399",
       "egcs_cn_executionfailurestatus": "10400",
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10381",
@@ -6183,8 +6171,7 @@
       "egcs_cn_cancellationstatus": "10399",
       "egcs_cn_executionfailurestatus": "10400",
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10382",
@@ -6199,8 +6186,7 @@
       "egcs_cn_cancellationstatus": "10399",
       "egcs_cn_executionfailurestatus": "10400",
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10383",
@@ -6215,8 +6201,7 @@
       "egcs_cn_cancellationstatus": "10390",
       "egcs_cn_executionfailurestatus": "10390",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10389",
@@ -6231,8 +6216,7 @@
       "egcs_cn_cancellationstatus": "10382",
       "egcs_cn_executionfailurestatus": "10382",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10392",
@@ -6247,8 +6231,7 @@
       "egcs_cn_cancellationstatus": "10382",
       "egcs_cn_executionfailurestatus": "10382",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10393",
@@ -6263,8 +6246,7 @@
       "egcs_cn_cancellationstatus": "10399",
       "egcs_cn_executionfailurestatus": "10400",
       "egcs_cn_allowretry": false,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10410",
@@ -6279,8 +6261,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     },
     {
       "id": "10411",
@@ -6295,8 +6276,7 @@
       "egcs_cn_cancellationstatus": "10381",
       "egcs_cn_executionfailurestatus": "10381",
       "egcs_cn_allowretry": true,
-      "_deleted": false,
-      "egcs_cn_riskratingrequired": false
+      "_deleted": false
     }
   ],
   "Common_Workflow_Setup_Allowed_Start_Status": [
@@ -7665,7 +7645,11 @@
       "egcs_tp_active": true,
       "_deleted": false,
       "egcs_tp_requireforecastfundingbreakdown": false,
-      "egcs_tp_requireclaimfundingbreakdown": false
+      "egcs_tp_requireclaimfundingbreakdown": false,
+      "egcs_tp_agreementriskenabled": true,
+      "egcs_tp_agreementriskworkflow": "10389",
+      "egcs_tp_amendmentriskenabled": false,
+      "egcs_tp_amendmentriskworkflow": null
     }
   ],
   "Transfer_Payment_Stream_Budget": [

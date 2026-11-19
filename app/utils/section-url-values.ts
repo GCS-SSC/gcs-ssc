@@ -31,6 +31,7 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
   'budgets': { fr: 'budgets' },
   'financial-summary': { fr: 'sommaire-financier' },
   'recommendation': { fr: 'recommandation' },
+  'risk-management': { fr: 'gestion-des-risques' },
   'risk-rating': { fr: 'cote-de-risque' },
   'commitments': { fr: 'engagements' },
   'payments': { fr: 'paiements' },

@@ -22,7 +22,6 @@ type WorkflowSetupItem = {
   egcs_cn_cancellationstatus: string
   egcs_cn_executionfailurestatus: string
   egcs_cn_allowretry: boolean
-  egcs_cn_riskratingrequired: boolean
   publicationId: string
   publicationState: PublicationState
   publicationVersionId: string | null
@@ -86,8 +85,7 @@ const add = () => {
     egcs_cn_description_en: '', egcs_cn_description_fr: '', egcs_cn_purpose: 'standard',
     egcs_cn_allowedstartstatuses: [], egcs_cn_cancellationstatus: '',
     egcs_cn_executionfailurestatus: '',
-    egcs_cn_allowretry: false,
-    egcs_cn_riskratingrequired: false
+    egcs_cn_allowretry: false
   }
   isOpen.value = true
 }

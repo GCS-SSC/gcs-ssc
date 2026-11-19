@@ -148,7 +148,7 @@ export default defineEventHandler(async event => {
       ...agreementWithState,
       egcs_fc_holdback: parseSafeDecimal(String(agreementWithState.egcs_fc_holdback)),
       egcs_fc_riskscore: agreementWithState.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(agreementWithState.egcs_fc_riskscore)),
-      risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, String(agreement.egcs_fc_transferpaymentstream), id),
+      risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, String(agreement.egcs_fc_transferpaymentstream)),
       has_risk_rating_runs: await hasAgreementRiskRatingRuns(db, id),
       latest_risk_rating_run: await resolveLatestAgreementRiskRating(db, id),
       risk_source: await resolveAgreementRiskSource(db, id, agreement.egcs_fc_riskscore == null ? null : parseSafeDecimal(String(agreement.egcs_fc_riskscore))),

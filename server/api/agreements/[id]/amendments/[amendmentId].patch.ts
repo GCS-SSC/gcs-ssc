@@ -31,7 +31,7 @@ export default defineEventHandler(async event => {
     const amendment = await assertDraftAgreementAmendment(event, trx, agreementId, amendmentId)
     if (!('id' in amendment)) return amendment
     const riskWorkflowManaged = await isRiskRatingWorkflowManaged(trx, {
-      streamId: currentContext.streamId, entityType: 'fundingcaseamendment', entityId: amendmentId
+      streamId: currentContext.streamId, entityType: 'fundingcaseamendment'
     })
     if (riskWorkflowManaged && (Object.hasOwn(body, 'egcs_fc_changerisk') || Object.hasOwn(body, 'egcs_fc_proposedriskscore'))) {
       return await badRequest(event, 'AMENDMENT_RISK_WORKFLOW_MANAGED', 'apiErrors.agreement.amendment_risk_workflow_managed')

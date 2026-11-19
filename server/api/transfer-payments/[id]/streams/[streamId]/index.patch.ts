@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
-import { TransferPaymentStreamPatchSchema } from '~~/shared/types/schemas'
+import { getDatabaseConstraintName } from '~~/server/utils/database-constraint-errors'
+import { TransferPaymentStreamPatchSchema, TransferPaymentStreamRiskManagementFields, TransferPaymentStreamRiskManagementSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
@@ -38,7 +39,9 @@ export default defineEventHandler(async event => {
         const current = await trx.selectFrom('Transfer_Payment_Stream')
           .select([
             'egcs_tp_parentstream', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_active',
-            'egcs_tp_budgetfundingmode', 'egcs_tp_requireforecastfundingbreakdown', 'egcs_tp_requireclaimfundingbreakdown'
+            'egcs_tp_budgetfundingmode', 'egcs_tp_requireforecastfundingbreakdown', 'egcs_tp_requireclaimfundingbreakdown',
+            'egcs_tp_agreementriskenabled', 'egcs_tp_agreementriskworkflow',
+            'egcs_tp_amendmentriskenabled', 'egcs_tp_amendmentriskworkflow'
           ])
           .where('id', '=', streamId)
           .where('egcs_tp_transferpaymentprofile', '=', profileId)
@@ -84,6 +87,24 @@ export default defineEventHandler(async event => {
         }
 
         const updatePayload = { ...validated }
+        const riskFields = Object.keys(TransferPaymentStreamRiskManagementFields.shape)
+        if (riskFields.some(field => Object.hasOwn(validated, field))) {
+          const risk = await parseI18n(event, TransferPaymentStreamRiskManagementSchema, {
+            egcs_tp_agreementriskenabled: validated.egcs_tp_agreementriskenabled ?? current.egcs_tp_agreementriskenabled,
+            egcs_tp_agreementriskworkflow: validated.egcs_tp_agreementriskworkflow === undefined
+              ? current.egcs_tp_agreementriskworkflow
+              : validated.egcs_tp_agreementriskworkflow,
+            egcs_tp_amendmentriskenabled: validated.egcs_tp_amendmentriskenabled ?? current.egcs_tp_amendmentriskenabled,
+            egcs_tp_amendmentriskworkflow: validated.egcs_tp_amendmentriskworkflow === undefined
+              ? current.egcs_tp_amendmentriskworkflow
+              : validated.egcs_tp_amendmentriskworkflow
+          })
+          Object.assign(updatePayload, {
+            ...risk,
+            egcs_tp_agreementriskworkflow: risk.egcs_tp_agreementriskenabled ? risk.egcs_tp_agreementriskworkflow : null,
+            egcs_tp_amendmentriskworkflow: risk.egcs_tp_amendmentriskenabled ? risk.egcs_tp_amendmentriskworkflow : null
+          })
+        }
         if (Object.hasOwn(validated, 'egcs_tp_parentstream')) {
           updatePayload.egcs_tp_parentstream = validated.egcs_tp_parentstream
             ? String(validated.egcs_tp_parentstream)
@@ -125,6 +146,9 @@ export default defineEventHandler(async event => {
       }
     )
   } catch (error) {
+    if (getDatabaseConstraintName(error) === 'tp_chk_streamriskworkflow') {
+      return await badRequest(event, 'STREAM_RISK_WORKFLOW_INVALID', 'apiErrors.workflow.stream_risk_workflow_invalid')
+    }
     return await throwIfTransferPaymentUniqueConstraintError(event, error)
   }
 })

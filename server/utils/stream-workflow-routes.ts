@@ -48,8 +48,7 @@ export const streamWorkflowRoute = async (event: H3Event, action: 'read' | 'crea
         return { ...item, id: String(item.id), egcs_tp_workflow: String(item.egcs_tp_workflow),
           ...(published
             ? { egcs_cn_name_en: published.nameEn, egcs_cn_name_fr: published.nameFr,
-                egcs_cn_entitytype: published.entityType, egcs_cn_purpose: published.purpose ?? 'standard',
-                egcs_cn_riskratingrequired: published.riskRatingRequired === true }
+                egcs_cn_entitytype: published.entityType, egcs_cn_purpose: published.purpose ?? 'standard' }
             : {}) }
       }) }
     })
@@ -102,12 +101,19 @@ export const streamWorkflowRoute = async (event: H3Event, action: 'read' | 'crea
 
   const linkId = getRouterParam(event, 'linkId') ?? ''
   if (!isPositivePostgresBigintText(linkId)) return await notFound(event, 'WORKFLOW_LINK_NOT_FOUND', 'apiErrors.request.not_found')
-  return await executeFreshAuthorizedTransferPaymentStreamWrite(event, db, profileId, stream.agencyId, streamId, 'update', async trx => {
-    const link = await trx.selectFrom('Transfer_Payment_Stream_Workflow').select('id')
-      .where('id', '=', linkId).where('egcs_tp_transferpaymentstream', '=', streamId)
-      .where('_deleted', '=', false).forUpdate().executeTakeFirst()
-    if (!link) return await notFound(event, 'WORKFLOW_LINK_NOT_FOUND', 'apiErrors.request.not_found')
-    await trx.updateTable('Transfer_Payment_Stream_Workflow').set({ _deleted: true }).where('id', '=', linkId).execute()
-    return { success: true }
-  })
+  try {
+    return await executeFreshAuthorizedTransferPaymentStreamWrite(event, db, profileId, stream.agencyId, streamId, 'update', async trx => {
+      const link = await trx.selectFrom('Transfer_Payment_Stream_Workflow').select('id')
+        .where('id', '=', linkId).where('egcs_tp_transferpaymentstream', '=', streamId)
+        .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+      if (!link) return await notFound(event, 'WORKFLOW_LINK_NOT_FOUND', 'apiErrors.request.not_found')
+      await trx.updateTable('Transfer_Payment_Stream_Workflow').set({ _deleted: true }).where('id', '=', linkId).execute()
+      return { success: true }
+    })
+  } catch (error: unknown) {
+    if (getDatabaseConstraintName(error) === 'tp_chk_streamriskworkflow') {
+      return await throwApiError(event, { statusCode: 409, code: 'STREAM_RISK_WORKFLOW_IN_USE', key: 'apiErrors.workflow.stream_risk_workflow_in_use' })
+    }
+    throw error
+  }
 }

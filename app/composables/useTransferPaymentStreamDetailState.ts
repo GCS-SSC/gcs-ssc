@@ -3,7 +3,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import CustomFieldsTab from '~/components/TransferPayment/CustomFieldsTab.vue'
 import type { FetchError } from 'ofetch'
-import type { TransferPaymentStreamBudgetManagement, TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
+import type { TransferPaymentStreamBudgetManagement, TransferPaymentStreamRiskManagement, TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
 import type { TabMap } from '~~/shared/types/ui'
 import type { Scope } from '~~/shared/utils/scopes'
 import TransferPaymentAmendmentSubtypesTab from '~/components/TransferPayment/TransferPaymentAmendmentSubtypesTab.vue'
@@ -22,6 +22,7 @@ import TransferPaymentStreamCostLineItemsTab from '~/components/TransferPayment/
 import TransferPaymentStreamGeneralTab from '~/components/TransferPayment/TransferPaymentStreamGeneralTab.vue'
 import TransferPaymentStreamHoldbackBasesTab from '~/components/TransferPayment/TransferPaymentStreamHoldbackBasesTab.vue'
 import TransferPaymentStreamRecipientsTab from '~/components/TransferPayment/TransferPaymentStreamRecipientsTab.vue'
+import TransferPaymentStreamRiskManagementTab from '~/components/TransferPayment/TransferPaymentStreamRiskManagementTab.vue'
 import TransferPaymentStreamRiskRatingsTab from '~/components/TransferPayment/TransferPaymentStreamRiskRatingsTab.vue'
 import TransferPaymentStreamFundingSubtypesTab from '~/components/TransferPayment/TransferPaymentStreamFundingSubtypesTab.vue'
 import StreamExtensionsTab from '~/components/Extension/StreamExtensionsTab.vue'
@@ -43,6 +44,7 @@ export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   chartOfAccounts: 'transfer_payment.chart_of_accounts.title',
   commitmentTypes: 'transfer_payment.commitment_types.title',
   monitorTypes: 'transfer_payment.monitor_types',
+  riskManagement: 'transfer_payment.risk_management.title',
   riskRatings: 'transfer_payment.risk_ratings',
   fundingSubtypes: 'agency.funding_types.subtypes',
   expertise: 'transfer_payment.areas_of_expertise',
@@ -84,7 +86,7 @@ export const useTransferPaymentStreamDetailState = (
     { immediate: options.immediate ?? true }
   )
   const { data: stream, error: streamError, status: streamStatus, refresh: refreshStream } = useFetch<
-    TransferPaymentStreamItem & { parent_name_en?: string; parent_name_fr?: string },
+    TransferPaymentStreamItem & TransferPaymentStreamRiskManagement & { parent_name_en?: string; parent_name_fr?: string },
     FetchError,
     string
   >(`/api/transfer-payments/${id}/streams/${streamId}`, { immediate: options.immediate ?? true })
@@ -109,21 +111,23 @@ export const useTransferPaymentStreamDetailState = (
     return String(profile.value.egcs_tp_agency)
   })
 
-  const budgetManagementContext = useActionContext({
+  const settingsContext = useActionContext({
     identity: [() => id, () => streamId, () => profile.value?.egcs_tp_agency],
     authority: canUpdateChild,
     eligible: () => profile.value?.id === id && stream.value?.id === streamId
   })
-  const budgetManagementPending = ref(false)
+  const settingsPending = ref(false)
   /**
-   * Persists settings and accepts the acknowledged draft even if the section closes.
+   * Persists Stream settings and accepts the acknowledged draft even if the section closes.
    * @param draft - Settings captured by the currently mounted editor.
    * @returns Whether the response still belongs to the current Stream context.
    */
-  const saveBudgetManagement = async (draft: TransferPaymentStreamBudgetManagement): Promise<boolean> => {
-    const operation = budgetManagementContext.capture()
-    if (!operation?.canDispatch() || budgetManagementPending.value) return false
-    budgetManagementPending.value = true
+  const saveStreamSettings = async (
+    draft: TransferPaymentStreamBudgetManagement | TransferPaymentStreamRiskManagement
+  ): Promise<boolean> => {
+    const operation = settingsContext.capture()
+    if (!operation?.canDispatch() || settingsPending.value) return false
+    settingsPending.value = true
     try {
       const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${id}/streams/${streamId}`), {
         method: 'PATCH',
@@ -135,7 +139,7 @@ export const useTransferPaymentStreamDetailState = (
       stream.value = { ...stream.value, ...draft }
       return true
     } finally {
-      budgetManagementPending.value = false
+      settingsPending.value = false
     }
   }
 
@@ -167,10 +171,10 @@ export const useTransferPaymentStreamDetailState = (
         /** @returns The parent-owned write and current persisted Stream. */
         getProps: () => ({
           stream: stream.value,
-          actionContext: budgetManagementContext,
+          actionContext: settingsContext,
           canUpdateChild: canUpdateChild.value,
-          pending: budgetManagementPending.value,
-          saveBudgetManagement
+          pending: settingsPending.value,
+          saveBudgetManagement: saveStreamSettings
         })
       }
     ],
@@ -212,6 +216,24 @@ export const useTransferPaymentStreamDetailState = (
     ],
     ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ key: 'custom-fields', transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     ['activityCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields, value: 'activity-custom-fields', icon: 'i-lucide-list-todo', component: CustomFieldsTab, getProps: () => ({ key: 'activity-custom-fields', transferPaymentId: id, streamId, target: 'activity', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
+    [
+      'risk-management',
+      {
+        key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.riskManagement,
+        value: 'risk-management',
+        icon: 'i-lucide-shield-check',
+        component: TransferPaymentStreamRiskManagementTab,
+        /** @returns The current Stream settings and their parent-owned save operation. */
+        getProps: () => ({
+          stream: stream.value,
+          transferPaymentId: id,
+          actionContext: settingsContext,
+          canUpdateChild: canUpdateChild.value,
+          pending: settingsPending.value,
+          saveRiskManagement: saveStreamSettings
+        })
+      }
+    ],
     [
       'riskRatings',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.riskRatings, icon: 'i-lucide-gauge', component: TransferPaymentStreamRiskRatingsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }

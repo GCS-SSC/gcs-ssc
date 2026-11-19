@@ -16,6 +16,7 @@ export type WorkflowRoutingEvidence = {
   correctionPacket?: CorrectionPacket
   correctionPacketHash?: string
   version?: 2 | 3
+  amendmentRiskSelections?: { typeSelectionIds: string[], subtypeSelectionIds: string[] }
   riskRatingMapping?: {
     streamId: string
     bands: Array<{ maximumScore: number, riskScore: number, riskRatingId: string, label: { en: string, fr: string } }>

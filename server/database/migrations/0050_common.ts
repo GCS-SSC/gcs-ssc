@@ -1131,14 +1131,12 @@ CREATE TABLE "Common_Workflow_Setup" (
   "egcs_cn_description_en" text NOT NULL,
   "egcs_cn_description_fr" text NOT NULL,
   "egcs_cn_purpose" character varying(32) DEFAULT 'standard'::character varying NOT NULL,
-  "egcs_cn_riskratingrequired" boolean DEFAULT false NOT NULL,
   "egcs_cn_cancellationstatus" bigint NOT NULL,
   "egcs_cn_executionfailurestatus" bigint NOT NULL,
   "egcs_cn_allowretry" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "cn_unq_workflowsetuptargetpurpose" UNIQUE (id, egcs_cn_entitytype, egcs_cn_purpose),
   CONSTRAINT "Common_Workflow_Setup_pkey" PRIMARY KEY (id),
-  CONSTRAINT "cn_chk_workflowriskrequiredpurpose" CHECK (NOT egcs_cn_riskratingrequired OR egcs_cn_purpose = 'risk_rating'),
   CONSTRAINT "cn_chk_workflowsetuppurpose" CHECK (((egcs_cn_purpose)::text = ANY ((ARRAY['standard'::character varying, 'approval_submission'::character varying, 'risk_rating'::character varying])::text[]))),
   CONSTRAINT "cn_chk_workflow_setup_publicationkind" CHECK (((egcs_cn_publicationkind)::text = 'workflow_setup'::text))
 );
@@ -1613,12 +1611,14 @@ CREATE FUNCTION protect_workflow_amendment_conditions()
 AS $function$
     DECLARE referenced boolean := false;
     BEGIN
-      IF TG_TABLE_NAME = 'Transfer_Payment_Amendment_Subtype' THEN
+      IF TG_TABLE_NAME IN ('Transfer_Payment_Amendment_Type', 'Transfer_Payment_Amendment_Subtype') THEN
         IF TG_OP = 'UPDATE' AND NOT (
           (NOT OLD._deleted AND NEW._deleted)
           OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream
         ) THEN RETURN NULL; END IF;
-        referenced := workflow_amendment_subtype_in_use(OLD.id);
+        referenced := workflow_amendment_condition_in_use(
+          CASE WHEN TG_TABLE_NAME = 'Transfer_Payment_Amendment_Type' THEN 'amendment_type' ELSE 'amendment_subtype' END, OLD.id
+        );
       ELSIF TG_TABLE_NAME = 'Transfer_Payment_Stream' THEN
         IF TG_OP = 'UPDATE' AND NOT (
           (NOT OLD._deleted AND NEW._deleted)
@@ -1626,7 +1626,10 @@ AS $function$
         ) THEN RETURN NULL; END IF;
         SELECT EXISTS (
           SELECT 1 FROM "Transfer_Payment_Amendment_Subtype" subtype
-          WHERE subtype.egcs_tp_transferpaymentstream = OLD.id AND workflow_amendment_subtype_in_use(subtype.id)
+          WHERE subtype.egcs_tp_transferpaymentstream = OLD.id AND workflow_amendment_condition_in_use('amendment_subtype', subtype.id)
+          UNION ALL
+          SELECT 1 FROM "Transfer_Payment_Amendment_Type" type
+          WHERE type.egcs_tp_transferpaymentstream = OLD.id AND workflow_amendment_condition_in_use('amendment_type', type.id)
         ) INTO referenced;
       ELSE
         IF TG_OP = 'UPDATE' AND NOT (
@@ -1636,7 +1639,11 @@ AS $function$
         SELECT EXISTS (
           SELECT 1 FROM "Transfer_Payment_Amendment_Subtype" subtype
           JOIN "Transfer_Payment_Stream" stream ON stream.id = subtype.egcs_tp_transferpaymentstream
-          WHERE stream.egcs_tp_transferpaymentprofile = OLD.id AND workflow_amendment_subtype_in_use(subtype.id)
+          WHERE stream.egcs_tp_transferpaymentprofile = OLD.id AND workflow_amendment_condition_in_use('amendment_subtype', subtype.id)
+          UNION ALL
+          SELECT 1 FROM "Transfer_Payment_Amendment_Type" type
+          JOIN "Transfer_Payment_Stream" stream ON stream.id = type.egcs_tp_transferpaymentstream
+          WHERE stream.egcs_tp_transferpaymentprofile = OLD.id AND workflow_amendment_condition_in_use('amendment_type', type.id)
         ) INTO referenced;
       END IF;
       IF referenced THEN
@@ -3993,7 +4000,7 @@ AS $function$
       RETURN NULL;
     END $function$;
 
-CREATE FUNCTION workflow_amendment_subtype_in_use(subtype_id bigint)
+CREATE FUNCTION workflow_amendment_condition_in_use(condition_source text, choice_id bigint)
  RETURNS boolean
  LANGUAGE sql
  STABLE
@@ -4003,15 +4010,15 @@ AS $function$
         JOIN "Common_Workflow_Setup" setup ON setup.id = member.egcs_cn_workflowsetup
         CROSS JOIN LATERAL jsonb_array_elements(member.egcs_cn_profileconditions) condition(value)
         WHERE member._deleted = false AND setup._deleted = false
-          AND condition.value->>'source' = 'amendment_subtype'
-          AND COALESCE(condition.value->'optionIds', '[]'::jsonb) ? subtype_id::text
+          AND condition.value->>'source' = condition_source
+          AND COALESCE(condition.value->'optionIds', '[]'::jsonb) ? choice_id::text
       ) OR EXISTS (
         SELECT 1 FROM "Common_Publication_Version" version
         CROSS JOIN LATERAL jsonb_array_elements(COALESCE(version.egcs_cn_definition->'members', '[]'::jsonb)) member(value)
         CROSS JOIN LATERAL jsonb_array_elements(COALESCE(member.value->'conditions', '[]'::jsonb)) condition(value)
         WHERE version.egcs_cn_kind = 'workflow_setup'
-          AND condition.value->>'source' = 'amendment_subtype'
-          AND COALESCE(condition.value->'optionIds', '[]'::jsonb) ? subtype_id::text
+          AND condition.value->>'source' = condition_source
+          AND COALESCE(condition.value->'optionIds', '[]'::jsonb) ? choice_id::text
       )
     $function$;
 CREATE FUNCTION trg_fn_guidedhelp_immutable_owner() RETURNS trigger LANGUAGE plpgsql AS $fn$

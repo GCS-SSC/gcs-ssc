@@ -3,7 +3,7 @@ import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { WorkflowMemberConditionsSchema, type CustomFieldCondition, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
-import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
+import { amendmentConditionOptionIds, readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readAgencyCustomFieldDefinitions } from './agency-custom-field-definitions'
 
 export const readWorkflowConditions = async (db: Kysely<Database>, memberId: string): Promise<WorkflowMemberCondition[]> => {
@@ -32,7 +32,8 @@ export const replaceWorkflowConditions = async (
   const profile = conditions.filter(condition => 'source' in condition)
   if (profile.length) {
     const choices = await readWorkflowProfileChoices(trx, agencyId, {
-      amendmentSubtypeIds: [...new Set(profile.flatMap(condition => condition.source === 'amendment_subtype' ? condition.optionIds : []))]
+      amendmentTypeIds: amendmentConditionOptionIds(profile, 'amendment_type'),
+      amendmentSubtypeIds: amendmentConditionOptionIds(profile, 'amendment_subtype')
     })
     try {
       profile.forEach(condition => resolveWorkflowProfileCondition(condition, choices))

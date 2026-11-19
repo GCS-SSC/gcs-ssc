@@ -42,7 +42,7 @@ export default defineEventHandler(async event => {
     ])
     const riskTarget = { entityType: 'fundingcaseamendment' as const, entityId: amendmentId }
     const [riskManaged, riskHistory, latestRiskRating] = await Promise.all([
-      isRiskRatingWorkflowManaged(db, { ...riskTarget, streamId: context.streamId }),
+      isRiskRatingWorkflowManaged(db, { entityType: 'fundingcaseamendment', streamId: context.streamId }),
       hasRiskRatingRuns(db, riskTarget), resolveLatestRiskRating(db, riskTarget)
     ])
     const completed = Boolean(amendmentsWithState[0]?.isCompleted)

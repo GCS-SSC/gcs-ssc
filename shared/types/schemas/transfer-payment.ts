@@ -96,6 +96,21 @@ export const TransferPaymentStreamBudgetManagementSchema = z.object({
 })
 export type TransferPaymentStreamBudgetManagement = z.infer<typeof TransferPaymentStreamBudgetManagementSchema>
 
+export const TransferPaymentStreamRiskManagementFields = z.object({
+  egcs_tp_agreementriskenabled: z.boolean(),
+  egcs_tp_agreementriskworkflow: PositivePostgresBigintIdSchema.nullable().meta({ formRequired: false }),
+  egcs_tp_amendmentriskenabled: z.boolean(),
+  egcs_tp_amendmentriskworkflow: PositivePostgresBigintIdSchema.nullable().meta({ formRequired: false })
+}).strict()
+
+export const TransferPaymentStreamRiskManagementSchema = TransferPaymentStreamRiskManagementFields
+  .refine(data => !data.egcs_tp_agreementriskenabled || data.egcs_tp_agreementriskworkflow !== null,
+    { error: 'validation.required', path: ['egcs_tp_agreementriskworkflow'] })
+  .refine(data => !data.egcs_tp_amendmentriskenabled || data.egcs_tp_amendmentriskworkflow !== null,
+    { error: 'validation.required', path: ['egcs_tp_amendmentriskworkflow'] })
+
+export type TransferPaymentStreamRiskManagement = z.infer<typeof TransferPaymentStreamRiskManagementSchema>
+
 const TransferPaymentStreamBaseSchema = z.object({
   egcs_tp_requireconsistentproponenttype: z.boolean().default(false),
   egcs_tp_budgetfundingmode: TransferPaymentBudgetFundingModeSchema.default('manual'),
@@ -132,6 +147,7 @@ export const TransferPaymentStreamSchema = TransferPaymentStreamBaseSchema.refin
 
 // PATCH omission must preserve stored flags rather than apply create defaults.
 export const TransferPaymentStreamPatchSchema = TransferPaymentStreamBaseSchema.partial().extend({
+  ...TransferPaymentStreamRiskManagementFields.partial().shape,
   egcs_tp_budgetfundingmode: TransferPaymentBudgetFundingModeSchema.optional(),
   egcs_tp_hidecostcategory: z.boolean().optional(),
   egcs_tp_hidecostsubsection: z.boolean().optional(),

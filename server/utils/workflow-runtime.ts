@@ -14,7 +14,9 @@ import { compareMoney, zeroMoney } from '~~/shared/utils/money'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
 import { lockAssignableGroup } from './groups'
-import { captureRiskRatingMapping, resolveRiskRatingAgreementId } from './agreement-risk-rating'
+import {
+  captureAmendmentRiskSelections, captureRiskRatingMapping, matchAmendmentRiskSelections, readStreamRiskPolicy, resolveRiskRatingAgreementId
+} from './agreement-risk-rating'
 import { hashPublicationDefinition } from './system-publication'
 import { captureWorkflowRouting } from './workflow-routing'
 import { WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing-contract'
@@ -381,10 +383,12 @@ const applyRiskRatingEffect = async (
     })
     return false
   }
-  if (!effect || !['fundingcaseagreement', 'fundingcaseamendment'].includes(run.egcs_cn_entitytype)) return await fail('risk_rating_configuration_invalid')
-  const agreementId = await resolveRiskRatingAgreementId(trx, {
-    entityType: run.egcs_cn_entitytype as 'fundingcaseagreement' | 'fundingcaseamendment', entityId: String(run.egcs_cn_entityid)
-  })
+  const entityType = run.egcs_cn_entitytype
+  if (!effect || (entityType !== 'fundingcaseagreement' && entityType !== 'fundingcaseamendment')) {
+    return await fail('risk_rating_configuration_invalid')
+  }
+  const target = { entityType, entityId: String(run.egcs_cn_entityid) }
+  const agreementId = await resolveRiskRatingAgreementId(trx, { ...target, entityType })
   if (!agreementId) return await fail('risk_rating_target_unavailable')
   if (run.egcs_cn_entitytype === 'fundingcaseamendment'
     && await resolveCompletionEvidenceId(trx, 'fundingcaseamendment', String(run.egcs_cn_entityid))) return await fail('risk_rating_frozen')
@@ -439,6 +443,11 @@ const applyRiskRatingEffect = async (
   }
   const band = mapping.bands.toSorted((left, right) => left.maximumScore - right.maximumScore).find(candidate => assessmentScore <= candidate.maximumScore)
   if (!band) return await fail('risk_rating_score_out_of_range')
+  const policy = await readStreamRiskPolicy(trx, lockedStreamId, entityType)
+  if (!policy.enabled || policy.setupId !== String(run.egcs_cn_sourcepublication)) return await fail('risk_rating_policy_changed')
+  if (entityType === 'fundingcaseamendment' && !matchAmendmentRiskSelections(
+    evidence.amendmentRiskSelections, await captureAmendmentRiskSelections(trx, target.entityId)
+  )) return await fail('risk_rating_selections_changed')
   if (run.egcs_cn_entitytype === 'fundingcaseamendment') {
     await trx.updateTable('Funding_Case_Agreement_Amendment')
       .set({ egcs_fc_changerisk: true, egcs_fc_proposedriskscore: band.riskScore })
@@ -853,6 +862,14 @@ export const resolveActiveWorkflowSetup = async (
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
   const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
   if (streamIds.length === 0) return null
+  let riskSetupId: string | null = null
+  if (purpose === 'risk_rating') {
+    const { entityType } = context
+    if (entityType !== 'fundingcaseagreement' && entityType !== 'fundingcaseamendment') return null
+    const policy = await readStreamRiskPolicy(db, streamIds[0]!, entityType)
+    if (!policy.enabled || !policy.setupId) return null
+    riskSetupId = policy.setupId
+  }
   const opportunityId = context.entityType === 'fundingcaseintake'
     ? scopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
     : null
@@ -883,6 +900,7 @@ export const resolveActiveWorkflowSetup = async (
     .where('Transfer_Payment_Stream_Workflow.egcs_tp_transferpaymentstream', 'in', streamIds)
     .where('Transfer_Payment_Stream_Workflow._deleted', '=', false)
     .orderBy('Common_Publication_Version.egcs_cn_version', 'desc')
+  if (riskSetupId !== null) query = query.where('Common_Workflow_Setup.id', '=', riskSetupId)
   if (lockRows) query = query.forUpdate([
     'Common_Workflow_Setup',
     'Common_Publication',
@@ -984,6 +1002,8 @@ export const resolveRetryableWorkflowSetup = async (
   lockRows = false,
   purpose: Workflow_Purpose = 'standard'
 ): Promise<WorkflowSetupSelection | null> => {
+  const selectedRiskSetup = purpose === 'risk_rating' ? await resolveActiveWorkflowSetup(db, context, purpose, lockRows) : null
+  if (purpose === 'risk_rating' && !selectedRiskSetup) return null
   let runQuery = db.selectFrom('Common_Runtime')
     .leftJoin('Common_Runtime as Successor_Runtime', join => join
       .onRef('Successor_Runtime.egcs_cn_previousruntime', '=', 'Common_Runtime.id')
@@ -1014,6 +1034,7 @@ export const resolveRetryableWorkflowSetup = async (
     .where('Common_Publication_Version.egcs_cn_kind', '=', 'workflow_setup')
     .whereRef('Common_Publication_Version.egcs_cn_publication', '=', 'Common_Runtime.egcs_cn_sourcepublication')
     .whereRef('Common_Publication_Version.egcs_cn_version', '=', 'Common_Runtime.egcs_cn_sourceversion')
+  if (selectedRiskSetup) runQuery = runQuery.where('Common_Runtime.egcs_cn_sourcepublication', '=', String(selectedRiskSetup.id))
   runQuery = runtimeId
     ? runQuery
         .where('Common_Runtime.id', '=', runtimeId)
@@ -1333,7 +1354,7 @@ const startWorkflowUnchecked = async (
   if (selectedSetup && context.entityType === 'fundingcaseintake' && !retry
     && (!selectedIntakeSetup || String(selectedIntakeSetup.id) !== String(selectedSetup.id)
       || selectedIntakeSetup.publicationVersionId !== selectedSetup.publicationVersionId)) return null
-  const setup = selectedSetup ?? (retry
+  const setup = (purpose === 'risk_rating' ? undefined : selectedSetup) ?? (retry
     ? await resolveRetryableWorkflowSetup(trx, context, retryRuntimeId, true, purpose)
     : purpose === 'standard'
       ? null
@@ -1482,7 +1503,11 @@ const startWorkflowUnchecked = async (
         throw new WorkflowRouteValidationError('Risk Rating Stream mapping is invalid', { cause: error })
       }
       const { hash: _hash, ...baseEvidence } = routing
-      const payload = { ...baseEvidence, version: 3 as const, riskRatingMapping }
+      const amendmentRiskSelections = context.entityType === 'fundingcaseamendment'
+        ? await captureAmendmentRiskSelections(trx, context.entityId)
+        : undefined
+      const payload = { ...baseEvidence, version: 3 as const, riskRatingMapping,
+        ...(amendmentRiskSelections ? { amendmentRiskSelections } : {}) }
       routing = { ...payload, hash: hashPublicationDefinition(payload as JsonValue) }
     }
   } catch (error) {

@@ -1,7 +1,7 @@
 import { isAssignableGroup } from './group-eligibility'
 import { isExpectedPublicationFailure } from './publication-errors'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
-import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
+import { amendmentConditionOptionIds, readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
 import { hasWorkflowMemberApproval } from './workflow-execution-plan'
 import { readAgencyCustomFieldDefinitions } from './agency-custom-field-definitions'
@@ -255,9 +255,11 @@ export const buildWorkflowSetupPublication = async (
       ? await readAgencyCustomFieldDefinitions(db, String(setup.egcs_cn_agency))
       : []
     if (conditions.length && (await resolveEntityTypeLifecycleDefinition(db, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') throw new Error('Workflow conditions require an Agreement owner')
-    const choices = conditions.some(condition => 'source' in condition)
+    const profileConditions = conditions.filter(condition => 'source' in condition)
+    const choices = profileConditions.length
       ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_agency), {
-          amendmentSubtypeIds: [...new Set(conditions.flatMap(condition => 'source' in condition && condition.source === 'amendment_subtype' ? condition.optionIds : []))]
+          amendmentTypeIds: amendmentConditionOptionIds(profileConditions, 'amendment_type'),
+          amendmentSubtypeIds: amendmentConditionOptionIds(profileConditions, 'amendment_subtype')
         })
       : null
     const resolvedConditions = conditions.map(condition => {
@@ -293,7 +295,6 @@ export const buildWorkflowSetupPublication = async (
     descriptionEn: setup.egcs_cn_description_en, descriptionFr: setup.egcs_cn_description_fr,
     entityType: setup.egcs_cn_entitytype as Workflow_Target_Entity_Type,
     purpose: setup.egcs_cn_purpose,
-    ...(setup.egcs_cn_riskratingrequired ? { riskRatingRequired: true } : {}),
     allowedStartStatuses: allowedRows.map(row => String(row.egcs_cn_status)),
     cancellationStatus: String(setup.egcs_cn_cancellationstatus),
     executionFailureStatus: String(setup.egcs_cn_executionfailurestatus),
@@ -381,7 +382,6 @@ export const applyPublishedWorkflowConfiguration = (
   egcs_cn_description_en: configuration.descriptionEn, egcs_cn_description_fr: configuration.descriptionFr,
   egcs_cn_entitytype: configuration.entityType,
   egcs_cn_purpose: configuration.purpose ?? 'standard',
-  egcs_cn_riskratingrequired: configuration.riskRatingRequired === true,
   egcs_cn_allowedstartstatuses: configuration.allowedStartStatuses,
   egcs_cn_cancellationstatus: configuration.cancellationStatus,
   egcs_cn_executionfailurestatus: configuration.executionFailureStatus,

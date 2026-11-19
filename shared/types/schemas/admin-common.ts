@@ -581,7 +581,6 @@ const CommonWorkflowSetupBaseSchema = z.object({
     error: 'validation.invalid_text_character'
   }),
   egcs_cn_purpose: z.enum(['standard', 'approval_submission', 'risk_rating'], { error: 'validation.workflow_purpose_required' }).default('standard'),
-  egcs_cn_riskratingrequired: z.boolean().default(false),
   egcs_cn_allowedstartstatuses: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.workflow_allowed_start_status_required' })
     .refine(statuses => new Set(statuses.map(String)).size === statuses.length, { error: 'validation.workflow_allowed_start_status_unique' }),
   egcs_cn_cancellationstatus: RequiredPostgresBigintIdSchema('validation.workflow_cancellation_status_required'),
@@ -601,15 +600,11 @@ const validateWorkflowSetup = (
   if (data.egcs_cn_purpose === 'risk_rating' && !['fundingcaseagreement', 'fundingcaseamendment'].includes(data.egcs_cn_entitytype ?? '')) {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_rating_entity_type', path: ['egcs_cn_entitytype'] })
   }
-  if (data.egcs_cn_riskratingrequired && data.egcs_cn_purpose !== 'risk_rating') {
-    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_rating_required_purpose', path: ['egcs_cn_riskratingrequired'] })
-  }
 }
 
 export const CommonWorkflowSetupCreateSchema = CommonWorkflowSetupBaseSchema.superRefine(validateWorkflowSetup)
 const CommonWorkflowSetupPatchBaseSchema = CommonWorkflowSetupBaseSchema.partial().extend({
   egcs_cn_purpose: z.enum(['standard', 'approval_submission', 'risk_rating'], { error: 'validation.workflow_purpose_required' }).optional(),
-  egcs_cn_riskratingrequired: z.boolean().optional(),
   _deleted: z.boolean().optional()
 })
 export const CommonWorkflowSetupPatchSchema = CommonWorkflowSetupPatchBaseSchema

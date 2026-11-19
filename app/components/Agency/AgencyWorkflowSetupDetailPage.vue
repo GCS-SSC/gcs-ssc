@@ -181,9 +181,6 @@ watch(purposeOptions, options => {
     state.value.egcs_cn_purpose = options[0]!.value
   }
 })
-watch(() => state.value?.egcs_cn_purpose, purpose => {
-  if (purpose !== 'risk_rating' && state.value) state.value.egcs_cn_riskratingrequired = false
-})
 const approvalTemplateFetchUrl = computed(() => agencyId ? `/api/agency/${agencyId}/approval-templates` : null)
 const recommendationSetQuery = computed(() => ({
   limit: 100
@@ -216,8 +213,7 @@ const buildSetupPayload = () => state.value
       egcs_cn_allowedstartstatuses: state.value.egcs_cn_allowedstartstatuses,
       egcs_cn_cancellationstatus: state.value.egcs_cn_cancellationstatus,
       egcs_cn_executionfailurestatus: state.value.egcs_cn_executionfailurestatus,
-      egcs_cn_allowretry: state.value.egcs_cn_allowretry,
-      egcs_cn_riskratingrequired: state.value.egcs_cn_riskratingrequired ?? false
+      egcs_cn_allowretry: state.value.egcs_cn_allowretry
     }
   : null
 let disposed = false
@@ -720,13 +716,6 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
 
               <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-behaviour" :title="t('workflow.behaviour')">
                 <div class="space-y-5">
-                  <UFormField
-                    v-if="state.egcs_cn_purpose === 'risk_rating'"
-                    :label="t('workflow.risk_rating_required')"
-                    name="egcs_cn_riskratingrequired"
-                    :description="t('workflow.risk_rating_required_help')">
-                    <USwitch v-model="state.egcs_cn_riskratingrequired" :disabled="!canEditFields" />
-                  </UFormField>
                   <UFormField :label="t('workflow.allow_retry')" name="egcs_cn_allowretry" :description="t('workflow.allow_retry_help')">
                     <USwitch v-model="state.egcs_cn_allowretry" :disabled="!canEditFields" />
                   </UFormField>

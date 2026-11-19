@@ -254,6 +254,12 @@ CREATE TABLE "Transfer_Payment_Stream" (
   "egcs_tp_requireclaimfundingbreakdown" boolean DEFAULT false NOT NULL,
   CHECK ("egcs_tp_budgetfundingmode" <> 'program_only'
     OR (NOT "egcs_tp_requireforecastfundingbreakdown" AND NOT "egcs_tp_requireclaimfundingbreakdown")),
+  "egcs_tp_agreementriskenabled" boolean DEFAULT false NOT NULL,
+  "egcs_tp_agreementriskworkflow" bigint,
+  "egcs_tp_amendmentriskenabled" boolean DEFAULT false NOT NULL,
+  "egcs_tp_amendmentriskworkflow" bigint,
+  CONSTRAINT tp_chk_agreementriskworkflow CHECK (egcs_tp_agreementriskenabled = (egcs_tp_agreementriskworkflow IS NOT NULL)),
+  CONSTRAINT tp_chk_amendmentriskworkflow CHECK (egcs_tp_amendmentriskenabled = (egcs_tp_amendmentriskworkflow IS NOT NULL)),
   CONSTRAINT "Transfer_Payment_Stream_pkey" PRIMARY KEY (id)
 );
 
@@ -950,7 +956,7 @@ AS $function$
           RAISE EXCEPTION 'Workflow must be published and belong to the Stream Agency'
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamworkflowpublishedagency';
         END IF;
-        IF workflow_purpose IN ('approval_submission', 'risk_rating') AND EXISTS (
+        IF workflow_purpose = 'approval_submission' AND EXISTS (
           SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
           JOIN "Common_Workflow_Setup" existing ON existing.id = linked.egcs_tp_workflow
           JOIN "Common_Publication" existing_publication ON existing_publication.id = existing.id
@@ -971,18 +977,80 @@ AS $function$
       RETURN NEW;
     END $function$;
 
+CREATE FUNCTION assert_stream_risk_workflows(stream_id bigint)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
+  BEGIN
+    IF EXISTS (
+      SELECT 1 FROM "Transfer_Payment_Stream" stream
+      JOIN "Transfer_Payment_Profile" profile ON profile.id = stream.egcs_tp_transferpaymentprofile
+      CROSS JOIN LATERAL (VALUES
+        (stream.egcs_tp_agreementriskworkflow, 'fundingcaseagreement'),
+        (stream.egcs_tp_amendmentriskworkflow, 'fundingcaseamendment')
+      ) AS selected(workflow_id, entity_type)
+      WHERE stream.id = stream_id AND NOT stream._deleted AND selected.workflow_id IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM "Transfer_Payment_Stream_Workflow" link
+          JOIN "Common_Workflow_Setup" setup ON setup.id = link.egcs_tp_workflow
+          JOIN "Common_Publication" publication ON publication.id = setup.id
+          JOIN "Common_Publication_Version" version ON version.id = publication.egcs_cn_currentversion
+          WHERE link.egcs_tp_transferpaymentstream = stream.id AND NOT link._deleted
+            AND setup.id = selected.workflow_id AND NOT setup._deleted
+            AND setup.egcs_cn_agency = profile.egcs_tp_agency
+            AND publication.egcs_cn_state = 'published' AND NOT publication._deleted
+            AND version.egcs_cn_definition->>'entityType' = selected.entity_type
+            AND version.egcs_cn_definition->>'purpose' = 'risk_rating'
+        )
+    ) THEN
+      RAISE EXCEPTION 'Stream must select a linked published Risk Rating workflow for its target'
+        USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamriskworkflow';
+    END IF;
+  END $function$;
+
+CREATE FUNCTION validate_stream_risk_workflows()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+  BEGIN
+    PERFORM assert_stream_risk_workflows(NEW.id);
+    RETURN NEW;
+  END $function$;
+
+CREATE FUNCTION protect_stream_risk_workflow_link()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+  BEGIN
+    PERFORM 1 FROM "Transfer_Payment_Stream" WHERE id = OLD.egcs_tp_transferpaymentstream FOR UPDATE;
+    IF EXISTS (
+      SELECT 1 FROM "Transfer_Payment_Stream" stream
+      WHERE stream.id = OLD.egcs_tp_transferpaymentstream AND NOT stream._deleted
+        AND OLD.egcs_tp_workflow IN (stream.egcs_tp_agreementriskworkflow, stream.egcs_tp_amendmentriskworkflow)
+    ) THEN
+      RAISE EXCEPTION 'Replace or disable the Stream risk workflow before unlinking it'
+        USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamriskworkflow';
+    END IF;
+    RETURN OLD;
+  END $function$;
+
 CREATE FUNCTION validate_stream_workflow_publication()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
   DECLARE definition jsonb;
   BEGIN
-    IF NEW.egcs_cn_kind <> 'workflow_setup' OR NEW.egcs_cn_state <> 'published' OR NEW._deleted THEN RETURN NEW; END IF;
+    IF NEW.egcs_cn_kind <> 'workflow_setup' THEN RETURN NEW; END IF;
     SELECT egcs_cn_definition INTO definition FROM "Common_Publication_Version" WHERE id = NEW.egcs_cn_currentversion;
     PERFORM 1 FROM "Transfer_Payment_Stream" stream
       WHERE stream.id IN (SELECT egcs_tp_transferpaymentstream FROM "Transfer_Payment_Stream_Workflow"
         WHERE egcs_tp_workflow = NEW.id AND NOT _deleted) ORDER BY stream.id FOR UPDATE OF stream;
-    IF COALESCE(definition->>'purpose', 'standard') NOT IN ('approval_submission', 'risk_rating') THEN RETURN NEW; END IF;
+    PERFORM assert_stream_risk_workflows(stream.id)
+      FROM "Transfer_Payment_Stream" stream
+      WHERE NOT stream._deleted
+        AND NEW.id IN (stream.egcs_tp_agreementriskworkflow, stream.egcs_tp_amendmentriskworkflow);
+    IF NEW.egcs_cn_state <> 'published' OR NEW._deleted
+      OR COALESCE(definition->>'purpose', 'standard') <> 'approval_submission' THEN RETURN NEW; END IF;
     IF EXISTS (
       SELECT 1 FROM "Transfer_Payment_Stream_Workflow" own_link
       JOIN "Transfer_Payment_Stream_Workflow" other_link ON other_link.egcs_tp_transferpaymentstream = own_link.egcs_tp_transferpaymentstream
@@ -1232,6 +1300,8 @@ CREATE TRIGGER guard_program_agency_immutable BEFORE UPDATE OF egcs_tp_agency ON
 
 CREATE TRIGGER guard_program_financial_id_agency BEFORE UPDATE OF egcs_tp_agency ON "Transfer_Payment_Profile" FOR EACH ROW EXECUTE FUNCTION guard_program_financial_id_agency();
 
+CREATE TRIGGER protect_workflow_amendment_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_tp_transferpaymentstream ON "Transfer_Payment_Amendment_Type" FOR EACH ROW EXECUTE FUNCTION protect_workflow_amendment_conditions();
+
 CREATE TRIGGER protect_workflow_amendment_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_tp_transferpaymentstream ON "Transfer_Payment_Amendment_Subtype" FOR EACH ROW EXECUTE FUNCTION protect_workflow_amendment_conditions();
 
 CREATE TRIGGER trg_enforce_amendment_subtype_type_stream_scope BEFORE INSERT OR UPDATE OF egcs_tp_amendmentsubtype, egcs_tp_amendmenttype ON "Transfer_Payment_Amendment_Subtype_Type" FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_amendment_subtype_type_stream_scope();
@@ -1287,7 +1357,13 @@ CREATE TRIGGER validate_stream_operational_catalog_link BEFORE INSERT OR UPDATE 
 
 CREATE TRIGGER validate_stream_review_set_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_reviewset, _deleted ON "Transfer_Payment_Stream_Review_Set" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
 
-CREATE TRIGGER validate_stream_workflow_publication AFTER UPDATE OF egcs_cn_currentversion, egcs_cn_state ON "Common_Publication" FOR EACH ROW EXECUTE FUNCTION validate_stream_workflow_publication();
+CREATE TRIGGER validate_stream_risk_workflows AFTER INSERT OR UPDATE OF egcs_tp_agreementriskworkflow, egcs_tp_amendmentriskworkflow ON "Transfer_Payment_Stream" FOR EACH ROW EXECUTE FUNCTION validate_stream_risk_workflows();
+
+CREATE TRIGGER protect_stream_risk_workflow_unlink AFTER UPDATE OF _deleted ON "Transfer_Payment_Stream_Workflow" FOR EACH ROW WHEN (NEW._deleted AND NOT OLD._deleted) EXECUTE FUNCTION protect_stream_risk_workflow_link();
+
+CREATE TRIGGER protect_stream_risk_workflow_delete AFTER DELETE ON "Transfer_Payment_Stream_Workflow" FOR EACH ROW WHEN (NOT OLD._deleted) EXECUTE FUNCTION protect_stream_risk_workflow_link();
+
+CREATE TRIGGER validate_stream_workflow_publication AFTER UPDATE OF egcs_cn_currentversion, egcs_cn_state, _deleted ON "Common_Publication" FOR EACH ROW EXECUTE FUNCTION validate_stream_workflow_publication();
 
 CREATE TRIGGER validate_stream_workflow_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_workflow, _deleted ON "Transfer_Payment_Stream_Workflow" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
 END $baseline$`.execute(db)

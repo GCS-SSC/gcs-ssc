@@ -2151,7 +2151,6 @@ export interface CommonWorkflowSetupTable {
   egcs_cn_description_en: string
   egcs_cn_description_fr: string
   egcs_cn_purpose: Generated<Workflow_Purpose>
-  egcs_cn_riskratingrequired: Generated<boolean>
   egcs_cn_cancellationstatus: StatusId
   egcs_cn_executionfailurestatus: StatusId
   egcs_cn_allowretry: Generated<boolean>
@@ -2343,6 +2342,10 @@ export interface TransferPaymentFiscalYearBudgetTable {
 }
 
 export interface TransferPaymentStreamTable {
+  egcs_tp_agreementriskenabled: Generated<boolean>
+  egcs_tp_agreementriskworkflow: Generated<string | null>
+  egcs_tp_amendmentriskenabled: Generated<boolean>
+  egcs_tp_amendmentriskworkflow: Generated<string | null>
   egcs_tp_requireconsistentproponenttype: Generated<boolean>
   egcs_tp_budgetfundingmode: Generated<TransferPaymentBudgetFundingMode>
   egcs_tp_hidecostcategory: Generated<boolean>
