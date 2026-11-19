@@ -3213,6 +3213,7 @@
       "reconcile_title": "Rapprochement",
       "cost_category": "Catégorie de coût",
       "submitted_amount": "Montant soumis",
+      "previously_reconciled": "Déjà rapproché",
       "reconciled_amount": "Montant rapproché",
       "sampled_amount": "Montant échantillonné",
       "balance": "Solde",

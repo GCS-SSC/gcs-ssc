@@ -96,13 +96,15 @@ const toggleGroup = (key: string) => {
  * @param groupLines
  * @param key
  */
-const sumLines = (groupLines: AgreementClaimReconciliationTableLine[], key: 'submittedAmount' | 'reconciledAmount' | 'sampledAmount') =>
+const sumLines = (groupLines: AgreementClaimReconciliationTableLine[], key: 'submittedAmount' | 'previouslyReconciledAmount' | 'reconciledAmount' | 'sampledAmount') =>
   sumMoney(groupLines.flatMap(line => {
     const amount = tryParseMoney(line[key])
     return amount === null ? [] : [amount]
   }), currency)
-const getLineBalance = (line: AgreementClaimReconciliationTableLine) => line.balance
-  ?? subtractMoney(line.submittedAmount, tryParseMoney(line.reconciledAmount) ?? zeroMoney(currency))
+const getLineBalance = (line: AgreementClaimReconciliationTableLine) => subtractMoney(
+  subtractMoney(line.submittedAmount, line.previouslyReconciledAmount),
+  tryParseMoney(line.reconciledAmount) ?? zeroMoney(currency)
+)
 const sumBalances = (groupLines: AgreementClaimReconciliationTableLine[]) => sumMoney(groupLines.map(getLineBalance), currency)
 const getCategoryLines = (category: ReconciliationCategoryGroup) => category.subsections.flatMap(subsection => subsection.lines)
 </script>
@@ -120,6 +122,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
           </th>
           <th class="min-w-40 px-4 py-4">
             {{ t('agreement.claims.submitted_amount') }}
+          </th>
+          <th scope="col" class="min-w-44 px-4 py-4">
+            {{ t('agreement.claims.previously_reconciled') }}
           </th>
           <th class="min-w-44 px-4 py-4">
             {{ t('agreement.claims.reconciled_amount') }}
@@ -158,6 +163,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
               {{ formatMoney(sumLines(getCategoryLines(category), 'submittedAmount')) }}
             </td>
             <td class="px-4 py-3 font-medium">
+              {{ formatMoney(sumLines(getCategoryLines(category), 'previouslyReconciledAmount')) }}
+            </td>
+            <td class="px-4 py-3 font-medium">
               {{ formatMoney(sumLines(getCategoryLines(category), 'reconciledAmount')) }}
             </td>
             <td class="px-4 py-3 font-medium">
@@ -193,6 +201,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                   {{ formatMoney(sumLines(subsection.lines, 'submittedAmount')) }}
                 </td>
                 <td class="px-4 py-3 font-medium">
+                  {{ formatMoney(sumLines(subsection.lines, 'previouslyReconciledAmount')) }}
+                </td>
+                <td class="px-4 py-3 font-medium">
                   {{ formatMoney(sumLines(subsection.lines, 'reconciledAmount')) }}
                 </td>
                 <td class="px-4 py-3 font-medium">
@@ -224,6 +235,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                 </th>
                 <td class="px-4 py-4 font-semibold">
                   {{ formatMoney(line.submittedAmount) }}
+                </td>
+                <td class="px-4 py-4">
+                  {{ formatMoney(line.previouslyReconciledAmount) }}
                 </td>
                 <td class="px-4 py-4">
                   <CommonCurrencyInput
@@ -281,7 +295,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
           </template>
         </template>
         <tr v-if="lines.length === 0">
-          <td :colspan="editMode === 'action' ? 6 : 5" class="px-4 py-10 text-center text-muted">
+          <td :colspan="editMode === 'action' ? 7 : 6" class="px-4 py-10 text-center text-muted">
             {{ t('agreement.claims.no_reconcile_lines') }}
           </td>
         </tr>
@@ -293,6 +307,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
           </th>
           <td class="px-4 py-4">
             {{ formatMoney(totalSubmitted ?? zeroMoney(currency)) }}
+          </td>
+          <td class="px-4 py-4">
+            {{ formatMoney(sumLines(lines, 'previouslyReconciledAmount')) }}
           </td>
           <td class="px-4 py-4">
             {{ formatMoney(totalReconciled ?? zeroMoney(currency)) }}

@@ -3213,6 +3213,7 @@
       "reconcile_title": "Reconciliation",
       "cost_category": "Cost category",
       "submitted_amount": "Submitted amount",
+      "previously_reconciled": "Previously reconciled",
       "reconciled_amount": "Reconciled amount",
       "sampled_amount": "Sampled amount",
       "balance": "Balance",

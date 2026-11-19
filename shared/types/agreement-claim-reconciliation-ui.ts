@@ -7,9 +7,9 @@ export type AgreementClaimReconciliationTableLine = {
   costCategory?: string
   costSubsection?: string
   submittedAmount: Money
+  previouslyReconciledAmount: Money
   reconciledAmount: MoneyInput
   sampledAmount: MoneyInput
-  balance?: Money
   rationale: string
   editable: boolean
 }

@@ -28,6 +28,7 @@ type ReconciliationLine = {
   submitted_cost_subsection?: string | null
   submitted_line_item: string | null
   submitted_amount: Money
+  previously_reconciled_amount: Money
   egcs_fc_reconciled: Money | null
   egcs_fc_sampled: Money | null
   egcs_fc_rationale: string | null
@@ -231,6 +232,7 @@ const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[
     || line.egcs_fc_costsubsection
     || t('common.all'),
   submittedAmount: line.submitted_amount,
+  previouslyReconciledAmount: line.previously_reconciled_amount,
   reconciledAmount: line.egcs_fc_reconciled ?? zeroAmount(),
   sampledAmount: line.egcs_fc_sampled,
   rationale: line.egcs_fc_rationale ?? '',

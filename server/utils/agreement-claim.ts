@@ -1429,6 +1429,50 @@ const compareDatabaseIds = (left: string, right: string): number => {
   return leftId < rightId ? -1 : leftId > rightId ? 1 : 0
 }
 
+/**
+ * Sum the amounts contributed by successful sibling reconciliations.
+ *
+ * @param db - Database or the caller's write transaction.
+ * @param claimId - Claim that owns the reconciliation.
+ * @param reconcileId - Reconciliation excluded from the history.
+ * @param currency - Owning Agreement currency.
+ * @returns Exact totals keyed by Claim line ID.
+ */
+export const readPreviouslyReconciledAmounts = async (
+  db: Kysely<Database>,
+  claimId: string,
+  reconcileId: string,
+  currency: string
+) => {
+  const zero = zeroMoney(currency)
+  const siblings = await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
+    .select('id')
+    .where('egcs_fc_fundingagreementclaim', '=', claimId)
+    .where('id', '!=', reconcileId)
+    .where('_deleted', '=', false)
+    .execute()
+  const successfulIds = (await Promise.all(siblings.map(async ({ id }) =>
+    await hasPositiveCompletionTerminus(db, 'fundingclaimreconcile', String(id)) ? String(id) : null
+  ))).filter(id => id !== null)
+  const priorLines = successfulIds.length === 0
+    ? []
+    : await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
+        .select([
+          'egcs_fc_lineitem as claimLineId',
+          databaseMoneyText(sql.ref('egcs_fc_reconciled')).as('amount')
+        ])
+        .where('egcs_fc_fundingagreementclaimreconcile', 'in', successfulIds)
+        .where('egcs_fc_fundingagreementclaim', '=', claimId)
+        .where('_deleted', '=', false)
+        .execute()
+  const priorAmounts = new Map<string, Money>()
+  for (const line of priorLines) {
+    const id = String(line.claimLineId)
+    priorAmounts.set(id, addMoney(priorAmounts.get(id) ?? zero, parseDatabaseMoney(line.amount, currency)))
+  }
+  return priorAmounts
+}
+
 type ReconcileAllAmountsResult =
   | { kind: 'saved', changedCount: number }
   | { kind: 'confirmation-required', overwriteCount: number, confirmation: string }
@@ -1471,31 +1515,7 @@ export const reconcileAllAgreementClaimAmounts = async (
           .orderBy('Funding_Case_Agreement_Claim_Line_Item.id')
           .execute()
 
-        const siblings = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
-          .select('id')
-          .where('egcs_fc_fundingagreementclaim', '=', claimId)
-          .where('id', '!=', reconcileId)
-          .where('_deleted', '=', false)
-          .execute()
-        const successfulIds = (await Promise.all(siblings.map(async ({ id }) =>
-          await hasPositiveCompletionTerminus(trx, 'fundingclaimreconcile', String(id)) ? String(id) : null
-        ))).filter(id => id !== null)
-        const priorLines = successfulIds.length === 0
-          ? []
-          : await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
-              .select([
-                'egcs_fc_lineitem as claimLineId',
-                databaseMoneyText(sql.ref('egcs_fc_reconciled')).as('amount')
-              ])
-              .where('egcs_fc_fundingagreementclaimreconcile', 'in', successfulIds)
-              .where('egcs_fc_fundingagreementclaim', '=', claimId)
-              .where('_deleted', '=', false)
-              .execute()
-        const priorAmounts = new Map<string, Money>()
-        for (const line of priorLines) {
-          const id = String(line.claimLineId)
-          priorAmounts.set(id, addMoney(priorAmounts.get(id) ?? zero, parseDatabaseMoney(line.amount, currency)))
-        }
+        const priorAmounts = await readPreviouslyReconciledAmounts(trx, claimId, reconcileId, currency)
 
         const changes = claimLines.flatMap(line => {
           const claimLineId = String(line.claimLineId)

@@ -58,6 +58,7 @@ type ReconciliationEditorLine = {
   description: string
   submitted_line_item: string | null
   submitted_amount: Money
+  previously_reconciled_amount: Money
   egcs_fc_reconciled: Money | null
   egcs_fc_sampled: Money | null
   egcs_fc_rationale: string | null
@@ -566,6 +567,8 @@ const selectedReconcileLinesByClaimLineId = computed(() => new Map(
 const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[]>(() => activeClaimLineItems.value.map(line => {
   const id = String(line.id)
   const persisted = selectedReconcileLinesByClaimLineId.value.get(id) ?? reconcileLineByClaimLineId.value.get(id)
+  const previouslyReconciledAmount = selectedReconcileLinesByClaimLineId.value.get(id)?.previously_reconciled_amount
+    ?? getSuccessfulReconciledExcludingReconcile(id, activeReconcile.value?.id)
   const reconciledAmount = persisted?.egcs_fc_reconciled ?? zeroAmount()
   return {
     id,
@@ -575,9 +578,9 @@ const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[
     costCategory: line.egcs_fc_submittedcostcategory?.trim() || getCostCategoryLabel(line),
     costSubsection: getCostSubsectionLabel(line.egcs_fc_submittedcostsubsection || line.egcs_fc_costsubsection),
     submittedAmount: line.egcs_fc_amount,
+    previouslyReconciledAmount,
     reconciledAmount,
     sampledAmount: persisted?.egcs_fc_sampled ?? undefined,
-    balance: getProjectedReconciliationLineBalance(id, line.egcs_fc_amount, reconciledAmount),
     rationale: persisted?.egcs_fc_rationale ?? '',
     editable: canUpdateReconcileRole.value
   }
@@ -726,23 +729,12 @@ const getSuccessfulReconciledExcludingReconcile = (
   .filter((item: FundingCaseAgreementClaimReconcileLineItemRow) => String(item.egcs_fc_lineitem) === String(claimLineId))
   .map(item => item.egcs_fc_reconciled), getCurrency())
 
-const getProjectedReconciliationLineBalance = (
-  claimLineId: string | number,
-  submittedAmount: Money,
-  reconciledAmount: Money
-) => subtractMoney(
-  subtractMoney(submittedAmount, getSuccessfulReconciledExcludingReconcile(claimLineId, activeReconcile.value?.id)),
-  reconciledAmount
-)
-
-const selectedReconcileLineBalance = computed(() => selectedReconcileLine.value
-  ? getProjectedReconciliationLineBalance(
-      selectedReconcileLine.value.id,
-      selectedReconcileLine.value.submittedAmount,
-      readDraftMoney(selectedReconcileLine.value.egcs_fc_reconciled)
-    )
-  : zeroAmount()
-)
+const selectedReconcileLineBalance = computed(() => {
+  const line = selectedReconcileLine.value
+  return line
+    ? subtractMoney(subtractMoney(line.submittedAmount, line.previouslyReconciledAmount), readDraftMoney(line.egcs_fc_reconciled))
+    : zeroAmount()
+})
 
 const submissionColumns = computed<TableColumnInput<ClaimSubmissionTableRow>[]>(() => [
   { id: COST_CATEGORY_GROUP_COLUMN_ID, accessorKey: COST_CATEGORY_GROUP_COLUMN_ID, headerKey: 'agreement.claims.cost_category' },

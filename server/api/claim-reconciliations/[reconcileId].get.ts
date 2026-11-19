@@ -15,6 +15,8 @@ import { sql } from 'kysely'
 import { budgetLineDisplayText, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { isDecimalDatabaseId } from '~~/server/utils/database-id'
+import { readPreviouslyReconciledAmounts } from '~~/server/utils/agreement-claim'
+import { zeroMoney } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 
 // eslint-disable-next-line local/require-authorize -- owning-entity business read is enforced below
@@ -89,6 +91,9 @@ export default defineEventHandler(async event => {
     .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false)
     .orderBy('Funding_Case_Agreement_Claim_Line_Item.id')
     .execute()
+  const priorAmounts = lines.length > 0
+    ? await readPreviouslyReconciledAmounts(event.context.$db, String(reconciliation.egcs_fc_fundingagreementclaim), reconcileId, reconciliation.egcs_fc_currency)
+    : undefined
   const grant = await resolveAssignedItemGrant(actor.auth.userId, 'fundingclaimreconcile', reconcileId, event.context.$db)
   const hasUpdateRole = owner
     ? await canAccessEntityAssignmentOwner(actor.auth, owner, 'update', event.context.$db)
@@ -114,6 +119,7 @@ export default defineEventHandler(async event => {
     reconciliation: reconciliationWithState,
     lines: lines.map(line => ({
       ...line,
+      previously_reconciled_amount: priorAmounts?.get(String(line.claim_line_id)) ?? zeroMoney(reconciliation.egcs_fc_currency),
       submitted_amount: parseDatabaseMoney(line.submitted_amount, reconciliation.egcs_fc_currency),
       egcs_fc_reconciled: line.egcs_fc_reconciled == null ? line.egcs_fc_reconciled : parseDatabaseMoney(line.egcs_fc_reconciled, reconciliation.egcs_fc_currency),
       egcs_fc_sampled: line.egcs_fc_sampled == null ? line.egcs_fc_sampled : parseDatabaseMoney(line.egcs_fc_sampled, reconciliation.egcs_fc_currency)
