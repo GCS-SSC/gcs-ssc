@@ -348,7 +348,6 @@ export const financialCaseworkLedger: TargetLedger = {
       label: { en: 'Forecast — Forecast Breakdown', fr: 'Prévision — Ventilation de la prévision' },
       targets: [
         { key: 'casework.forecasts.breakdown.records', label: { en: 'Record list', fr: 'Liste des dossiers' }, kind: 'section' },
-        { key: 'casework.forecasts.detail.forecasts-save-breakdown', label: { en: 'Save forecast', fr: 'Enregistrer la prévision' }, kind: 'button' },
         { key: 'casework.forecasts.breakdown.search', label: { en: 'Search records', fr: 'Rechercher des dossiers' }, kind: 'text' }
       ]
     },

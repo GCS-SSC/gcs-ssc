@@ -36,6 +36,7 @@ type CompletionWorkflowStartOptions = {
   actionRoleAllowed?: MaybeRefOrGetter<boolean | undefined>
   actionPrerequisiteWarning?: MaybeRefOrGetter<LocalizedToastText | undefined>
   completePayload?: MaybeRefOrGetter<unknown>
+  completionComments?: MaybeRefOrGetter<string | undefined>
   completedSuccessKey: MaybeRefOrGetter<string>
   confirmationMessageKey?: MaybeRefOrGetter<string | undefined>
   immediate?: boolean
@@ -180,7 +181,7 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
           : {
               entityType: toValue(options.entityType),
               entityId: toValue(options.entityId),
-              comments: null,
+              comments: toValue(options.completionComments) ?? null,
               payload: toValue(options.completePayload)
             })
       })

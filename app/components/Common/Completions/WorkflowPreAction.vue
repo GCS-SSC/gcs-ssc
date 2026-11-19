@@ -18,6 +18,7 @@ const {
   actionPrerequisiteWarning,
   canEdit = true,
   isLocked = false,
+  completionComments,
   actionLabelKey = 'workflow.start',
   completedSuccessKey,
   showWhenUnconfigured = false,
@@ -35,6 +36,7 @@ const {
   actionPrerequisiteWarning?: LocalizedToastText
   canEdit?: boolean
   isLocked?: boolean
+  completionComments?: string
   actionLabelKey?: string
   completedSuccessKey: string
   showWhenUnconfigured?: boolean
@@ -57,6 +59,7 @@ const completionState = useCompletionWorkflowStart({
   isLocked: () => isLocked || !canEdit,
   actionRoleAllowed: () => actionRoleAllowed,
   actionPrerequisiteWarning: () => actionPrerequisiteWarning,
+  completionComments: () => completionComments,
   completedSuccessKey: () => completedSuccessKey,
   immediate: false,
   onCompleted: handleChanged
@@ -94,7 +97,7 @@ const completionState = useCompletionWorkflowStart({
       <slot name="notices" />
     </template>
     <template v-if="$slots.default" #pre-action>
-      <slot />
+      <slot :pending="completionState.isLoading.value || completionState.isSubmitting.value" />
     </template>
   </CommonWorkflowSection>
 </template>

@@ -3,6 +3,7 @@ import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import type { FetchError } from 'ofetch'
+import { useActionContext, type CapturedActionContext } from '~/composables/useActionContext'
 import { useStatusCatalog } from '~/composables/useStatusCatalog'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
@@ -11,7 +12,8 @@ import type { Ref } from 'vue'
 import type { ExpandedState, Updater } from '@tanstack/vue-table'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
-import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
+import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
+import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
 import type { FundingCaseAgreementForecastBreakdownPatch } from '~~/shared/types/schemas'
@@ -112,14 +114,20 @@ const draftFundingAmounts: Ref<Record<string, Money | null>> = ref({})
 const draftTotalAmounts: Ref<Record<string, Money>> = ref({})
 const monthlyEditorRow: Ref<ForecastBreakdownTableRow | null> = ref(null)
 const monthlyEditorOpen = ref(false)
+let monthlyEditorOwner: CapturedActionContext | null = null
 const monthlyEditorAmounts: Ref<Record<number, MoneyInput>> = ref({})
-const isSavingBreakdown: Ref<boolean> = ref(false)
+const monthlyEditorOriginal: Ref<Record<number, MoneyInput>> = ref({})
+let monthlyEditorAttempted: Partial<Record<number, Money>> = {}
+const monthlyEditorEditableMonths: Ref<number[]> = ref([])
+const breakdownOperation: Ref<'idle' | 'recovering' | 'saving' | 'refreshing'> = ref('idle')
+const isSavingBreakdown = computed(() => breakdownOperation.value !== 'idle')
 let disposed = false
 onScopeDispose(() => {
   disposed = true
 })
 const breakdownReloadRequired = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
+const completionComments = ref('')
 
 const tabs = [
   { key: 'agreement.forecasts.breakdown_title', value: 'breakdown', icon: 'i-lucide-chart-no-axes-column-increasing' },
@@ -221,6 +229,13 @@ const activeForecastIsLocked = computed(() => isRecordLocked(activeForecast.valu
 const canCreateForecastLineItems = computed(() => profile.value?.can_create_agreement_role === true)
 const canUpdateForecast = computed(() => profile.value?.can_update_agreement_role === true)
 const canEditForecastBreakdown = computed(() => canCreateForecastLineItems.value || canUpdateForecast.value)
+const breakdownAction = useActionContext({
+  identity: [() => agreementId, () => forecastId, canCreateForecastLineItems, canUpdateForecast],
+  authority: canEditForecastBreakdown
+})
+watch([selectedTab, breakdownAction.version], () => {
+  completionComments.value = ''
+})
 const workflowPrerequisiteWarning = computed(() => {
   if (!isAssigned.value) return toast.localized('assignments.read_only_description')
   if (!activeForecast.value || isTerminalStatus(activeForecast.value.egcs_fc_status)) return toast.localized('apiErrors.request.invalid_status')
@@ -245,7 +260,9 @@ const isLoadingDetail = computed(() => profileStatus.value === 'pending' || over
   || assignmentStatus.value === 'pending'
   || (statusCatalog.state.value.status === 'pending' && !statusCatalog.getById(activeForecast.value?.egcs_fc_status)))
 const retryLoad = async () => {
+  if (isSavingBreakdown.value) return
   await Promise.all([refreshProfile(), refreshOverview()])
+  if (!disposed && overviewStatus.value === 'success') breakdownReloadRequired.value = false
 }
 
 const getDraftKey = (budgetLineId: string, month: number) => `${budgetLineId}:${month}`
@@ -267,22 +284,39 @@ const canEditForecastAmount = (budgetLineId: string, month: number): boolean => 
     && (existing ? canUpdateForecast.value : canCreateForecastLineItems.value)
 }
 
+const getMonthlyEditorAmount = (row: ForecastBreakdownTableRow, month: number) =>
+  row.funding?.kind === 'other'
+    ? getDraftFundingAmount(row.budgetLineId, row.funding.subtype, month)
+    : row.funding?.kind === 'total'
+      ? getDraftTotalCost(row.budgetLineId, month)
+      : getDraftAmount(row.budgetLineId, month)
+
+const canEditForecastRowAmount = (row: ForecastBreakdownTableRow, month: number) =>
+  canEditForecastAmount(row.budgetLineId, month)
+  && (row.funding?.kind !== 'total' || (forecastFundingMode.value === 'manual'
+    && !getSavedFundingSources(row.budgetLineId, month).length))
+
 const openMonthlyEditor = (row: ForecastBreakdownTableRow) => {
-  if (isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) return
+  if (isSavingBreakdown.value || breakdownReloadRequired.value || !canMutateForecast(canEditForecastBreakdown.value)) return
   if (row.historical || !activeBudgetLineItems.value.some(line => String(line.id) === row.budgetLineId)) {
     warnPrerequisite(toast.localized('agreement.forecasts.historical_budget_line_read_only'))
     return
   }
+  monthlyEditorOwner = breakdownAction.capture()
+  if (!monthlyEditorOwner) return
   monthlyEditorRow.value = row
-  monthlyEditorAmounts.value = Object.fromEntries(MONTH_KEYS.map((_key, month) => [month,
-    row.funding?.kind === 'other'
-      ? getDraftFundingAmount(row.budgetLineId, row.funding.subtype, month)
-      : row.funding?.kind === 'total'
-        ? getDraftTotalCost(row.budgetLineId, month)
-        : getDraftAmount(row.budgetLineId, month)
-  ]))
+  monthlyEditorEditableMonths.value = MONTH_KEYS.map((_key, month) => month)
+    .filter(month => canEditForecastRowAmount(row, month))
+  monthlyEditorAmounts.value = Object.fromEntries(MONTH_KEYS.map((_key, month) => [month, getMonthlyEditorAmount(row, month)]))
+  monthlyEditorOriginal.value = { ...monthlyEditorAmounts.value }
+  monthlyEditorAttempted = {}
   monthlyEditorOpen.value = true
 }
+const isMonthlyEditorMonthEditable = (row: ForecastBreakdownTableRow, month: number) =>
+  !isSavingBreakdown.value && Boolean(monthlyEditorOwner?.isCurrent()) && (breakdownReloadRequired.value && !overview.value
+    ? isAssigned.value && canEditForecastBreakdown.value && monthlyEditorEditableMonths.value.includes(month)
+    : canEditForecastRowAmount(row, month))
+
 const isMonthlyEditorAmountInvalid = (month: number) => {
   try {
     return compareMoney(parseMoney(monthlyEditorAmounts.value[month]), zeroAmount()) < 0
@@ -298,30 +332,61 @@ const selectMonthlyAmount = async (event: FocusEvent) => {
     if (document.activeElement === input) input.select()
   })
 }
-const applyMonthlyEditor = () => {
+const applyMonthlyEditor = async () => {
   const row = monthlyEditorRow.value
-  if (!row || isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) return
-  if (!activeBudgetLineItems.value.some(line => String(line.id) === row.budgetLineId)) {
-    warnPrerequisite(toast.localized('agreement.forecasts.historical_budget_line_read_only'))
-    return
-  }
-  if (MONTH_KEYS.some((_key, month) => isMonthlyEditorAmountInvalid(month))) return
-  MONTH_KEYS.forEach((_key, month) => {
-    if (!canEditForecastAmount(row.budgetLineId, month)) return
-    if (row.funding?.kind === 'other') {
-      setDraftFundingAmount(row.budgetLineId, row.funding.subtype, month, parseMoney(monthlyEditorAmounts.value[month]))
-    } else if (row.funding?.kind === 'total') {
-      const key = getDraftKey(row.budgetLineId, month)
-      const total = parseMoney(monthlyEditorAmounts.value[month])
-      const { [key]: _previous, ...otherDraftTotals } = draftTotalAmounts.value
-      draftTotalAmounts.value = compareMoney(total, getDefaultTotalCost(row.budgetLineId, month)) === 0
-        ? otherDraftTotals
-        : { ...otherDraftTotals, [key]: total }
-    } else {
-      setDraftAmount(row.budgetLineId, month, monthlyEditorAmounts.value[month])
+  if (isSavingBreakdown.value || !monthlyEditorOpen.value || !row || MONTH_KEYS.some((_key, month) => isMonthlyEditorAmountInvalid(month))) return
+  const owner = monthlyEditorOwner
+  if (!owner?.canDispatch()) return
+  const amounts = MONTH_KEYS.map((_key, month) => ({
+    month,
+    amount: parseMoney(monthlyEditorAmounts.value[month])
+  }))
+  const changedAmounts = () => amounts.filter(({ month, amount }) =>
+    compareMoney(parseMoney(monthlyEditorOriginal.value[month]), amount) !== 0)
+  let changes = changedAmounts()
+
+  const saved = await saveForecastBreakdown(() => {
+    if (row.historical || !activeBudgetLineItems.value.some(line => String(line.id) === row.budgetLineId)) {
+      warnPrerequisite(toast.localized('agreement.forecasts.historical_budget_line_read_only'))
+      return false
     }
+    for (const { month } of amounts) {
+      const attempted = monthlyEditorAttempted[month]
+      if (!attempted) continue
+      const persisted = getMonthlyEditorAmount(row, month)
+      if (compareMoney(attempted, parseMoney(persisted)) === 0) monthlyEditorOriginal.value[month] = persisted
+    }
+    changes = changedAmounts()
+    if (changes.some(({ month }) => !canEditForecastRowAmount(row, month))) {
+      warnPrerequisite(t('apiErrors.request.invalid_status'))
+      return false
+    }
+    monthlyEditorAttempted = Object.fromEntries(changes.map(({ month, amount }) => [month, amount]))
+    for (const { month, amount } of changes) {
+      if (row.funding?.kind === 'other') {
+        setDraftFundingAmount(row.budgetLineId, row.funding.subtype, month, amount)
+      } else if (row.funding?.kind === 'total') {
+        if (compareMoney(amount, getDefaultTotalCost(row.budgetLineId, month)) !== 0) {
+          draftTotalAmounts.value[getDraftKey(row.budgetLineId, month)] = amount
+        }
+      } else {
+        setDraftAmount(row.budgetLineId, month, amount)
+      }
+    }
+    return true
   })
-  monthlyEditorOpen.value = false
+  if (!owner.isCurrent() || monthlyEditorRow.value !== row) return
+  if (saved) {
+    monthlyEditorOpen.value = false
+  } else if (!breakdownReloadRequired.value) {
+    MONTH_KEYS.forEach((_key, month) => {
+      const amount = getMonthlyEditorAmount(row, month)
+      const change = changes.find(item => item.month === month)
+      if (change && compareMoney(change.amount, parseMoney(amount)) !== 0) return
+      monthlyEditorOriginal.value[month] = amount
+      monthlyEditorAmounts.value[month] = amount
+    })
+  }
 }
 
 const forecastHeroTitle = computed(() => activeForecast.value
@@ -410,14 +475,6 @@ const breakdownPeriodColumnVisibility = computed<Record<string, boolean>>(() => 
   ])
 ))
 
-watch(activeForecastLineItems, () => {
-  if (!breakdownReloadRequired.value) {
-    draftAmounts.value = {}
-    draftFundingAmounts.value = {}
-    draftTotalAmounts.value = {}
-  }
-}, { immediate: true })
-
 const displayValue = (value: string | number | null | undefined) => {
   if (value === undefined || value === null || value === '') {
     return '-'
@@ -447,10 +504,6 @@ const getDraftMoney = (budgetLineId: string, month: number): Money | null => {
   }
 }
 
-const hasInvalidDraftAmounts = computed(() => activeBudgetLineItems.value.some(line =>
-  MONTH_KEYS.some((_month, month) => getDraftMoney(String(line.id), month) === null)
-))
-
 const setDraftAmount = (budgetLineId: string, month: number, value: MoneyInput) => {
   const key = getDraftKey(budgetLineId, month)
   const draft = value
@@ -460,9 +513,10 @@ const setDraftAmount = (budgetLineId: string, month: number, value: MoneyInput) 
 }
 
 const getFundingDraftKey = (budgetLineId: string, subtype: string, month: number) => `${budgetLineId}:${month}:${subtype}`
+const getSavedFundingSources = (budgetLineId: string, month: number) =>
+  lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_fundingsources ?? []
 const getSavedFundingSource = (budgetLineId: string, subtype: string, month: number) =>
-  lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_fundingsources
-    .find(source => source.egcs_fc_fundingsubtype === subtype)
+  getSavedFundingSources(budgetLineId, month).find(source => source.egcs_fc_fundingsubtype === subtype)
 const getDraftFundingAmount = (budgetLineId: string, subtype: string, month: number) => {
   const key = getFundingDraftKey(budgetLineId, subtype, month)
   return (Object.hasOwn(draftFundingAmounts.value, key)
@@ -478,10 +532,13 @@ const setDraftFundingAmount = (budgetLineId: string, subtype: string, month: num
 }
 const removeForecastSource = (row: ForecastBreakdownTableRow) => {
   const source = row.funding
-  if (source?.kind !== 'other' || !canMutateForecast(canEditForecastBreakdown.value) || isSavingBreakdown.value) return
-  for (let month = 0; month < MONTH_KEYS.length; month += 1) {
-    if (canEditForecastAmount(row.budgetLineId, month)) setDraftFundingAmount(row.budgetLineId, source.subtype, month, null)
-  }
+  if (source?.kind !== 'other' || !canMutateForecast(canEditForecastBreakdown.value) || isSavingBreakdown.value || breakdownReloadRequired.value) return
+  return saveForecastBreakdown(() => {
+    for (let month = 0; month < MONTH_KEYS.length; month += 1) {
+      if (canEditForecastAmount(row.budgetLineId, month)) setDraftFundingAmount(row.budgetLineId, source.subtype, month, null)
+    }
+    return true
+  })
 }
 const canClearRetiredForecastSources = (row: ForecastBreakdownTableRow) => row.historical
   && showForecastFunding.value && !isHistoricalForecast.value && !activeForecastIsLocked.value
@@ -489,12 +546,16 @@ const canClearRetiredForecastSources = (row: ForecastBreakdownTableRow) => row.h
   && activeForecastLineItems.value.some(line => getStableBudgetLineId(line) === row.budgetLineId
     && getProposedFundingSources(row.budgetLineId, line.egcs_fc_month).length > 0)
 const clearRetiredForecastSources = (row: ForecastBreakdownTableRow) => {
-  if (!canClearRetiredForecastSources(row) || isSavingBreakdown.value) return
-  for (let month = 0; month < MONTH_KEYS.length; month += 1) {
-    for (const source of getProposedFundingSources(row.budgetLineId, month)) {
-      setDraftFundingAmount(row.budgetLineId, source.egcs_fc_fundingsubtype, month, null)
+  if (!canClearRetiredForecastSources(row) || isSavingBreakdown.value || breakdownReloadRequired.value) return
+  return saveForecastBreakdown(() => {
+    if (!canClearRetiredForecastSources(row)) return false
+    for (let month = 0; month < MONTH_KEYS.length; month += 1) {
+      for (const source of getProposedFundingSources(row.budgetLineId, month)) {
+        setDraftFundingAmount(row.budgetLineId, source.egcs_fc_fundingsubtype, month, null)
+      }
     }
-  }
+    return true
+  })
 }
 
 const getProposedFundingSources = (budgetLineId: string, month: number) => {
@@ -688,59 +749,32 @@ const toggleQuarter = (quarter: QuarterKey) => {
 
 const refreshPage = async () => {
   await refreshOverview()
-  approvalsRefreshKey.value += 1
+  if (!disposed) approvalsRefreshKey.value += 1
 }
 
-const reloadForecastBreakdown = async () => {
-  let pendingDrafts = { ...draftAmounts.value }
-  let pendingFundingDrafts = { ...draftFundingAmounts.value }
-  let pendingTotalDrafts = { ...draftTotalAmounts.value }
-  breakdownReloadRequired.value = true
+const reloadForecastBreakdown = async (owner: CapturedActionContext) => {
   try {
     await refreshPage()
     if (disposed) return false
     if (overviewError.value || overviewStatus.value === 'error') {
       throw overviewError.value ?? new Error(t('common.resource_table_load_failed'))
     }
-    pendingDrafts = Object.fromEntries(Object.entries(pendingDrafts).filter(([key, value]) => {
-      try {
-        return compareMoney(parseMoney(value), lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? zeroAmount()) !== 0
-      } catch {
-        return true
-      }
-    }))
-    pendingFundingDrafts = Object.fromEntries(Object.entries(pendingFundingDrafts).filter(([key, value]) => {
-      const [budgetLineId, month, subtype] = key.split(':')
-      const saved = getSavedFundingSource(budgetLineId ?? '', subtype ?? '', Number(month))
-      return value === null ? saved !== undefined : compareMoney(value, saved?.egcs_fc_amount ?? zeroAmount()) !== 0
-    }))
-    if (forecastFundingMode.value === 'program_only') pendingFundingDrafts = {}
-    pendingTotalDrafts = forecastFundingMode.value === 'manual'
-      ? Object.fromEntries(Object.entries(pendingTotalDrafts).filter(([key, value]) =>
-          compareMoney(value, lineItemByBudgetMonth.value.get(key)?.egcs_fc_totalamount ?? zeroAmount()) !== 0))
-      : {}
     breakdownReloadRequired.value = false
     return true
   } catch (error: unknown) {
-    if (!disposed) showError(error)
+    if (owner.isCurrent()) showError(error)
     return false
-  } finally {
-    if (!disposed) {
-      draftAmounts.value = pendingDrafts
-      draftFundingAmounts.value = pendingFundingDrafts
-      draftTotalAmounts.value = pendingTotalDrafts
-    }
   }
 }
 
-const saveForecastBreakdown = async () => {
-  if (disposed || !activeForecast.value || isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) {
-    return
-  }
+const saveForecastBreakdown = async (stageChanges: () => boolean) => {
+  const owner = breakdownAction.capture()
+  if (!owner || isSavingBreakdown.value) return false
 
   try {
-    isSavingBreakdown.value = true
-    if (breakdownReloadRequired.value && !await reloadForecastBreakdown()) return
+    breakdownOperation.value = 'recovering'
+    if (breakdownReloadRequired.value && !await reloadForecastBreakdown(owner)) return false
+    if (!owner.canDispatch() || !activeForecast.value || !canMutateForecast(canEditForecastBreakdown.value) || !stageChanges()) return false
     const cells: FundingCaseAgreementForecastBreakdownPatch['cells'] = []
 
     for (const { id: budgetLineId } of displayedBudgetLineItems.value) {
@@ -752,22 +786,35 @@ const saveForecastBreakdown = async () => {
             description: toast.localized('validation.invalid_number'),
             color: 'error'
           })
-          return
+          return false
         }
         const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
         const fundingChanged = Object.keys(draftFundingAmounts.value).some(key => key.startsWith(`${budgetLineId}:${month}:`))
-        const total = draftTotalAmounts.value[getDraftKey(budgetLineId, month)]
-        if (!total && !fundingChanged && (existing ? compareMoney(existing.egcs_fc_amount, amount) === 0 : compareMoney(amount, zeroAmount()) === 0)) continue
+        const explicitTotal = draftTotalAmounts.value[getDraftKey(budgetLineId, month)]
+        if (!explicitTotal && !fundingChanged && (existing ? compareMoney(existing.egcs_fc_amount, amount) === 0 : compareMoney(amount, zeroAmount()) === 0)) continue
         if (!(existing ? canUpdateForecast.value : canCreateForecastLineItems.value)) {
           warnPrerequisite(t('apiErrors.request.invalid_status'))
-          return
+          return false
         }
+        const savedSources = getSavedFundingSources(budgetLineId, month)
+        const sources = fundingChanged ? getProposedFundingSources(budgetLineId, month) : savedSources
+        const fundedTotal = sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)], getCurrency())
+        const manualTotalFollowsFunding = forecastFundingMode.value === 'manual' && existing && (
+          sources.length > 0
+          || compareMoney(existing.egcs_fc_totalamount, fundedTotal) < 0
+          || (savedSources.length === 0 && compareMoney(existing.egcs_fc_totalamount, existing.egcs_fc_amount) === 0)
+        )
+        const total = explicitTotal ?? (manualTotalFollowsFunding
+          && compareMoney(existing.egcs_fc_totalamount, fundedTotal) !== 0
+          ? fundedTotal
+          : undefined)
+
         cells.push({
           egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
           egcs_fc_month: month,
           egcs_fc_amount: amount,
           ...(total ? { egcs_fc_totalamount: total } : {}),
-          ...(fundingChanged ? { egcs_fc_fundingsources: getProposedFundingSources(budgetLineId, month) } : {}),
+          ...(fundingChanged ? { egcs_fc_fundingsources: sources } : {}),
           expected: existing
             ? {
                 id: existing.id, egcs_fc_amount: existing.egcs_fc_amount,
@@ -783,28 +830,33 @@ const saveForecastBreakdown = async () => {
       }
     }
 
-    if (cells.length > 0) {
-      // A failed response may follow a committed save; reload before any retry.
-      breakdownReloadRequired.value = true
-      await saveJson(`/api/agreements/${agreementId}/forecasts/${forecastId}/breakdown`, 'PATCH', { cells })
-      if (disposed) return
-      const savedKeys = new Set(cells.map(cell => getDraftKey(cell.egcs_fc_fundingagreementbudgetlineitem, cell.egcs_fc_month)))
-      draftAmounts.value = Object.fromEntries(Object.entries(draftAmounts.value).filter(([key]) => !savedKeys.has(key)))
-      draftFundingAmounts.value = Object.fromEntries(Object.entries(draftFundingAmounts.value).filter(([key]) => !savedKeys.has(key.slice(0, key.lastIndexOf(':')))))
-      draftTotalAmounts.value = Object.fromEntries(Object.entries(draftTotalAmounts.value).filter(([key]) => !savedKeys.has(key)))
+    if (cells.length === 0) return true
+    breakdownOperation.value = 'saving'
+    breakdownReloadRequired.value = true
+    await saveJson(`/api/agreements/${agreementId}/forecasts/${forecastId}/breakdown`, 'PATCH', { cells })
+    if (disposed) return true
+    breakdownOperation.value = 'refreshing'
+    if (await reloadForecastBreakdown(owner) && owner.isCurrent()) {
+      toast.add({
+        title: toast.localized('common.success'),
+        description: toast.localized('agreement.forecasts.saved_breakdown'),
+        color: 'success'
+      })
     }
-    if (!await reloadForecastBreakdown() || disposed) return
-    toast.add({
-      title: toast.localized('common.success'),
-      description: toast.localized('agreement.forecasts.saved_breakdown'),
-      color: 'success'
-    })
+    return true
   } catch (error: unknown) {
-    if (disposed) return
-    showError(error)
-    if (breakdownReloadRequired.value) await reloadForecastBreakdown()
+    if (disposed) return false
+    if (owner.isCurrent()) showError(error)
+    if (breakdownOperation.value === 'saving') {
+      breakdownOperation.value = 'recovering'
+      await reloadForecastBreakdown(owner)
+    }
+    return false
   } finally {
-    isSavingBreakdown.value = false
+    draftAmounts.value = {}
+    draftFundingAmounts.value = {}
+    draftTotalAmounts.value = {}
+    breakdownOperation.value = 'idle'
   }
 }
 
@@ -813,7 +865,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
 
 <template>
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.forecasts" data-scope-label-en="Agreements > Forecasts > Breakdown" data-scope-label-fr="Ententes > Prévisions > Ventilation" class="flex w-full flex-col">
-    <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
+    <UAlert v-if="hasLoadError || (breakdownReloadRequired && !isSavingBreakdown && !monthlyEditorOpen)" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
@@ -834,17 +886,6 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
           <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.forecasts.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-forecast-detail-content">
             <CommonSection v-if="selectedTab === 'breakdown'" data-help-view="casework.forecasts.breakdown" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
               <div class="space-y-4">
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                  <CommonSaveButton
-                    v-if="canEditForecastBreakdown"
-                    data-help-target="casework.forecasts.detail.forecasts-save-breakdown"
-                    type="button"
-                    :label="t('agreement.forecasts.save_breakdown')"
-                    :loading="isSavingBreakdown"
-                    :disabled="isLoadingDetail || isSavingBreakdown || hasInvalidDraftAmounts"
-                    @click="saveForecastBreakdown" />
-                </div>
-
                 <section data-help-target="casework.forecasts.breakdown.records">
                   <CommonResourceLayout
                     v-model:search="breakdownSearch"
@@ -970,13 +1011,13 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
 
                     <template #actions-cell="{ row }">
                       <CommonActionButton
-                        v-if="!isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) && row.original.funding?.kind !== 'program' && (row.original.funding?.kind !== 'total' || forecastFundingMode === 'manual') && MONTH_KEYS.some((_key, month) => canEditForecastAmount(row.original.budgetLineId, month))"
+                        v-if="!isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) && row.original.funding?.kind !== 'program' && MONTH_KEYS.some((_key, month) => canEditForecastRowAmount(row.original, month))"
                         :data-help-instance="row.original.id"
                         icon="i-lucide-pencil"
                         color="neutral"
                         variant="ghost"
                         size="sm"
-                        :disabled="isLoadingDetail || isSavingBreakdown"
+                        :disabled="isLoadingDetail || isSavingBreakdown || breakdownReloadRequired"
                         :aria-label="`${t('common.edit')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
                         @click="openMonthlyEditor(row.original)" />
                       <CommonActionButton
@@ -985,7 +1026,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                         color="error"
                         variant="ghost"
                         size="sm"
-                        :disabled="isLoadingDetail || isSavingBreakdown"
+                        :disabled="isLoadingDetail || isSavingBreakdown || breakdownReloadRequired"
                         :aria-label="`${t('agreement.funding_sources.remove')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
                         @click="removeForecastSource(row.original)" />
                       <CommonActionButton
@@ -994,7 +1035,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                         color="error"
                         variant="ghost"
                         size="sm"
-                        :disabled="isLoadingDetail || isSavingBreakdown"
+                        :disabled="isLoadingDetail || isSavingBreakdown || breakdownReloadRequired"
                         :aria-label="t('agreement.funding_sources.clear')"
                         @click="clearRetiredForecastSources(row.original)" />
                     </template>
@@ -1015,26 +1056,46 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
             </CommonSection>
 
             <section v-else-if="selectedTab === 'completion'" data-help-view="casework.forecasts.completion" data-help-target="casework.forecasts.detail.completion" data-help-kind="section" class="space-y-6">
-              <CommonCompletionPanel
+              <CommonCompletionWorkflowPreAction
+                mode="completion"
                 :mutation-role-allowed="canUpdateForecast"
                 entity-type="fundingcaseforecast"
                 :entity-id="forecastId"
-                :can-complete="canUpdateForecast"
-                :can-work-workflow="isAssigned"
+                :is-locked="isSavingBreakdown || activeForecastIsLocked"
+                :can-edit="isAssigned"
                 :action-role-allowed="canUpdateForecast"
-                :completion-prerequisite-warning="completionPrerequisiteWarning"
-                :workflow-prerequisite-warning="workflowPrerequisiteWarning"
+                :action-prerequisite-warning="completionPrerequisiteWarning"
+                show-when-unconfigured
                 :show-header="false"
-                :show-divider="false"
                 title-key="agreement.forecasts.completion.title"
                 description-key="agreement.forecasts.completion.description"
-                status-complete-key="agreement.forecasts.completion.status_complete"
-                status-locked-key="agreement.forecasts.completion.status_locked"
-                comment-placeholder-key="agreement.forecasts.completion.comment_placeholder"
-                complete-action-key="agreement.forecasts.completion.complete"
+                :completion-comments="completionComments"
                 completed-success-key="agreement.forecasts.completion.completed_success"
-                :refresh-key="approvalsRefreshKey"
-                @changed="refreshPage" />
+                @changed="refreshPage">
+                <template #default="{ pending }">
+                  <UFormField
+                    v-if="canUpdateForecast && !activeForecast?.isCompleted"
+                    data-field-scope="agreements.forecasts.completion"
+                    name="comments"
+                    :label="t('assessment.completion.comment')">
+                    <CommonTextarea
+                      v-model="completionComments"
+                      :rows="4"
+                      :disabled="pending"
+                      :placeholder="t('agreement.forecasts.completion.comment_placeholder')" />
+                  </UFormField>
+                </template>
+              </CommonCompletionWorkflowPreAction>
+              <CommonCompletionSection
+                v-if="activeForecast?.isCompleted"
+                entity-type="fundingcaseforecast"
+                :entity-id="forecastId"
+                :action-role-allowed="false"
+                is-locked
+                :show-header="false"
+                :show-divider="false"
+                status-complete-key="agreement.forecasts.completion.status_complete"
+                :refresh-key="approvalsRefreshKey" />
             </section>
 
             <CommonReviewsTab
@@ -1058,6 +1119,8 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
     <UModal
       v-if="monthlyEditorRow"
       v-model:open="monthlyEditorOpen"
+      :dismissible="!isSavingBreakdown"
+      :close="!isSavingBreakdown"
       data-help-view="casework.forecasts.detail.monthly-editor-open"
       :title="`${t('common.edit')}: ${getBilingualValue({ name_en: monthlyEditorRow.lineItemNameEn, name_fr: monthlyEditorRow.lineItemNameFr }, 'name', '')}`"
       :ui="{ content: 'sm:max-w-2xl', body: 'max-h-[75vh] overflow-y-auto' }">
@@ -1075,7 +1138,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                   <CommonCurrencyInput
                     :model-value="monthlyEditorAmounts[month]"
                     :currency="profile?.egcs_fc_currency"
-                    :disabled="!canEditForecastAmount(monthlyEditorRow.budgetLineId, month)"
+                    :disabled="!isMonthlyEditorMonthEditable(monthlyEditorRow, month)"
                     required
                     aria-required="true"
                     :aria-label="`${t(`agreement.forecasts.months.${MONTH_KEYS[month]}`)} ${locale === 'fr' ? monthlyEditorRow.lineItemNameFr : monthlyEditorRow.lineItemNameEn}`"
@@ -1090,12 +1153,13 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
             </fieldset>
           </div>
           <div class="flex justify-end gap-2">
-            <UButton data-help-target="casework.forecasts.detail.monthly-editor-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="monthlyEditorOpen = false" />
+            <UButton data-help-target="casework.forecasts.detail.monthly-editor-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="isSavingBreakdown" @click="monthlyEditorOpen = false" />
             <UButton
               data-help-target="casework.forecasts.detail.monthly-editor-open.common-update"
               data-testid="apply-forecast-months"
               :label="t('common.update')"
-              :disabled="isLoadingDetail || isSavingBreakdown || MONTH_KEYS.some((_key, month) => isMonthlyEditorAmountInvalid(month))"
+              :loading="isSavingBreakdown"
+              :disabled="isLoadingDetail || isSavingBreakdown || !monthlyEditorOwner?.isCurrent() || MONTH_KEYS.some((_key, month) => isMonthlyEditorAmountInvalid(month))"
               @click="applyMonthlyEditor" />
           </div>
         </div>

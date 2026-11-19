@@ -3121,7 +3121,6 @@
       "total_budget": "Total budget",
       "total_forecasted": "Total forecasted",
       "budget_utilization": "Budget utilization",
-      "save_breakdown": "Save forecast",
       "saved_breakdown": "Forecast breakdown saved successfully",
       "no_budget_lines": "No budget line items are available for this fiscal year.",
       "quarters": {
