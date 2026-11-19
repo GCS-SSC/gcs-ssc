@@ -52,7 +52,8 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
   if (modalSession.isDisposed() || !pending.begin(session)) return
   try {
     if (!operation.canDispatch()) return
-    await $fetch<unknown, string>(`/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts`, {
+    const route = `/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts` as const
+    await $fetch<object, typeof route>(route, {
       method: 'POST', body: event.data
     })
     if (!operation.isCurrent()) return

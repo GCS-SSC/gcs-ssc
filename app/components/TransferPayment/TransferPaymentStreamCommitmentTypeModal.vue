@@ -34,10 +34,6 @@ watch([
   modalSession.isOpen.value = open.value
 }, { immediate: true, flush: 'sync' })
 const pending = useCrudModalPending(() => captureSession ? captureSession() : modalSession.captureSession())
-const submitCommitmentType: (url: string, options: {
-  method: 'POST'
-  body: z.infer<typeof TransferPaymentStreamCommitmentTypeSchema>
-}) => Promise<unknown> = $fetch
 /**
  * Persists the validated commitment type for the active modal session.
  *
@@ -54,7 +50,8 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
   if (modalSession.isDisposed() || !pending.begin(session)) return
   try {
     if (!operation.canDispatch()) return
-    await submitCommitmentType(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types`, {
+    const route = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types` as const
+    await $fetch<object, typeof route>(route, {
       method: 'POST', body: event.data
     })
     if (!operation.isCurrent()) return
