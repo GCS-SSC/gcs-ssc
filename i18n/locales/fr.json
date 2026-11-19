@@ -1,4 +1,27 @@
 {
+  "review_copy": {
+    "selected_version_mismatch": "La soumission sélectionnée utilise une version différente. Choisissez une soumission qui correspond à ce brouillon.",
+    "copied_title": "Réponses copiées",
+    "copied": "Les réponses précédentes ont été copiées dans le brouillon.",
+    "draft_unavailable": "Ce brouillon ne peut plus être modifié. Actualisez l’examen et réessayez.",
+    "action": "Copier les réponses précédentes",
+    "apply": "Copier les réponses",
+    "replace": "Remplacer les réponses du brouillon",
+    "not_latest": "Soumission antérieure",
+    "overwrite": "La copie remplacera les réponses et le contenu modifiable de ce brouillon.",
+    "failed": "Impossible de copier les réponses précédentes",
+    "draft_changed": "Le brouillon a changé pendant le chargement des réponses précédentes. Vérifiez votre brouillon et confirmez de nouveau.",
+    "assessment": {
+      "description": "Choisissez une évaluation soumise à copier dans ce brouillon.",
+      "no_history": "Aucune évaluation de ce type n’a été soumise pour cette entité.",
+      "version_mismatch": "Aucune évaluation précédente n’utilise la version actuelle de l’évaluation."
+    },
+    "checklist": {
+      "description": "Choisissez une liste de contrôle soumise à copier dans ce brouillon.",
+      "no_history": "Aucune liste de contrôle de ce type n’a été soumise pour cette entité.",
+      "version_mismatch": "Aucune liste de contrôle précédente n’utilise la version actuelle de la liste de contrôle."
+    }
+  },
   "clauses": {
     "title": "Clauses",
     "clause": "Clause",
@@ -1238,6 +1261,11 @@
     "return_home": "Retourner au tableau de bord"
   },
   "apiErrors": {
+    "review_copy": {
+      "alignment": "L’évaluation précédente contient des renseignements sur l’harmonisation, mais l’harmonisation est désactivée pour cette évaluation.",
+      "custom_outcomes": "L’évaluation précédente contient des résultats personnalisés, mais les résultats personnalisés sont désactivés pour cette évaluation.",
+      "strategies": "L’évaluation précédente contient des décisions ou des notes sur les stratégies qui ne peuvent pas être reprises avec les paramètres actuels."
+    },
     "audit": {
       "access_unavailable": "L’historique des accès est temporairement indisponible. Réessayez plus tard."
     },

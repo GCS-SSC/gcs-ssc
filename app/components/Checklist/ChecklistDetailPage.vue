@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ReviewCopyPrevious from '~/components/Review/CopyPrevious.vue'
+import type { ReviewCopyResult } from '~~/shared/types/review-copy'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, vue/singleline-html-element-content-newline -- local presentation helpers and compact result labels are self-describing */
@@ -196,6 +198,14 @@ const handleApprovalChanged = async () => {
   await refresh()
   invalidate()
 }
+const heroActionSlot = computed(() => isHeroCollapsed.value ? 'collapsed-actions' : 'actions')
+const hasCopyDraftContent = computed(() => responses.value.some(response => response.answer !== null || response.comment !== ''))
+const copyDraftSnapshot = () => JSON.stringify(responses.value)
+const applyPreviousReview = (result: ReviewCopyResult) => {
+  if (result.kind === 'checklist') {
+    responses.value = result.response.map(response => ({ ...response, comment: response.comment ?? '' }))
+  }
+}
 </script>
 
 <template>
@@ -210,7 +220,20 @@ const handleApprovalChanged = async () => {
           :badges="[
             ...(checklist?.runtimeState ? [{ lifecycleEngine: 'runtime' as const, lifecycleState: checklist.runtimeState }] : []),
             { variant: 'code', label: `${t('transfer_payment.schema_version')} ${checklist?.publicationVersion ?? 0}` }
-          ]" />
+          ]">
+          <template #[heroActionSlot]>
+            <ReviewCopyPrevious
+              :review-id="checklist.id"
+              :publication-version-id="checklist.publicationVersionId"
+              kind="checklist"
+              :authority="checklist.permissions?.can_copy_previous === true"
+              :eligible="canUpdate"
+              :saving="isSaving"
+              :has-content="hasCopyDraftContent"
+              :get-draft="copyDraftSnapshot"
+              @apply="applyPreviousReview" />
+          </template>
+        </CommonEntityHero>
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:items-start lg:gap-8">
           <main ref="sectionContent" class="min-h-0 min-w-0 flex-1 pt-6">

@@ -1,3 +1,4 @@
+import { loadAssessmentResponse } from '~~/server/utils/assessment-runtime-response'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
@@ -15,6 +16,7 @@ import {
 import {
   authorizeReviewRuntimeAction,
   canAuthorizeReviewRuntimeAction,
+  canAuthorizeReviewRuntimeWorkOwnerRole,
   resolveReviewRuntimeEntityFromReview
 } from '~~/server/utils/review-runtime-access'
 import { isReviewLockedStatus } from '~~/server/utils/review-runtime-state'
@@ -126,84 +128,11 @@ export default defineEventHandler(async event => {
     }
     throw error
   }
-  const egcsCnReviewAlignment = review.egcs_cn_reviewalignment === true
-  const egcsCnReviewAlignResult = review.egcs_cn_reviewalignresult === null || review.egcs_cn_reviewalignresult === undefined
-    ? null
-    : parseSafeDecimal(String(review.egcs_cn_reviewalignresult))
-  const egcsCnReviewAlignmentNarrative = review.egcs_cn_reviewalignmentnarrative ?? ''
-
-  const [responses, outcomes, customOutcomes, totalAdditionalReviewerCount, pendingAdditionalReviewerCount] = await Promise.all([
-    db
-      .selectFrom('Common_Review_Response')
-      .select([
-        'egcs_cn_section as section',
-        'egcs_cn_subsection as subsection',
-        'egcs_cn_question as question',
-        'egcs_cn_value as value',
-        'egcs_cn_comment as comment',
-        'egcs_cn_calculated as calculated'
-      ])
-      .where('egcs_cn_assessment', '=', String(review.id))
-      .where('Common_Review_Response._deleted', '=', false)
-      .execute(),
-    db
-      .selectFrom('Common_Assessment_Outcome')
-      .select([
-        'egcs_cn_section as section',
-        'egcs_cn_subsection as subsection',
-        'egcs_cn_name_en as nameEn',
-        'egcs_cn_name_fr as nameFr',
-        'egcs_cn_recommendedstrategy as recommendedStrategy',
-        'egcs_cn_selectedstrategy as selectedStrategy',
-        'egcs_cn_accepted as accepted',
-        'egcs_cn_justification as justification',
-        'egcs_cn_comment as comment'
-      ])
-      .where('egcs_cn_review', '=', String(review.id))
-      .where('Common_Assessment_Outcome._deleted', '=', false)
-      .execute(),
-    db
-      .selectFrom('Common_Assessment_Custom_Outcome')
-      .select([
-        'id',
-        'egcs_cn_name as name',
-        'egcs_cn_outcome as outcome'
-      ])
-      .where('egcs_cn_review', '=', String(review.id))
-      .where('Common_Assessment_Custom_Outcome._deleted', '=', false)
-      .execute(),
+  const [assessmentResponse, totalAdditionalReviewerCount, pendingAdditionalReviewerCount] = await Promise.all([
+    loadAssessmentResponse(db, review),
     countReviewAdditionalReviewers(db, String(review.id)),
     countPendingReviewAdditionalReviewers(db, String(review.id))
   ])
-
-  const assessmentResponse = {
-    answers: responses.filter(answer => answer.calculated !== true).map(answer => ({
-      section: answer.section,
-      subsection: answer.subsection,
-      question: answer.question,
-      value: answer.value === null || answer.value === undefined ? null : parseSafeDecimal(String(answer.value)),
-      comment: answer.comment ?? ''
-    })),
-    outcomes: outcomes.map(outcome => ({
-      section: outcome.section,
-      subsection: outcome.subsection,
-      nameEn: outcome.nameEn,
-      nameFr: outcome.nameFr,
-      recommendedStrategy: outcome.recommendedStrategy,
-      selectedStrategy: outcome.selectedStrategy,
-      accepted: Boolean(outcome.accepted),
-      justification: outcome.justification ?? '',
-      comment: outcome.comment ?? ''
-    })),
-    customOutcomes: customOutcomes.map(customOutcome => ({
-      id: String(customOutcome.id),
-      name: customOutcome.name ?? '',
-      outcome: customOutcome.outcome ?? ''
-    })),
-    egcs_cn_reviewalignment: egcsCnReviewAlignment,
-    egcs_cn_reviewalignresult: egcsCnReviewAlignResult,
-    egcs_cn_reviewalignmentnarrative: egcsCnReviewAlignmentNarrative
-  }
 
   const runtime = buildAssessmentRuntimeSummary(
     assessmentResponse,
@@ -217,6 +146,8 @@ export default defineEventHandler(async event => {
       isReviewLocked: isLocked
     }
   )
+
+  const canCopyPrevious = await canAuthorizeReviewRuntimeWorkOwnerRole(event, 'save_assessment', runtimeEntity)
 
   return {
     id: String(review.id),
@@ -233,9 +164,9 @@ export default defineEventHandler(async event => {
     egcs_cn_disablecustomoutcomes: review.egcs_cn_disablecustomoutcomes,
     egcs_cn_disablealignment: review.egcs_cn_disablealignment,
     egcs_cn_disablereviewers: review.egcs_cn_disablereviewers,
-    egcs_cn_reviewalignment: egcsCnReviewAlignment,
-    egcs_cn_reviewalignresult: egcsCnReviewAlignResult,
-    egcs_cn_reviewalignmentnarrative: egcsCnReviewAlignmentNarrative,
+    egcs_cn_reviewalignment: assessmentResponse.egcs_cn_reviewalignment,
+    egcs_cn_reviewalignresult: assessmentResponse.egcs_cn_reviewalignresult,
+    egcs_cn_reviewalignmentnarrative: assessmentResponse.egcs_cn_reviewalignmentnarrative,
     egcs_cn_entitytype: review.egcs_cn_entitytype,
     egcs_cn_entityid: String(review.egcs_cn_entityid),
     egcs_cn_transferpaymentstream: null,
@@ -259,7 +190,8 @@ export default defineEventHandler(async event => {
     entity_operating_name_fr: review.entity_operating_name_fr ?? '',
     permissions: {
       can_read: true,
-      can_update: canUpdateAssessment
+      can_update: canUpdateAssessment,
+      can_copy_previous: canCopyPrevious
     },
     reviewRuntime: {
       is_locked: isLocked,

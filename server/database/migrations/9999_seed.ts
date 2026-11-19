@@ -1,6 +1,6 @@
 import { validatePersistedMonetaryRows } from '../schema/currency-money'
 import { hashPassword } from 'better-auth/crypto'
-import { sql, type Kysely, type Migration } from 'kysely'
+import { sql, type Kysely, type Migration, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { restoreNciaTemplateObjects } from '../ncia-template-objects'
 import { seedGuidedHelpExample } from '../guided-help-seed'
@@ -8,6 +8,7 @@ import { seedFieldTooltipExamples } from '../field-tooltip-seed'
 import { initializeCatalogCacheRevisions } from '../catalog-cache-revisions'
 import { seedNotificationDemo } from '../notification-demo-seed'
 import { upgradeNciaGaRiskAssessment } from '../ncia-ga-risk-assessment'
+import { seedReviewCopyDemo } from '../review-copy-demo-seed'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: string | number }> }
 
@@ -88,6 +89,10 @@ export const restoreDemoSnapshot = async <DB>(db: Kysely<DB>, snapshot: DemoSnap
 export const up: Migration['up'] = async db => {
   // One coherent snapshot includes NCIA, Maple and Health Canada, including publications.
   const { default: snapshot } = await import('../seeds/demo.json' as string) as { default: DemoSnapshot }
-  if (db.isTransaction) await restoreDemoSnapshot(db, snapshot)
-  else await db.transaction().execute(transaction => restoreDemoSnapshot(transaction, snapshot))
+  const seed = async (transaction: Transaction<unknown>) => {
+    await restoreDemoSnapshot(transaction, snapshot)
+    await seedReviewCopyDemo(transaction as unknown as Transaction<Database>)
+  }
+  if (db.isTransaction) await seed(db as Transaction<unknown>)
+  else await db.transaction().execute(seed)
 }

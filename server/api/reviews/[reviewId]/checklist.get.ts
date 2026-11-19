@@ -8,6 +8,7 @@ import {
 import {
   authorizeReviewRuntimeAction,
   canAuthorizeReviewRuntimeAction,
+  canAuthorizeReviewRuntimeWorkOwnerRole,
   resolveReviewRuntimeEntityFromReview
 } from '~~/server/utils/review-runtime-access'
 import { isReviewLockedStatus } from '~~/server/utils/review-runtime-state'
@@ -64,6 +65,8 @@ export default defineEventHandler(async event => {
   const isLocked = isReviewLockedStatus(review.runtimeState, review.reviewSetRuntimeState)
   const canUpdate = !isLocked && await canAuthorizeReviewRuntimeAction(event, 'save_assessment', runtimeEntity)
 
+  const canCopyPrevious = await canAuthorizeReviewRuntimeWorkOwnerRole(event, 'save_assessment', runtimeEntity)
+
   return {
     id: String(review.id),
     runtimeId: String(review.runtimeId),
@@ -90,7 +93,7 @@ export default defineEventHandler(async event => {
       result: details.egcs_cn_result,
       evaluationTrace: details.egcs_cn_evaluationtrace
     },
-    permissions: { can_read: true, can_update: canUpdate },
+    permissions: { can_read: true, can_update: canUpdate, can_copy_previous: canCopyPrevious },
     reviewRuntime: {
       is_locked: isLocked,
       additional_reviewer_count: additionalReviewerCount,

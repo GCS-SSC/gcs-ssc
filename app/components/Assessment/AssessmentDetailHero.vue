@@ -34,9 +34,11 @@ const badges = computed(() => [
     :meta-items="[entityName]"
     :badges="badges">
     <template #collapsed-actions>
+      <slot name="actions" />
       <GuidedHelpLauncher />
     </template>
     <template #actions>
+      <slot name="actions" />
       <GuidedHelpLauncher />
     </template>
   </CommonEntityHero>

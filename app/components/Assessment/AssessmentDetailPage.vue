@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ReviewCopyPrevious from '~/components/Review/CopyPrevious.vue'
+import type { ReviewCopyResult } from '~~/shared/types/review-copy'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- concise local helpers remain clear without repetitive tags */
@@ -288,6 +290,19 @@ const handleApprovalChanged = async () => {
   await refreshAssessment()
   invalidate()
 }
+const hasCopyDraftContent = computed(() => {
+  const draft = assessmentResponse.value
+  return draft.answers.some(answer => answer.value !== null || answer.comment !== '')
+    || draft.outcomes.some(outcome => outcome.selectedStrategy !== '' || outcome.comment !== '' || outcome.justification !== '')
+    || draft.customOutcomes.length > 0
+    || draft.egcs_cn_reviewalignment
+    || draft.egcs_cn_reviewalignresult != null
+    || draft.egcs_cn_reviewalignmentnarrative !== ''
+})
+const copyDraftSnapshot = () => JSON.stringify(assessmentResponse.value)
+const applyPreviousReview = (result: ReviewCopyResult) => {
+  if (result.kind === 'assessment') assessmentResponse.value = result.response
+}
 </script>
 
 <template>
@@ -299,7 +314,20 @@ const handleApprovalChanged = async () => {
           :entity-name="entityName"
           :runtime-state="assessment?.runtimeState"
           :publication-version="assessment?.publicationVersion"
-          :is-collapsed="isHeroCollapsed" />
+          :is-collapsed="isHeroCollapsed">
+          <template #actions>
+            <ReviewCopyPrevious
+              :review-id="assessment.id"
+              :publication-version-id="assessment.publicationVersionId"
+              kind="assessment"
+              :authority="assessment.permissions?.can_copy_previous === true"
+              :eligible="canUpdateAssessment"
+              :saving="isSaving"
+              :has-content="hasCopyDraftContent"
+              :get-draft="copyDraftSnapshot"
+              @apply="applyPreviousReview" />
+          </template>
+        </AssessmentDetailHero>
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:items-start lg:gap-8">
           <div ref="sectionContent" class="min-h-0 min-w-0 flex-1 pt-6">
             <UForm

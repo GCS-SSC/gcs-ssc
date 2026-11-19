@@ -1,4 +1,27 @@
 {
+  "review_copy": {
+    "selected_version_mismatch": "The selected submission uses a different version. Choose a submission that matches this draft.",
+    "copied_title": "Answers copied",
+    "copied": "Previous answers copied into the draft.",
+    "draft_unavailable": "This draft is no longer editable. Refresh the review and try again.",
+    "action": "Copy previous answers",
+    "apply": "Copy answers",
+    "replace": "Replace draft answers",
+    "not_latest": "Not the latest",
+    "overwrite": "Copying will replace the answers and editable content in this draft.",
+    "failed": "Could not copy previous answers",
+    "draft_changed": "The draft changed while loading the previous answers. Review your draft and confirm again.",
+    "assessment": {
+      "description": "Choose a submitted assessment to copy into this draft.",
+      "no_history": "No previous assessment of this type has been submitted for this entity.",
+      "version_mismatch": "None of the previous assessments use the current assessment version."
+    },
+    "checklist": {
+      "description": "Choose a submitted checklist to copy into this draft.",
+      "no_history": "No previous checklist of this type has been submitted for this entity.",
+      "version_mismatch": "None of the previous checklists use the current checklist version."
+    }
+  },
   "clauses": {
     "title": "Clauses",
     "clause": "Clause",
@@ -1238,6 +1261,11 @@
     "return_home": "Return to dashboard"
   },
   "apiErrors": {
+    "review_copy": {
+      "alignment": "The previous assessment contains alignment information, but alignment is disabled for this assessment.",
+      "custom_outcomes": "The previous assessment contains custom outcomes, but custom outcomes are disabled for this assessment.",
+      "strategies": "The previous assessment contains strategy decisions or notes that cannot be carried forward under the current assessment settings."
+    },
     "audit": {
       "access_unavailable": "Access history is temporarily unavailable. Try again later."
     },

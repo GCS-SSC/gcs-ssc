@@ -63,6 +63,7 @@ type AssessmentDetailResponse = {
   permissions?: {
     can_read: boolean
     can_update: boolean
+    can_copy_previous?: boolean
   }
   reviewRuntime?: {
     is_locked: boolean
