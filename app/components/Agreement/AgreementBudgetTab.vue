@@ -292,8 +292,9 @@ const showOtherFunding = computed(() => budgetFundingMode.value !== 'program_onl
 const canEditFundingSources = computed(() => !staticMode
   && budgetFundingMode.value !== 'program_only'
   && overview.value?.showHistoricalFunding !== true)
-const hideCostCategory = computed(() => overview.value?.budgetSettings?.egcs_tp_hidecostcategory === true)
-const hideCostSubsection = computed(() => overview.value?.budgetSettings?.egcs_tp_hidecostsubsection === true)
+const costVisibility = computed(() => overview.value?.costVisibility ?? overview.value?.budgetSettings)
+const hideCostCategory = computed(() => costVisibility.value?.egcs_tp_hidecostcategory === true)
+const hideCostSubsection = computed(() => costVisibility.value?.egcs_tp_hidecostsubsection === true)
 watch([budgetFundingMode, hideCostCategory, hideCostSubsection], () => {
   lineItemModal.close()
   fundingSourceModal.close()

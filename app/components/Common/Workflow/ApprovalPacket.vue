@@ -136,6 +136,10 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow | nu
     })
     return {
       proponents: [],
+      costVisibility: {
+        egcs_tp_hidecostcategory: asRecord(budget.value.costVisibility).egcs_tp_hidecostcategory === true,
+        egcs_tp_hidecostsubsection: asRecord(budget.value.costVisibility).egcs_tp_hidecostsubsection === true
+      },
       fiscalYears: mappedFiscalYears,
       lineItems: lineItems.value.map((line, index) => {
         const fiscalYearId = fiscalYearIdByDisplay.get(display(line.fiscalYear)) ?? `packet-fiscal-year-missing-${index}`

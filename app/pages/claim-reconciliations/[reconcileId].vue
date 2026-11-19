@@ -434,8 +434,8 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
 
                 <AgreementClaimReconciliationLinesTable
                   :lines="reconciliationTableLines"
-                  :hide-cost-category="!data.reconciliation.isCompleted && data.reconciliation.egcs_tp_hidecostcategory"
-                  :hide-cost-subsection="!data.reconciliation.isCompleted && data.reconciliation.egcs_tp_hidecostsubsection"
+                  :hide-cost-category="data.reconciliation.egcs_tp_hidecostcategory"
+                  :hide-cost-subsection="data.reconciliation.egcs_tp_hidecostsubsection"
                   :currency="data.reconciliation.egcs_fc_currency"
                   :total-submitted="totalSubmitted"
                   :total-reconciled="totalReconciled"

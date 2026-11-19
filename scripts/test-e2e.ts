@@ -117,6 +117,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/composed-financial-spine.spec.ts',
   'tests/e2e/correction-lifecycle.spec.ts',
   'tests/e2e/cost-category-availability.spec.ts',
+  'tests/e2e/stream-cost-visibility.spec.ts',
   'tests/e2e/custom-field-namespace-crud.spec.ts',
   'tests/e2e/document-docx-generation.spec.ts',
   'tests/e2e/document-generation-failures.spec.ts',

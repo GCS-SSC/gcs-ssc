@@ -184,6 +184,7 @@ export interface FundingCaseAgreementBudgetOverviewRow {
   proponents: Array<{ id: string, label_en: string, label_fr: string }>
   budget_differences?: FundingCaseAgreementBudgetDifference[]
   budgetSettings?: AgreementBudgetManagementSettings
+  costVisibility?: AgreementBudgetCostVisibility
   showHistoricalFunding?: boolean
 }
 
@@ -457,8 +458,10 @@ export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgre
   budget_line_program_funding?: Money | null
 }
 
-type AgreementBudgetManagementSettings = Pick<Selectable<TransferPaymentStreamTable>,
-  'egcs_tp_budgetfundingmode' | 'egcs_tp_hidecostcategory' | 'egcs_tp_hidecostsubsection'>
+export type AgreementBudgetCostVisibility = Pick<Selectable<TransferPaymentStreamTable>,
+  'egcs_tp_hidecostcategory' | 'egcs_tp_hidecostsubsection'>
+
+type AgreementBudgetManagementSettings = AgreementBudgetCostVisibility & Pick<Selectable<TransferPaymentStreamTable>, 'egcs_tp_budgetfundingmode'>
 
 export interface FundingCaseAgreementForecastOverviewRow {
   budgetManagement?: AgreementBudgetManagementSettings

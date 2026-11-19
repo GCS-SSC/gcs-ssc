@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { agreementCustomFieldMergeSchema, customFieldHasValue, customFieldOptionIds, type AgreementCustomFieldValues, type AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { AgreementActivityCustomFieldEvidenceSchema, type AgreementActivityCustomFieldEvidence } from '~~/shared/types/schemas/agreement-activity-evidence'
 import type { Amended_Type, Database, JsonValue } from '~~/shared/types/database'
+import type { AgreementBudgetCostVisibility } from '~~/shared/types/funding-case-agreement-ui'
+import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
 import { throwApiError, validationError } from './api-errors'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
@@ -109,7 +111,7 @@ export type AgreementApprovalSnapshot = {
   proponents: Array<Record<string, JsonValue>>
   amendment: Record<string, JsonValue> | null
   sourceVersions: { budget: string | null, activity: string | null }
-  budget: { fiscalYears: Array<Record<string, JsonValue>>, lineItems: Array<Record<string, JsonValue>> } | null
+  budget: { costVisibility?: AgreementBudgetCostVisibility, fiscalYears: Array<Record<string, JsonValue>>, lineItems: Array<Record<string, JsonValue>> } | null
   activities: Array<Record<string, JsonValue>> | null
   amendmentTypes: Array<Record<string, JsonValue>>
   amendmentSubtypes: Array<Record<string, JsonValue>>
@@ -504,6 +506,13 @@ export const buildAgreementApprovalSnapshot = async (
     }) ?? []
   })
   if (activityFieldIssues.length) await validationError(event, new z.ZodError(activityFieldIssues))
+  const budgetSettings = budgetVersion && !previousPacket ? await loadAgreementBudgetManagement(trx, agreementId) : null
+  const costVisibility = budgetSettings
+    ? {
+        egcs_tp_hidecostcategory: budgetSettings.egcs_tp_hidecostcategory,
+        egcs_tp_hidecostsubsection: budgetSettings.egcs_tp_hidecostsubsection
+      }
+    : previousPacket?.budget?.costVisibility
   const businessPacket: AgreementApprovalSnapshot = {
     schemaVersion: 4,
     risk,
@@ -550,6 +559,7 @@ export const buildAgreementApprovalSnapshot = async (
     }) : null,
     sourceVersions: { budget: budgetVersion ? String(budgetVersion.id) : null, activity: activityVersion ? String(activityVersion.id) : null },
     budget: budgetVersion ? {
+      ...(costVisibility ? { costVisibility } : {}),
       fiscalYears: fiscalYears.map(row => normalizeRow({ display: row.egcs_ay_fiscalyeardisplay, year: row.egcs_ay_fiscalyear, startDate: row.egcs_ay_startdate, endDate: row.egcs_ay_enddate })),
       lineItems: lineItems.map(row => normalizeRow({
         fiscalYear: row.fiscal_year_display,

@@ -85,10 +85,15 @@ export default defineEventHandler(async event => {
     const proponents = await loadAgreementBudgetProponents(db, agreementId)
     const fundingSourcesByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, lineItems.map(line => String(line.row_id))))
     const protection = await resolveBusinessStatusProtection(db, 'fundingcaseamendment', amendmentId)
+    const budgetSettings = await loadAgreementBudgetManagement(db, agreementId)
     return {
       fiscalYears,
       proponents,
-      budgetSettings: protection?.isDraft && !protection.locked ? await loadAgreementBudgetManagement(db, agreementId) : undefined,
+      budgetSettings: protection?.isDraft && !protection.locked ? budgetSettings : undefined,
+      costVisibility: {
+        egcs_tp_hidecostcategory: budgetSettings.egcs_tp_hidecostcategory,
+        egcs_tp_hidecostsubsection: budgetSettings.egcs_tp_hidecostsubsection
+      },
       lineItems: lineItems.map(line => ({
         ...line,
         egcs_fc_percentage: line.egcs_fc_percentage === null ? null : parseSafeDecimal(String(line.egcs_fc_percentage)),

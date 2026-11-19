@@ -177,8 +177,8 @@ const isHistoricalForecast = computed(() => Boolean(activeForecast.value?.isComp
   || getDefinition(activeForecast.value?.egcs_fc_status)?.readOnly
   || isTerminalStatus(activeForecast.value?.egcs_fc_status)))
 const showForecastFunding = computed(() => forecastFundingMode.value !== 'program_only' || isHistoricalForecast.value)
-const hideForecastCostCategory = computed(() => !isHistoricalForecast.value && overview.value?.budgetManagement?.egcs_tp_hidecostcategory === true)
-const hideForecastCostSubsection = computed(() => !isHistoricalForecast.value && overview.value?.budgetManagement?.egcs_tp_hidecostsubsection === true)
+const hideForecastCostCategory = computed(() => overview.value?.budgetManagement?.egcs_tp_hidecostcategory === true)
+const hideForecastCostSubsection = computed(() => overview.value?.budgetManagement?.egcs_tp_hidecostsubsection === true)
 const activeBudgetLineItems = computed(() => {
   if (!activeForecast.value) {
     return []

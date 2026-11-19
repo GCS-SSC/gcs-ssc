@@ -134,6 +134,10 @@ export default defineEventHandler(async event => {
       fiscalYears,
       proponents,
       budgetSettings: protection?.locked ? undefined : budgetSettings,
+      costVisibility: {
+        egcs_tp_hidecostcategory: budgetSettings.egcs_tp_hidecostcategory,
+        egcs_tp_hidecostsubsection: budgetSettings.egcs_tp_hidecostsubsection
+      },
       showHistoricalFunding: budgetSettings.egcs_tp_budgetfundingmode === 'program_only' && fundingSourcesByLine.size > 0,
       lineItems: lineItems.map(line => ({
         ...line,

@@ -227,8 +227,8 @@ const claimFundingMode = computed(() => overview.value?.budgetManagement?.egcs_t
 const isHistoricalClaim = computed(() => Boolean(activeClaim.value?.isCompleted || activeClaim.value?.hasPositiveCompletionTerminus
   || getDefinition(activeClaim.value?.egcs_fc_status)?.readOnly || isTerminalStatus(activeClaim.value?.egcs_fc_status)))
 const showClaimFunding = computed(() => claimFundingMode.value !== 'program_only' || isHistoricalClaim.value)
-const hideClaimCostCategory = computed(() => !isHistoricalClaim.value && overview.value?.budgetManagement?.egcs_tp_hidecostcategory === true)
-const hideClaimCostSubsection = computed(() => !isHistoricalClaim.value && overview.value?.budgetManagement?.egcs_tp_hidecostsubsection === true)
+const hideClaimCostCategory = computed(() => overview.value?.budgetManagement?.egcs_tp_hidecostcategory === true)
+const hideClaimCostSubsection = computed(() => overview.value?.budgetManagement?.egcs_tp_hidecostsubsection === true)
 
 const activeBudgetLineItems = computed(() => {
   if (!activeClaim.value) {
@@ -1682,8 +1682,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                       v-if="profile.egcs_fc_currency"
                       :currency="profile.egcs_fc_currency"
                       :lines="reconciliationTableLines"
-                      :hide-cost-category="!activeReconcile?.isCompleted && overview?.budgetManagement?.egcs_tp_hidecostcategory"
-                      :hide-cost-subsection="!activeReconcile?.isCompleted && overview?.budgetManagement?.egcs_tp_hidecostsubsection"
+                      :hide-cost-category="overview?.budgetManagement?.egcs_tp_hidecostcategory"
+                      :hide-cost-subsection="overview?.budgetManagement?.egcs_tp_hidecostsubsection"
                       :total-submitted="totalSubmitted"
                       :total-reconciled="totalReconciled"
                       :total-sampled="totalSampled"
