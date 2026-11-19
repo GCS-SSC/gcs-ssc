@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LanguageIndependentCodeSchema } from '../language-independent-code'
 
 export const ASSESSMENT_CALCULATION_OPERATORS = [
   'add',
@@ -71,9 +72,9 @@ const AssessmentCalculationBooleanLiteralSchema = z.object({
 
 const AssessmentCalculationAnswerReferenceSchema = z.object({
   kind: z.literal('answer'),
-  section: RequiredString('validation.section_required'),
-  subsection: RequiredString('validation.subsection_required'),
-  question: RequiredString('validation.required')
+  section: LanguageIndependentCodeSchema,
+  subsection: LanguageIndependentCodeSchema,
+  question: LanguageIndependentCodeSchema
 })
 
 const AssessmentCalculationHelperReferenceSchema = z.object({

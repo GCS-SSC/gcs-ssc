@@ -106,7 +106,7 @@ const statusFilter = defineModel<string>('statusFilter')
 const { t } = useI18n()
 const { active: guidedHelpActive } = useGuidedHelpDiscovery()
 const slots = useSlots()
-const forwardedSlotNames = computed(() => Object.keys(slots).filter(name => name !== 'actions-cell'))
+const forwardedSlotNames = computed(() => Object.keys(slots).filter(name => name !== 'actions-cell' && name !== 'table'))
 
 const tableRef: Ref<unknown | null> = ref(null)
 const helpRoot = ref<HTMLElement | null>(null)
@@ -138,6 +138,7 @@ const {
   resolvedModalTitle,
   submitLabel,
   isSaving,
+  isDeleting,
   closeModal,
   openCreate,
   openUpdate,
@@ -197,6 +198,13 @@ watch([isModalOpen, formState], () => {
 }, { immediate: true, flush: 'sync' })
 const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote', context: formActionContext }, submit: saveGuidedItem })
 
+const setTableSearch = (value: string) => {
+  search.value = value
+}
+const setTablePagination = (value: typeof pagination.value) => {
+  pagination.value = value
+}
+
 defineExpose({
   search,
   pagination,
@@ -208,7 +216,18 @@ defineExpose({
 
 <template>
   <div ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" class="min-w-0">
+    <slot
+      v-if="$slots.table"
+      name="table"
+      :state="{ search, pagination, items, totalRecords, status: listStatus, busy: isSaving || isDeleting }"
+      :set-search="setTableSearch"
+      :set-pagination="setTablePagination"
+      :open-create="openGuidedCreate"
+      :open-update="openUpdate"
+      :delete-item="deleteItem"
+      :retry="retry" />
     <CommonResourceLayout
+      v-else
       ref="tableRef"
       v-model:search="search"
       v-model:status-filter="statusFilter"

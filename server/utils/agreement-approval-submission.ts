@@ -18,6 +18,7 @@ import { assertAgreementActivitiesWithinDuration } from './agreement-activity'
 import { FundingCaseAgreementTitleProposalSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import { parseI18n } from './api-validate'
 import { mergeAgreementCustomFields, readActivityCustomFieldDefinitions, readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
+import { readAgreementSelectedClauses } from './agreement-clauses'
 
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
   'pending',
@@ -487,6 +488,12 @@ export const buildAgreementApprovalSnapshot = async (
   const customFields = captureCustomFields(
     await readAssignedAgencyCustomFieldDefinitions(trx, streamId), agreement.egcs_fc_customfields
   )
+  const clauses = amendment ? [] : (await readAgreementSelectedClauses(trx, agreementId)).map(clause => ({
+    code: clause.code,
+    versionId: clause.versionId,
+    name: bilingualValue(clause.nameEn, clause.nameFr),
+    rows: clause.rows.map(row => bilingualValue(row.textEn, row.textFr))
+  }))
   const activityFieldDefinitions = activities.length ? await readActivityCustomFieldDefinitions(trx, streamId) : []
   const activityFieldsById = new Map(activityFieldDefinitions.map(field => [field.id, field]))
   const activityFieldIssues = activities.flatMap(activity => {
@@ -520,6 +527,7 @@ export const buildAgreementApprovalSnapshot = async (
     risk,
     agreement: amendment ? null : normalizeRow({
       customFields,
+      clauses,
       agreementNumber: agreement.egcs_fc_agreementnumber,
       financialSystemNumber: agreement.egcs_fc_financialsystemnumber,
       title: bilingualValue(agreement.egcs_fc_title_en, agreement.egcs_fc_title_fr),

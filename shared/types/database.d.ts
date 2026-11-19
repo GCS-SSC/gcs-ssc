@@ -330,6 +330,8 @@ export interface AuditDatabase {
 export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Catalog_Revision: AgencyCatalogRevisionTable
   Agency_Profile: AgencyProfileTable
+  Agency_Clause: AgencyClauseTable
+  Agency_Clause_Text: AgencyClauseTextTable
   Agency_Custom_Field: AgencyCustomFieldTable
   Agency_Custom_Field_Option: AgencyCustomFieldOptionTable
   Agency_Cost_Category: AgencyCostCategoryTable
@@ -382,6 +384,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Revision: FundingCaseAgreementRevisionTable
   Funding_Case_Agreement_Approval_Submission: FundingCaseAgreementApprovalSubmissionTable
   Funding_Case_Agreement_Applicant_Recipient: FundingCaseAgreementApplicantRecipientTable
+  Funding_Case_Agreement_Clause: FundingCaseAgreementClauseTable
   Funding_Case_Agreement_Relationship: FundingCaseAgreementRelationshipTable
   Funding_Case_Agreement_Address: FundingCaseAgreementAddressTable
   Funding_Case_Agreement_Budget_Fiscal_Year: FundingCaseAgreementBudgetFiscalYearTable
@@ -440,6 +443,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Transfer_Payment_Outcome: TransferPaymentOutcomeTable
   Transfer_Payment_Outcome_Performance_Indicator: TransferPaymentOutcomePerformanceIndicatorTable
   Transfer_Payment_Stream_Outcome: TransferPaymentStreamOutcomeTable
+  Transfer_Payment_Stream_Clause: TransferPaymentStreamClauseTable
   Transfer_Payment_Stream_Review_Set: TransferPaymentStreamReviewSetTable
   Transfer_Payment_Stream_Workflow: TransferPaymentStreamWorkflowTable
   Transfer_Payment_Amendment_Type: TransferPaymentAmendmentTypeTable
@@ -2617,6 +2621,28 @@ export interface TransferPaymentStreamFieldSectionTable {
   egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
+export interface AgencyClauseTable {
+  id: Generated<string>
+  egcs_ay_publicationkind: Generated<'agency_clause'>
+  egcs_ay_organizationagency: string
+  egcs_ay_languageindependentcode: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_description_en: string
+  egcs_ay_description_fr: string
+  egcs_ay_active: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyClauseTextTable {
+  id: Generated<string>
+  egcs_ay_clause: string
+  egcs_ay_clause_en: string
+  egcs_ay_clause_fr: string
+  egcs_ay_displayorder: number
+  _deleted: Generated<boolean>
+}
+
 export interface AgencyCustomFieldTable {
   id: Generated<string>
   egcs_ay_agency: string
@@ -2654,6 +2680,13 @@ export interface TransferPaymentStreamFieldAssignmentTable {
   egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
+export interface TransferPaymentStreamClauseTable {
+  id: Generated<string>
+  egcs_tp_transferpaymentstream: string
+  egcs_tp_clause: string
+  _deleted: Generated<boolean>
+}
+
 export interface TransferPaymentStreamReviewSetTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
@@ -2985,6 +3018,15 @@ export interface AgencyProponentRelationshipTypeTable {
   egcs_ay_inversecode: string | null
   egcs_ay_inversename_en: string | null
   egcs_ay_inversename_fr: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementClauseTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_clause: string
+  egcs_fc_publicationversion: string
+  egcs_fc_publicationkind: Generated<'agency_clause'>
   _deleted: Generated<boolean>
 }
 

@@ -11,6 +11,19 @@ import type { Database } from '../../../shared/types/database'
 /** Installs the current up definitions for this subject on a fresh database. */
 export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TABLE "Funding_Case_Agreement_Clause" (
+  id bigserial PRIMARY KEY,
+  egcs_fc_fundingagreement bigint NOT NULL,
+  egcs_fc_clause bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
+  egcs_fc_publicationversion bigint NOT NULL,
+  egcs_fc_publicationkind varchar(64) NOT NULL DEFAULT 'agency_clause' CHECK (egcs_fc_publicationkind = 'agency_clause'),
+  _deleted boolean NOT NULL DEFAULT false,
+  FOREIGN KEY (egcs_fc_publicationversion, egcs_fc_clause, egcs_fc_publicationkind)
+    REFERENCES "Common_Publication_Version"(id, egcs_cn_publication, egcs_cn_kind) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX fc_uq_agreement_clause ON "Funding_Case_Agreement_Clause" (egcs_fc_fundingagreement, egcs_fc_clause) WHERE NOT _deleted;
+
 CREATE TABLE "Funding_Case_Agreement_Relationship" (
   id bigserial CONSTRAINT fc_pk_agreement_relationship PRIMARY KEY,
   egcs_fc_fundingagreement bigint NOT NULL,
@@ -3064,6 +3077,8 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+ALTER TABLE "Funding_Case_Agreement_Clause" ADD CONSTRAINT fc_fk_agreement_clause_agreement
+  FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_source FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_target FOREIGN KEY (egcs_fc_relatedagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_type FOREIGN KEY (egcs_fc_relationshiptype) REFERENCES "Agency_Agreement_Relationship_Type"(id) ON DELETE RESTRICT;

@@ -418,6 +418,15 @@ CREATE TABLE "Transfer_Payment_Stream_Outcome" (
 
 CREATE UNIQUE INDEX tp_idx_streamoutcometransferpaymentstreamtransferpaymentoutcome ON "Transfer_Payment_Stream_Outcome" USING btree (egcs_tp_transferpaymentstream, egcs_tp_transferpaymentoutcome) WHERE (_deleted = false);
 
+CREATE TABLE "Transfer_Payment_Stream_Clause" (
+  "id" bigserial PRIMARY KEY,
+  "egcs_tp_transferpaymentstream" bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+  "egcs_tp_clause" bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
+  "_deleted" boolean DEFAULT false NOT NULL
+);
+
+CREATE UNIQUE INDEX tp_idx_streamclause_livepair ON "Transfer_Payment_Stream_Clause" (egcs_tp_transferpaymentstream, egcs_tp_clause) WHERE (_deleted = false);
+
 CREATE TABLE "Transfer_Payment_Stream_Review_Set" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Stream_Review_Set_id_seq"'::regclass) NOT NULL,
   "egcs_tp_transferpaymentstream" bigint NOT NULL,
@@ -677,6 +686,9 @@ AS $function$
               SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
               WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
             ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Clause" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
               SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" linked
               WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
             ) OR EXISTS (
@@ -898,6 +910,11 @@ AS $function$
             RAISE EXCEPTION 'Stream catalog link identity is immutable'
               USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamcataloglinkidentity';
           END IF;
+        ELSIF TG_TABLE_NAME = 'Transfer_Payment_Stream_Clause' THEN
+          IF NEW.egcs_tp_clause IS DISTINCT FROM OLD.egcs_tp_clause THEN
+            RAISE EXCEPTION 'Stream catalog link identity is immutable'
+              USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamcataloglinkidentity';
+          END IF;
         ELSE
           IF NEW.egcs_tp_workflow IS DISTINCT FROM OLD.egcs_tp_workflow THEN
             RAISE EXCEPTION 'Stream catalog link identity is immutable'
@@ -940,6 +957,22 @@ AS $function$
         ) THEN
           RAISE EXCEPTION 'Review Set must be published and belong to the Stream Agency'
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamreviewsetpublishedagency';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Transfer_Payment_Stream_Clause' THEN
+        PERFORM 1 FROM "Agency_Clause" catalog
+          JOIN "Common_Publication" publication ON publication.id = catalog.id
+          WHERE catalog.id = NEW.egcs_tp_clause
+            AND catalog.egcs_ay_organizationagency = stream_agency
+            AND catalog.egcs_ay_active
+            AND NOT catalog._deleted
+            AND NOT publication._deleted
+            AND publication.egcs_cn_kind = 'agency_clause'
+            AND publication.egcs_cn_state = 'published'
+            AND publication.egcs_cn_currentversion IS NOT NULL
+          FOR SHARE OF catalog, publication;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Clause must be active, published and belong to the Stream Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamclausepublishedagency';
         END IF;
       ELSE
         SELECT version.egcs_cn_definition->>'entityType', COALESCE(version.egcs_cn_definition->>'purpose', 'standard')
@@ -1355,6 +1388,8 @@ CREATE TRIGGER enforce_stream_field_assignment_agency BEFORE INSERT OR UPDATE OF
 CREATE TRIGGER trg_validate_stream_funding_subtype_agency BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_fundingsubtype, _deleted ON "Transfer_Payment_Stream_Funding_Subtype" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_stream_funding_subtype_agency();
 
 CREATE TRIGGER validate_stream_operational_catalog_link BEFORE INSERT OR UPDATE ON "Transfer_Payment_Stream_Holdback_Basis" FOR EACH ROW EXECUTE FUNCTION validate_stream_operational_catalog_link();
+
+CREATE TRIGGER validate_stream_clause_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_clause, _deleted ON "Transfer_Payment_Stream_Clause" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
 
 CREATE TRIGGER validate_stream_review_set_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_reviewset, _deleted ON "Transfer_Payment_Stream_Review_Set" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
 

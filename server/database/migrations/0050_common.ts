@@ -611,7 +611,7 @@ CREATE TABLE "Common_Publication" (
   CONSTRAINT "Common_Publication_pkey" PRIMARY KEY (id),
   CONSTRAINT "cn_chk_publicationdeleted" CHECK (((_deleted = false) OR ((egcs_cn_state)::text = 'draft'::text))),
   CONSTRAINT "cn_chk_publicationinitial" CHECK (((((egcs_cn_state)::text = 'draft'::text) AND (egcs_cn_currentversion IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['published'::character varying, 'retired'::character varying])::text[])) AND (egcs_cn_currentversion IS NOT NULL)))),
-  CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['guided_help'::character varying, 'guided_help_catalog'::character varying, 'approval_template'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'data_collection_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
+  CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['guided_help'::character varying, 'guided_help_catalog'::character varying, 'approval_template'::character varying, 'agency_clause'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'data_collection_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
   CONSTRAINT "cn_chk_publicationstate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'retired'::character varying])::text[])))
 );
 
@@ -2282,6 +2282,8 @@ AS $function$
       IF TG_OP = 'INSERT' THEN authoring_row := NEW; ELSE authoring_row := OLD; END IF;
       IF TG_ARGV[0] = 'publication' THEN
         publication_id := authoring_row.id;
+      ELSIF TG_ARGV[0] = 'agency_clause_child' THEN
+        publication_id := authoring_row.egcs_ay_clause;
       ELSIF TG_ARGV[0] = 'approval_step' THEN
         publication_id := authoring_row.egcs_cn_approvaltemplate;
       ELSIF TG_ARGV[0] = 'certification' THEN
@@ -4070,6 +4072,8 @@ ALTER TABLE "Common_Approval_Step" ADD CONSTRAINT "Common_Approval_Step_egcs_cn_
 
 ALTER TABLE "Common_Approval_Step" ADD CONSTRAINT "Common_Approval_Step_egcs_cn_defaultuser_fkey" FOREIGN KEY (egcs_cn_defaultuser) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Agency_Clause" ADD CONSTRAINT ay_ref_clausepublication FOREIGN KEY (id, egcs_ay_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT;
+
 ALTER TABLE "Common_Approval_Template" ADD CONSTRAINT "cn_ref_approvaltemplatepublication" FOREIGN KEY (id, egcs_cn_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind);
 
 ALTER TABLE "Common_Approval_Template" ADD CONSTRAINT "Common_Approval_Template_egcs_cn_agency_fkey" FOREIGN KEY (egcs_cn_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
@@ -4398,6 +4402,10 @@ CREATE TRIGGER trg_guard_approval_step_authoring BEFORE INSERT OR DELETE OR UPDA
 CREATE TRIGGER prevent_catalog_agency_change BEFORE UPDATE OF egcs_cn_agency ON "Common_Approval_Template" FOR EACH ROW EXECUTE FUNCTION prevent_catalog_agency_change();
 
 CREATE TRIGGER trg_guard_publication_authoring BEFORE DELETE OR UPDATE ON "Common_Approval_Template" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('publication');
+
+CREATE TRIGGER trg_register_clause_publication BEFORE INSERT ON "Agency_Clause" FOR EACH ROW EXECUTE FUNCTION trg_fn_register_publication('agency_clause');
+CREATE TRIGGER trg_guard_clause_authoring BEFORE DELETE OR UPDATE ON "Agency_Clause" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('publication');
+CREATE TRIGGER trg_guard_clause_text_authoring BEFORE INSERT OR DELETE OR UPDATE ON "Agency_Clause_Text" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('agency_clause_child');
 
 CREATE TRIGGER trg_register_approvaltemplate_publication BEFORE INSERT ON "Common_Approval_Template" FOR EACH ROW EXECUTE FUNCTION trg_fn_register_publication('approval_template');
 

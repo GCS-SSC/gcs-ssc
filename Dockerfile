@@ -47,7 +47,7 @@ RUN set -eux; \
   }; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions c0b12fd3445e3a9a3adb35a35e5f0a57a4e95326; \
   fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 74c8bfd60c0ef91517a8cc5d7694aa4d9d1e11dd; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments bb2a4d596cbeb56ac34205b221ece649ce2ed6f8; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 8cc5b5aa73a6fef6d8130db7a51330819d13b11d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration daf35cb61ff2cd19a7630ea3802da8a0f5a4e320; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation e69302dda77193c0cf44bcd5573d98ca455ff69e; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 3763ddeb60701b44df0e59c8141b8804bac787b2; \

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nanoid } from 'nanoid'
+import { createLanguageIndependentCode } from '~/utils/language-independent-code'
 import type { RecommendationDefinition, RecommendationQuestion } from '~~/shared/types/schemas/recommendation/recommendation'
 
 const definition = defineModel<RecommendationDefinition>({ required: true })
@@ -9,7 +10,7 @@ const { t } = useI18n()
  * @returns Newly authored Recommendation radio question.
  */
 const questionFactory = (): RecommendationQuestion => ({
-  key: `question-${nanoid(6)}`, type: 'radio', required: true, isResult: false, commentPolicy: 'none',
+  key: createLanguageIndependentCode('question'), type: 'radio', required: true, isResult: false, commentPolicy: 'none',
   question: { en: t('recommendation_schema.new_question_en'), fr: t('recommendation_schema.new_question_fr') },
   options: [0, 1].map(() => ({ key: `option-${nanoid(6)}`, label: { en: t('recommendation_schema.new_option_en'), fr: t('recommendation_schema.new_option_fr') } }))
 })

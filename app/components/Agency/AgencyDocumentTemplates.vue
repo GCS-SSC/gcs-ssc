@@ -368,7 +368,7 @@ const formSession = useFormSession({ owner: templateModal, action: { kind: 'remo
                 @change="onFileChange($event, 'fr')" />
             </UFormField>
           </div>
-          <UCheckbox v-model="selectedTemplate.egcs_ay_active" :label="t('common.active')" data-ui-target="agency.document-templates.selectedTemplate.egcs_ay_active" />
+          <USwitch v-model="selectedTemplate.egcs_ay_active" :label="t('common.active')" data-ui-target="agency.document-templates.selectedTemplate.egcs_ay_active" />
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isOpen = false" />
             <CommonSaveButton :label="selectedTemplate.id ? t('common.update') : t('common.add')" :loading="isSaving" :disabled="isSaving" />

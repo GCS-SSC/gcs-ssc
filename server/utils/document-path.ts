@@ -1,5 +1,5 @@
 /**
- * Resolves template data, treating unpopulated related-proponent roles as empty lists.
+ * Resolves template data, treating unpopulated clause codes and related-proponent roles as empty lists.
  * @param scope - The current template scope.
  * @param path - The template's dot-separated path.
  * @param propertyAccess - The existing property lookup mode for this syntax.
@@ -9,6 +9,9 @@ export const resolveDocumentPath = (
   scope: unknown, path: string, propertyAccess: 'own' | 'inherited'
 ): unknown => path.split('.').reduce<unknown>((current, segment, index, segments) => {
   if (current === null || typeof current !== 'object') return undefined
+  if (index === 2 && segments[0] === 'agreement' && segments[1] === 'clauses') {
+    return Object.hasOwn(current, segment) ? Reflect.get(current, segment) : []
+  }
   const hasProperty = propertyAccess === 'own' ? Object.hasOwn(current, segment) : segment in current
   if (hasProperty) return Reflect.get(current, segment)
 

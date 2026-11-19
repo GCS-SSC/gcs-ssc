@@ -2,6 +2,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- local policy-editor mutations are self-describing */
 import { computed } from 'vue'
 import { nanoid } from 'nanoid'
+import { createLanguageIndependentCode } from '~/utils/language-independent-code'
 import type {
   ChecklistPolicyQuestionOption,
   EditorResultPolicy
@@ -33,7 +34,7 @@ const addGroup = () => {
   commitPolicy({ ...currentPolicy.value, groups: [...currentPolicy.value.groups, {
     _key: nanoid(),
     kind: 'group',
-    key: `result-group-${nanoid()}`,
+    key: createLanguageIndependentCode('result_group'),
     label: {
       en: t('checklist_schema.policy.default_group_name_en', { number }),
       fr: t('checklist_schema.policy.default_group_name_fr', { number })

@@ -25,6 +25,7 @@ const supportedPacket = computed(() => capturedPacket.value.schemaVersion === 4
     || (typeof capturedPacket.value.risk === 'object' && !Array.isArray(capturedPacket.value.risk))))
 const packet = computed<PacketRecord>(() => supportedPacket.value ? capturedPacket.value : {})
 const agreement = computed(() => packet.value.agreement == null ? null : asRecord(packet.value.agreement))
+const clauses = computed(() => asRecords(agreement.value?.clauses))
 const amendment = computed(() => packet.value.amendment == null ? null : asRecord(packet.value.amendment))
 const risk = computed(() => packet.value.risk == null ? null : asRecord(packet.value.risk))
 const riskReadiness = computed(() => asRecord(risk.value?.readiness))
@@ -41,6 +42,7 @@ const amendmentTypes = computed(() => asRecords(packet.value.amendmentTypes))
 const amendmentSubtypes = computed(() => asRecords(packet.value.amendmentSubtypes))
 const sectionOrder = computed(() => [
   agreement.value ? 'agreement' : null,
+  clauses.value.length ? 'clauses' : null,
   agreement.value ? 'proponents' : null,
   amendment.value ? 'amendment' : null,
   risk.value ? 'risk' : null,
@@ -257,6 +259,19 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
           </dd>
         </div>
       </dl>
+    </CommonSection>
+
+    <CommonSection v-if="clauses.length" :title="t('workflow.packet.clauses')" :badge="sectionBadge('clauses')" :grid-cols="1">
+      <article v-for="clause in clauses" :key="String(clause.code)" class="space-y-2">
+        <h4 class="font-semibold">
+          {{ bilingual(clause.name) }}
+        </h4>
+        <ol class="list-decimal space-y-2 ps-5">
+          <li v-for="(row, index) in asRecords(clause.rows)" :key="index" class="whitespace-pre-wrap text-sm">
+            {{ bilingual(row) }}
+          </li>
+        </ol>
+      </article>
     </CommonSection>
 
     <CommonSection v-if="agreement" :title="t('workflow.packet.proponents')" :badge="sectionBadge('proponents')">

@@ -3,6 +3,7 @@
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import { nanoid } from 'nanoid'
+import { createLanguageIndependentCode } from '~/utils/language-independent-code'
 import type {
   ChecklistPolicyQuestionOption,
   EditorQuestionFailure,
@@ -14,7 +15,7 @@ const group = defineModel<EditorResultGroup>({
   default: () => ({
     _key: nanoid(),
     kind: 'group',
-    key: 'result-group',
+    key: createLanguageIndependentCode('result_group'),
     label: { en: '', fr: '' },
     mode: 'any',
     result: 'fail',
@@ -112,7 +113,7 @@ const addSubGroup = () => {
   commitGroup({ ...currentGroup.value, items: [...currentGroup.value.items, {
     _key: nanoid(),
     kind: 'group',
-    key: `${currentGroup.value.key}-group-${nanoid()}`,
+    key: createLanguageIndependentCode('result_group'),
     label: {
       en: t('checklist_schema.policy.default_group_name_en', { number }),
       fr: t('checklist_schema.policy.default_group_name_fr', { number })

@@ -59,6 +59,7 @@ const PUBLICATION_KIND = {
   guidedHelp: 'guided_help',
   guidedHelpCatalog: 'guided_help_catalog',
   approvalTemplate: 'approval_template',
+  agencyClause: 'agency_clause',
   reviewSchema: 'review_schema',
   reviewSetSetup: 'review_set_setup',
   recommendationSchema: 'recommendation_schema',

@@ -1,3 +1,4 @@
+import { LanguageIndependentCodeSchema } from './language-independent-code'
 import { RequiredDateSchema } from './form-input'
 import { AgencyCalculationFields, validateAgencyCalculationFields } from './budget-calculation'
 import { z } from 'zod'
@@ -109,13 +110,12 @@ export type StatusDefinitionItem = StatusDefinition
 
 export const AgencyHoldbackBasisSchema = z.object({
   egcs_ay_holdbackbasis: z.enum(HOLDBACK_BASES_ENUM).default('fullagreement'),
-  egcs_ay_languageindependentcode: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }),
+  egcs_ay_languageindependentcode: LanguageIndependentCodeSchema,
   egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
   egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
 })
 
 export const AgencyHoldbackBasisWriteSchema = AgencyHoldbackBasisSchema.extend({
-  egcs_ay_languageindependentcode: AgencyLabelSchema('validation.required'),
   egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
   egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
 })

@@ -14,8 +14,10 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getAssessmentLocaleLabel } from '~/utils/assessment-schema'
+import { createLanguageIndependentCode } from '~/utils/language-independent-code'
 import { ChecklistDefinitionSchema } from '~~/shared/types/schemas/checklist/checklist'
 import type { ChecklistDefinition } from '~~/shared/types/schemas/checklist/checklist'
+import { LanguageIndependentCodeSchema } from '~~/shared/types/schemas/language-independent-code'
 import type { ChecklistEditorQuestion } from '~/types/checklist-schema-editor'
 import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 import type { Scope } from '~~/shared/utils/scopes'
@@ -127,7 +129,7 @@ const toEditorDefinition = (value: ChecklistDefinition): EditorDefinition => ({
     _key: nanoid(),
     subSections: [
       ...(section.questions.length > 0
-        ? [{ key: `${section.key}-general`, label: { ...section.label }, questions: section.questions }]
+        ? [{ key: createLanguageIndependentCode('subsection'), label: { ...section.label }, questions: section.questions }]
         : []),
       ...section.subSections
     ].map(subSection => ({
@@ -197,14 +199,21 @@ const isSaving = computed(() => mutation.isActionPending('save'))
 const isPublishing = computed(() => mutation.isActionPending('publish'))
 const isRetiring = computed(() => mutation.isActionPending('retire'))
 const canEditFields = computed(() => canEdit.value && !mutation.isPending.value)
-const ChecklistMetadataSchema = z.object({
+const ChecklistEditorFormSchema = z.object({
   egcs_cn_name_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_en.trim().min(1, { error: 'validation.name_en_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
   egcs_cn_name_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_fr.trim().min(1, { error: 'validation.name_fr_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
   egcs_cn_outcomename_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_en.trim().min(1, { error: 'validation.outcome_name_en_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
-  egcs_cn_outcomename_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_fr.trim().min(1, { error: 'validation.outcome_name_fr_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en)
+  egcs_cn_outcomename_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_fr.trim().min(1, { error: 'validation.outcome_name_fr_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
+  egcs_cn_checklistschema: z.object({
+    sections: z.array(z.object({
+      key: LanguageIndependentCodeSchema,
+      subSections: z.array(z.object({ key: LanguageIndependentCodeSchema }))
+    }))
+  })
 })
 const { createValidator } = useZodI18n()
-const validateMetadata = createValidator(ChecklistMetadataSchema)
+const validateEditorForm = createValidator(ChecklistEditorFormSchema)
+const editorFormState = computed(() => state.value && { ...state.value, egcs_cn_checklistschema: definition.value })
 const importDefinition = (value: ChecklistDefinition) => {
   if (!canEditFields.value) return
   definition.value = toEditorDefinition(value)
@@ -297,7 +306,7 @@ const addSection = () => {
   const number = definition.value.sections.length + 1
   definition.value.sections.push({
     _key: nanoid(),
-    key: `section-${number}-${nanoid(6)}`,
+    key: createLanguageIndependentCode('section'),
     label: { en: `Section ${number}`, fr: `Section ${number}` },
     subSections: []
   })
@@ -307,7 +316,7 @@ const addSubSection = (section: EditorSection) => {
   const number = section.subSections.length + 1
   section.subSections.push({
     _key: nanoid(),
-    key: `${section.key}-subsection-${number}-${nanoid(6)}`,
+    key: createLanguageIndependentCode('subsection'),
     label: { en: `Subsection ${number}`, fr: `Sous-section ${number}` },
     questions: []
   })
@@ -506,7 +515,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
             </aside>
           </template>
 
-          <UForm v-bind="formSession" ref="checklistForm" :state="state" :validate="validateMetadata">
+          <UForm v-bind="formSession" ref="checklistForm" :state="editorFormState ?? undefined" :validate="validateEditorForm">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
                 <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')" role="tabpanel" :aria-label="t('checklist_schema.general')">
@@ -551,7 +560,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                           <UFormField :label="t('checklist_schema.section_name_fr')" required data-ui-target="checklist-schema.detail-page.checklist_schema.section_name_fr">
                             <UInput v-model="section.label.fr" />
                           </UFormField>
-                          <UFormField :label="t('checklist_schema.language_independent_code')" required data-ui-target="checklist-schema.detail-page.checklist_schema.language_independent_code">
+                          <UFormField :label="t('checklist_schema.language_independent_code')" :name="`egcs_cn_checklistschema.sections.${sectionIndex}.key`" required data-ui-target="checklist-schema.detail-page.checklist_schema.language_independent_code">
                             <UInput v-model="section.key" class="font-mono" />
                           </UFormField>
                         </div>
@@ -584,7 +593,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                                   <UFormField :label="t('checklist_schema.subsection_name_fr')" required data-ui-target="checklist-schema.detail-page.checklist_schema.subsection_name_fr">
                                     <UInput v-model="subSection.label.fr" />
                                   </UFormField>
-                                  <UFormField :label="t('checklist_schema.language_independent_code')" required data-ui-target="checklist-schema.detail-page.result-group.code">
+                                  <UFormField :label="t('checklist_schema.language_independent_code')" :name="`egcs_cn_checklistschema.sections.${sectionIndex}.subSections.${subSectionIndex}.key`" required data-ui-target="checklist-schema.detail-page.result-group.code">
                                     <UInput v-model="subSection.key" class="font-mono" />
                                   </UFormField>
                                 </div>

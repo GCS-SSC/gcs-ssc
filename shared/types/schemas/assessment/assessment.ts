@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import { EnFrLabelSchema } from '../common'
 import { HelpSchema } from '../help'
+import { LanguageIndependentCodeSchema } from '../language-independent-code'
 import { ASSESSMENT_CALCULATION_LIMITS, AssessmentCalculationFormulaSchema } from './calculation'
 import type { AssessmentCalculationExpression } from './calculation'
 import {
@@ -25,9 +26,9 @@ const HelpersDependencySchema = z.object({
 
 const AnswerDependencySchema = z.object({
   type: z.literal('answers'),
-  section: z.string().trim().min(1, 'validation.required'),
-  subsection: z.string().trim().min(1, 'validation.required'),
-  question: z.string().trim().min(1, 'validation.required')
+  section: LanguageIndependentCodeSchema,
+  subsection: LanguageIndependentCodeSchema,
+  question: LanguageIndependentCodeSchema
 })
 
 const DependencyOnSchema = z.discriminatedUnion('type', [HelpersDependencySchema, AnswerDependencySchema])
@@ -74,10 +75,10 @@ const OutcomeOptionSchema = z.object({
 
 export const OutcomeSchema = z.object({
   label: RequiredEnFrLabelSchema,
-  name: z.string().trim().min(1, 'validation.required'),
+  name: LanguageIndependentCodeSchema,
   strategies: z.array(
     z.object({
-      name: z.string().trim().min(1, 'validation.required'),
+      name: LanguageIndependentCodeSchema,
       label: RequiredEnFrLabelSchema,
       options: z.array(OutcomeOptionSchema)
     })
@@ -121,7 +122,7 @@ const DependencySchema = DependencySchemaBase.or(z.array(DependencySchemaBase))
 
 export const QuestionSchema = z.object({
   type: z.literal('question'),
-  name: z.string().trim().min(1, 'validation.required'),
+  name: LanguageIndependentCodeSchema,
   question: RequiredEnFrLabelSchema,
   weight: AdjustableWeightSchema.or(FixedWeightSchema),
   commentThreshold: MinMaxSchema,
@@ -133,7 +134,7 @@ export const QuestionSchema = z.object({
 
 export const CalculationSchema = z.object({
   type: z.literal('calculation'),
-  name: z.string().trim().min(1, 'validation.required'),
+  name: LanguageIndependentCodeSchema,
   question: RequiredEnFrLabelSchema,
   weight: AdjustableWeightSchema.or(FixedWeightSchema),
   help: z.array(HelpSchema),
@@ -144,7 +145,7 @@ export const CalculationSchema = z.object({
 export const AssessmentQuestionItemSchema = z.discriminatedUnion('type', [QuestionSchema, CalculationSchema])
 
 const SubSectionSchema = z.object({
-  name: z.string(),
+  name: LanguageIndependentCodeSchema,
   weight: AdjustableWeightSchema.or(FixedWeightSchema).or(AdjustableWeightArraySchema),
   label: EnFrLabelSchema,
   // "questions" is retained for compatibility, but entries may be direct prompts or calculated values.
@@ -156,7 +157,7 @@ const SectionSchema = z.object({
   weight: z.coerce.number(),
   number: z.string(),
   label: EnFrLabelSchema,
-  name: z.string(),
+  name: LanguageIndependentCodeSchema,
   icon: z.string(),
   subSections: z.array(SubSectionSchema)
 })

@@ -18,6 +18,49 @@ CREATE TABLE "Agency_Catalog_Revision" (
   CONSTRAINT ay_chk_catalogrevisionactive CHECK (NOT _deleted)
 );
 
+CREATE TABLE "Agency_Clause" (
+  id bigint PRIMARY KEY,
+  egcs_ay_organizationagency bigint NOT NULL,
+  egcs_ay_publicationkind varchar(64) NOT NULL DEFAULT 'agency_clause',
+  egcs_ay_languageindependentcode varchar(255) NOT NULL,
+  egcs_ay_name_en varchar(255) NOT NULL,
+  egcs_ay_name_fr varchar(255) NOT NULL,
+  egcs_ay_description_en text NOT NULL,
+  egcs_ay_description_fr text NOT NULL,
+  egcs_ay_active boolean NOT NULL DEFAULT true,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_chk_clausepublicationkind CHECK (egcs_ay_publicationkind = 'agency_clause'),
+  CONSTRAINT ay_chk_clausecodeformat CHECK (egcs_ay_languageindependentcode ~ '^[a-z][a-z0-9_]*$' AND egcs_ay_languageindependentcode NOT IN ('constructor', 'prototype')),
+  CONSTRAINT ay_uq_clauseagencycode UNIQUE (egcs_ay_organizationagency, egcs_ay_languageindependentcode)
+);
+
+CREATE TABLE "Agency_Clause_Text" (
+  id bigserial PRIMARY KEY,
+  egcs_ay_clause bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
+  egcs_ay_clause_en text NOT NULL,
+  egcs_ay_clause_fr text NOT NULL,
+  egcs_ay_displayorder integer NOT NULL,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_chk_clausetextorder CHECK (egcs_ay_displayorder >= 0)
+);
+
+CREATE INDEX ay_idx_clausetextorder ON "Agency_Clause_Text" (egcs_ay_clause, egcs_ay_displayorder, id) WHERE (_deleted = false);
+
+CREATE FUNCTION protect_agency_clause_identity() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $function$
+    BEGIN
+      IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency
+        OR NEW.egcs_ay_languageindependentcode IS DISTINCT FROM OLD.egcs_ay_languageindependentcode THEN
+        RAISE EXCEPTION 'Agency Clause identity is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_clauseidentityimmutable';
+      END IF;
+      RETURN NEW;
+    END;
+  $function$;
+
+CREATE TRIGGER protect_agency_clause_identity BEFORE UPDATE ON "Agency_Clause" FOR EACH ROW EXECUTE FUNCTION protect_agency_clause_identity();
+
 CREATE TABLE "Agency_Agreement_Relationship_Type" (
   id bigserial CONSTRAINT ay_pk_agreement_relationship_type PRIMARY KEY,
   egcs_ay_organizationagency bigint NOT NULL,
@@ -383,7 +426,8 @@ CREATE UNIQUE INDEX ay_uq_funding_type_name_fr_active ON "Agency_Funding_Type" U
 CREATE TABLE "Agency_Holdback_Basis" (
   "id" bigint DEFAULT nextval('"Agency_Holdback_Basis_id_seq"'::regclass) NOT NULL,
   "egcs_ay_organizationagency" bigint NOT NULL,
-  "egcs_ay_languageindependentcode" character varying(255) NOT NULL,
+  "egcs_ay_languageindependentcode" character varying(255) NOT NULL
+    CONSTRAINT ay_chk_holdback_code CHECK (egcs_ay_languageindependentcode ~ '^[a-z][a-z0-9_]*$' AND egcs_ay_languageindependentcode NOT IN ('constructor', 'prototype')),
   "egcs_ay_holdbackbasis" holdback_bases DEFAULT 'fullagreement'::holdback_bases NOT NULL,
   "egcs_ay_name_en" character varying(255) NOT NULL,
   "egcs_ay_name_fr" character varying(255) NOT NULL,
@@ -831,6 +875,8 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+ALTER TABLE "Agency_Clause" ADD CONSTRAINT ay_fk_clauseagency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Agency_Agreement_Relationship_Type" ADD CONSTRAINT ay_fk_agreement_relationship_type_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Proponent_Relationship_Type" ADD CONSTRAINT ay_fk_proponent_reltype_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Catalog_Revision" ADD CONSTRAINT ay_fk_catalogrevisionagency FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;

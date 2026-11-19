@@ -363,7 +363,7 @@ watch(
                 <UInput v-model.number="entry.section.weight" type="number" />
               </UFormField>
 
-              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${entry.sourceIndex}.name`" data-ui-target="assessment-schema.sections-editor.sections.name">
+              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${entry.sourceIndex}.name`" required data-ui-target="assessment-schema.sections-editor.sections.name">
                 <UInput v-model="entry.section.name" />
               </UFormField>
 

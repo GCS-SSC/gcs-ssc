@@ -12,6 +12,7 @@ import { escapeLikePattern } from './sql-like'
 import type { AgencyDocumentTemplateTable, Database, FundingCaseAgreementGeneratedDocumentTable, Language_Preference, TransferPaymentDocumentTemplateEntityType, TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
 import { readAssignedAgencyCustomFieldDefinitions, validatePersistedAgreementCustomFieldSelections } from './agreement-custom-fields'
 import { buildAgreementDocumentCustomFields } from './agreement-document-custom-fields'
+import { readAgreementSelectedClauses } from './agreement-clauses'
 import { buildAgreementCloseoutReadiness, hasActiveAgreementCloseoutWorkflow, hasCompetingAgreementCloseoutWorkflow } from './agreement-closeout'
 import { resolveBusinessStatusProtection } from './business-status-runtime'
 import type { CloseoutDocumentPersistence } from '~~/shared/types/agreement-closeout'
@@ -425,7 +426,13 @@ export const buildAgreementDocumentContext = async (
   db: Kysely<Database>,
   event?: H3Event,
   language: Language_Preference = 'eng',
-  versions: { budgetVersionId?: string, activityVersionId?: string, validationEvent?: H3Event, includeRelatedProponents?: boolean } = {}
+  versions: {
+    budgetVersionId?: string
+    activityVersionId?: string
+    validationEvent?: H3Event
+    includeRelatedProponents?: boolean
+    includeClauses?: boolean
+  } = {}
 ): Promise<Record<string, unknown>> => {
   const localized = <T extends { en: unknown, fr: unknown }>(value: T): unknown => language === 'fra' ? value.fr : value.en
   const localizedValue = (value: unknown): string => valueOrFallback(value, language)
@@ -805,6 +812,12 @@ export const buildAgreementDocumentContext = async (
   const relatedRecipients = versions.includeRelatedProponents
     ? await loadRelatedDocumentRecipients(db, agreement.agencyId, primaryRecipient?.applicantRecipientId, language)
     : undefined
+  const clauses = versions.includeClauses
+    ? Object.fromEntries((await readAgreementSelectedClauses(db, agreementId)).map(clause => [
+        clause.code,
+        clause.rows.map(row => ({ text: language === 'fra' ? row.textFr : row.textEn }))
+      ]))
+    : undefined
   const totalProgramFunding = sumMoney(lineItems.map(item => getAmount(item.programFunding)), agreement.currency)
   const totalProgramDeliveryFunding = sumMoney(lineItems
     .filter(item => getSchedule2ColumnKey(item.subsection) === 'programDelivery')
@@ -837,6 +850,7 @@ export const buildAgreementDocumentContext = async (
   const baseContext: Record<string, unknown> = {
     agreement: {
       ...buildAgreementDocumentCustomFields(customFieldDefinitions, agreement.customFieldValues, language),
+      ...(clauses ? { clauses } : {}),
       number: localizedValue(agreement.number),
       title: localizedValue(localized({ en: agreement.titleEn, fr: agreement.titleFr })),
       description: localizedValue(localized({ en: agreement.descriptionEn, fr: agreement.descriptionFr })),
@@ -967,7 +981,8 @@ export const loadAgreementDocumentRenderInput = async (
 
   const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language, {
     validationEvent: event,
-    includeRelatedProponents: options.entityType !== 'fundingcaseagreementcloseout'
+    includeRelatedProponents: options.entityType !== 'fundingcaseagreementcloseout',
+    includeClauses: template.egcs_ay_entitytype === 'fundingcaseagreement'
   })
   return {
     agreementId, template, coreContext,

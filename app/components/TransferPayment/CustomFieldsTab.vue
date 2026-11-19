@@ -317,7 +317,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
           <UFormField v-if="hasSections" :label="t('custom_fields.section')" name="egcs_tp_section">
             <CommonBilingualSelectMenu v-model="assignmentModal.selected.value.egcs_tp_section" :items="data?.sections ?? []" :prepend-options="[{ label: t('custom_fields.unsectioned'), value: null }]" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" value-key="id" />
           </UFormField>
-          <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" data-ui-target="transfer-payment.custom-field-assignment.egcs_tp_active" />
+          <USwitch v-model="assignmentModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" data-ui-target="transfer-payment.custom-field-assignment.egcs_tp_active" />
           <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_required" :label="t('custom_fields.required')" data-ui-target="transfer-payment.custom-field-assignment.egcs_tp_required" />
           <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
             <UInput v-model.number="assignmentModal.selected.value.egcs_tp_displayorder" type="number" min="0" />

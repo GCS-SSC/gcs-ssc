@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- exported Zod declarations are self-describing */
 import { z } from 'zod'
 import { HelpSchema } from '../help'
+import { LanguageIndependentCodeSchema } from '../language-independent-code'
 
 export const CHECKLIST_ANSWERS = ['pass', 'fail', 'not_applicable'] as const
 export const CHECKLIST_RESULTS = ['pass', 'pass_with_considerations', 'fail'] as const
@@ -57,7 +58,7 @@ const ChecklistOptionsSchema = z.array(ChecklistOptionSchema)
   })
 
 export const ChecklistQuestionSchema = z.object({
-  key: RequiredTextSchema,
+  key: LanguageIndependentCodeSchema,
   question: BilingualTextSchema,
   help: z.array(HelpSchema).default([]),
   options: ChecklistOptionsSchema,
@@ -70,13 +71,13 @@ export const ChecklistQuestionSchema = z.object({
 })
 
 export const ChecklistSubSectionSchema = z.object({
-  key: RequiredTextSchema,
+  key: LanguageIndependentCodeSchema,
   label: BilingualTextSchema,
   questions: z.array(ChecklistQuestionSchema).min(1, { error: 'validation.checklist_question_required' })
 })
 
 export const ChecklistSectionSchema = z.object({
-  key: RequiredTextSchema,
+  key: LanguageIndependentCodeSchema,
   label: BilingualTextSchema,
   questions: z.array(ChecklistQuestionSchema).default([]),
   subSections: z.array(ChecklistSubSectionSchema).default([])
@@ -108,7 +109,7 @@ export const ChecklistQuestionFailureConditionSchema = z.object({
 
 export const ChecklistResultGroupSchema: z.ZodType<ChecklistResultGroup> = z.lazy(() => z.object({
   kind: z.literal('group'),
-  key: RequiredTextSchema,
+  key: LanguageIndependentCodeSchema,
   label: BilingualTextSchema,
   mode: z.enum(CHECKLIST_RESULT_GROUP_MODES),
   threshold: z.number().nonnegative().optional(),

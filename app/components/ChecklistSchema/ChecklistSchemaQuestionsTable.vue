@@ -6,6 +6,7 @@ import { nanoid } from 'nanoid'
 import { computed, toRaw } from 'vue'
 import type { ChecklistEditorQuestion } from '~/types/checklist-schema-editor'
 import { DEFAULT_CHECKLIST_OPTIONS } from '~~/shared/types/schemas/checklist/checklist'
+import { createLanguageIndependentCode } from '~/utils/language-independent-code'
 
 const questions = defineModel<ChecklistEditorQuestion[]>('questions', { default: () => [] })
 const { t, locale } = useI18n()
@@ -40,10 +41,9 @@ const columns = computed<TableColumn<ChecklistQuestionTableRow>[]>(() => [
 ])
 
 const openCreateEditor = () => {
-  const number = questions.value.length + 1
   rowEditor.openCreate({
     _key: nanoid(),
-    key: `question-${number}-${nanoid(6)}`,
+    key: createLanguageIndependentCode('question'),
     question: { en: '', fr: '' },
     help: [],
     options: DEFAULT_CHECKLIST_OPTIONS.map(option => ({ value: option.value, description: { ...option.description } })),

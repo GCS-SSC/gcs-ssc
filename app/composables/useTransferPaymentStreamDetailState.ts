@@ -1,3 +1,5 @@
+import TransferPaymentStreamClausesTab from '~/components/TransferPayment/TransferPaymentStreamClausesTab.vue'
+import { useStreamClauseLinks } from '~/composables/useStreamClauseLinks'
 import TransferPaymentStreamBudgetManagementTab from '~/components/TransferPayment/TransferPaymentStreamBudgetManagementTab.vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -51,6 +53,7 @@ export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   financialLimits: 'transfer_payment.financial_limits',
   reviewSetups: 'transfer_payment.review_setups',
   documentTemplates: 'transfer_payment.document_templates.title',
+  clauses: 'clauses.title',
   workflowSetups: 'workflow.title',
   extensions: 'extensions.tab'
 } as const
@@ -251,6 +254,16 @@ export const useTransferPaymentStreamDetailState = (
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.reviewSetups, icon: 'i-lucide-clipboard-list', component: TransferPaymentReviewSetupsTab, getProps: () => ({ showHeader: false, transferPaymentId: id, streamId, agencyId: agencyId.value ?? undefined, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
+      'clauses',
+      {
+        key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.clauses,
+        value: 'clauses',
+        icon: 'i-lucide-list-ordered',
+        component: TransferPaymentStreamClausesTab,
+        getProps: () => clauseLinks.props.value
+      }
+    ],
+    [
       'document-templates',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.documentTemplates, value: 'document-templates', icon: 'i-lucide-files', component: TransferPaymentDocumentTemplatesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? '', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
@@ -273,6 +286,9 @@ export const useTransferPaymentStreamDetailState = (
     )),
     queryKey: 'section'
   })
+
+  const clauseLinks = useStreamClauseLinks(id, streamId, agencyId, canUpdateChild,
+    () => selectedTabKey.value === TRANSFER_PAYMENT_STREAM_TAB_KEYS.clauses)
 
   const breadcrumbItems = computed(() => [
     { label: t('transfer_payment.title'), to: localePath(appRouteLocations.transferPayments()) },

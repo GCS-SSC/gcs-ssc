@@ -60,7 +60,7 @@ const subSectionTitle = computed(() => {
           <UInput v-model="subSection.number" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.name`" data-ui-target="assessment-schema.sub-section-editor.sections.subSections.name">
+        <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.name`" required data-ui-target="assessment-schema.sub-section-editor.sections.subSections.name">
           <UInput v-model="subSection.name" />
         </UFormField>
       </div>

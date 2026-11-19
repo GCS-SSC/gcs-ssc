@@ -1,7 +1,7 @@
 {
   "sections": [
     {
-      "name": "risk-factor-1",
+      "name": "risk_factor_1",
       "number": "1",
       "label": {
         "en": "Governance",
@@ -11,7 +11,7 @@
       "weight": 0.25,
       "subSections": [
         {
-          "name": "consideration-1",
+          "name": "consideration_1",
           "label": {
             "en": "HR Capacity",
             "fr": "Capacité des ressources humaines"
@@ -23,7 +23,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Does the organization have enough qualified staff and backup coverage to deliver the proposed activities?",
                 "fr": "L’organisation dispose-t-elle de personnel qualifié en nombre suffisant et de remplaçants pour réaliser les activités proposées?"
@@ -76,7 +76,7 @@
           ]
         },
         {
-          "name": "consideration-2",
+          "name": "consideration_2",
           "label": {
             "en": "Governance Management Structure",
             "fr": "Structure de gouvernance et de gestion"
@@ -88,7 +88,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are decision-making authority, oversight responsibilities and conflict-of-interest controls clearly documented?",
                 "fr": "Les pouvoirs décisionnels, les responsabilités de surveillance et les contrôles des conflits d’intérêts sont-ils clairement documentés?"
@@ -143,7 +143,7 @@
       ]
     },
     {
-      "name": "risk-factor-2",
+      "name": "risk_factor_2",
       "number": "2",
       "label": {
         "en": "Performance History",
@@ -153,7 +153,7 @@
       "weight": 0.25,
       "subSections": [
         {
-          "name": "consideration-1",
+          "name": "consideration_1",
           "label": {
             "en": "History",
             "fr": "Historique"
@@ -165,7 +165,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Has the organization consistently met previous funding obligations, reporting deadlines and project commitments?",
                 "fr": "L’organisation a-t-elle respecté ses obligations de financement, ses échéances de rapports et ses engagements antérieurs?"
@@ -218,7 +218,7 @@
           ]
         },
         {
-          "name": "consideration-2",
+          "name": "consideration_2",
           "label": {
             "en": "Experience with proposed activities",
             "fr": "Expérience des activités proposées"
@@ -230,7 +230,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Has the organization successfully delivered activities of a similar scope and scale?",
                 "fr": "L’organisation a-t-elle réalisé avec succès des activités de portée et d’envergure comparables?"
@@ -285,7 +285,7 @@
       ]
     },
     {
-      "name": "risk-factor-3",
+      "name": "risk_factor_3",
       "number": "3",
       "label": {
         "en": "Financial Stability",
@@ -295,7 +295,7 @@
       "weight": 0.25,
       "subSections": [
         {
-          "name": "consideration-1",
+          "name": "consideration_1",
           "label": {
             "en": "Financial and Operational Capacity",
             "fr": "Capacité financière et opérationnelle"
@@ -307,7 +307,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are cash flow, financial controls and operational resources sufficient to deliver the project?",
                 "fr": "La trésorerie, les contrôles financiers et les ressources opérationnelles suffisent-ils à réaliser le projet?"
@@ -360,7 +360,7 @@
           ]
         },
         {
-          "name": "consideration-2",
+          "name": "consideration_2",
           "label": {
             "en": "Results of Last Audit",
             "fr": "Résultats du dernier audit"
@@ -372,7 +372,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Does the most recent audit provide assurance without unresolved significant findings?",
                 "fr": "Le dernier audit fournit-il une assurance sans constatation importante non résolue?"
@@ -425,7 +425,7 @@
           ]
         },
         {
-          "name": "consideration-3",
+          "name": "consideration_3",
           "label": {
             "en": "Support from other sources",
             "fr": "Soutien provenant d’autres sources"
@@ -437,7 +437,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are other funding commitments and in-kind contributions confirmed and reliable?",
                 "fr": "Les autres engagements de financement et contributions en nature sont-ils confirmés et fiables?"
@@ -492,7 +492,7 @@
       ]
     },
     {
-      "name": "risk-factor-4",
+      "name": "risk_factor_4",
       "number": "4",
       "label": {
         "en": "Planning and Project Complexity",
@@ -502,7 +502,7 @@
       "weight": 0.25,
       "subSections": [
         {
-          "name": "consideration-1",
+          "name": "consideration_1",
           "label": {
             "en": "Materiality",
             "fr": "Importance relative"
@@ -514,7 +514,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Is the requested funding proportionate to the organization’s demonstrated delivery capacity?",
                 "fr": "Le financement demandé est-il proportionnel à la capacité de réalisation démontrée de l’organisation?"
@@ -567,7 +567,7 @@
           ]
         },
         {
-          "name": "consideration-2",
+          "name": "consideration_2",
           "label": {
             "en": "Complexity",
             "fr": "Complexité"
@@ -579,7 +579,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are project dependencies, partners and technical requirements manageable with the proposed controls?",
                 "fr": "Les dépendances, les partenaires et les exigences techniques du projet sont-ils gérables avec les contrôles proposés?"
@@ -632,7 +632,7 @@
           ]
         },
         {
-          "name": "consideration-3",
+          "name": "consideration_3",
           "label": {
             "en": "Feasibility of submission",
             "fr": "Faisabilité de la proposition"
@@ -644,7 +644,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are the proposed timeline, budget and work plan realistic and supported by evidence?",
                 "fr": "Le calendrier, le budget et le plan de travail proposés sont-ils réalistes et étayés?"
@@ -697,7 +697,7 @@
           ]
         },
         {
-          "name": "consideration-4",
+          "name": "consideration_4",
           "label": {
             "en": "Ability to Evaluate / Analyze Results",
             "fr": "Capacité à évaluer et à analyser les résultats"
@@ -709,7 +709,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are measurable indicators, baseline data and evaluation responsibilities clearly defined?",
                 "fr": "Les indicateurs mesurables, les données de référence et les responsabilités d’évaluation sont-ils clairement définis?"
@@ -762,7 +762,7 @@
           ]
         },
         {
-          "name": "consideration-5",
+          "name": "consideration_5",
           "label": {
             "en": "Alignment with Program Objectives",
             "fr": "Concordance avec les objectifs du programme"
@@ -774,7 +774,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Do the proposed activities and expected results clearly support the program objectives?",
                 "fr": "Les activités proposées et les résultats attendus appuient-ils clairement les objectifs du programme?"
@@ -827,7 +827,7 @@
           ]
         },
         {
-          "name": "consideration-6",
+          "name": "consideration_6",
           "label": {
             "en": "Sustainability",
             "fr": "Pérennité"
@@ -839,7 +839,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Is there a credible plan to sustain the benefits after this funding ends?",
                 "fr": "Existe-t-il un plan crédible pour maintenir les retombées après la fin du financement?"
@@ -892,7 +892,7 @@
           ]
         },
         {
-          "name": "consideration-7",
+          "name": "consideration_7",
           "label": {
             "en": "Sense of Unknown",
             "fr": "Incertitude"
@@ -904,7 +904,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Have key uncertainties been identified and addressed through contingency plans?",
                 "fr": "Les principales incertitudes ont-elles été recensées et prises en compte dans des plans de contingence?"
@@ -957,7 +957,7 @@
           ]
         },
         {
-          "name": "consideration-8",
+          "name": "consideration_8",
           "label": {
             "en": "Sensitivity",
             "fr": "Sensibilité"
@@ -969,7 +969,7 @@
           "questions": [
             {
               "type": "question",
-              "name": "risk-rating",
+              "name": "risk_rating",
               "question": {
                 "en": "Are reputational, public-interest and stakeholder concerns identified and adequately managed?",
                 "fr": "Les enjeux de réputation, d’intérêt public et des parties prenantes sont-ils recensés et bien gérés?"
@@ -1059,7 +1059,7 @@
       },
       "strategies": [
         {
-          "name": "monitoring-level",
+          "name": "monitoring_level",
           "label": {
             "en": "Monitoring approach",
             "fr": "Approche de surveillance"

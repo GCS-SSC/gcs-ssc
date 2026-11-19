@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { LanguageIndependentCodeSchema } from './language-independent-code'
 
 export const QUESTIONNAIRE_QUESTION_TYPES = ['radio', 'text'] as const
 export const QUESTIONNAIRE_COMMENT_POLICIES = ['none', 'optional', 'required'] as const
@@ -19,7 +20,7 @@ export const QuestionnaireRadioOptionSchema = z.strictObject({
 }, { error: 'validation.invalid_selection' })
 
 export const QuestionnaireQuestionBaseSchema = z.strictObject({
-  key: RequiredTextSchema,
+  key: LanguageIndependentCodeSchema,
   question: QuestionnaireBilingualTextSchema,
   required: z.boolean(),
   help: z.array(QuestionnaireHelpSchema).optional()
@@ -175,7 +176,7 @@ export const validateQuestionnaireResponses = (
 export const createDefaultQuestionnaireDefinition = (): QuestionnaireDefinition => ({
   sections: [{ key: 'section-1', label: { en: '', fr: '' }, subSections: [{
     key: 'subsection-1', label: { en: '', fr: '' }, questions: [{
-      key: 'question-1', type: 'text', question: { en: '', fr: '' }, required: true, maxLength: 1000
+      key: 'question_1', type: 'text', question: { en: '', fr: '' }, required: true, maxLength: 1000
     }]
   }] }]
 })

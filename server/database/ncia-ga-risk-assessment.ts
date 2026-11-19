@@ -39,7 +39,7 @@ export const buildNciaGaRiskAssessment = () => {
         }))
       })),
       { name: 'reporting', label: { en: 'Demonstration reporting', fr: 'Rapports de démonstration' }, strategies: [
-        { name: 'reporting-frequency', label: { en: 'Reporting frequency', fr: 'Fréquence des rapports' }, options: [
+        { name: 'reporting_frequency', label: { en: 'Reporting frequency', fr: 'Fréquence des rapports' }, options: [
           { max: 2, value: 'annual', label: { en: 'Annual reporting', fr: 'Rapports annuels' } },
           { max: 4, value: 'quarterly', label: { en: 'Quarterly reporting', fr: 'Rapports trimestriels' } },
           { max: 5, value: 'monthly', label: { en: 'Monthly reporting', fr: 'Rapports mensuels' } }
@@ -52,7 +52,7 @@ export const buildNciaGaRiskAssessment = () => {
           { max: 100000, value: 0 }, { max: 250000, value: 1 }, { max: 1000000000, value: 2 }
         ] },
       { label: { en: 'Audit findings (demo)', fr: 'Constatations d’audit (démo)' }, weight: 0.5,
-        on: { type: 'answers', section: 'risk-factor-3', subsection: 'consideration-2', question: 'risk-rating' },
+        on: { type: 'answers', section: 'risk_factor_3', subsection: 'consideration_2', question: 'risk_rating' },
         scoringMatrix: [{ max: 1, value: 0 }, { max: 2, value: 1 }, { max: 3, value: 2 }] }
     ]
   })

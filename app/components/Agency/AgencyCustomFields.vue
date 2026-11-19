@@ -356,7 +356,7 @@ const optionFormSession = useFormSession({ owner: optionModal, action: { kind: '
           <UFormField :label="t('custom_fields.category_fr')" name="egcs_ay_category_fr" :required="Boolean(optionModal.selected.value.egcs_ay_category_en)">
             <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_fr" class="w-full" />
           </UFormField>
-          <UCheckbox v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" data-ui-target="agency.custom-field-option.egcs_ay_active" />
+          <USwitch v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" data-ui-target="agency.custom-field-option.egcs_ay_active" />
           <UFormField :label="t('custom_fields.order')" name="egcs_ay_displayorder">
             <UInput v-model.number="optionModal.selected.value.egcs_ay_displayorder" type="number" min="0" />
           </UFormField>

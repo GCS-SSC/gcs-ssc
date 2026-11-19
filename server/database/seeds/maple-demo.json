@@ -437,7 +437,7 @@
     {
       "id": "10041",
       "egcs_ay_organizationagency": "10021",
-      "egcs_ay_languageindependentcode": "full-agreement",
+      "egcs_ay_languageindependentcode": "full_agreement",
       "egcs_ay_holdbackbasis": "fullagreement",
       "egcs_ay_name_en": "Full Agreement Budget",
       "egcs_ay_name_fr": "Budget total de la convention",
@@ -446,7 +446,7 @@
     {
       "id": "10042",
       "egcs_ay_organizationagency": "10021",
-      "egcs_ay_languageindependentcode": "final-fiscal",
+      "egcs_ay_languageindependentcode": "final_fiscal",
       "egcs_ay_holdbackbasis": "finalfiscal",
       "egcs_ay_name_en": "Final Fiscal Year Budget",
       "egcs_ay_name_fr": "Budget du dernier exercice",

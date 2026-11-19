@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nanoid } from 'nanoid'
+import { createLanguageIndependentCode } from '~/utils/language-independent-code'
 import { computed } from 'vue'
 import type { QuestionnaireDefinition, QuestionnaireQuestion } from '~~/shared/types/schemas/questionnaire'
 import { getAssessmentLocaleLabel } from '~/utils/assessment-schema'
@@ -40,7 +41,7 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
   const question: QuestionnaireQuestion = questionFactory
     ? questionFactory()
     : {
-        key: `question-${nanoid(6)}`,
+        key: createLanguageIndependentCode('question'),
         type: 'radio',
         commentPolicy: 'none',
         question: { en: t('recommendation_schema.new_question_en'), fr: t('recommendation_schema.new_question_fr') },

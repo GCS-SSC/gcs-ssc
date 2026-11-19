@@ -7,10 +7,10 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export const DEFAULT_CHECKLIST_DEFINITION = ChecklistDefinitionSchema.parse({
   sections: [{
-    key: 'section-1',
+    key: 'section_1',
     label: { en: 'Section 1', fr: 'Section 1' },
     questions: [{
-      key: 'question-1',
+      key: 'question_1',
       question: { en: 'New question', fr: 'Nouvelle question' },
       required: true,
       commentPolicy: 'optional'

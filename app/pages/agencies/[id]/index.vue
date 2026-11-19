@@ -23,6 +23,7 @@ import AgencyDataCollections from '~/components/Agency/AgencyDataCollections.vue
 import AgencyRecommendationSets from '~/components/Agency/AgencyRecommendationSets.vue'
 import AgencyCostCategories from '~/components/Agency/AgencyCostCategories.vue'
 import AgencyFundingTypes from '~/components/Agency/AgencyFundingTypes.vue'
+import AgencyClauses from '~/components/Agency/AgencyClauses.vue'
 import AgencyCustomFields from '~/components/Agency/AgencyCustomFields.vue'
 import AgencyFieldHelp from '~/components/Agency/AgencyFieldHelp.vue'
 import AgencyDetailGeneralTab from '~/components/Agency/AgencyDetailGeneralTab.vue'
@@ -91,6 +92,7 @@ const tabMap: TabMap = new Map([
   ['customFields', { key: 'custom_fields.title', icon: 'i-lucide-list-filter', component: AgencyCustomFields, getProps: () => ({
     agencyId: id, showHeader: false, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value
   }) }],
+  ['clauses', { key: 'clauses.title', icon: 'i-lucide-list-ordered', component: AgencyClauses, getProps: () => ({ agencyId: id, canManage: canUpdateAgency.value }) }],
   ['approvalTemplates', { key: 'agency.tabs.approval_templates', icon: 'i-lucide-stamp', component: AgencyApprovalTemplates, getProps: agencyResourceCapabilities }],
   ['workflowSetups', { key: 'agency.tabs.workflow_setups', icon: 'i-lucide-git-branch', component: AgencyWorkflowSetups, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
   ['reviewSets', { key: 'transfer_payment.review_setups', icon: 'i-lucide-clipboard-list', component: AgencyReviewSets, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
