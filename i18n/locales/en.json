@@ -1228,7 +1228,6 @@
       "owner_changed": "The item owner changed while its assignments were being updated. Refresh and try again."
     },
     "validation": {
-    "stream_budget_breakdown_conflict": "Turn off both Other Funding breakdown requirements before switching to Program Funding only.",
       "failed": "Some fields are invalid. Review the form and try again."
     },
     "funding_history": {
@@ -2321,6 +2320,7 @@
     }
   },
   "validation": {
+    "stream_budget_breakdown_conflict": "Turn off both Other Funding breakdown requirements before switching to Program Funding only.",
     "notification_field_binding_invalid": "Select a supported variable. Text variables use a field binding; date and time variables require a timezone.",
     "notification_recipient_invalid": "Select an email variable for the notification recipient.",
     "notification_locale_invalid": "Select English or French for this variable.",

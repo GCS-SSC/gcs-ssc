@@ -1228,7 +1228,6 @@
       "owner_changed": "Le responsable de l’élément a changé pendant la mise à jour de ses affectations. Actualisez la page et réessayez."
     },
     "validation": {
-    "stream_budget_breakdown_conflict": "Désactivez les deux exigences de ventilation des autres financements avant de choisir le financement du programme seulement.",
       "failed": "Certains champs sont invalides. Vérifiez le formulaire et réessayez."
     },
     "funding_history": {
@@ -2321,6 +2320,7 @@
     }
   },
   "validation": {
+    "stream_budget_breakdown_conflict": "Désactivez les deux exigences de ventilation des autres financements avant de choisir le financement du programme seulement.",
     "notification_field_binding_invalid": "Sélectionnez une variable prise en charge. Les variables texte utilisent un champ; les dates et les heures nécessitent un fuseau horaire.",
     "notification_recipient_invalid": "Sélectionnez une variable de courriel pour le destinataire de la notification.",
     "notification_locale_invalid": "Sélectionnez l’anglais ou le français pour cette variable.",

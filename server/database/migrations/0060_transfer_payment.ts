@@ -247,12 +247,12 @@ CREATE TABLE "Transfer_Payment_Stream" (
   "egcs_tp_active" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_tp_budgetfundingmode" text DEFAULT 'manual' NOT NULL
-    CHECK ("egcs_tp_budgetfundingmode" IN ('program_only', 'manual', 'automatic')),
+    CONSTRAINT tp_chk_stream_budget_funding_mode CHECK ("egcs_tp_budgetfundingmode" IN ('program_only', 'manual', 'automatic')),
   "egcs_tp_hidecostcategory" boolean DEFAULT false NOT NULL,
   "egcs_tp_hidecostsubsection" boolean DEFAULT false NOT NULL,
   "egcs_tp_requireforecastfundingbreakdown" boolean DEFAULT false NOT NULL,
   "egcs_tp_requireclaimfundingbreakdown" boolean DEFAULT false NOT NULL,
-  CHECK ("egcs_tp_budgetfundingmode" <> 'program_only'
+  CONSTRAINT tp_chk_stream_budget_funding_breakdown CHECK ("egcs_tp_budgetfundingmode" <> 'program_only'
     OR (NOT "egcs_tp_requireforecastfundingbreakdown" AND NOT "egcs_tp_requireclaimfundingbreakdown")),
   "egcs_tp_agreementriskenabled" boolean DEFAULT false NOT NULL,
   "egcs_tp_agreementriskworkflow" bigint,
