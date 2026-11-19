@@ -1064,7 +1064,8 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                 :is-locked="isSavingBreakdown || activeForecastIsLocked"
                 :can-edit="isAssigned"
                 :action-role-allowed="canUpdateForecast"
-                :action-prerequisite-warning="completionPrerequisiteWarning"
+                :action-prerequisite-warning="workflowPrerequisiteWarning"
+                :completion-prerequisite-warning="completionPrerequisiteWarning"
                 show-when-unconfigured
                 :show-header="false"
                 title-key="agreement.forecasts.completion.title"
