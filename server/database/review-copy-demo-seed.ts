@@ -76,7 +76,7 @@ export const seedReviewCopyDemo = async (db: Transaction<Database>): Promise<voi
       egcs_cn_disablealignment: true,
       egcs_cn_disablecustomoutcomes: true,
       egcs_cn_disablereviewers: true,
-      egcs_cn_scoringmatrix: kind === 'assessment' ? bands : null,
+      egcs_cn_scoringmatrix: kind === 'assessment' ? sql`${JSON.stringify(bands)}::jsonb` : null,
       egcs_cn_assessmentschema: kind === 'assessment' ? assessmentDefinition : null
     }))
   ).returningAll().execute()
