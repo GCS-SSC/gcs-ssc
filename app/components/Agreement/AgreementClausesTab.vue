@@ -134,12 +134,12 @@ const buildDeleteQuery = (row: ClauseSelection) =>
               v-if="item.group.reviewSources.length"
               :title="t('agreement.clauses.sources')"
               :description="locale === 'fr' ? item.group.nameFr : item.group.nameEn">
-              <UButton
+              <CommonActionButton
                 icon="i-lucide-eye"
                 color="neutral"
                 variant="ghost"
                 size="sm"
-                :aria-label="t('agreement.clauses.view_sources')" />
+                :aria-label="`${t('agreement.clauses.view_sources')}: ${locale === 'fr' ? item.group.nameFr : item.group.nameEn}`" />
               <template #body>
                 <ul class="divide-y divide-default">
                   <li v-for="source in item.group.reviewSources" :key="source.applicationId" class="space-y-1 py-3 first:pt-0 last:pb-0">

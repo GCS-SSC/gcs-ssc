@@ -26,7 +26,7 @@ const { t } = useI18n()
           <CommonBilingualName :name-en="item.typeNameEn" :name-fr="item.typeNameFr" />
         </div>
       </div>
-      <UButton
+      <CommonActionButton
         v-if="canRemove"
         type="button"
         variant="ghost"

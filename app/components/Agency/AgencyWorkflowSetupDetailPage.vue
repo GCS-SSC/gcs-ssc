@@ -70,7 +70,7 @@ const toast = useLocalizedToast()
 const agencyId = route.params.id as string
 provideBilingualFieldScope(() => ({ subject: 'agency', agencyId, permissionAction: 'update' }))
 const workflowSetupId = route.params.workflowSetupId as string
-const endpoint = `/api/agency/${agencyId}/workflows/${workflowSetupId}`
+const endpoint: `/api/agency/${string}/workflows/${string}` = `/api/agency/${agencyId}/workflows/${workflowSetupId}`
 
 const { data: agency } = await useFetch<AgencyProfileItem, FetchError, string>(`/api/agency/${agencyId}`)
 const { data: setup, error: loadError, status: loadStatus, refresh } = await useFetch<WorkflowSetupDetail, FetchError, string>(endpoint)

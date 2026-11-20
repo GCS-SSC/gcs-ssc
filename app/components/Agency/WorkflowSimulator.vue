@@ -16,7 +16,7 @@ import type { WorkflowFlowChoices, WorkflowFlowMember } from '~/utils/workflow-f
 import { workflowResultPredicateLabel, workflowResultSourceLabel, workflowResultValueLabel } from '~/utils/workflow-result-conditions'
 
 const { endpoint, members, customFields, choices } = defineProps<{
-  endpoint: string
+  endpoint: `/api/agency/${string}/workflows/${string}`
   members: WorkflowFlowMember[]
   customFields: AgencyCustomFieldDefinition[]
   choices: WorkflowFlowChoices
@@ -83,37 +83,34 @@ const selectedBoolean = (key: string) => {
   return value === undefined ? undefined : value === 'true'
 }
 const identity = computed(() => JSON.stringify([endpoint, user.value?.id, permissionRevision.value, members]))
+const requestSimulation = (signal: AbortSignal, body: WorkflowSimulationScenario) =>
+  $fetch<WorkflowSimulation, `${typeof endpoint}/simulate`>(`${endpoint}/simulate`, { method: 'POST', signal, body })
 const catalog = useResourceRequest<WorkflowSimulation>({
   identity,
-  load: async signal => await $fetch<WorkflowSimulation>(`${endpoint}/simulate`, {
-    method: 'POST', signal, body: {}
-  })
+  load: signal => requestSimulation(signal, {})
 })
 const simulation = useResourceRequest<WorkflowSimulation>({
   identity,
   trigger: 'refresh',
   refreshData: 'retain',
   failureData: 'retain',
-  load: async signal => await $fetch<WorkflowSimulation>(`${endpoint}/simulate`, {
-    method: 'POST', signal,
-    body: {
-      profile: {
-        further_distribution: selectedBoolean('further_distribution'),
-        jv_fiscal_eligible: selectedBoolean('jv_fiscal_eligible'),
-        jv_payment_final: selectedBoolean('jv_payment_final'),
-        jv_rationale_present: selectedBoolean('jv_rationale_present'),
-        agreement_subtype: selected('agreement_subtype')[0],
-        amendment_type: selected('amendment_type'),
-        amendment_subtype: selected('amendment_subtype'),
-        recipient_subtype: selected('recipient_subtype').map(value => value === unavailable.id ? null : value)
-      },
-      customFields: Object.fromEntries(profileInputs.value
-        .filter(input => customFields.some(field => field.id === input.key))
-        .map(input => [input.key, selected(input.key)])),
-      outcomes: Object.fromEntries((catalog.data.value?.steps ?? []).map(step => [
-        step.memberId, outcomes.value[step.memberId] ?? { state: 'succeeded', results: {} }
-      ]))
-    }
+  load: signal => requestSimulation(signal, {
+    profile: {
+      further_distribution: selectedBoolean('further_distribution'),
+      jv_fiscal_eligible: selectedBoolean('jv_fiscal_eligible'),
+      jv_payment_final: selectedBoolean('jv_payment_final'),
+      jv_rationale_present: selectedBoolean('jv_rationale_present'),
+      agreement_subtype: selected('agreement_subtype')[0],
+      amendment_type: selected('amendment_type'),
+      amendment_subtype: selected('amendment_subtype'),
+      recipient_subtype: selected('recipient_subtype').map(value => value === unavailable.id ? null : value)
+    },
+    customFields: Object.fromEntries(profileInputs.value
+      .filter(input => customFields.some(field => field.id === input.key))
+      .map(input => [input.key, selected(input.key)])),
+    outcomes: Object.fromEntries((catalog.data.value?.steps ?? []).map(step => [
+      step.memberId, outcomes.value[step.memberId] ?? { state: 'succeeded', results: {} }
+    ]))
   })
 })
 const trace = simulation.data
@@ -233,11 +230,11 @@ const actualValue = (condition: WorkflowMemberCondition, actual: WorkflowSimulat
       <p v-if="catalog.status.value === 'pending'" role="status" class="text-sm text-muted">
         {{ t('common.loading') }}
       </p>
-      <UAlert v-if="catalog.error.value" color="error" variant="subtle" :title="t('workflow.simulator.input_error')">
+      <CommonNotice v-if="catalog.error.value" tone="error" :title="t('workflow.simulator.input_error')">
         <template #actions>
           <UButton type="button" :label="t('common.retry')" @click="catalog.refresh()" />
         </template>
-      </UAlert>
+      </CommonNotice>
       <fieldset v-for="step in scenarioSteps" :key="step.memberId" data-testid="workflow-simulation-input-step" class="space-y-3 rounded-md border border-default p-4">
         <legend class="mb-2 text-sm font-medium">
           {{ t('workflow.conditions.step', { number: step.sequence }) }} · {{ stepName(step.memberId) }}
@@ -280,13 +277,13 @@ const actualValue = (condition: WorkflowMemberCondition, actual: WorkflowSimulat
         <UButton type="button" variant="outline" color="neutral" :label="t('workflow.simulator.reset')" @click="reset" />
       </div>
     </fieldset>
-    <UAlert
-      v-if="simulation.error.value" color="error" variant="subtle" icon="i-lucide-circle-alert"
+    <CommonNotice
+      v-if="simulation.error.value" tone="error"
       :title="t('workflow.simulator.request_error')">
       <template #actions>
         <UButton type="button" :label="t('common.retry')" @click="run" />
       </template>
-    </UAlert>
+    </CommonNotice>
     <template v-if="trace">
       <p aria-live="polite" class="font-semibold" data-testid="workflow-simulation-status">
         {{ t(allSkipped ? 'workflow.simulator.all_skipped' : `workflow.simulator.status.${trace.status}`) }}
