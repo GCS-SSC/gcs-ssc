@@ -1,7 +1,7 @@
 /**
  * Manually maintained host tables available to the audit browser.
- * The migrated-database catalog test requires every installed capture table to be listed.
- * Extension-owned tables are discovered from their installed database capture policies.
+ * The migrated-database catalog test checks the host tables and their capture triggers.
+ * Additional extension tables are discovered from their installed database capture policies.
  */
 export const AUDIT_TABLE_NAMES: readonly string[] = [
   'audit.capture_policy',
@@ -11,6 +11,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'extensions.kv_entry',
   'extensions.secret_entry',
   'extensions.stream_configuration',
+  'extensions.system_enablement',
   'public.Agency_Account_Receivable_Type',
   'public.Agency_Address_Type',
   'public.Agency_Agreement_Relationship_Type',
@@ -20,6 +21,8 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Agency_Approval_Behalf_Type',
   'public.Agency_Catalog_Revision',
   'public.Agency_Chart_of_Account',
+  'public.Agency_Clause',
+  'public.Agency_Clause_Text',
   'public.Agency_Commitment_Type',
   'public.Agency_Cost_Category',
   'public.Agency_Cost_Category_Line_Item',
@@ -34,6 +37,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Agency_Holdback_Basis',
   'public.Agency_Monitor_Type',
   'public.Agency_Profile',
+  'public.Agency_Review_Clause_Rule',
   'public.Applicant_Recipient_Address',
   'public.Applicant_Recipient_Agency_Financial_Id',
   'public.Applicant_Recipient_Contact',
@@ -47,6 +51,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Common_Additional_Reviewers',
   'public.Common_Address',
   'public.Common_Approval',
+  'public.Common_Approval_Attachment',
   'public.Common_Approval_Certification',
   'public.Common_Approval_Step',
   'public.Common_Approval_Template',
@@ -134,6 +139,8 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Funding_Case_Agreement_Claim_Line_Item_Funding',
   'public.Funding_Case_Agreement_Claim_Reconcile',
   'public.Funding_Case_Agreement_Claim_Reconcile_Line_Item',
+  'public.Funding_Case_Agreement_Clause',
+  'public.Funding_Case_Agreement_Clause_Review',
   'public.Funding_Case_Agreement_Closeout',
   'public.Funding_Case_Agreement_Closeout_Snapshot',
   'public.Funding_Case_Agreement_Commitment',
@@ -185,6 +192,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Transfer_Payment_Stream_Area_of_Expertise',
   'public.Transfer_Payment_Stream_Budget',
   'public.Transfer_Payment_Stream_Chart_of_Account',
+  'public.Transfer_Payment_Stream_Clause',
   'public.Transfer_Payment_Stream_Commitment_Type',
   'public.Transfer_Payment_Stream_Cost_Category_Line_Item',
   'public.Transfer_Payment_Stream_Document_Template',
