@@ -13,7 +13,8 @@ const props = withDefaults(defineProps<{
   labels: FlowDiagramLabels
   selectedNodeId?: string
   filename?: string
-  direction?: 'auto' | 'vertical'
+  direction?: 'auto' | 'horizontal' | 'vertical'
+  highlightedNodeIds?: readonly string[]
   layout?: 'ordered' | 'branches'
   editable?: boolean
   branchNodeIds?: string[]
@@ -34,6 +35,15 @@ const viewScale = zoom
 const viewportWidth = ref(0)
 const flowSize = ref({ width: 0, height: 0 })
 const edges = ref<Array<{ path: string; kind: FlowDiagramEdgeKind }>>([])
+const highlightTrails = Array.from({ length: 12 }, (_, index) => {
+  const length = 25 * (12 - index) / 12
+  const offset = -25 * index / 12
+  return {
+    dash: `${length} ${100 - length}`,
+    style: { '--flow-trail-start': String(offset), '--flow-trail-end': String(offset - 100), 'strokeOpacity': 1 / (12 - index) }
+  }
+})
+const highlightDiamond = 'M50 0 L100 50 L50 100 L0 50 Z'
 const markerId = `flow-arrow-${useId()}`
 const branchOverflow = ref(false)
 const branchLabelHeights = ref<Record<number, number>>({})
@@ -52,6 +62,7 @@ const branchStepStyle = (id: string) => props.layout === 'branches'
   ? { gridRow: branchLayout.value.nodes[id]!.row + 1, marginLeft: `${branchLayout.value.nodes[id]!.left}px` }
   : undefined
 const exporting = ref(false)
+const highlighted = computed(() => new Set(props.highlightedNodeIds))
 const exportError = ref(false)
 const kinds = computed(() => [...new Set(props.definition.nodes.flatMap(node => node.routes?.map(route => route.kind) ?? []))])
 const directRoute = (node: FlowDiagramProps['definition']['nodes'][number]) =>
@@ -272,6 +283,10 @@ watch(() => props.selectedNodeId, async () => {
   await nextTick()
   scheduleEdges()
 })
+watch(highlighted, async () => {
+  await nextTick()
+  scheduleEdges()
+})
 const exportDiagram = async (format: 'svg' | 'png') => {
   if (!root.value || exporting.value) return
   exporting.value = true
@@ -301,7 +316,7 @@ const exportDiagram = async (format: 'svg' | 'png') => {
 </script>
 
 <template>
-  <section ref="root" class="flow-map" :class="{ 'flow-map--vertical': direction === 'vertical', 'flow-map--branches': layout === 'branches', 'flow-map--fullscreen': fullscreen }" :aria-label="definition.title">
+  <section ref="root" class="flow-map" :class="{ 'flow-map--vertical': direction === 'vertical', 'flow-map--horizontal': direction === 'horizontal', 'flow-map--branches': layout === 'branches', 'flow-map--fullscreen': fullscreen }" :aria-label="definition.title">
     <div class="flow-heading">
       <p v-if="definition.description" class="flow-description">
         {{ definition.description }}
@@ -363,7 +378,7 @@ const exportDiagram = async (format: 'svg' | 'png') => {
             <div ref="canvas" class="flow-canvas" :data-flow-zoom="viewScale" :style="{ '--flow-lanes': routedCount, '--flow-viewport-width': viewportWidth ? `${viewportWidth}px` : '100%', 'transform': `scale(${viewScale})`, ...(layout === 'branches' ? { '--flow-branch-width': `${branchLayout.width}px`, '--flow-branch-rail-space': `${branchRailCount * 16 + 32}px` } : {}) }">
               <svg v-if="edges.length" class="flow-connections" :viewBox="`0 0 ${flowSize.width} ${flowSize.height}`" aria-hidden="true">
                 <defs>
-                  <marker v-for="kind in kinds" :id="`${markerId}-${kind}`" :key="kind" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <marker v-for="kind in kinds" :id="`${markerId}-${kind}`" :key="kind" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" :refX="props.direction === 'horizontal' ? 8 : 6" refY="4" orient="auto">
                     <path d="M 0 0 L 8 4 L 0 8 z" :class="`flow-marker--${kind}`" />
                   </marker>
                 </defs>
@@ -386,9 +401,23 @@ const exportDiagram = async (format: 'svg' | 'png') => {
                   <component
                     :is="node.selectLabel ? 'button' : 'div'" :type="node.selectLabel ? 'button' : undefined"
                     :class="node.kind === 'start' || node.kind === 'end' ? ['flow-terminal-node', `flow-terminal-node--${node.kind}`] : ['flow-page-node', { 'flow-page-node--decision': node.kind === 'decision' }]"
-                    :data-flow-node="node.id" :data-flow-destination="directRoute(node)?.targetId" :data-flow-kind="directRoute(node)?.kind"
+                    :data-flow-node="node.id" :data-flow-highlighted="highlighted.has(node.id) || undefined"
+                    :data-flow-destination="directRoute(node)?.targetId" :data-flow-kind="directRoute(node)?.kind"
                     :aria-current="selectedNodeId === node.id ? 'step' : undefined" :aria-label="node.selectLabel"
                     @click="node.selectLabel && emit('select-node', node.id)">
+                    <svg v-if="highlighted.has(node.id)" class="flow-highlight-outline" :viewBox="node.kind === 'decision' ? '0 0 100 100' : undefined" preserveAspectRatio="none" aria-hidden="true" data-export-ignore>
+                      <path v-if="node.kind === 'decision'" class="flow-highlight-border" :d="highlightDiamond" vector-effect="non-scaling-stroke" />
+                      <template v-for="trail in highlightTrails" :key="trail.dash">
+                        <path
+                          v-if="node.kind === 'decision'" class="flow-highlight-trail"
+                          :d="highlightDiamond" pathLength="100" vector-effect="non-scaling-stroke"
+                          :stroke-dasharray="trail.dash" :style="trail.style" />
+                        <rect
+                          v-else class="flow-highlight-trail flow-highlight-rect" width="100%" height="100%"
+                          pathLength="100" vector-effect="non-scaling-stroke"
+                          :stroke-dasharray="trail.dash" :style="trail.style" />
+                      </template>
+                    </svg>
                     <svg v-if="node.kind === 'start' || node.kind === 'end'" class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path :d="node.kind === 'start' ? 'm6 3 14 9-14 9V3Z' : 'M4 22V3m0 0c4-3 8 3 12 0v10c-4 3-8-3-12 0'" />
                     </svg>
@@ -486,10 +515,10 @@ const exportDiagram = async (format: 'svg' | 'png') => {
 .flow-map--vertical .flow-terminal-node { width: auto; min-width: 6.5rem; margin-inline: auto; padding: 1rem; }
 @container (max-width: 44rem) {
 
-  .flow-canvas { width: calc(var(--flow-viewport-width) - 3rem); min-width: 0; }
-  .flow-track { width: 100%; min-width: 0; flex-direction: column; gap: 3rem; padding: .5rem calc(min(var(--flow-lanes) * 16px, 64px) + 2rem) .5rem 0; }
-  .flow-step { width: 100%; }
-  .flow-terminal-node { width: 6.5rem; margin-inline: auto; }
+  :where(.flow-map:not(.flow-map--horizontal)) .flow-canvas { width: calc(var(--flow-viewport-width) - 3rem); min-width: 0; }
+  :where(.flow-map:not(.flow-map--horizontal)) .flow-track { width: 100%; min-width: 0; flex-direction: column; gap: 3rem; padding: .5rem calc(min(var(--flow-lanes) * 16px, 64px) + 2rem) .5rem 0; }
+  :where(.flow-map:not(.flow-map--horizontal)) .flow-step { width: 100%; }
+  :where(.flow-map:not(.flow-map--horizontal)) .flow-terminal-node { width: 6.5rem; margin-inline: auto; }
   .flow-map--vertical .flow-terminal-node { width: auto; }
 }
 .flow-export { border: 1px solid var(--ui-border); border-radius: .375rem; padding: .4rem .65rem; font-size: .75rem; color: var(--ui-text); cursor: pointer; }
@@ -537,7 +566,41 @@ const exportDiagram = async (format: 'svg' | 'png') => {
 .flow-map--branches .flow-track { display: grid; grid-template-columns: var(--flow-branch-width); width: var(--flow-branch-width); min-width: 0; align-items: start; gap: 5rem 0; padding: .5rem 0 1rem; }
 .flow-map--branches .flow-step { grid-column: 1; width: 264px; max-width: none; }
 .flow-terminal-node { flex-direction: row; flex-wrap: wrap; gap: .5rem; width: max-content; min-width: 6.5rem; max-width: 100%; margin-inline: auto; padding: 1rem; }
+.flow-map--horizontal .flow-terminal { width: 12rem; }
+.flow-map { --flow-highlight: var(--color-violet-800, #5b21b6); }
+:global(.dark .flow-map) { --flow-highlight: var(--color-violet-200, #ddd6fe); }
+.flow-map [data-flow-highlighted='true'] {
+  position: relative;
+  border: 3px solid color-mix(in srgb, var(--flow-highlight) 32%, transparent);
+}
+.flow-highlight-outline {
+  position: absolute;
+  inset: -1.5px;
+  width: calc(100% + 3px);
+  height: calc(100% + 3px);
+  overflow: visible;
+  pointer-events: none;
+  color: var(--flow-highlight);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3px;
+}
+.flow-highlight-rect { rx: calc(.5rem - 1.5px); }
+.flow-terminal-node .flow-highlight-rect { rx: calc(1rem - 1.5px); }
+.flow-page-node--decision .flow-highlight-outline { inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); }
+.flow-highlight-border { stroke-opacity: .32; }
+.flow-highlight-trail { animation: flow-highlight-travel 3s linear infinite; }
+@keyframes flow-highlight-travel {
+  from { stroke-dashoffset: var(--flow-trail-start); }
+  to { stroke-dashoffset: var(--flow-trail-end); }
+}
+@media (prefers-reduced-motion: reduce), print {
+  .flow-map [data-flow-highlighted='true'] { border-color: var(--flow-highlight); }
+  .flow-highlight-border { stroke-opacity: 1; }
+  .flow-highlight-trail { display: none; animation: none; }
+}
 .flow-terminal-node .flow-page-title { white-space: nowrap; }
+.flow-map--horizontal .flow-terminal-node .flow-page-title { white-space: normal; }
 .flow-terminal-node .flow-node-line { flex-basis: 100%; text-align: center; }
 .flow-branch-labels { display: grid; gap: .5rem; margin-bottom: 1rem; position: relative; }
 .flow-branch-label { width: 100%; text-align: center; }

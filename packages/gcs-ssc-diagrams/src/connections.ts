@@ -48,6 +48,11 @@ export const flowConnectionPath = (connection: Connection): string => {
     const end = vertical
       ? { x: to.left + to.width / 2, y: to.top - 8 }
       : { x: to.left - 8, y: to.top + to.height / 2 }
+    if (!vertical && start.y !== end.y && end.x > start.x) {
+      const entryX = end.x - Math.min(8, (end.x - start.x) / 3)
+      const midpoint = (start.x + entryX) / 2
+      return `M ${start.x} ${start.y} C ${midpoint} ${start.y}, ${midpoint} ${end.y}, ${entryX} ${end.y} L ${end.x} ${end.y}`
+    }
     const midpoint = vertical ? (start.y + end.y) / 2 : (start.x + end.x) / 2
     return vertical
       ? `M ${start.x} ${start.y} C ${start.x} ${midpoint}, ${end.x} ${midpoint}, ${end.x} ${end.y}`

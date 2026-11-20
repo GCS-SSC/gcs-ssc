@@ -21,6 +21,18 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { AppFetchResponseError, throwFetchResponseError } from '~/utils/fetch-error'
 import { appRouteLocations } from '~/utils/route-locations'
 import { dataCollectionRuntimeConfiguration as dataCollectionConfiguration } from '~/utils/data-collection-runtime'
+import { workflowResultPredicateLabel, workflowResultValueLabel } from '~/utils/workflow-result-conditions'
+import { isWorkflowResultCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { WorkflowMemberCondition, WorkflowResultCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { ChecklistResult } from '~~/shared/types/schemas/checklist/checklist'
+
+type ResultConditionEvidence = {
+  condition: WorkflowResultCondition
+  name_en: string
+  name_fr: string
+  matched: boolean
+  actual: number | boolean | ChecklistResult | null
+}
 
 type RuntimeRecommendation = {
   id: string
@@ -90,6 +102,8 @@ type RuntimeResponse = {
   workflowItems: Array<{ runtimeItemId: string, runtimeState: RuntimeState }>
   steps?: Array<{
     eligibility?: { eligible: boolean, unmatchedFieldIds: string[] }
+    conditions?: WorkflowMemberCondition[]
+    resultConditions?: ResultConditionEvidence[]
     memberId: string
     sequence: number
     kind: 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
@@ -133,7 +147,7 @@ type RuntimeResponse = {
 }
 type WorkflowDisplayStep = {
   id: string
-  ordinal: number
+  ordinal: number | string
   name: string
   status: RuntimeState | 'upcoming' | 'not_reached' | 'skipped'
   outcome: string | null
@@ -250,6 +264,43 @@ watch(isChooserOpen, open => {
 }, { flush: 'sync' })
 const endpoint = computed(() => `/api/workflows/${approvalOnly ? 'approval-runtime' : 'runtime'}?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}${selectedAttemptId.value ? `&runtimeId=${selectedAttemptId.value}` : ''}`)
 const { data, refresh, status, error = ref(undefined) } = await useFetch<RuntimeResponse, Error, string>(endpoint)
+const hasWorkflowResultConditions = computed(() => data.value?.steps?.some(step => step.conditions?.some(isWorkflowResultCondition)))
+const routingDecisions = computed(() => data.value?.routing?.decisions.map((decision, index) => {
+  const step = data.value?.steps?.find(member => member.memberId === decision.memberId)
+  const eligible = step?.eligibility?.eligible ?? decision.eligible
+  const awaitingResult = eligible && !step?.resultConditions && step?.conditions?.some(isWorkflowResultCondition)
+  const statusLabel = awaitingResult
+    ? `workflow.${unmaterializedStepStatus(data.value?.current?.runtimeState)}`
+    : eligible ? 'workflow.conditions.included' : 'custom_fields.skipped'
+  return {
+    ...decision,
+    sequence: step?.sequence ?? index + 1,
+    statusLabel,
+    resultConditions: step?.resultConditions ?? [],
+    pendingConditions: step?.resultConditions ? [] : step?.conditions?.filter(isWorkflowResultCondition) ?? []
+  }
+}) ?? [])
+const resultSourceName = (condition: WorkflowResultCondition & { name_en?: string, name_fr?: string }) => {
+  const result = t(`workflow.conditions.${condition.source}`)
+  const name = (locale.value === 'fr' ? condition.name_fr : condition.name_en) || result
+  const source = data.value?.steps?.find(step => step.memberId === condition.workflowMemberId)
+  return source
+    ? t('workflow.conditions.result_source_label', {
+        step: t('workflow.conditions.step', { number: source.sequence }),
+        name,
+        result
+      })
+    : name
+}
+const recordedResultLabel = (result: ResultConditionEvidence, consumerSequence: number) => {
+  if (result.actual === null) {
+    const source = data.value?.steps?.find(step => step.memberId === result.condition.workflowMemberId)
+    if (!source || source.sequence >= consumerSequence || source.eligibility?.eligible !== false) {
+      return t('workflow.conditions.result_source_unavailable')
+    }
+  }
+  return workflowResultValueLabel(result.actual, locale.value, t)
+}
 const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}:${approvalOnly}`)
 const helpDraftRevision = ref(0)
 watch(() => JSON.stringify(responses.value), () => {
@@ -486,19 +537,30 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
     let ordinal = 0
     const steps: WorkflowDisplayStep[] = []
     for (const member of data.value.steps) {
+      let nestedOrdinal = 0
+      const stepNumber = () => hasWorkflowResultConditions.value
+        ? (nestedOrdinal++ === 0 ? member.sequence : `${member.sequence}.${nestedOrdinal}`)
+        : ++ordinal
       if (member.eligibility?.eligible === false) {
-        steps.push({ id: `skipped-${member.memberId}`, ordinal: ++ordinal, name: t(`workflow.${member.kind}`), status: 'skipped', outcome: null, hasApproval: false, kind: 'review' })
+        const name = locale.value === 'fr'
+          ? member.reviewPlan?.name.fr ?? member.recommendationPlan?.nameFr ?? member.dataCollectionPlan?.nameFr ?? member.approval?.nameFr
+          : member.reviewPlan?.name.en ?? member.recommendationPlan?.nameEn ?? member.dataCollectionPlan?.nameEn ?? member.approval?.nameEn
+        steps.push({
+          id: `skipped-${member.memberId}`, ordinal: stepNumber(),
+          name: hasWorkflowResultConditions.value ? name ?? t(`workflow.${member.kind}`) : t(`workflow.${member.kind}`),
+          status: 'skipped', outcome: null, hasApproval: false, kind: 'review'
+        })
         continue
       }
       if (member.kind === 'review_set') {
         steps.push({
-          id: `review-${member.memberId}`, ordinal: ++ordinal,
+          id: `review-${member.memberId}`, ordinal: stepNumber(),
           name: (locale.value === 'fr' ? member.reviewPlan?.name.fr : member.reviewPlan?.name.en) ?? t('workflow.review_set'),
           status: member.runtimeItem?.runtimeState ?? unmaterializedStepStatus(runStatus),
           outcome: null, hasApproval: false, kind: 'review' as const
         })
         if (member.reviewPlan?.finalApproval) steps.push({
-          id: `review-approval-${member.memberId}`, ordinal: ++ordinal,
+          id: `review-approval-${member.memberId}`, ordinal: stepNumber(),
           name: locale.value === 'fr'
             ? member.reviewPlan.finalApproval.definition.nameFr
             : member.reviewPlan.finalApproval.definition.nameEn,
@@ -509,7 +571,7 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
       } else if (member.kind === 'data_collection') {
         const collection = data.value?.dataCollections?.find(item => item.workflowMemberId === member.memberId)
         steps.push({
-          id: `data-collection-${member.memberId}`, ordinal: ++ordinal,
+          id: `data-collection-${member.memberId}`, ordinal: stepNumber(),
           name: (locale.value === 'fr' ? member.dataCollectionPlan?.nameFr : member.dataCollectionPlan?.nameEn) ?? t('workflow.data_collection'),
           status: collection?.runtimeState ?? unmaterializedStepStatus(runStatus),
           outcome: null, hasApproval: Boolean(member.dataCollectionPlan?.approval), kind: 'data_collection'
@@ -518,7 +580,7 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
         for (const nested of member.recommendationPlan?.members ?? []) {
           const recommendation = data.value?.recommendations?.find(item => String(item.egcs_cn_recommendationsetup) === nested.memberId && item.workflowMemberOrder === member.sequence)
           steps.push({
-            id: `recommendation-${member.memberId}-${nested.memberId}`, ordinal: ++ordinal,
+            id: `recommendation-${member.memberId}-${nested.memberId}`, ordinal: stepNumber(),
             name: locale.value === 'fr' ? nested.schemaNameFr : nested.schemaNameEn,
             status: recommendation?.runtimeState ?? unmaterializedStepStatus(runStatus),
             outcome: recommendation?.egcs_cn_outcome ?? null,
@@ -526,7 +588,7 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
           })
         }
         if (member.recommendationPlan?.finalApproval) steps.push({
-          id: `recommendation-approval-${member.memberId}`, ordinal: ++ordinal,
+          id: `recommendation-approval-${member.memberId}`, ordinal: stepNumber(),
           name: locale.value === 'fr'
             ? member.recommendationPlan.finalApproval.definition.nameFr
             : member.recommendationPlan.finalApproval.definition.nameEn,
@@ -536,7 +598,7 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
         })
       } else {
         steps.push({
-          id: `approval-${member.memberId}`, ordinal: ++ordinal,
+          id: `approval-${member.memberId}`, ordinal: stepNumber(),
           name: (locale.value === 'fr' ? member.approval?.nameFr : member.approval?.nameEn) ?? t('workflow.final_approval'),
           status: member.runtimeItem?.runtimeState ?? unmaterializedStepStatus(runStatus),
           outcome: null, hasApproval: false, kind: 'final_approval' as const,
@@ -909,7 +971,7 @@ const handleApprovalChanged = async () => {
       <UButton icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" :loading="isRetrying" :disabled="status === 'pending' || isMutationPending" @click="retry" />
       <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="status === 'pending' || isMutationPending" @click="cancel" />
     </div>
-    <CommonWorkflowPacket v-if="data?.routing && (data.routing.fields.length || data.routing.decisions.some(decision => decision.conditions?.length))" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
+    <CommonWorkflowPacket v-if="data?.routing && (hasWorkflowResultConditions || data.routing.fields.length || routingDecisions.some(decision => decision.conditions?.length || decision.resultConditions.length))" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t(hasWorkflowResultConditions ? 'workflow.conditions.start_routing_hash' : 'workflow.packet.hash')">
       <dl class="space-y-3">
         <div v-for="field in data.routing.fields" :key="`${field.fieldId}:${field.optionId}`">
           <dt class="text-sm text-muted">
@@ -918,9 +980,9 @@ const handleApprovalChanged = async () => {
           <dd>{{ locale === 'fr' ? field.option_fr : field.option_en }}</dd>
         </div>
       </dl>
-      <div v-for="(decision, index) in data.routing.decisions" :key="decision.memberId" class="mt-4 space-y-2">
+      <div v-for="decision in routingDecisions" :key="decision.memberId" class="mt-4 space-y-2">
         <p class="font-medium">
-          {{ t('workflow.conditions.step', { number: index + 1 }) }}: {{ t(decision.eligible ? 'workflow.conditions.included' : 'custom_fields.skipped') }}
+          {{ t('workflow.conditions.step', { number: decision.sequence }) }}: {{ t(decision.statusLabel) }}
         </p>
         <p v-for="condition in decision.conditions" :key="condition.key" class="text-sm">
           {{ locale === 'fr' ? condition.name_fr : condition.name_en }}:
@@ -928,6 +990,21 @@ const handleApprovalChanged = async () => {
           <span v-if="condition.quantifier">({{ t(`workflow.conditions.${condition.quantifier}`) }})</span>
           : {{ t(condition.matched ? 'workflow.conditions.matched' : 'workflow.conditions.unmatched') }}
         </p>
+        <div v-for="(condition, conditionIndex) in decision.pendingConditions" :key="`pending-${conditionIndex}`" class="text-sm">
+          <p>{{ resultSourceName(condition) }}</p>
+          <p class="text-muted">
+            {{ t('workflow.conditions.expected_result', { value: workflowResultPredicateLabel(condition, locale, t) }) }}
+            · {{ t('workflow.conditions.not_evaluated') }}
+          </p>
+        </div>
+        <div v-for="(result, resultIndex) in decision.resultConditions" :key="resultIndex" class="text-sm">
+          <p>{{ resultSourceName({ ...result.condition, name_en: result.name_en, name_fr: result.name_fr }) }}</p>
+          <p class="text-muted">
+            {{ t('workflow.conditions.expected_result', { value: workflowResultPredicateLabel(result.condition, locale, t) }) }}
+            · {{ t('workflow.conditions.actual_result', { value: recordedResultLabel(result, decision.sequence) }) }}
+            · {{ t(result.matched ? 'workflow.conditions.matched' : 'workflow.conditions.unmatched') }}
+          </p>
+        </div>
       </div>
     </CommonWorkflowPacket>
     <AccountReceivablePacket v-if="data?.submission && (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment')" :submission="data.submission" />

@@ -6,6 +6,7 @@ import type { Database } from '~~/shared/types/database'
 import type { RiskReadiness, RiskTarget, SubmissionRisk } from '~~/shared/types/risk'
 import { throwApiError } from './api-errors'
 import { readPublishedWorkflowConfiguration } from './workflow-setup-versioning'
+import { usesWorkflowResultConditions } from './workflow-execution-plan'
 import {
   captureAmendmentRiskSelections, matchAmendmentRiskSelections, readStreamRiskPolicy, resolveLatestRiskRating
 } from './agreement-risk-rating'
@@ -68,8 +69,17 @@ export const getConfiguredRiskWorkflowSuccess = async (
   const scope = target.entityType === 'fundingcaseamendment'
     ? selections ?? await captureAmendmentRiskSelections(db, target.entityId)
     : undefined
-  const attempts = await successfulRiskRuns(db, target).where('runtime.egcs_cn_sourcepublication', '=', setupId).execute()
-  return attempts.find(attempt => matchesRiskScope(attempt.egcs_cn_routing, streamId, scope))
+  const attempts = await successfulRiskRuns(db, target)
+    .innerJoin('Common_Publication_Version as pinned', 'pinned.id', 'runtime.egcs_cn_sourcepublicationversion')
+    .select('pinned.egcs_cn_definition as pinnedDefinition')
+    .where('runtime.egcs_cn_sourcepublication', '=', setupId).execute()
+  for (const attempt of attempts) {
+    if (!matchesRiskScope(attempt.egcs_cn_routing, streamId, scope) || attempt.pinnedDefinition == null) continue
+    const definition = readPublishedWorkflowConfiguration(attempt.pinnedDefinition)
+    if (!usesWorkflowResultConditions(definition)
+      || (await resolveLatestRiskRating(db, { ...target, runtimeId: attempt.id }))?.mappedRating) return attempt
+  }
+  return undefined
 }
 
 const resolveRiskDecision = async (db: RiskDb, target: RiskTarget) => {

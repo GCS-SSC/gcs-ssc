@@ -4016,7 +4016,55 @@
       "stopped": "Cette tâche ou ce processus a pris fin avant l’achèvement de cette tâche. Vérifiez le résultat du processus actuel et les options de nouvelle tentative.",
       "reviews": "Examens"
     },
+    "simulator": {
+      "title": "Simulateur de flux de travail",
+      "description": "Saisissez les données et les résultats du scénario avant d’exécuter le flux de travail enregistré. La simulation ne crée aucune tentative, fiche d’acheminement ni tâche d’approbation.",
+      "calculate_score": "Calculer la note de {assessment} à partir des réponses et des variables auxiliaires",
+      "comma_separated_ids": "Identifiants séparés par des virgules",
+      "invalid_helper_amount": "Saisissez un montant valide pour la devise sélectionnée.",
+      "input_error": "Impossible de charger les données du flux de travail.",
+      "scenario_inputs": "Valeurs du scénario",
+      "unavailable": "Non disponible",
+      "run": "Lancer la simulation",
+      "reset": "Réinitialiser la simulation",
+      "outcome": "Résultat de l’étape",
+      "all_skipped": "Réussi · toutes les étapes ont été ignorées",
+      "request_error": "Impossible de simuler le scénario. Réessayez avec les mêmes valeurs.",
+      "status": {
+        "succeeded": "Réussi",
+        "approved": "Approuvé",
+        "denied": "Refusé",
+        "failed": "Échec",
+        "cancelled": "Annulé",
+        "unsuccessful": "Sans succès",
+        "awaiting_input": "En attente de résultats simulés",
+        "blocked": "Bloqué au démarrage"
+      },
+      "step": {
+        "run": "Exécutée",
+        "awaiting_input": "Résultats simulés attendus",
+        "skipped": "Ignorée",
+        "not_reached": "Non atteinte"
+      },
+      "reason": {
+        "condition_unmet": "Une condition n’a pas été satisfaite.",
+        "source_unavailable": "Une condition dépend d’un résultat non disponible.",
+        "terminal": "Une étape précédente a terminé le flux."
+      },
+      "finish_reason": {
+        "route_invalid": "Ces valeurs ne permettent pas de démarrer un parcours.",
+        "terminal_status_required": "Cette opération exige un statut de réussite terminal.",
+        "correction_approval_required": "La comptabilisation d’une correction exige une approbation."
+      }
+    },
     "flow": {
+      "start_with_results": "Démarrer et saisir le profil",
+      "result_description": "Les valeurs du profil sont saisies au démarrage. Les conditions qui utilisent le résultat d’une étape précédente sont vérifiées au moment d’atteindre l’étape.",
+      "at_start": "Saisi au démarrage",
+      "after_result": "Vérifié à l’étape",
+      "optional_risk_effect": "Appliquer la cote de risque seulement si l’évaluation désignée a été exécutée.",
+      "terminal_success_required": "Une étape doit atteindre un statut de réussite terminal pour cette opération.",
+      "empty_success": "Le flux peut réussir même si toutes les étapes sont ignorées.",
       "title": "Flux",
       "description": "Les conditions sélectionnent le parcours au démarrage. Les membres retenus s’exécutent dans l’ordre; une nouvelle tentative capture les valeurs actuelles avec la version publiée d’origine.",
       "order": "Ordre d’exécution",
@@ -4057,6 +4105,24 @@
       "retry_disabled": "Les nouvelles tentatives sont désactivées."
     },
     "conditions": {
+      "not_evaluated": "Non évalué",
+      "earlier_result": "Résultat d’une étape précédente",
+      "add_result": "Ajouter une condition de résultat",
+      "result_source_label": "{step} : {name} ({result})",
+      "result_source_order": "La source doit être une étape précédente",
+      "result_source_unavailable": "La source du résultat du flux de travail est indisponible",
+      "results_help": "Toutes les conditions configurées doivent être remplies. Une condition liée à un résultat exige que l’étape précédente produise ce résultat.",
+      "assessment_score": "Note de l’évaluation",
+      "checklist_result": "Résultat de la liste de contrôle",
+      "recommendation_result": "Résultat de la recommandation",
+      "score_operator": "Comparaison de la note",
+      "score_value": "Seuil de la note",
+      "checklist_value": "Résultat final de la liste de contrôle",
+      "recommendation_value": "Résultat final de la recommandation",
+      "start_routing_hash": "Empreinte des valeurs et décisions de routage saisies au démarrage du flux de travail",
+      "expected_result": "Attendu : {value}",
+      "actual_result": "Obtenu : {value}",
+      "source_skipped": "L’étape source a été ignorée",
       "field": "Champ de condition",
       "edit_member": "Conditions du membre {sequence} du processus",
       "badge": "{field} : {value}",

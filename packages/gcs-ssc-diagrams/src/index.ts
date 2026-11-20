@@ -1,10 +1,16 @@
+import type { FlowDiagramProps as ExtensionFlowDiagramProps } from '@gcs-ssc/extensions/ui'
+
 export type {
   FlowDiagramDefinition,
   FlowDiagramNode,
   FlowDiagramRoute,
-  FlowDiagramEdgeKind,
-  FlowDiagramProps
+  FlowDiagramEdgeKind
 } from '@gcs-ssc/extensions/ui'
+
+export type FlowDiagramProps = Omit<ExtensionFlowDiagramProps, 'direction'> & {
+  direction?: 'auto' | 'horizontal' | 'vertical'
+  highlightedNodeIds?: readonly string[]
+}
 
 export { flowConnectionPath, flowLaneSpacing } from './connections'
 export { diagramSvg, diagramPng } from './export'

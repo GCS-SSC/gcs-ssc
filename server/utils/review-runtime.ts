@@ -1,3 +1,4 @@
+import { isConfiguredNegativeReview } from '~~/shared/utils/workflow-configured-outcome'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- typed review runtime helpers */
 import type { Kysely, Selectable, Transaction } from 'kysely'
@@ -546,9 +547,14 @@ const isConfiguredNegative = async (db: Transaction<Database>, review: {
     ? await db.selectFrom('Common_Checklist').select('egcs_cn_result')
         .where('egcs_cn_review', '=', String(review.id)).where('_deleted', '=', false).executeTakeFirst()
     : null
-  return (review.egcs_cn_failonchecklistfailure && checklist?.egcs_cn_result === 'fail')
-    || (review.egcs_cn_failurethreshold !== null && review.egcs_cn_reviewresult !== null
-      && parseSafeDecimal(String(review.egcs_cn_reviewresult)) < parseSafeDecimal(String(review.egcs_cn_failurethreshold)))
+  const compareScore = review.egcs_cn_failurethreshold !== null && review.egcs_cn_reviewresult !== null
+    && checklist?.egcs_cn_result !== 'fail'
+  return isConfiguredNegativeReview({
+    failOnChecklistFailure: review.egcs_cn_failonchecklistfailure,
+    checklistResult: checklist?.egcs_cn_result ?? null,
+    failureThreshold: compareScore ? parseSafeDecimal(String(review.egcs_cn_failurethreshold)) : null,
+    score: compareScore ? parseSafeDecimal(String(review.egcs_cn_reviewresult)) : null
+  })
 }
 
 export const activateRetriedApprovalRuntime = async (

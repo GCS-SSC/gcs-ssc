@@ -45,7 +45,7 @@ export default defineEventHandler(async event => {
     const run = await trx.selectFrom('Common_Runtime')
       .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
       .selectAll('Common_Runtime')
-      .select('Common_Workflow_Run.egcs_cn_completion')
+      .select(['Common_Workflow_Run.egcs_cn_completion', 'Common_Workflow_Run.egcs_cn_routing'])
       .where('Common_Runtime.id', '=', body.runtimeId)
       .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
       .where('Common_Runtime.egcs_cn_entitytype', '=', context.entityType)

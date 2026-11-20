@@ -23,6 +23,8 @@ import { applyCurrentWorkflowMemberSelection } from '~/utils/workflow-member-sel
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useAgencyWorkflowEntityTypes } from '~/composables/useAgencyWorkflowEntityTypes'
+import type { WorkflowResultMember } from '~/utils/workflow-result-conditions'
+import type { WorkflowSimulation } from '~~/shared/types/schemas/workflow-simulation'
 
 const { flowOnly = false } = defineProps<{ flowOnly?: boolean }>()
 
@@ -37,12 +39,8 @@ type WorkflowSetupDetail = WorkflowSetupItem & {
   hasUnpublishedChanges: boolean
   members: WorkflowMember[]
 }
-type WorkflowMember = {
-  referenceNameEn?: string | null
-  referenceNameFr?: string | null
+type WorkflowMember = WorkflowResultMember & {
   conditions?: WorkflowMemberCondition[]
-  id: string
-  egcs_cn_sequence: number
   egcs_cn_kind: 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
   egcs_cn_reviewset?: string
   egcs_cn_datacollection?: string
@@ -94,6 +92,7 @@ const cloneSetup = (value: WorkflowSetupDetail): WorkflowSetupDetail => ({
   }))
 })
 const state: Ref<WorkflowSetupDetail | null> = ref(setup.value ? cloneSetup(setup.value) : null)
+const simulationTrace: Ref<WorkflowSimulation | null> = ref(null)
 const isMemberOpen: Ref<boolean> = ref(false)
 const selectedMember: Ref<WorkflowMemberForm | null> = ref(null)
 const isConditionsOpen: Ref<boolean> = ref(false)
@@ -673,7 +672,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                       <div class="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
                         <TransferPaymentWorkflowConditions
                           data-field-container="Composite editor; its individual field declarations own their identities."
-                          :model-value="member.conditions ?? []" readonly
+                          :model-value="member.conditions ?? []" :workflow-members="state.members" :sequence="member.egcs_cn_sequence" readonly
                           :entity-type="state.egcs_cn_entitytype" :custom-fields="conditionFields?.items ?? []"
                           :choices="conditionChoices ?? {}" :load-error="Boolean(conditionFieldsError || conditionChoicesError)"
                           @retry="retryConditionCatalogs" />
@@ -688,8 +687,15 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
 
               <AssessmentSchemaPageSection v-if="flowOnly" section-id="workflow-flow" :title="t('workflow.flow.title')">
                 <AgencyWorkflowFlowDiagram
-                  :setup="state" :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}" />
+                  :setup="state" :simulation="simulationTrace"
+                  :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}" />
                 <UButton v-if="conditionFieldsError || conditionChoicesError" :label="t('common.retry')" color="neutral" variant="ghost" @click="retryConditionCatalogs" />
+                <CommonSection :title="t('workflow.simulator.title')" :grid-cols="1" class="mt-6">
+                  <AgencyWorkflowSimulator
+                    :endpoint="endpoint" :members="setup?.members ?? state.members"
+                    :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}"
+                    @trace="simulationTrace = $event" />
+                </CommonSection>
               </AssessmentSchemaPageSection>
 
               <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-transitions" :title="t('workflow.transitions')">
@@ -825,7 +831,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
       <UForm v-if="selectedConditions" v-bind="conditionsFormSession" :state="selectedConditions" :validate="validateConditions">
         <fieldset :disabled="mutation.isPending.value" class="space-y-4">
           <TransferPaymentWorkflowConditions
-            v-model="selectedConditions.conditions"
+            v-model="selectedConditions.conditions" :workflow-members="state?.members ?? []" :sequence="selectedConditions.sequence"
             data-field-container="Composite editor; its individual field declarations own their identities." :entity-type="state?.egcs_cn_entitytype ?? ''"
             :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}"
             :load-error="Boolean(conditionFieldsError || conditionChoicesError)" @retry="retryConditionCatalogs" />

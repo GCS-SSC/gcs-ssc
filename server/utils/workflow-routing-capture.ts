@@ -6,7 +6,7 @@ import type { PublishedWorkflowConfiguration } from './workflow-setup-versioning
 import { WorkflowRouteValidationError, type WorkflowRoutingSnapshot, type WorkflowRoutingEvidence } from './workflow-routing-contract'
 import { amendmentConditionOptionIds, profileConditionLabels, readWorkflowProfileChoices } from './workflow-profile-conditions'
 import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
-import { customFieldOptionIds, type AgreementRoutingValues, type AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
+import { isWorkflowResultCondition, customFieldOptionIds, type AgreementProfileCondition, type AgreementRoutingValues, type AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
 import { journalVoucherPaymentIsFinal } from './journal-voucher-source'
 
 export const captureWorkflowRoutingSnapshot = async (
@@ -16,7 +16,7 @@ export const captureWorkflowRoutingSnapshot = async (
   const agreementId = context.entityType === 'fundingcaseagreement' ? context.entityId : context.agreementId ?? null
   const values: AgreementCustomFieldValues = {}
   const capturedFields: WorkflowRoutingEvidence['fields'] = []
-  const profileConditions = definition.members.flatMap(member => (member.conditions ?? []).filter(condition => 'source' in condition))
+  const profileConditions = definition.members.flatMap(member => (member.conditions ?? []).filter((condition): condition is typeof condition & AgreementProfileCondition => 'source' in condition && !isWorkflowResultCondition(condition)))
   let profile: AgreementRoutingValues | undefined
   const relationships: NonNullable<WorkflowRoutingEvidence['relationships']> = []
   if (referencedIds.length || profileConditions.length) {

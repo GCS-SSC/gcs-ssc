@@ -145,6 +145,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/workflow-amendment-conditions.spec.ts',
   'tests/e2e/workflow-group-owners.spec.ts',
   'tests/e2e/workflow-profile-conditions.spec.ts',
+  'tests/e2e/workflow-result-conditions.spec.ts',
   'tests/e2e/maple-finance-ready.spec.ts',
   'tests/e2e/additional-reviewer-lookup-review.spec.ts',
   'tests/e2e/checklist-load-recovery.spec.ts',

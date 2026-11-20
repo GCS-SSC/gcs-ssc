@@ -1,3 +1,4 @@
+import { isConfiguredNegativeRecommendation } from '~~/shared/utils/workflow-configured-outcome'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
 /* eslint-disable jsdoc/require-jsdoc -- typed recommendation runtime helpers */
 import type { H3Event } from 'h3'
@@ -574,7 +575,7 @@ export const advanceRecommendationRuntimeAfterTerminalItem = async (
   const configuration = readPublishedRecommendationPlan(current.setDefinition)
   const currentMember = configuration.members.find(member => member.memberId === String(current.memberId))
   if (!currentMember) throw new Error('Pinned recommendation member is missing from its set publication')
-  const configuredNegative = current.outcome === 'not_recommended' && currentMember.failOnNotRecommended
+  const configuredNegative = isConfiguredNegativeRecommendation(current.outcome, currentMember.failOnNotRecommended)
   const positive = (current.recommendationState === 'succeeded' || current.recommendationState === 'approved')
     && !configuredNegative
   const siblings = await db.selectFrom('Common_Runtime_Item')
@@ -620,8 +621,8 @@ export const advanceRecommendationRuntimeAfterTerminalItem = async (
     .where('Common_Runtime_Item._deleted', '=', false)
     .execute()
   if (recommendationRows.some(row => !RUNTIME_TERMINAL_STATES.has(row.state))) return null
-  const hasConfiguredNegative = recommendationRows.some(row => row.outcome === 'not_recommended'
-    && configuration.members.find(member => member.memberId === String(row.memberId))?.failOnNotRecommended === true)
+  const hasConfiguredNegative = recommendationRows.some(row => isConfiguredNegativeRecommendation(row.outcome,
+    configuration.members.find(member => member.memberId === String(row.memberId))?.failOnNotRecommended === true))
   const states = recommendationRows.map(row => row.state)
   if (configuration.finalApproval && !hasConfiguredNegative
     && states.every(state => state === 'succeeded' || state === 'approved')) {
@@ -767,7 +768,7 @@ export const saveRecommendationById = async (
           runtimeId: String(recommendation.runtimeId),
           runtimeItemId: String(recommendation.runtimeItemId),
           from: 'active',
-          to: updated.egcs_cn_outcome === 'not_recommended' && member.failOnNotRecommended
+          to: isConfiguredNegativeRecommendation(updated.egcs_cn_outcome, member.failOnNotRecommended)
             ? 'unsuccessful'
             : 'succeeded',
           actorId: userId,

@@ -1,13 +1,14 @@
 /* eslint-disable jsdoc/require-jsdoc -- Localized presentation of workflow authoring, without evaluating routing. */
+import { isCoreEntityType, requiresTerminalApprovalSubmissionSuccess } from '~~/shared/constants/entity-registry'
+import { isWorkflowResultCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import { workflowResultPredicateLabel, workflowResultSourceLabel } from '~/utils/workflow-result-conditions'
+import type { WorkflowResultMember } from '~/utils/workflow-result-conditions'
 import type { FlowDiagramDefinition } from '@gcs-ssc/diagrams'
 import type { AgencyCustomFieldDefinition, AgreementProfileCondition, WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { WorkflowSimulation } from '~~/shared/types/schemas/workflow-simulation'
 
-export type WorkflowFlowMember = {
-  id: string
-  egcs_cn_sequence: number
+export type WorkflowFlowMember = WorkflowResultMember & {
   egcs_cn_kind: 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
-  referenceNameEn?: string | null
-  referenceNameFr?: string | null
   conditions?: WorkflowMemberCondition[]
   egcs_cn_materializationstatus?: string | null
   egcs_cn_successstatus?: string | null
@@ -37,11 +38,23 @@ type FlowContext = {
 export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: FlowContext): FlowDiagramDefinition => {
   const { locale, t, statusName } = context
   const members = [...setup.members].sort((left, right) => left.egcs_cn_sequence - right.egcs_cn_sequence)
+  const hasResultConditions = members.some(member => member.conditions?.some(isWorkflowResultCondition))
+  const approvalSubmission = setup.egcs_cn_purpose === 'approval_submission'
+  const requiresTerminalStatus = approvalSubmission && isCoreEntityType(setup.egcs_cn_entitytype)
+    && requiresTerminalApprovalSubmissionSuccess(setup.egcs_cn_entitytype)
+  const entryRequirement = !hasResultConditions
+    ? 'workflow.flow.nonempty'
+    : requiresTerminalStatus ? 'workflow.flow.terminal_success_required' : 'workflow.flow.empty_success'
   const conditionCount = members.reduce((count, member) => count + (member.conditions?.length ?? 0), 0)
   const entry = (member: WorkflowFlowMember | undefined) => member
     ? (member.conditions?.length ? `conditions-${member.id}` : member.id)
     : 'success'
-  const conditionLine = (condition: WorkflowMemberCondition): string => {
+  const conditionLine = (condition: WorkflowMemberCondition, sequence: number): string => {
+    if (isWorkflowResultCondition(condition)) {
+      const source = workflowResultSourceLabel(condition, sequence, members, locale, t)
+      const label = t('workflow.conditions.badge', { field: source.label, value: workflowResultPredicateLabel(condition, locale, t) })
+      return `${t('workflow.flow.after_result')} · ${label}${source.error ? ` (${source.error})` : ''}`
+    }
     const field = 'fieldId' in condition ? context.customFields.find(item => item.id === condition.fieldId) : undefined
     const name = 'fieldId' in condition
       ? field?.[`egcs_ay_name_${locale}`] || t('workflow.conditions.unavailable')
@@ -59,14 +72,17 @@ export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: F
         }).join(t('workflow.flow.or'))
     const quantifier = 'quantifier' in condition ? ` (${t(`workflow.conditions.${condition.quantifier}`)})` : ''
     const grouped = 'optionIds' in condition && condition.optionIds.length > 1 ? `(${value})` : value
-    return `${name}${quantifier}: ${grouped}`
+    return `${hasResultConditions ? `${t('workflow.flow.at_start')} · ` : ''}${name}${quantifier}: ${grouped}`
   }
   const nodes: FlowDiagramDefinition['nodes'] = [{
-    id: 'start', kind: 'start', title: t('workflow.flow.start'),
+    id: 'start', kind: 'start', title: t(hasResultConditions ? 'workflow.flow.start_with_results' : 'workflow.flow.start'),
     lines: [t('workflow.flow.allowed', { statuses: setup.egcs_cn_allowedstartstatuses.map(statusName).join(', ') }),
-      t('workflow.flow.nonempty'),
-      ...(setup.egcs_cn_purpose === 'approval_submission' ? [t('workflow.flow.approval_required')] : []),
-      ...(setup.egcs_cn_purpose === 'risk_rating' ? [t('workflow.flow.source_required')] : [])],
+      t(entryRequirement),
+      ...(!hasResultConditions && approvalSubmission ? [t('workflow.flow.approval_required')] : []),
+      ...(hasResultConditions && approvalSubmission && setup.egcs_cn_entitytype === 'fundingcasecorrection'
+        ? [t('workflow.simulator.finish_reason.correction_approval_required')]
+        : []),
+      ...(!hasResultConditions && setup.egcs_cn_purpose === 'risk_rating' ? [t('workflow.flow.source_required')] : [])],
     routes: members.length
       ? [{ targetId: entry(members[0]), kind: 'direct', label: t('workflow.flow.begin') }, {
           targetId: 'stopped', kind: 'default', label: t('workflow.flow.cancel'),
@@ -80,7 +96,7 @@ export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: F
     if (member.conditions?.length) nodes.push({
       id: `conditions-${member.id}`, kind: 'decision', title: t('workflow.flow.all_conditions'),
       eyebrow: t('workflow.flow.member_conditions', { sequence: member.egcs_cn_sequence }),
-      routes: [{ targetId: member.id, kind: 'conditional', label: t('workflow.flow.match'), detail: member.conditions.map(conditionLine).join(t('workflow.flow.and')) }, {
+      routes: [{ targetId: member.id, kind: 'conditional', label: t('workflow.flow.match'), detail: member.conditions.map(condition => conditionLine(condition, member.egcs_cn_sequence)).join(t('workflow.flow.and')) }, {
         targetId: next, kind: 'default', label: t('workflow.flow.skip'), detail: t('workflow.flow.skip_effect')
       }]
     })
@@ -103,7 +119,7 @@ export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: F
     id: 'success', kind: 'end', title: t('workflow.flow.complete'),
     lines: [t('workflow.flow.positive_outcome'), ...(setup.egcs_cn_purpose === 'risk_rating'
       ? [
-          t(setup.egcs_cn_entitytype === 'fundingcaseamendment' ? 'workflow.flow.amendment_risk_effect' : 'workflow.flow.agreement_risk_effect')
+          t(hasResultConditions ? 'workflow.flow.optional_risk_effect' : setup.egcs_cn_entitytype === 'fundingcaseamendment' ? 'workflow.flow.amendment_risk_effect' : 'workflow.flow.agreement_risk_effect')
         ]
       : [])]
   }, {
@@ -113,9 +129,23 @@ export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: F
       t(setup.egcs_cn_allowretry ? 'workflow.flow.retry_allowed' : 'workflow.flow.retry_disabled')]
   })
   return {
-    title: setup[`egcs_cn_name_${locale}`], description: t('workflow.flow.description'),
+    title: setup[`egcs_cn_name_${locale}`], description: t(hasResultConditions ? 'workflow.flow.result_description' : 'workflow.flow.description'),
     stats: [t(members.length === 1 ? 'workflow.flow.member_count_one' : 'workflow.flow.member_count', { count: members.length }),
       t(conditionCount === 1 ? 'workflow.flow.condition_count_one' : 'workflow.flow.condition_count', { count: conditionCount })],
     orderLabel: t('workflow.flow.order'), nodes
   }
+}
+
+export const workflowSimulationNodeIds = (members: readonly WorkflowFlowMember[], trace: WorkflowSimulation | null | undefined): string[] => {
+  if (!trace) return []
+  const conditionalIds = new Set(members.filter(member => member.conditions?.length).map(member => member.id))
+  const nodes = ['start']
+  for (const step of trace.steps) {
+    if (step.state === 'not_reached') continue
+    if (conditionalIds.has(step.memberId)) nodes.push(`conditions-${step.memberId}`)
+    if (step.state !== 'skipped') nodes.push(step.memberId)
+  }
+  if (trace.status === 'approved' || trace.status === 'succeeded') nodes.push('success')
+  else if (trace.status !== 'awaiting_input') nodes.push('stopped')
+  return nodes
 }

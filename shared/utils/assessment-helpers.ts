@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- typed helper registry declarations are self-describing */
-import type { Entity_Type } from '../types/database'
+import type { Entity_Type, JsonValue } from '../types/database'
 import { getCoreEntityDefinition, isCoreEntityType } from '../constants/entity-registry'
 
 export const ASSESSMENT_HELPER_DATA_TYPES = ['string', 'number', 'boolean', 'id', 'id_list', 'money'] as const
@@ -70,4 +70,23 @@ export const getAssessmentHelperComparableValueType = (
   }
 
   return 'string'
+}
+
+export const referencedAssessmentHelperFields = (definition: JsonValue): string[] => {
+  const fields = new Set<string>()
+  const visit = (value: JsonValue) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+    if (value === null || typeof value !== 'object') return
+    if ((value.type === 'helpers' || value.kind === 'helper') && typeof value.field === 'string') fields.add(value.field)
+    Object.values(value).forEach(visit)
+  }
+  visit(definition)
+  if (definition !== null && !Array.isArray(definition) && typeof definition === 'object'
+    && definition.helpers !== null && !Array.isArray(definition.helpers) && typeof definition.helpers === 'object') {
+    Object.keys(definition.helpers).forEach(field => fields.add(field))
+  }
+  return [...fields]
 }

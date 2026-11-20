@@ -6,7 +6,8 @@ defineProps<{
   definition: FlowDiagramDefinition
   selectedNodeId?: string
   filename?: string
-  direction?: 'auto' | 'vertical'
+  direction?: 'auto' | 'horizontal' | 'vertical'
+  highlightedNodeIds?: readonly string[]
   layout?: 'ordered' | 'branches'
   editable?: boolean
   branchNodeIds?: string[]
@@ -42,6 +43,6 @@ const labels = computed<FlowDiagramLabels>(() => ({
 <template>
   <DiagramRenderer
     :definition="definition" :selected-node-id="selectedNodeId" :filename="filename" :direction="direction"
-    :labels="labels" :layout="layout" :editable="editable" :branch-node-ids="branchNodeIds"
+    :labels="labels" :highlighted-node-ids="highlightedNodeIds" :layout="layout" :editable="editable" :branch-node-ids="branchNodeIds"
     @select-node="emit('select-node', $event)" @add-node="emit('add-node', $event)" @add-branch="emit('add-branch', $event)" />
 </template>

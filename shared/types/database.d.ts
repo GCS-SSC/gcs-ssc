@@ -2253,6 +2253,7 @@ export interface CommonWorkflowSetupMemberOwnerTable {
 
 export interface CommonWorkflowRunTable {
   egcs_cn_routing?: JsonValue | null
+  egcs_cn_resultconditions?: JsonValue | null
   id: string
   egcs_cn_completion?: string | null
 }

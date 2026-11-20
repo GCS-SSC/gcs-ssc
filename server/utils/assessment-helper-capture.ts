@@ -1,37 +1,18 @@
 /* eslint-disable jsdoc/require-jsdoc -- transaction-bound assessment helper snapshot */
 import { sql, type Transaction } from 'kysely'
 import type { Database, Entity_Type, JsonValue } from '~~/shared/types/database'
-import { getAssessmentHelperDefinition } from '~~/shared/utils/assessment-helpers'
+import { getAssessmentHelperDefinition, referencedAssessmentHelperFields } from '~~/shared/utils/assessment-helpers'
 import { averageAnnualAgreementValue } from '~~/shared/utils/assessment-helper-values'
 import { isAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import { sumMoney } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { resolveEntityAssignmentOwner } from './entity-assignment'
 
-const referencedHelperFields = (definition: JsonValue): string[] => {
-  const fields = new Set<string>()
-  const visit = (value: JsonValue) => {
-    if (Array.isArray(value)) {
-      value.forEach(visit)
-      return
-    }
-    if (value === null || typeof value !== 'object') return
-    if ((value.type === 'helpers' || value.kind === 'helper') && typeof value.field === 'string') fields.add(value.field)
-    Object.values(value).forEach(visit)
-  }
-  visit(definition)
-  if (definition !== null && !Array.isArray(definition) && typeof definition === 'object'
-    && definition.helpers !== null && !Array.isArray(definition.helpers) && typeof definition.helpers === 'object') {
-    Object.keys(definition.helpers).forEach(field => fields.add(field))
-  }
-  return [...fields]
-}
-
 export const captureAssessmentHelpers = async (
   db: Transaction<Database>,
   input: { entityType: Entity_Type, entityId: string, assessmentSchema: JsonValue }
 ): Promise<Record<string, JsonValue> | null> => {
-  const fields = referencedHelperFields(input.assessmentSchema)
+  const fields = referencedAssessmentHelperFields(input.assessmentSchema)
     .filter(field => {
       const definition = getAssessmentHelperDefinition(input.entityType, field)
       return definition && !definition.retired

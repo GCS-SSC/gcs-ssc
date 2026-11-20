@@ -2,7 +2,7 @@ import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 /* eslint-disable jsdoc/require-jsdoc -- Relational workflow predicate authoring and immutable metadata. */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import { WorkflowMemberConditionsSchema, type CustomFieldCondition, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import { isWorkflowResultCondition, WorkflowMemberConditionsSchema, type CustomFieldCondition, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { amendmentConditionOptionIds, readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readAgencyCustomFieldDefinitions } from './agency-custom-field-definitions'
 
@@ -26,10 +26,11 @@ export const replaceWorkflowConditions = async (
     .innerJoin('Common_Workflow_Setup as s', 's.id', 'm.egcs_cn_workflowsetup')
     .select(['s.egcs_cn_entitytype', 's.egcs_cn_agency']).where('m.id', '=', memberId).executeTakeFirstOrThrow()
   if (String(setup.egcs_cn_agency) !== agencyId) return false
-  if (conditions.length && (await resolveEntityTypeLifecycleDefinition(trx, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') return false
+  if (conditions.some(condition => !isWorkflowResultCondition(condition))
+    && (await resolveEntityTypeLifecycleDefinition(trx, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') return false
   if (conditions.some(condition => 'source' in condition && condition.source.startsWith('jv_')) && setup.egcs_cn_entitytype !== 'fundingcasejournalvoucher') return false
   const custom = conditions.filter((condition): condition is CustomFieldCondition => 'fieldId' in condition)
-  const profile = conditions.filter(condition => 'source' in condition)
+  const profile = conditions.filter(condition => !isWorkflowResultCondition(condition) && 'source' in condition)
   if (profile.length) {
     const choices = await readWorkflowProfileChoices(trx, agencyId, {
       amendmentTypeIds: amendmentConditionOptionIds(profile, 'amendment_type'),
@@ -47,7 +48,8 @@ export const replaceWorkflowConditions = async (
     return field?.egcs_ay_kind !== 'relational' || !field.egcs_ay_discriminator
       || condition.optionIds.some(id => !field.options.some(option => option.id === id && option.egcs_ay_active))
   })) return false
-  await trx.updateTable('Common_Workflow_Setup_Member').set({ egcs_cn_profileconditions: sql`${JSON.stringify(profile)}::jsonb` }).where('id', '=', memberId).execute()
+  const storedConditions = conditions.filter(condition => 'source' in condition)
+  await trx.updateTable('Common_Workflow_Setup_Member').set({ egcs_cn_profileconditions: sql`${JSON.stringify(storedConditions)}::jsonb` }).where('id', '=', memberId).execute()
   await trx.updateTable('Common_Workflow_Member_Condition').set({ _deleted: true }).where('egcs_cn_workflowsetupmember', '=', memberId).execute()
   const rows = custom.flatMap(condition => condition.optionIds.map(optionId => ({ egcs_cn_workflowsetupmember: memberId, egcs_cn_field: condition.fieldId, egcs_cn_option: optionId })))
   if (rows.length) await trx.insertInto('Common_Workflow_Member_Condition').values(rows).execute()

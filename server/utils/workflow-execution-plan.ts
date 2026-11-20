@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Execution selects saved decisions, never live Agreement values. */
+import { isWorkflowResultCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { PublishedWorkflowConfiguration, PublishedWorkflowMember } from './workflow-setup-versioning'
 import { WorkflowRouteValidationError, type WorkflowRoutingDecisions, type WorkflowRoutingEvidence } from './workflow-routing-contract'
 
@@ -24,6 +25,9 @@ export const selectWorkflowRoute = (
   const eligibleIds = new Set(decisions.filter(decision => decision.eligible).map(decision => decision.memberId))
   return { ...definition, members: definition.members.filter(member => eligibleIds.has(member.memberId)) }
 }
+
+export const usesWorkflowResultConditions = (definition: PublishedWorkflowConfiguration): boolean =>
+  definition.members.some(member => member.conditions?.some(isWorkflowResultCondition))
 
 export const assertWorkflowRouteRequirements = (route: PublishedWorkflowConfiguration): void => {
   if (!route.members.length) throw new WorkflowRouteValidationError('Workflow route is empty')

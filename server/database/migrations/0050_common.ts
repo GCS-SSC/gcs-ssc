@@ -1140,6 +1140,8 @@ CREATE TABLE "Common_Workflow_Run" (
   "id" bigint NOT NULL,
   "egcs_cn_completion" bigint,
   "egcs_cn_routing" jsonb,
+  "egcs_cn_resultconditions" jsonb,
+  CONSTRAINT "cn_chk_workflow_resultconditions" CHECK (jsonb_typeof(egcs_cn_resultconditions) = 'object'),
   CONSTRAINT "Common_Workflow_Run_pkey" PRIMARY KEY (id)
 );
 
@@ -1697,6 +1699,20 @@ AS $function$
     BEGIN
       IF NEW.egcs_cn_routing IS DISTINCT FROM OLD.egcs_cn_routing THEN
         RAISE EXCEPTION 'Workflow routing is immutable' USING ERRCODE = '23514';
+      END IF;
+      IF NEW.egcs_cn_resultconditions IS DISTINCT FROM OLD.egcs_cn_resultconditions AND (
+        NEW.egcs_cn_resultconditions IS NULL
+        OR NOT NEW.egcs_cn_resultconditions @> COALESCE(OLD.egcs_cn_resultconditions, '{}'::jsonb)
+        OR EXISTS (
+          SELECT 1 FROM jsonb_each(OLD.egcs_cn_resultconditions) AS evidence
+          WHERE NEW.egcs_cn_resultconditions -> evidence.key IS DISTINCT FROM evidence.value
+        )
+        OR NOT EXISTS (
+          SELECT 1 FROM "Common_Runtime" runtime WHERE runtime.id = NEW.id
+          AND runtime.egcs_cn_state = 'active' AND runtime._deleted = false
+        )
+      ) THEN
+        RAISE EXCEPTION 'Workflow result decisions can only be appended during an active attempt' USING ERRCODE = '23514';
       END IF;
       RETURN NEW;
     END $function$;

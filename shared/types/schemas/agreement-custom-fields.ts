@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from './common'
+import { CHECKLIST_RESULTS } from './checklist/checklist'
 
 const Label = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
   .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
@@ -242,20 +243,66 @@ export const AgreementProfileConditionSchema = z.union([
   z.object({ source: z.literal('further_distribution'), value: z.boolean({ error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('recipient_subtype'), quantifier: z.enum(['any', 'all'], { error: 'validation.required' }), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict()
 ])
-export const WorkflowMemberConditionsSchema = z.array(z.union([CustomFieldConditionSchema, AgreementProfileConditionSchema])).superRefine((conditions, ctx) => {
+const resultConditionReference = {
+  workflowMemberId: PositivePostgresBigintIdSchema,
+  nestedMemberId: PositivePostgresBigintIdSchema
+}
+export const WORKFLOW_SCORE_OPERATORS = ['eq', 'lt', 'lte', 'gt', 'gte'] as const
+export const WorkflowResultConditionSchema = z.discriminatedUnion('source', [
+  z.strictObject({
+    ...resultConditionReference,
+    source: z.literal('assessment_score'),
+    operator: z.enum(WORKFLOW_SCORE_OPERATORS, { error: 'validation.required' }),
+    value: z.number({ error: 'validation.required' })
+  }),
+  z.strictObject({
+    ...resultConditionReference,
+    source: z.literal('checklist_result'),
+    values: z.array(z.enum(CHECKLIST_RESULTS)).min(1, { error: 'validation.required' })
+  }),
+  z.strictObject({
+    ...resultConditionReference,
+    source: z.literal('recommendation_result'),
+    value: z.boolean({ error: 'validation.required' })
+  })
+])
+export type WorkflowResultCondition = z.infer<typeof WorkflowResultConditionSchema>
+
+const WorkflowStartConditionSchema = z.union([CustomFieldConditionSchema, AgreementProfileConditionSchema])
+const WorkflowMemberConditionSchema = z.unknown().transform((condition, ctx) => {
+  const source = typeof condition === 'object' && condition !== null && 'source' in condition ? condition.source : undefined
+  const isResult = source === 'assessment_score' || source === 'checklist_result' || source === 'recommendation_result'
+  const parsed = (isResult ? WorkflowResultConditionSchema : WorkflowStartConditionSchema).safeParse(condition)
+  if (parsed.success) return parsed.data
+  for (const issue of parsed.error.issues) ctx.addIssue({ ...issue })
+  return z.NEVER
+})
+
+export const WorkflowMemberConditionsSchema = z.array(WorkflowMemberConditionSchema).superRefine((conditions, ctx) => {
   const seen = new Set<string>()
   conditions.forEach((condition, index) => {
-    const key = 'fieldId' in condition ? condition.fieldId : condition.source
+    const key = workflowConditionKey(condition)
     if (seen.has(key)) ctx.addIssue({ code: 'custom', path: [index], message: 'validation.duplicate' })
     seen.add(key)
     if ('optionIds' in condition && new Set(condition.optionIds).size !== condition.optionIds.length) {
       ctx.addIssue({ code: 'custom', path: [index, 'optionIds'], message: 'validation.duplicate' })
+    }
+    if ('values' in condition && new Set(condition.values).size !== condition.values.length) {
+      ctx.addIssue({ code: 'custom', path: [index, 'values'], message: 'validation.duplicate' })
     }
   })
 })
 export type CustomFieldCondition = z.infer<typeof CustomFieldConditionSchema>
 export type AgreementProfileCondition = z.infer<typeof AgreementProfileConditionSchema>
 export type WorkflowMemberCondition = z.infer<typeof WorkflowMemberConditionsSchema>[number]
+export type WorkflowStartCondition = Exclude<WorkflowMemberCondition, WorkflowResultCondition>
+
+/**
+ * @param condition - Authored workflow predicate.
+ * @returns Whether the predicate references an earlier workflow result.
+ */
+export const isWorkflowResultCondition = (condition: WorkflowMemberCondition): condition is WorkflowResultCondition =>
+  'workflowMemberId' in condition
 export type AgreementRoutingValues = {
   amendment_type?: string[]
   amendment_subtype?: string[]
@@ -271,7 +318,12 @@ export type AgreementRoutingValues = {
  * @returns Stable field or profile source key.
  * @param condition - Saved workflow predicate.
  */
-export const workflowConditionKey = (condition: WorkflowMemberCondition): string => 'fieldId' in condition ? condition.fieldId : condition.source
+export const workflowConditionKey = (condition: WorkflowMemberCondition): string => {
+  if ('fieldId' in condition) return condition.fieldId
+  if (!isWorkflowResultCondition(condition)) return condition.source
+  const reference = `${condition.source}:${condition.workflowMemberId}:${condition.nestedMemberId}`
+  return condition.source === 'assessment_score' ? `${reference}:${condition.operator}` : reference
+}
 /**
  *
  * @returns Whether every predicate matches.
@@ -279,16 +331,18 @@ export const workflowConditionKey = (condition: WorkflowMemberCondition): string
  * @param values - Captured custom selections.
  * @param profile - Captured Agreement values.
  */
-export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], values: AgreementCustomFieldValues, profile?: AgreementRoutingValues): boolean =>
+export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], values: AgreementCustomFieldValues, profile?: Partial<AgreementRoutingValues>): boolean =>
   conditions.every(condition => {
+    if (isWorkflowResultCondition(condition)) return false
     if ('fieldId' in condition) return customFieldOptionIds(values[condition.fieldId]).some(optionId => condition.optionIds.includes(optionId))
     if (!profile) return false
     if (condition.source === 'amendment_type' || condition.source === 'amendment_subtype') return (profile[condition.source] ?? []).some(optionId => condition.optionIds.includes(optionId))
     if ('value' in condition) return profile[condition.source] === condition.value
     if (condition.source === 'recipient_subtype') {
       const matches = (id: string | null) => id !== null && condition.optionIds.includes(id)
-      return profile.recipient_subtype.length > 0 && (condition.quantifier === 'all' ? profile.recipient_subtype.every(matches) : profile.recipient_subtype.some(matches))
+      const recipients = profile.recipient_subtype ?? []
+      return recipients.length > 0 && (condition.quantifier === 'all' ? recipients.every(matches) : recipients.some(matches))
     }
     const selected = profile[condition.source]
-    return selected !== null && condition.optionIds.includes(selected)
+    return typeof selected === 'string' && condition.optionIds.includes(selected)
   })

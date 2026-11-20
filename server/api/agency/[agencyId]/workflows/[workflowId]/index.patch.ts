@@ -4,6 +4,7 @@ import { areAgencyWorkflowStatusesValid, authorizeAgencyWorkflowSetup } from '~~
 import { resolveEntityTypeLifecycleDefinition, supportsWorkflowConfiguration } from '~~/server/utils/entity-type-registry'
 import { readWorkflowConditions } from '~~/server/utils/workflow-conditions'
 import { CommonWorkflowSetupCreateSchema, CommonWorkflowSetupPatchSchema } from '~~/shared/types/schemas'
+import { isWorkflowResultCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { lockWorkflowSetupForMutation, readWorkflowSetupPublicationMetadata } from '~~/server/utils/workflow-setup-versioning'
 import { withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
@@ -66,7 +67,7 @@ export default defineEventHandler(async event => {
       const members = await trx.selectFrom('Common_Workflow_Setup_Member').select('id')
         .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false).execute()
       for (const member of members) {
-        if ((await readWorkflowConditions(trx, String(member.id))).length) {
+        if ((await readWorkflowConditions(trx, String(member.id))).some(condition => !isWorkflowResultCondition(condition))) {
           return await badRequest(event, 'WORKFLOW_CONDITIONS_INVALID', 'apiErrors.request.invalid_resource')
         }
       }

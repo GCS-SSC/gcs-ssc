@@ -4016,7 +4016,55 @@
       "stopped": "This task or workflow ended before this task completed. Check the current workflow’s result and available retry actions.",
       "reviews": "Reviews"
     },
+    "simulator": {
+      "title": "Workflow simulator",
+      "description": "Enter the scenario inputs and outcomes before running the saved workflow. Simulation creates no workflow attempts, routing slips, or approval tasks.",
+      "calculate_score": "Calculate {assessment} score from answers and helpers",
+      "comma_separated_ids": "Comma-separated IDs",
+      "invalid_helper_amount": "Enter a valid amount for the selected currency.",
+      "input_error": "The workflow inputs could not be loaded.",
+      "scenario_inputs": "Scenario inputs",
+      "unavailable": "Unavailable",
+      "run": "Run simulation",
+      "reset": "Reset simulation",
+      "outcome": "Step outcome",
+      "all_skipped": "Succeeded · all steps skipped",
+      "request_error": "The scenario could not be simulated. Retry to use the same inputs.",
+      "status": {
+        "succeeded": "Succeeded",
+        "approved": "Approved",
+        "denied": "Denied",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
+        "unsuccessful": "Unsuccessful",
+        "awaiting_input": "Waiting for simulated results",
+        "blocked": "Blocked at start"
+      },
+      "step": {
+        "run": "Ran",
+        "awaiting_input": "Awaiting simulated results",
+        "skipped": "Skipped",
+        "not_reached": "Not reached"
+      },
+      "reason": {
+        "condition_unmet": "A condition was not met.",
+        "source_unavailable": "A condition needs a result that was unavailable.",
+        "terminal": "An earlier step ended the workflow."
+      },
+      "finish_reason": {
+        "route_invalid": "These inputs do not admit a workflow route at start.",
+        "terminal_status_required": "This operation requires a terminal success status.",
+        "correction_approval_required": "Posting a correction requires an approval."
+      }
+    },
     "flow": {
+      "start_with_results": "Start and capture profile inputs",
+      "result_description": "Profile inputs are captured at start. Conditions that use an earlier step’s result are checked when their step is reached.",
+      "at_start": "Captured at start",
+      "after_result": "Checked when reached",
+      "optional_risk_effect": "Apply the risk score only if the designated assessment ran.",
+      "terminal_success_required": "A step must reach a terminal success status for this operation.",
+      "empty_success": "Skipping every step can complete the workflow.",
       "title": "Flow",
       "description": "Conditions select the route at start. Selected members run in order; retry captures current values using the original published version.",
       "order": "Execution order",
@@ -4057,6 +4105,24 @@
       "retry_disabled": "Retry is disabled."
     },
     "conditions": {
+      "not_evaluated": "Not evaluated",
+      "earlier_result": "Earlier workflow result",
+      "add_result": "Add result condition",
+      "result_source_label": "{step}: {name} ({result})",
+      "result_source_order": "Source must be an earlier step",
+      "result_source_unavailable": "The workflow result source is unavailable",
+      "results_help": "All configured conditions must match. A condition that uses a workflow result matches only if the earlier step produces that result.",
+      "assessment_score": "Assessment score",
+      "checklist_result": "Checklist result",
+      "recommendation_result": "Recommendation result",
+      "score_operator": "Score comparison",
+      "score_value": "Score threshold",
+      "checklist_value": "Final checklist result",
+      "recommendation_value": "Final recommendation result",
+      "start_routing_hash": "Hash of routing values and decisions captured at workflow start",
+      "expected_result": "Expected: {value}",
+      "actual_result": "Actual: {value}",
+      "source_skipped": "Source step was skipped",
       "field": "Condition field",
       "edit_member": "Conditions for workflow member {sequence}",
       "badge": "{field}: {value}",

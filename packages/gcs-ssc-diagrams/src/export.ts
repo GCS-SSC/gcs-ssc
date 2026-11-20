@@ -85,7 +85,12 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
   // Edges keep their original measured geometry.
   for (const element of root.querySelectorAll<HTMLElement>('.flow-page-node, .flow-terminal-node, .flow-route, .flow-stats span')) {
     const rect = position(element), style = getComputedStyle(element)
-    const common = { 'fill': paint(style.backgroundColor), 'stroke': paint(style.borderTopColor), 'stroke-width': parseFloat(style.borderTopWidth) || 0 }
+    const highlight = element.querySelector('.flow-highlight-outline')
+    const common = {
+      'fill': paint(style.backgroundColor),
+      'stroke': paint(highlight ? getComputedStyle(highlight).color : style.borderTopColor),
+      'stroke-width': parseFloat(style.borderTopWidth) || 0
+    }
     if (element.classList.contains('flow-page-node--decision')) {
       svg.append(svgElement('polygon', { points: `${rect.x + rect.width / 2},${rect.y} ${rect.x + rect.width},${rect.y + rect.height / 2} ${rect.x + rect.width / 2},${rect.y + rect.height} ${rect.x},${rect.y + rect.height / 2}`, ...common }))
     } else {

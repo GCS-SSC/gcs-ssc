@@ -3,9 +3,10 @@ import { isExpectedPublicationFailure } from './publication-errors'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { amendmentConditionOptionIds, readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
-import { hasWorkflowMemberApproval } from './workflow-execution-plan'
+import { hasWorkflowMemberApproval, usesWorkflowResultConditions } from './workflow-execution-plan'
 import { readAgencyCustomFieldDefinitions } from './agency-custom-field-definitions'
-import type { WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import { isWorkflowResultCondition, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import { readWorkflowResultSources, type WorkflowResultSource } from './workflow-result-sources'
 /* eslint-disable jsdoc/require-jsdoc -- typed workflow publication primitives */
 import type { Kysely, Selectable, Transaction } from 'kysely'
 import type { PublicationKind } from '~~/shared/constants/system-lifecycle'
@@ -254,8 +255,9 @@ export const buildWorkflowSetupPublication = async (
     const fields = conditions.some(condition => 'fieldId' in condition)
       ? await readAgencyCustomFieldDefinitions(db, String(setup.egcs_cn_agency))
       : []
-    if (conditions.length && (await resolveEntityTypeLifecycleDefinition(db, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') throw new Error('Workflow conditions require an Agreement owner')
-    const profileConditions = conditions.filter(condition => 'source' in condition)
+    if (conditions.some(condition => !isWorkflowResultCondition(condition))
+      && (await resolveEntityTypeLifecycleDefinition(db, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') throw new Error('Workflow conditions require an Agreement owner')
+    const profileConditions = conditions.filter(condition => !isWorkflowResultCondition(condition) && 'source' in condition)
     const choices = profileConditions.length
       ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_agency), {
           amendmentTypeIds: amendmentConditionOptionIds(profileConditions, 'amendment_type'),
@@ -263,6 +265,9 @@ export const buildWorkflowSetupPublication = async (
         })
       : null
     const resolvedConditions = conditions.map(condition => {
+      if (isWorkflowResultCondition(condition)) {
+        return { ...condition, name_en: '', name_fr: '', options: [] }
+      }
       if ('source' in condition) return resolveWorkflowProfileCondition(condition, choices!)
       const field = fields.find(candidate => candidate.id === condition.fieldId)
       if (!field?.egcs_ay_discriminator || field.egcs_ay_kind !== 'relational') throw new Error('Workflow discriminator must be active')
@@ -290,6 +295,22 @@ export const buildWorkflowSetupPublication = async (
       ...nestedDefinition
     })
   }
+  const resultSources = new Map<string, readonly WorkflowResultSource[]>()
+  for (const member of members) {
+    for (const condition of member.conditions ?? []) {
+      if (!isWorkflowResultCondition(condition)) continue
+      if (!resultSources.has(condition.workflowMemberId)) {
+        const producer = members.find(candidate => candidate.memberId === condition.workflowMemberId)
+        resultSources.set(condition.workflowMemberId, producer ? await readWorkflowResultSources(db, producer) : [])
+      }
+      const source = resultSources.get(condition.workflowMemberId)
+        ?.find(candidate => candidate.nestedMemberId === condition.nestedMemberId && candidate.source === condition.source)
+      if (source) {
+        condition.name_en = source.nameEn
+        condition.name_fr = source.nameFr
+      }
+    }
+  }
   const definition: PublishedWorkflowConfiguration = {
     nameEn: setup.egcs_cn_name_en, nameFr: setup.egcs_cn_name_fr,
     descriptionEn: setup.egcs_cn_description_en, descriptionFr: setup.egcs_cn_description_fr,
@@ -307,7 +328,7 @@ export const buildWorkflowSetupPublication = async (
   if (definition.purpose === 'risk_rating') {
     definition.riskRatingEffect = await buildRiskRatingEffect(db, setup, members, rows)
   }
-  if (definition.purpose === 'approval_submission') {
+  if (definition.purpose === 'approval_submission' && !usesWorkflowResultConditions(definition)) {
     if (!members.some(hasWorkflowMemberApproval)) throw new Error('Approval submission workflow requires an approval stage')
   }
   validatePublishedWorkflowStatusGraph(definition, await readLockedWorkflowStatusDefinitions(db, setup, definition))
