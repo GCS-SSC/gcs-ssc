@@ -18,10 +18,8 @@ CREATE TABLE "Funding_Case_Agreement_Clause" (
   egcs_fc_publicationversion bigint NOT NULL,
   egcs_fc_protected boolean NOT NULL DEFAULT false,
   egcs_fc_removedby bigint REFERENCES "Common_User"(id) ON DELETE RESTRICT,
-  egcs_fc_publicationkind varchar(64) NOT NULL DEFAULT 'agency_clause' CHECK (egcs_fc_publicationkind = 'agency_clause'),
-  _deleted boolean NOT NULL DEFAULT false,
-  FOREIGN KEY (egcs_fc_publicationversion, egcs_fc_clause, egcs_fc_publicationkind)
-    REFERENCES "Common_Publication_Version"(id, egcs_cn_publication, egcs_cn_kind) ON DELETE RESTRICT
+  egcs_fc_publicationkind varchar(64) NOT NULL DEFAULT 'agency_clause' CONSTRAINT fc_chk_agreement_clause_publicationkind CHECK (egcs_fc_publicationkind = 'agency_clause'),
+  _deleted boolean NOT NULL DEFAULT false
 );
 
 CREATE UNIQUE INDEX fc_uq_agreement_clause ON "Funding_Case_Agreement_Clause" (egcs_fc_fundingagreement, egcs_fc_clause) WHERE NOT _deleted;
@@ -37,8 +35,8 @@ CREATE TABLE "Funding_Case_Agreement_Clause_Review" (
   egcs_fc_strategy text,
   egcs_fc_protected boolean NOT NULL,
   _deleted boolean NOT NULL DEFAULT false,
-  UNIQUE (egcs_fc_review, egcs_fc_rule),
-  CHECK ((egcs_fc_result IS NOT NULL AND egcs_fc_outcome IS NULL AND egcs_fc_strategy IS NULL)
+  CONSTRAINT fc_uq_agreement_clause_review_rule UNIQUE (egcs_fc_review, egcs_fc_rule),
+  CONSTRAINT fc_chk_agreement_clause_review_result CHECK ((egcs_fc_result IS NOT NULL AND egcs_fc_outcome IS NULL AND egcs_fc_strategy IS NULL)
     OR (egcs_fc_result IS NULL AND egcs_fc_outcome IS NOT NULL AND egcs_fc_strategy IS NOT NULL))
 );
 CREATE INDEX fc_idx_agreement_clause_review_replay ON "Funding_Case_Agreement_Clause_Review" (egcs_fc_review, egcs_fc_clause);
@@ -3122,6 +3120,9 @@ export const installForeignKeys = async (db: Kysely<Database>): Promise<void> =>
   await sql`DO $baseline$ BEGIN
 ALTER TABLE "Funding_Case_Agreement_Clause" ADD CONSTRAINT fc_fk_agreement_clause_agreement
   FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Clause" ADD CONSTRAINT fc_fk_agreement_clause_publicationversion
+  FOREIGN KEY (egcs_fc_publicationversion, egcs_fc_clause, egcs_fc_publicationkind)
+  REFERENCES "Common_Publication_Version"(id, egcs_cn_publication, egcs_cn_kind) ON DELETE RESTRICT;
 ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_source FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_target FOREIGN KEY (egcs_fc_relatedagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Funding_Case_Agreement_Relationship" ADD CONSTRAINT fc_fk_agreement_relationship_type FOREIGN KEY (egcs_fc_relationshiptype) REFERENCES "Agency_Agreement_Relationship_Type"(id) ON DELETE RESTRICT;

@@ -1397,21 +1397,6 @@ CREATE TABLE "Common_Guided_Help" (
   _deleted boolean NOT NULL DEFAULT false,
   CONSTRAINT cn_chk_guidedhelpowner CHECK ((egcs_cn_ownertype = 'system' AND egcs_cn_agency IS NULL) OR (egcs_cn_ownertype = 'agency' AND egcs_cn_agency IS NOT NULL))
 );
-CREATE TABLE "Agency_Review_Clause_Rule" (
-  id bigserial PRIMARY KEY,
-  egcs_ay_organizationagency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
-  egcs_ay_reviewschema bigint NOT NULL REFERENCES "Common_Review_Schema"(id) ON DELETE RESTRICT,
-  egcs_ay_result "Checklist_Result",
-  egcs_ay_outcome text,
-  egcs_ay_strategy text,
-  egcs_ay_clause bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
-  egcs_ay_protected boolean NOT NULL DEFAULT false,
-  _deleted boolean NOT NULL DEFAULT false,
-  CHECK ((egcs_ay_result IS NOT NULL AND egcs_ay_outcome IS NULL AND egcs_ay_strategy IS NULL)
-    OR (egcs_ay_result IS NULL AND egcs_ay_outcome IS NOT NULL AND egcs_ay_strategy IS NOT NULL))
-);
-CREATE UNIQUE INDEX ay_uq_review_clause_rule ON "Agency_Review_Clause_Rule"
-  (egcs_ay_organizationagency, egcs_ay_reviewschema, egcs_ay_result, egcs_ay_outcome, egcs_ay_strategy, egcs_ay_clause) NULLS NOT DISTINCT WHERE NOT _deleted;
 END $baseline$`.execute(db)
 }
 

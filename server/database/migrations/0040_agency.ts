@@ -553,6 +553,22 @@ CREATE TABLE "Agency_Guided_Help" (
   _deleted boolean NOT NULL DEFAULT false
 );
 CREATE UNIQUE INDEX ay_uq_guidedhelpactive ON "Agency_Guided_Help" (egcs_ay_agency, egcs_ay_guide) WHERE NOT _deleted;
+
+CREATE TABLE "Agency_Review_Clause_Rule" (
+  id bigserial PRIMARY KEY,
+  egcs_ay_organizationagency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
+  egcs_ay_reviewschema bigint NOT NULL,
+  egcs_ay_result "Checklist_Result",
+  egcs_ay_outcome text,
+  egcs_ay_strategy text,
+  egcs_ay_clause bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
+  egcs_ay_protected boolean NOT NULL DEFAULT false,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_chk_review_clause_rule_result CHECK ((egcs_ay_result IS NOT NULL AND egcs_ay_outcome IS NULL AND egcs_ay_strategy IS NULL)
+    OR (egcs_ay_result IS NULL AND egcs_ay_outcome IS NOT NULL AND egcs_ay_strategy IS NOT NULL))
+);
+CREATE UNIQUE INDEX ay_uq_review_clause_rule ON "Agency_Review_Clause_Rule"
+  (egcs_ay_organizationagency, egcs_ay_reviewschema, egcs_ay_result, egcs_ay_outcome, egcs_ay_strategy, egcs_ay_clause) NULLS NOT DISTINCT WHERE NOT _deleted;
 END $baseline$`.execute(db)
 }
 
@@ -876,6 +892,8 @@ END $baseline$`.execute(db)
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 ALTER TABLE "Agency_Clause" ADD CONSTRAINT ay_fk_clauseagency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Review_Clause_Rule" ADD CONSTRAINT ay_fk_review_clause_rule_schema
+  FOREIGN KEY (egcs_ay_reviewschema) REFERENCES "Common_Review_Schema"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Agreement_Relationship_Type" ADD CONSTRAINT ay_fk_agreement_relationship_type_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Proponent_Relationship_Type" ADD CONSTRAINT ay_fk_proponent_reltype_agency FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;

@@ -420,7 +420,7 @@ CREATE UNIQUE INDEX tp_idx_streamoutcometransferpaymentstreamtransferpaymentoutc
 
 CREATE TABLE "Transfer_Payment_Stream_Clause" (
   "id" bigserial PRIMARY KEY,
-  "egcs_tp_transferpaymentstream" bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+  "egcs_tp_transferpaymentstream" bigint NOT NULL CONSTRAINT tp_fk_streamclause_stream REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
   "egcs_tp_clause" bigint NOT NULL REFERENCES "Agency_Clause"(id) ON DELETE RESTRICT,
   "_deleted" boolean DEFAULT false NOT NULL
 );
