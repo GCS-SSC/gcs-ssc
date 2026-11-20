@@ -20,7 +20,7 @@ const localePath = useLocalePath()
 const { canAny } = useCan()
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
-const { search, pagination, items, totalRecords, refresh, retry, status } = useResourceTable<Row>({ fetchUrl: '/api/funding-opportunities' })
+const { search, pagination, items, totalRecords, retry, status } = useResourceTable<Row>({ fetchUrl: '/api/funding-opportunities' })
 const isHeroCollapsed = getHeroCollapsed('funding-opportunities')
 const canCreate = computed(() => canAny('transfer_payment', 'create'))
 const actionContext = useActionContext({ identity: [], authority: canCreate })
@@ -57,9 +57,7 @@ const openCreate = () => {
   form.value = emptyForm()
   modalOpen.value = true
 }
-/**
- *
- */
+/** Opens the committed Opportunity from the create response. */
 const submit = async () => {
   const operation = actionContext.capture()
   if (!operation?.canDispatch()) return
@@ -67,24 +65,24 @@ const submit = async () => {
   const draft = form.value
   if (session === null || !canCreate.value || !mutation.begin(session)) return
   const ownsOpening = () => operation.isCurrent() && modalSession.isCurrentSession(session) && form.value === draft && canCreate.value
-  const ownsCompletion = () => operation.isCurrent() && !modalSession.isDisposed() && modalSession.captureSession() === null && form.value === draft && canCreate.value
-  let completed = false
+  const ownsCompletion = () => operation.isCurrent() && modalSession.isLatestSession(session) && form.value === draft && canCreate.value
+  let settlement: 'unacknowledged' | 'acknowledged' | 'navigating' = 'unacknowledged'
   try {
     const response = await fetch(getClientRequestUrl('/api/funding-opportunities'), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(draft)
     })
     if (!response.ok) await throwFetchResponseError(response)
     const created = await response.json() as { id: string }
+    settlement = 'acknowledged'
     if (!ownsOpening()) return
     modalOpen.value = false
-    completed = true
-    await refresh()
-    if (!ownsCompletion()) return
+    settlement = 'navigating'
     await navigateTo(localePath(appRouteLocations.fundingOpportunityDetail(String(created.id))))
   } catch (error: unknown) {
-    if (completed ? ownsCompletion() : ownsOpening()) showError(error)
+    if (settlement === 'navigating' ? ownsCompletion() : ownsOpening()) showError(error)
   } finally {
     mutation.end(session)
+    if (settlement !== 'unacknowledged' && operation.isCurrent()) void retry()
   }
 }
 </script>
