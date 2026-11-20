@@ -9,12 +9,56 @@ import { initializeCatalogCacheRevisions } from '../catalog-cache-revisions'
 import { seedNotificationDemo } from '../notification-demo-seed'
 import { upgradeNciaGaRiskAssessment } from '../ncia-ga-risk-assessment'
 import { seedReviewCopyDemo } from '../review-copy-demo-seed'
+import { seedHealthCanadaCatalogs } from '../health-canada-catalog-seed'
+import { seedHealthCanadaClauses } from '../health-canada-clause-seed'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: string | number }> }
 
 interface ForeignKey {
   table_name: string
   constraint_name: string
+}
+
+/**
+ * Adds a reusable Health Canada testing cohort to the curated demo identities.
+ * @param snapshot The curated demo rows.
+ * @returns The snapshot with the additional demo users and role assignments.
+ */
+const addHealthCanadaTestUsers = (snapshot: DemoSnapshot): DemoSnapshot => {
+  const officer = snapshot.user.find(user => 'email' in user && user.email === 'hc.officer5@example.com')
+  const commonUsers = snapshot.Common_User ?? []
+  const assignments = snapshot.user_role_assignment ?? []
+  const officerIdentity = commonUsers.find(user => user.egcs_cn_authuserid === officer?.id && user._deleted === false)
+  const healthCanadaRoles = new Set((snapshot.role ?? [])
+    .filter(role => role.agency_id === '30021' && role._deleted === false).map(role => role.id))
+  const officerRoles = assignments.filter(assignment => assignment.user_id === officer?.id && assignment._deleted === false
+    && healthCanadaRoles.has(assignment.role_id))
+  if (!officer || !officerIdentity || !officerRoles.length) throw new Error('Health Canada demo officer roles are missing')
+
+  const nextId = (rows: Array<Record<string, unknown>>) => {
+    let id = rows.reduce((max, row) => {
+      const candidate = BigInt(String(row.id))
+      return candidate > max ? candidate : max
+    }, BigInt(0))
+    return () => String(++id)
+  }
+  const nextUserId = nextId(snapshot.user)
+  const nextCommonUserId = nextId(commonUsers)
+  const nextAssignmentId = nextId(assignments)
+  const users = Array.from({ length: 30 }, (_, index) => {
+    const suffix = String(index + 1).padStart(2, '0')
+    return { ...officer, id: nextUserId(), name: `Health Canada Test ${suffix}`, email: `hc.test${suffix}@example.test` }
+  })
+  return {
+    ...snapshot,
+    user: [...snapshot.user, ...users],
+    Common_User: [...commonUsers, ...users.map(user => ({
+      ...officerIdentity, id: nextCommonUserId(), egcs_cn_authuserid: user.id, egcs_cn_name: user.name, egcs_cn_email: user.email
+    }))],
+    user_role_assignment: [...assignments, ...users.flatMap(user => officerRoles.map(role => ({
+      ...role, id: nextAssignmentId(), user_id: user.id
+    })))]
+  }
 }
 
 // The curated snapshot includes captured casework and authored approval evidence.
@@ -90,8 +134,11 @@ export const up: Migration['up'] = async db => {
   // One coherent snapshot includes NCIA, Maple and Health Canada, including publications.
   const { default: snapshot } = await import('../seeds/demo.json' as string) as { default: DemoSnapshot }
   const seed = async (transaction: Transaction<unknown>) => {
-    await restoreDemoSnapshot(transaction, snapshot)
-    await seedReviewCopyDemo(transaction as unknown as Transaction<Database>)
+    await restoreDemoSnapshot(transaction, addHealthCanadaTestUsers(snapshot))
+    const demo = transaction as unknown as Transaction<Database>
+    await seedReviewCopyDemo(demo)
+    await seedHealthCanadaCatalogs(demo)
+    await seedHealthCanadaClauses(demo)
   }
   if (db.isTransaction) await seed(db as Transaction<unknown>)
   else await db.transaction().execute(seed)
