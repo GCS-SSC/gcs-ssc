@@ -54,11 +54,17 @@ const examples = [
 ]
 
 /**
- * Adds enabled Agreement field help for the NCIA and Health Canada demo Agencies.
- * @param db - Owning final-seed transaction.
+ * Adds enabled Agreement field help for the demo Agencies present in the database.
+ * @param db - Owning demo-seed transaction.
  */
 export const seedFieldTooltipExamples = async (db: Transaction<Database>): Promise<void> => {
+  const agencies = await db.selectFrom('Agency_Profile').select('id')
+    .where('id', 'in', [...new Set(examples.map(example => example.agencyId))])
+    .where('_deleted', '=', false)
+    .execute()
+  const agencyIds = new Set(agencies.map(agency => agency.id))
   for (const example of examples) {
+    if (!agencyIds.has(example.agencyId)) continue
     const target = uiTargetRegistry.targets.find(item => item.key === example.key && item.tooltip)
     if (!target || target.owner.kind !== 'host') throw new Error(`Seeded tooltip target is unavailable: ${example.key}`)
     await db.insertInto('Agency_Field_Tooltip').values({
