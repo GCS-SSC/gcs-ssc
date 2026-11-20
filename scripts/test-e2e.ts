@@ -5,7 +5,7 @@ import { realpathSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Client } from 'pg'
 import { NUXT_ARTIFACT_LOCK_ENV, runWithNuxtArtifactLock } from './nuxt-artifact-lock'
@@ -109,6 +109,11 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/agreement-proponent-update-review.spec.ts',
   'tests/e2e/agreement-relationships.spec.ts',
   'tests/e2e/agreement-clauses.spec.ts',
+  'tests/e2e/review-agreement-clauses.spec.ts',
+  'tests/e2e/review-clause-adversarial-finality.spec.ts',
+  'tests/e2e/review-clause-adversarial-permissions.spec.ts',
+  'tests/e2e/review-clause-adversarial-submission.spec.ts',
+  'tests/e2e/review-clause-assessment.spec.ts',
   'tests/e2e/related-proponents.spec.ts',
   'tests/e2e/agreement-update-review.spec.ts',
   'tests/e2e/agreements.spec.ts',
@@ -190,36 +195,13 @@ export const freshResetE2eSpecPaths = [
 
 export const reviewScratchE2eFilePattern = String.raw`.*\.tmp\.spec\.ts$`
 
-const postgresE2eBasenames = [...postgresE2eSpecPaths, extensionProfileE2eSpecPath].map(path => path.split('/').at(-1))
-const escapedPostgresE2eBasenames = postgresE2eBasenames
-  .map(name => name?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedAmendmentRefreshE2eBasenames = amendmentRefreshE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedAgreementCloseoutE2eBasenames = agreementCloseoutE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedWorkflowRecommendationE2eBasenames = workflowRecommendationE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedWorkflowSetupRetiredE2eBasenames = workflowSetupRetiredE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedAgreementAmendmentsE2eBasenames = agreementAmendmentsE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedAttachmentsE2eBasenames = attachmentsE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedAgencyStatusesE2eBasenames = agencyStatusesE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
-const escapedFreshResetE2eBasenames = freshResetE2eSpecPaths
-  .map(path => path.split('/').at(-1)?.replaceAll('.', String.raw`\.`))
-  .join('|')
+const reservedE2eBasenames = [
+  notificationEditorE2eSpecPath, extensionProfileE2eSpecPath, ...postgresE2eSpecPaths, ...amendmentRefreshE2eSpecPaths,
+  ...agreementCloseoutE2eSpecPaths, ...workflowRecommendationE2eSpecPaths, ...workflowSetupRetiredE2eSpecPaths,
+  ...agreementAmendmentsE2eSpecPaths, ...attachmentsE2eSpecPaths, ...agencyStatusesE2eSpecPaths, ...freshResetE2eSpecPaths
+].map(path => basename(path).replaceAll('.', String.raw`\.`)).join('|')
 
-export const pgliteE2eFilePattern = String.raw`^(?!.*notification-provider-editor-host\.spec\.ts$)(?!.*\.tmp\.spec\.ts$)(?!.*(?:${escapedPostgresE2eBasenames})$)(?!.*(?:${escapedAmendmentRefreshE2eBasenames})$)(?!.*(?:${escapedAgreementCloseoutE2eBasenames})$)(?!.*(?:${escapedWorkflowRecommendationE2eBasenames})$)(?!.*(?:${escapedWorkflowSetupRetiredE2eBasenames})$)(?!.*(?:${escapedAgreementAmendmentsE2eBasenames})$)(?!.*(?:${escapedAttachmentsE2eBasenames})$)(?!.*(?:${escapedAgencyStatusesE2eBasenames})$)(?!.*(?:${escapedFreshResetE2eBasenames})$).*\.spec\.ts$`
+export const pgliteE2eFilePattern = String.raw`^(?!(?:.*[/\\])?(?:${reservedE2eBasenames})$)(?!.*\.tmp\.spec\.ts$).*\.spec\.ts$`
 
 export type E2eSuite = 'pglite' | 'postgres' | 'review-scratch' | 'amendment-refresh' | 'agreement-closeout' | 'workflow-recommendation' | 'workflow-setup-retired' | 'agreement-amendments' | 'attachments' | 'agency-statuses' | 'fresh-reset'
 
