@@ -46,14 +46,14 @@ RUN set -eux; \
     rm -rf "$destination/.git"; \
   }; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 4b42db8a98608a9f0ad00639197650b6362bb66b; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 74c8bfd60c0ef91517a8cc5d7694aa4d9d1e11dd; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 8cc5b5aa73a6fef6d8130db7a51330819d13b11d; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number e38b1441bc58fae25121d2fe0d0b4e114e843e50; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments ddbd9f1eb8b353336d7d7d0499541178e1db5396; \
   fetch_workspace https://github.com/GCS-SSC/gcs-feedback.git extensions/gcs-feedback 95b1735dea81cca50e0f4805575c925b4b1cefc9; \
   fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration daf35cb61ff2cd19a7630ea3802da8a0f5a4e320; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation e69302dda77193c0cf44bcd5573d98ca455ff69e; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 3763ddeb60701b44df0e59c8141b8804bac787b2; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 393f304413603635f74e2c5695f1222f1f2aafe2; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 1abc9e0cd6669ec0fc04ae066b027e34db1781d9; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 28bb0ebe324baed204086249cc31e5b2e18a4052; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector f13f27fb43bb0ec73e8325167cbd635d442c16f6; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 7f46dc38d004462d2e8282932054550935a810ef; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 4a428601472a912f0760fd5bf9a2f4bd6495f845; \
