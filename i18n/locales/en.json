@@ -1027,8 +1027,97 @@
     "description": "Manage system roles and their granular permissions.",
     "permissions": "Permissions",
     "manage_assignments": "Manage assignment",
-    "permission_level_help": "Choose the cumulative business-data access ceiling for this subject.",
+    "permission_level_help": "Choose what a person with this role can do in this area.",
     "debt_management_permission_help": "Managers can choose to pay despite accounts receivable when creating a payment.",
+    "permission_help": {
+      "title": "Permission help",
+      "open": "Permission help for {subject}",
+      "none": "This role gives you no access in this area. You may still have access through another role or be able to manage assignments through the separate switch.",
+      "assignments": "Add or remove staff from a record and choose who is primarily responsible for it. Staff must have active accounts and Contributor access for that work. The record must be open to assignment changes. Use Viewer or a higher level if the person managing assignments also needs to see the record.",
+      "record_prerequisites": "To change or delete an existing record, you generally need to be assigned to that record. You may need to be assigned to a related record to start new work. Approval tasks have their own assignments.",
+      "agreement_prerequisites": "You need an assignment to the record you are changing. For example, being assigned to an agreement does not let you change a claim assigned separately. You also need initial Agreement approval before you can create a claim or payment. Approval tasks have their own assignments.",
+      "extensions": "Your organization may have enabled additional features that use these same permissions.",
+      "scope": {
+        "global": "This role covers all agencies and programs. Record assignments and approval requirements still apply.",
+        "agency": "This role covers work within its agency, including its transfer payment programs. Some tasks, such as creating an agency or a user account, require a system-wide role.",
+        "program": "This role covers only the selected transfer payment programs and their records. Work that covers the whole agency needs a separate role."
+      },
+      "subjects": {
+        "audit": {
+          "viewer": "See who opened or changed a record and when, within the area covered by this role.",
+          "contributor": "Provides the same log access as Viewer. Use this to review activity without changing the logs.",
+          "manager": "See the details submitted with some logged actions. Protected information stays hidden."
+        },
+        "help": {
+          "viewer": "Review the guides and field instructions staff see as they work.",
+          "contributor": "Write or update guides and field instructions. For example, publish instructions for reviewing a claim or explain what staff should enter in a field.",
+          "manager": "Retire guides that staff no longer use and remove unpublished drafts or field instructions where allowed. Access to an agreement or claim still comes from its own permission."
+        },
+        "system": {
+          "viewer": "Check which features are available across the system and whether background tasks are running or waiting.",
+          "contributor": "Maintain shared settings, such as federal chart of accounts entries and which optional features the system uses.",
+          "manager": "Administer features that require this level, such as Feedback when it is enabled. Use the program or agreement permissions for grants and contributions files."
+        },
+        "agency": {
+          "viewer": "See an agency’s profile and the shared lists and templates its program teams use, such as cost categories, agreement templates, and review forms.",
+          "contributor": "Maintain shared lists and templates, change agency settings, and publish items such as review sets. Creating an agency requires a system-wide role.",
+          "manager": "Remove agency records or shared list entries where allowed. You can change protected settings, such as whether a record status locks a file against editing."
+        },
+        "transfer_payment": {
+          "viewer": "See how a transfer payment program is set up, including its streams, budgets, objectives, and funding opportunities.",
+          "contributor": "Update program details and set up streams and funding opportunities. For example, add a stream budget or update the results a stream tracks. To create a program, you need this permission for the agency.",
+          "manager": "Remove programs, streams, or funding opportunities where allowed. Opening an agreement file or working on an intake also requires the corresponding permission."
+        },
+        "role": {
+          "viewer": "See which permissions a role includes and which agency or programs it covers.",
+          "contributor": "Create a role or edit what it allows. For example, set up a role for staff who need to read agreements. Assign the role to a person through Users.",
+          "manager": "Remove roles where allowed. People who have the role lose the permissions it gave them."
+        },
+        "user": {
+          "viewer": "See staff profiles and which roles staff have where your role applies.",
+          "contributor": "Update staff profiles or give and remove roles where you have permission to do so. Creating or activating an account requires a system-wide role.",
+          "manager": "Remove a user when you have permission for every area the user’s access covers."
+        },
+        "group": {
+          "viewer": "See who belongs to agency groups, such as teams that share review or approval work.",
+          "contributor": "Create groups and add or remove members. Each review or approval process determines what group members can do.",
+          "manager": "Remove groups where allowed. A group still used by a workflow may need to stay in place."
+        },
+        "agreement": {
+          "viewer": "Read agreement terms and see related records such as claims, payments, forecasts, and monitoring reports.",
+          "contributor": "Create agreements. On files assigned to you, you can enter claim amounts, prepare payments, update forecasts, record monitoring findings, or submit work for approval when the file is ready.",
+          "manager": "Remove assigned agreements or related records where the file status allows it. For example, you can delete an eligible draft claim that is assigned to you."
+        },
+        "applicant_recipient": {
+          "viewer": "Look up proponents and see their profiles. Access to agency-specific information, such as notes about a proponent, also depends on the agency that owns it.",
+          "contributor": "Register a new proponent or update contact information and other details on profiles assigned to you.",
+          "manager": "Remove assigned proponent profiles or related entries where allowed."
+        },
+        "funding_case": {
+          "viewer": "Read intake files and see their assessment information for funding opportunities covered by this role.",
+          "contributor": "Open intake files and work on assigned files, such as completing an intake review once it is assigned to you. To pick up unassigned group work, you must belong to the group and have Contributor access for that program.",
+          "manager": "Remove assigned intake files where their status allows it."
+        },
+        "journal_voucher": {
+          "viewer": "See journal vouchers, including their amounts, account coding, and posting details.",
+          "contributor": "Prepare accounting entries, update the coding on assigned vouchers, or start a reversal when the original entry can be reversed.",
+          "manager": "Remove assigned drafts where allowed. To undo a posted entry, use a reversal."
+        },
+        "correction": {
+          "viewer": "See corrections to recorded payments and the details of the amounts that changed.",
+          "contributor": "Start a correction to a recorded payment and prepare or update the correction when the file is assigned to you.",
+          "manager": "Remove assigned draft corrections where allowed. Posted corrections remain part of the payment history."
+        },
+        "account_receivable": {
+          "viewer": "See amounts a proponent owes, credit memos, and information about amounts already recovered.",
+          "contributor": "Prepare receivables or adjustments and work on assigned files. You can prepare a manual credit memo if you have this permission for the agency that owns it.",
+          "manager": "Remove assigned drafts where allowed. Use the applicable adjustment or recovery process for posted amounts."
+        },
+        "debt_management": {
+          "manager": "When preparing a payment, you can choose to pay even if the proponent has an outstanding debt. You still need permission to create payments and an assignment to the agreement. You must record why you are paying despite the debt. The agreement must already have its initial approval."
+        }
+      }
+    },
     "permission_level": "Access level",
     "access_levels": {
       "none": "No access",

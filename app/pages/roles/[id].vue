@@ -164,15 +164,11 @@ const updateContext = useActionContext({
   eligible: () => role.value !== null
 })
 
-const allowedSubjects = computed(() => {
-  if (!role.value) return []
+const roleScopeType = computed(() => getRoleScopeType(role.value?.agency_id, role.value?.transfer_payment_ids?.length ?? 0))
 
-  const roleScopeType = getRoleScopeType(
-    role.value.agency_id ? String(role.value.agency_id) : null,
-    role.value.transfer_payment_ids?.length ?? 0
-  )
-  return ROLE_ABILITY_SUBJECTS.filter(subject => isAbilityAllowedForRoleScope(subject, roleScopeType))
-})
+const allowedSubjects = computed(() => role.value
+  ? ROLE_ABILITY_SUBJECTS.filter(subject => isAbilityAllowedForRoleScope(subject, roleScopeType.value))
+  : [])
 
 const tabMap: TabMap = new Map([
   [
@@ -191,11 +187,11 @@ const tabMap: TabMap = new Map([
       icon: 'i-lucide-shield-check',
       component: RolePermissionsTab,
       getProps: () => ({
+        scope: roleScopeType.value,
         allowedSubjects: allowedSubjects.value,
         rolePermissions: role.value?.permissions ?? [],
         canUpdateRole: canUpdateRole.value,
-        pending: isSavingRole.value,
-        getBilingualValue
+        pending: isSavingRole.value
       })
     }
   ]

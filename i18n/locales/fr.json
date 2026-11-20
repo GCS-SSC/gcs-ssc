@@ -1027,8 +1027,97 @@
     "description": "Gérez les rôles du système et leurs autorisations granulaires.",
     "permissions": "Autorisations",
     "manage_assignments": "Gérer l’affectation",
-    "permission_level_help": "Choisissez le plafond cumulatif d’accès aux données administratives pour ce sujet.",
+    "permission_level_help": "Choisissez ce qu’une personne qui détient ce rôle peut faire dans ce domaine.",
     "debt_management_permission_help": "Un gestionnaire peut choisir de payer malgré les comptes débiteurs lors de la création d’un paiement.",
+    "permission_help": {
+      "title": "Aide sur les permissions",
+      "open": "Aide sur les permissions pour {subject}",
+      "none": "Ce rôle ne vous donne aucun accès dans ce domaine. Un autre rôle peut vous donner accès. Le réglage distinct de gestion des affectations peut aussi vous permettre de les gérer.",
+      "assignments": "Ajoutez ou retirez des personnes d’un dossier et désignez la personne responsable principale. Les personnes affectées doivent avoir un compte actif et le niveau Contributeur pour ce travail. Le dossier doit permettre les changements d’affectation. Prévoyez le niveau Lecteur ou supérieur si la personne qui gère les affectations doit aussi consulter le dossier.",
+      "record_prerequisites": "Pour modifier ou supprimer un dossier existant, vous devez généralement y être affecté. Pour ouvrir un dossier, vous pourriez devoir être affecté à un dossier connexe. Les tâches d’approbation ont leurs propres affectations.",
+      "agreement_prerequisites": "Vous devez être affecté au dossier que vous modifiez. Par exemple, une affectation à une entente ne vous permet pas de modifier une demande de remboursement qui fait l’objet d’une affectation distincte. L’approbation initiale de l’entente est requise avant de créer une demande de remboursement ou un paiement. Les tâches d’approbation ont leurs propres affectations.",
+      "extensions": "Votre organisme peut avoir activé d’autres fonctions qui utilisent ces mêmes permissions.",
+      "scope": {
+        "global": "Ce rôle couvre tous les organismes et leurs programmes. Les exigences liées aux affectations et aux approbations continuent de s’appliquer.",
+        "agency": "Ce rôle couvre le travail dans son organisme, y compris ses programmes de paiements de transfert. Certaines tâches, comme créer un organisme ou un compte d’utilisateur, exigent un rôle à l’échelle du système.",
+        "program": "Ce rôle couvre uniquement les programmes de paiements de transfert sélectionnés et leurs dossiers. Un rôle distinct est nécessaire pour les tâches qui concernent l’ensemble de l’organisme."
+      },
+      "subjects": {
+        "audit": {
+          "viewer": "Vérifiez qui a consulté ou modifié un dossier et à quel moment, dans le domaine couvert par le rôle.",
+          "contributor": "Donne le même accès aux journaux que le niveau Lecteur. Vous pouvez examiner l’activité consignée.",
+          "manager": "Consultez les renseignements fournis lors de certaines actions consignées. Les renseignements protégés restent masqués."
+        },
+        "help": {
+          "viewer": "Consultez les guides et les consignes que le personnel voit pendant son travail.",
+          "contributor": "Rédigez ou mettez aussi à jour les guides et les consignes. Vous pouvez, par exemple, publier la marche à suivre pour examiner une demande de remboursement ou expliquer comment remplir un champ.",
+          "manager": "Retirez les guides qui ne servent plus et supprimez les ébauches non publiées ou les consignes lorsque c’est permis. L’accès à une entente ou à une demande de remboursement dépend de la permission correspondante."
+        },
+        "system": {
+          "viewer": "Vérifiez quelles fonctions sont offertes dans le système et quelles tâches automatisées sont en cours ou en attente.",
+          "contributor": "Tenez à jour les paramètres communs, comme les entrées du plan comptable pangouvernemental et les fonctions facultatives utilisées.",
+          "manager": "Administrez les fonctions qui exigent ce niveau, comme la Rétroaction si elle est activée. Les dossiers de subventions et de contributions relèvent des permissions liées aux programmes ou aux ententes."
+        },
+        "agency": {
+          "viewer": "Consultez le profil d’un organisme ainsi que les listes et modèles communs utilisés par ses équipes, comme les catégories de coûts, les modèles d’entente et les formulaires d’examen.",
+          "contributor": "Tenez à jour les listes, les modèles et les paramètres de l’organisme. Vous pouvez publier, par exemple, des ensembles d’examens. La création d’un organisme exige un rôle à l’échelle du système.",
+          "manager": "Supprimez des dossiers de l’organisme ou des entrées de listes communes lorsque c’est permis. Vous pouvez modifier des réglages protégés, par exemple un statut qui empêche la modification d’un dossier."
+        },
+        "transfer_payment": {
+          "viewer": "Consultez la configuration d’un programme de paiements de transfert, dont ses volets, ses budgets, ses objectifs et ses possibilités de financement.",
+          "contributor": "Mettez à jour les renseignements du programme et configurez les volets et les possibilités de financement. Vous pouvez, par exemple, ajouter un budget de volet ou modifier les résultats suivis. La création d’un programme exige cette permission pour l’organisme.",
+          "manager": "Supprimez des programmes, des volets ou des possibilités de financement lorsque c’est permis. La consultation d’une entente ou le traitement d’un dossier de demande exige la permission correspondante."
+        },
+        "role": {
+          "viewer": "Consultez les permissions d’un rôle et voyez quels organismes ou programmes il couvre.",
+          "contributor": "Créez un rôle ou modifiez ses permissions. Vous pouvez, par exemple, créer un rôle pour le personnel qui doit consulter les ententes. Attribuez-le à une personne dans Utilisateurs.",
+          "manager": "Supprimez des rôles lorsque c’est permis. Les personnes qui détenaient le rôle perdent les permissions qu’il leur accordait."
+        },
+        "user": {
+          "viewer": "Consultez les profils du personnel et les rôles attribués dans les domaines couverts par votre rôle.",
+          "contributor": "Mettez à jour les profils du personnel, ou attribuez et retirez des rôles lorsque vous en avez l’autorisation. La création ou l’activation d’un compte exige un rôle à l’échelle du système.",
+          "manager": "Supprimez un compte lorsque vous avez l’autorisation dans tous les domaines auxquels la personne a accès."
+        },
+        "group": {
+          "viewer": "Voyez qui fait partie des groupes de l’organisme, comme les équipes qui se partagent les examens ou les approbations.",
+          "contributor": "Créez des groupes et ajoutez ou retirez des membres. Chaque processus d’examen ou d’approbation détermine ce que les membres peuvent faire.",
+          "manager": "Supprimez des groupes lorsque c’est permis. Un groupe encore utilisé dans un processus peut devoir être conservé."
+        },
+        "agreement": {
+          "viewer": "Consultez les modalités des ententes et les dossiers connexes, comme les demandes de remboursement, les paiements, les prévisions et les rapports de suivi.",
+          "contributor": "Créez des ententes. Dans les dossiers qui vous sont affectés, vous pouvez saisir les montants d’une demande de remboursement, préparer des paiements, actualiser des prévisions, consigner des constats de suivi ou soumettre le travail pour approbation.",
+          "manager": "Supprimez des ententes ou des dossiers connexes qui vous sont affectés lorsque leur statut le permet. Vous pouvez, par exemple, supprimer une demande de remboursement à l’état d’ébauche qui vous est affectée."
+        },
+        "applicant_recipient": {
+          "viewer": "Recherchez des promoteurs et consultez leurs profils. L’accès aux renseignements propres à un organisme, comme les notes sur un promoteur, dépend aussi de l’organisme qui les détient.",
+          "contributor": "Inscrivez un nouveau promoteur ou mettez à jour les coordonnées et d’autres renseignements dans les profils qui vous sont affectés.",
+          "manager": "Supprimez des profils de promoteurs ou des entrées connexes qui vous sont affectés lorsque c’est permis."
+        },
+        "funding_case": {
+          "viewer": "Consultez les dossiers de demande et leurs renseignements d’évaluation pour les possibilités de financement couvertes par ce rôle.",
+          "contributor": "Ouvrez des dossiers de demande et traitez ceux qui vous sont affectés, par exemple en terminant un examen qui vous est confié. Pour prendre en charge un dossier de groupe sans affectation, vous devez faire partie du groupe et avoir le niveau Contributeur pour le programme.",
+          "manager": "Supprimez des dossiers de demande qui vous sont affectés lorsque leur statut le permet."
+        },
+        "journal_voucher": {
+          "viewer": "Consultez les pièces de journal, dont les montants, le codage comptable et les détails de comptabilisation.",
+          "contributor": "Préparez des écritures, mettez à jour le codage des pièces qui vous sont affectées ou amorcez une contrepassation lorsque l’écriture d’origine le permet.",
+          "manager": "Supprimez des ébauches qui vous sont affectées lorsque c’est permis. Pour annuler une écriture comptabilisée, faites une contrepassation."
+        },
+        "correction": {
+          "viewer": "Consultez les corrections apportées aux paiements comptabilisés et le détail des montants modifiés.",
+          "contributor": "Amorcez la correction d’un paiement comptabilisé. Préparez ou mettez à jour la correction lorsque le dossier vous est affecté.",
+          "manager": "Supprimez des corrections à l’état d’ébauche qui vous sont affectées lorsque c’est permis. Les corrections comptabilisées restent dans l’historique du paiement."
+        },
+        "account_receivable": {
+          "viewer": "Consultez les sommes dues par un promoteur, les notes de crédit et les renseignements sur les montants déjà recouvrés.",
+          "contributor": "Préparez des comptes débiteurs ou des ajustements et traitez les dossiers qui vous sont affectés. Vous pouvez préparer une note de crédit manuelle si vous avez cette permission pour l’organisme qui la détient.",
+          "manager": "Supprimez des ébauches qui vous sont affectées lorsque c’est permis. Pour les montants comptabilisés, suivez le processus d’ajustement ou de recouvrement applicable."
+        },
+        "debt_management": {
+          "manager": "Lorsque vous préparez un paiement, vous pouvez choisir de payer même si le promoteur a une dette impayée. Vous devez aussi avoir la permission de créer le paiement et être affecté à l’entente. Vous devez indiquer pourquoi vous payez malgré la dette. L’entente doit avoir reçu son approbation initiale."
+        }
+      }
+    },
     "permission_level": "Niveau d’accès",
     "access_levels": {
       "none": "Aucun accès",

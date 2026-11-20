@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { RolePermissionInput, RoleAccessLevel } from '~~/shared/types/schemas/rbac'
 import type { RoleAbilitySubject } from '~~/shared/utils/abilities'
-import { canSubjectManageAssignments } from '~~/shared/utils/role-scope'
+import RolePermissionHelp from '~/components/Role/RolePermissionHelp.vue'
+import { canSubjectManageAssignments, type RoleScopeType } from '~~/shared/utils/role-scope'
 
-const { allowedSubjects, rolePermissions, canUpdateRole, pending = false } = defineProps<{
+const { scope, allowedSubjects, rolePermissions, canUpdateRole, pending = false } = defineProps<{
+  scope: RoleScopeType
   allowedSubjects: RoleAbilitySubject[]
   rolePermissions: RolePermissionInput[]
   canUpdateRole: boolean
@@ -54,7 +56,7 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
 
 <template>
   <div class="w-full divide-y divide-default rounded-sm border border-default" data-field-scope="role.permissions-tab" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
-    <div v-for="subject in allowedSubjects" :key="subject" class="grid gap-4 p-4 md:grid-cols-[1fr_14rem_12rem] md:items-center">
+    <div v-for="subject in allowedSubjects" :key="subject" class="grid gap-4 p-4 md:grid-cols-[1fr_14rem_12rem_auto] md:items-center">
       <div>
         <p class="font-medium">
           {{ t(`role.subjects.${subject}`) }}
@@ -77,6 +79,12 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
         :aria-label="`${t('role.manage_assignments')}: ${t(`role.subjects.${subject}`)}`"
         :disabled="!canUpdateRole || pending"
         data-ui-target="role.permissions-tab.manage-assignments" @update:model-value="value => updateAssignmentManagement(subject, value)" />
+      <div class="justify-self-end md:col-start-4">
+        <RolePermissionHelp
+          :subject="subject"
+          :scope="scope"
+          :levels="subject === 'debt_management' ? debtManagementLevelItems : levelItems" />
+      </div>
     </div>
   </div>
 </template>
