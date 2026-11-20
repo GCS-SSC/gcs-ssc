@@ -17,15 +17,10 @@ type CrudModalState<U> =
   | { kind: 'closed' }
   | { kind: 'create' | 'update'; session: CrudModalSession; draft: Ref<U | null> }
 
-export type CrudModalSessionLifecycle =
-  | {
-    captureSession: () => CrudModalSession | null
-    closeSession: (session: CrudModalSession | null) => boolean
-  }
-  | {
-    captureSession?: never
-    closeSession?: never
-  }
+export interface CrudModalSessionLifecycle {
+  captureSession: () => CrudModalSession | null
+  closeSession: (session: CrudModalSession | null) => boolean
+}
 
 /**
  * @param captureSession - Active session getter.

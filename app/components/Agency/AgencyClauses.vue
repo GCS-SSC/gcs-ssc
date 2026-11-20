@@ -246,19 +246,19 @@ const removeClause = async (clauseId: string) => {
       <template #actions="{ item }">
         <div v-if="item.kind === 'group'" class="flex items-center gap-2">
           <CommonActionButton v-if="canEditGroup(item.group)" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" :aria-label="`${t('clauses.add_clause')}: ${name(item.group)}`" :disabled="pending" @click="editClause(item.group)" />
-          <CommonActionButton :icon="canEditGroup(item.group) ? 'i-lucide-pencil' : 'i-lucide-eye'" color="neutral" variant="ghost" size="sm" :aria-label="t(canEditGroup(item.group) ? 'common.edit' : 'common.open')" :disabled="pending" @click="editGroup(item.group)" />
+          <CommonActionButton :record-action="canEditGroup(item.group) ? 'edit' : 'preview'" color="neutral" variant="ghost" size="sm" :aria-label="t(canEditGroup(item.group) ? 'common.edit' : 'common.open')" :disabled="pending" @click="editGroup(item.group)" />
           <CommonActionButton v-if="canManage && canPublish(item.group)" icon="i-lucide-upload" color="neutral" variant="ghost" size="sm" :aria-label="`${t('clauses.publish')}: ${name(item.group)}`" :disabled="pending" @click="changePublication(item.group.id, 'publish')" />
           <CommonActionButton v-if="canManage && item.group.publicationState === 'published'" icon="i-lucide-archive" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.retire')}: ${name(item.group)}`" :disabled="pending" @click="changePublication(item.group.id, 'retire')" />
           <CommonActionButton v-if="canManage && item.group.publicationState === 'draft'" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${name(item.group)}`" :disabled="pending" @click="removeClause(item.group.id)" />
         </div>
         <div v-else-if="canEditGroup(item.group)" class="flex items-center gap-2">
-          <CommonActionButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('clauses.edit_clause_named', { number: item.clause.egcs_ay_displayorder })" :disabled="pending" @click="editClause(item.group, item.clause)" />
+          <CommonActionButton record-action="edit" color="neutral" variant="ghost" size="sm" :aria-label="t('clauses.edit_clause_named', { number: item.clause.egcs_ay_displayorder })" :disabled="pending" @click="editClause(item.group, item.clause)" />
           <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('clauses.remove_row', { number: item.clause.egcs_ay_displayorder })" :disabled="pending" @click="removeText(item.group.id, item.clause.id)" />
         </div>
       </template>
     </CommonClauseGroupTable>
 
-    <UModal v-model:open="isOpen" :title="modalTitle" :ui="{ content: 'sm:max-w-3xl' }">
+    <UModal v-model:open="isOpen" :title="modalTitle" :ui="{ content: 'sm:max-w-4xl' }">
       <template #body>
         <UForm v-if="selected?.kind === 'group'" v-bind="formSession" :state="selected.draft" :validate="validateGroup" :disabled="!editable || pending" data-field-scope="agency.clause" class="space-y-5">
           <UFormField :label="t('clauses.code')" name="egcs_ay_languageindependentcode" required :description="selected.id ? undefined : t('clauses.code_help')">

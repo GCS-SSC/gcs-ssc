@@ -18,6 +18,10 @@ const { transferPaymentId, streamId, captureSession, closeSession, actionContext
   transferPaymentId: string
   streamId: string
 } & CrudModalSessionLifecycle>()
+
+if (!captureSession || !closeSession) {
+  throw new Error('TransferPaymentStreamCommitmentTypeModal requires captureSession and closeSession together')
+}
 const emit = defineEmits<{ saved: [] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
@@ -28,12 +32,12 @@ watch([
   () => transferPaymentId,
   () => streamId,
   () => state.value,
-  () => captureSession ? captureSession() : null
+  () => captureSession()
 ], () => {
   modalSession.isOpen.value = false
   modalSession.isOpen.value = open.value
 }, { immediate: true, flush: 'sync' })
-const pending = useCrudModalPending(() => captureSession ? captureSession() : modalSession.captureSession())
+const pending = useCrudModalPending(() => captureSession())
 /**
  * Persists the validated commitment type for the active modal session.
  *
@@ -43,11 +47,11 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
   const operation = actionContext.capture()
   const refreshCommittedCollection = refreshCollection
   if (!operation) return
-  const session = captureSession ? captureSession() : modalSession.captureSession()
+  const session = captureSession()
   const localSession = modalSession.captureSession()
   const ownsSession = () => operation.isCurrent() && modalSession.isCurrentSession(localSession)
-    && (!captureSession || captureSession() === session)
-  if (modalSession.isDisposed() || !pending.begin(session)) return
+    && captureSession() === session
+  if (session === null || modalSession.isDisposed() || !pending.begin(session)) return
   try {
     if (!operation.canDispatch()) return
     const route = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types` as const
@@ -55,8 +59,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
       method: 'POST', body: event.data
     })
     if (!operation.isCurrent()) return
-    if (ownsSession() && (!closeSession || closeSession(session))) {
-      if (!closeSession) open.value = false
+    if (ownsSession() && closeSession(session)) {
       emit('saved')
     }
     if (operation.isCurrent()) await refreshCommittedCollection?.()

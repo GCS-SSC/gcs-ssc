@@ -21,12 +21,9 @@ const { agencyId, captureSession, closeSession, actionContext, captureCommitted 
 
 const { t } = useI18n()
 const entityTypeDisabled = computed(() => !state.value?.id && Boolean(state.value?.egcs_cn_entitytype))
-if (Boolean(captureSession) !== Boolean(closeSession)) {
+if (!captureSession || !closeSession) {
   throw new Error('TransferPaymentReviewSetupModal requires captureSession and closeSession together')
 }
-const sessionLifecycle = captureSession
-  ? { captureSession, closeSession }
-  : { captureSession: undefined, closeSession: undefined }
 const {
   formSession,
   validate,
@@ -41,7 +38,8 @@ const {
   actionContext: () => actionContext,
   captureCommitted,
   emitSaved: () => emit('saved'),
-  ...sessionLifecycle
+  captureSession: () => captureSession(),
+  closeSession: session => closeSession(session)
 })
 </script>
 

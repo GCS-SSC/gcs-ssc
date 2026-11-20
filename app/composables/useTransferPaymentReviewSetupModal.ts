@@ -62,7 +62,7 @@ export const useTransferPaymentReviewSetupModal = ({
   const { showError } = useApiErrorToast()
 
   const modalSession = useModalSession()
-  watch([open, state, () => toValue(agencyId), () => captureSession?.()], () => {
+  watch([open, state, () => toValue(agencyId), captureSession], () => {
     modalSession.isOpen.value = false
     modalSession.isOpen.value = open.value && state.value !== null
   }, { immediate: true, flush: 'sync' })
@@ -114,10 +114,10 @@ export const useTransferPaymentReviewSetupModal = ({
     const committed = captureCommitted()
     const operation = toValue(actionContext).capture()
     const session = modalSession.captureSession()
-    const parentSession = captureSession?.() ?? null
-    if (!committed || !operation || session === null || (captureSession && parentSession === null) || !pending.begin(session)) return
+    const parentSession = captureSession()
+    if (!committed || !operation || session === null || parentSession === null || !pending.begin(session)) return
     const isCurrent = () => operation.isCurrent() && modalSession.isCurrentSession(session)
-      && (!captureSession || captureSession() === parentSession)
+      && captureSession() === parentSession
 
     try {
       try {
@@ -146,9 +146,7 @@ export const useTransferPaymentReviewSetupModal = ({
       }
       const readback = await committed.settle()
       if (readback.kind === 'retired' || !isCurrent()) return
-      if (closeSession) {
-        if (!closeSession(parentSession)) return
-      } else open.value = false
+      if (!closeSession(parentSession)) return
       emitSaved()
     } finally {
       pending.end(session)

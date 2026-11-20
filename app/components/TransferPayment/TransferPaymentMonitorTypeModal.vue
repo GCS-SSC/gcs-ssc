@@ -28,7 +28,7 @@ const { transferPaymentId, streamId, captureSession, closeSession, actionContext
   agencyId: string
 } & CrudModalSessionLifecycle>()
 
-if (Boolean(captureSession) !== Boolean(closeSession)) {
+if (!captureSession || !closeSession) {
   throw new Error('TransferPaymentMonitorTypeModal requires captureSession and closeSession together')
 }
 
@@ -40,12 +40,12 @@ watch([
   () => transferPaymentId,
   () => streamId,
   () => state.value,
-  () => captureSession ? captureSession() : null
+  () => captureSession()
 ], () => {
   modalSession.isOpen.value = false
   modalSession.isOpen.value = open.value
 }, { immediate: true, flush: 'sync' })
-const pending = useCrudModalPending(() => captureSession ? captureSession() : modalSession.captureSession())
+const pending = useCrudModalPending(() => captureSession())
 const isSaving = pending.isPending
 
 /**
@@ -59,11 +59,11 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
   const operation = actionContext.capture()
   const refreshCommittedCollection = refreshCollection
   if (!operation) return
-  const session = captureSession ? captureSession() : modalSession.captureSession()
+  const session = captureSession()
   const localSession = modalSession.captureSession()
   const ownsSession = () => operation.isCurrent() && modalSession.isCurrentSession(localSession)
-    && (!captureSession || captureSession() === session)
-  if (modalSession.isDisposed() || !pending.begin(session)) return
+    && captureSession() === session
+  if (session === null || modalSession.isDisposed() || !pending.begin(session)) return
   try {
     const url = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/monitor-types`
 
@@ -80,8 +80,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
     }
 
     if (!operation.isCurrent()) return
-    if (ownsSession() && (!closeSession || closeSession(session))) {
-      if (!closeSession) open.value = false
+    if (ownsSession() && closeSession(session)) {
       emit('saved')
     }
     if (operation.isCurrent()) await refreshCommittedCollection?.()

@@ -18,12 +18,9 @@ const { agencyId, captureSession, closeSession, actionContext, captureCommitted 
 } & CrudModalSessionLifecycle>()
 
 const { t } = useI18n()
-if (Boolean(captureSession) !== Boolean(closeSession)) {
+if (!captureSession || !closeSession) {
   throw new Error('AgencyRecommendationSetModal requires captureSession and closeSession together')
 }
-const sessionLifecycle = captureSession
-  ? { captureSession, closeSession }
-  : { captureSession: undefined, closeSession: undefined }
 const {
   formSession,
   validate,
@@ -37,7 +34,8 @@ const {
   actionContext: () => actionContext,
   captureCommitted,
   emitSaved: () => emit('saved'),
-  ...sessionLifecycle
+  captureSession: () => captureSession(),
+  closeSession: session => closeSession(session)
 })
 </script>
 

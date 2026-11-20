@@ -16,6 +16,10 @@ const { streamId, profileId, captureSession, closeSession, actionContext, refres
   streamId: string
   profileId: string
 } & CrudModalSessionLifecycle>()
+
+if (!captureSession || !closeSession) {
+  throw new Error('TransferPaymentStreamChartOfAccountModal requires captureSession and closeSession together')
+}
 const emit = defineEmits<{ save: [] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
@@ -25,12 +29,12 @@ watch([
   () => isOpen.value,
   () => profileId,
   () => streamId,
-  () => captureSession ? captureSession() : null
+  () => captureSession()
 ], () => {
   modalSession.isOpen.value = false
   modalSession.isOpen.value = isOpen.value
 }, { immediate: true, flush: 'sync' })
-const pending = useCrudModalPending(() => captureSession ? captureSession() : modalSession.captureSession())
+const pending = useCrudModalPending(() => captureSession())
 const state = ref<{ egcs_tp_agencychartofaccount?: string }>({})
 watch(isOpen, open => {
   if (open) state.value = {}
@@ -45,11 +49,11 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
   const operation = actionContext.capture()
   const refreshCommittedCollection = refreshCollection
   if (!operation) return
-  const session = captureSession ? captureSession() : modalSession.captureSession()
+  const session = captureSession()
   const localSession = modalSession.captureSession()
   const ownsSession = () => operation.isCurrent() && modalSession.isCurrentSession(localSession)
-    && (!captureSession || captureSession() === session)
-  if (modalSession.isDisposed() || !pending.begin(session)) return
+    && captureSession() === session
+  if (session === null || modalSession.isDisposed() || !pending.begin(session)) return
   try {
     if (!operation.canDispatch()) return
     const route = `/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts` as const
@@ -57,8 +61,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
       method: 'POST', body: event.data
     })
     if (!operation.isCurrent()) return
-    if (ownsSession() && (!closeSession || closeSession(session))) {
-      if (!closeSession) isOpen.value = false
+    if (ownsSession() && closeSession(session)) {
       emit('save')
     }
     if (operation.isCurrent()) await refreshCommittedCollection?.()

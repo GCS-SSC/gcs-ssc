@@ -43,7 +43,7 @@ const created = async (id: string) => await navigateTo(localePath(appRouteLocati
           </template>
           <template #actions-cell="{ row }">
             <div class="flex justify-end">
-              <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(appRouteLocations.journalVoucherDetail(row.original.id))" />
+              <CommonActionButton record-action="open" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(appRouteLocations.journalVoucherDetail(row.original.id))" />
             </div>
           </template>
         </CommonResourceLayout>

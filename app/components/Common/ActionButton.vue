@@ -4,8 +4,9 @@ import type { ComponentPublicInstance } from 'vue'
 
 defineOptions({ inheritAttrs: false })
 
-const { ariaLabel } = defineProps<{
+const { ariaLabel, recordAction } = defineProps<{
   ariaLabel?: string
+  recordAction?: 'open' | 'edit' | 'preview'
 }>()
 const attrs = useAttrs()
 const slots = useSlots()
@@ -18,12 +19,13 @@ defineExpose({
    */
   get $el() { return button.value?.$el }
 })
-const hasTooltip = () => Boolean(ariaLabel && attrs.icon && !attrs.label && !slots.default)
+const recordActionIcons = { open: 'i-lucide-arrow-right', edit: 'i-lucide-pencil', preview: 'i-lucide-eye' }
+const hasTooltip = () => Boolean(ariaLabel && (recordAction || attrs.icon) && !attrs.label && !slots.default)
 </script>
 
 <template>
   <UTooltip :text="hasTooltip() ? ariaLabel : undefined" :disabled="!hasTooltip()">
-    <UButton ref="button" v-bind="$attrs" :aria-label="ariaLabel">
+    <UButton ref="button" v-bind="recordAction ? { ...$attrs, icon: recordActionIcons[recordAction] } : $attrs" :aria-label="ariaLabel">
       <template v-for="(_, name) in $slots" #[name]="slotData">
         <slot :name="name" v-bind="slotData || {}" />
       </template>
