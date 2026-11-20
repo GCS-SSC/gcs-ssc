@@ -220,6 +220,9 @@ const updateAgency = async () => {
     })
     if (!response.ok) await throwFetchResponseError(response)
     if (isAgencyPageDisposed || !operation.isCurrent()) return
+    const savedProfile = await response.json() as AgencyProfileItem
+    if (isAgencyPageDisposed || !operation.isCurrent()) return
+    agency.value = savedProfile
     const closed = ownsEditor() && closeAgencySession(session)
     const feedbackGeneration = agencyEditorGeneration
     if (closed) {
