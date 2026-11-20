@@ -2,6 +2,7 @@ import { defineEventHandler } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeAgreementStreamLookupRoute, prepareAgreementStreamLookupRoute } from '~~/server/utils/agreement-stream-lookup-routes'
 import { buildListRouteResponse } from '~~/server/utils/list-route-response'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -16,6 +17,9 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream_Holdback_Basis._deleted', '=', false)
     .where('Agency_Holdback_Basis._deleted', '=', false)
   if (lookup.escapedSearch) query = query.where(eb => eb.or([
+    ...(isPositivePostgresBigintText(lookup.escapedSearch)
+      ? [eb('Transfer_Payment_Stream_Holdback_Basis.id', '=', lookup.escapedSearch)]
+      : []),
     eb('Agency_Holdback_Basis.egcs_ay_name_en', 'ilike', `%${lookup.escapedSearch}%`),
     eb('Agency_Holdback_Basis.egcs_ay_name_fr', 'ilike', `%${lookup.escapedSearch}%`)
   ]))
