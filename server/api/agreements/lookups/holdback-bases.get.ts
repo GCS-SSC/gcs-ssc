@@ -16,21 +16,22 @@ export default defineEventHandler(async event => {
     .where('egcs_tp_transferpaymentstream', '=', lookup.streamId)
     .where('Transfer_Payment_Stream_Holdback_Basis._deleted', '=', false)
     .where('Agency_Holdback_Basis._deleted', '=', false)
+  const searchId = isPositivePostgresBigintText(lookup.escapedSearch) ? lookup.escapedSearch : null
   if (lookup.escapedSearch) query = query.where(eb => eb.or([
-    ...(isPositivePostgresBigintText(lookup.escapedSearch)
-      ? [eb('Transfer_Payment_Stream_Holdback_Basis.id', '=', lookup.escapedSearch)]
-      : []),
+    ...(searchId ? [eb('Transfer_Payment_Stream_Holdback_Basis.id', '=', searchId)] : []),
     eb('Agency_Holdback_Basis.egcs_ay_name_en', 'ilike', `%${lookup.escapedSearch}%`),
     eb('Agency_Holdback_Basis.egcs_ay_name_fr', 'ilike', `%${lookup.escapedSearch}%`)
   ]))
+  let listing = query.select([
+    'Transfer_Payment_Stream_Holdback_Basis.id', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback',
+    'Agency_Holdback_Basis.egcs_ay_name_en', 'Agency_Holdback_Basis.egcs_ay_name_fr',
+    'Agency_Holdback_Basis.egcs_ay_name_en as label_en',
+    'Agency_Holdback_Basis.egcs_ay_name_fr as label_fr',
+    'Agency_Holdback_Basis.egcs_ay_languageindependentcode'
+  ])
+  if (searchId) listing = listing.orderBy(eb => eb('Transfer_Payment_Stream_Holdback_Basis.id', '=', searchId), 'desc')
   const [items, count] = await Promise.all([
-    query.select([
-      'Transfer_Payment_Stream_Holdback_Basis.id', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback',
-      'Agency_Holdback_Basis.egcs_ay_name_en', 'Agency_Holdback_Basis.egcs_ay_name_fr',
-      'Agency_Holdback_Basis.egcs_ay_name_en as label_en',
-      'Agency_Holdback_Basis.egcs_ay_name_fr as label_fr',
-      'Agency_Holdback_Basis.egcs_ay_languageindependentcode'
-    ]).orderBy('Transfer_Payment_Stream_Holdback_Basis.id', 'asc').limit(lookup.limit).offset(lookup.offset).execute(),
+    listing.orderBy('Transfer_Payment_Stream_Holdback_Basis.id', 'asc').limit(lookup.limit).offset(lookup.offset).execute(),
     query.select(eb => eb.fn.count('Transfer_Payment_Stream_Holdback_Basis.id').as('total')).executeTakeFirst()
   ])
   return buildListRouteResponse(items, count, count, lookup.page, lookup.limit)
