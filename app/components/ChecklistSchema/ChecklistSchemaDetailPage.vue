@@ -31,10 +31,12 @@ import { AgencyProfileSchema, AgencyReviewSchemaCreateSchema } from '~~/shared/t
 
 type EditorSubSection = Omit<ChecklistDefinition['sections'][number]['subSections'][number], 'questions'> & {
   _key: string
+  _accordionKey: string
   questions: ChecklistEditorQuestion[]
 }
 type EditorSection = Omit<ChecklistDefinition['sections'][number], 'questions' | 'subSections'> & {
   _key: string
+  _accordionKey: string
   subSections: EditorSubSection[]
 }
 type EditorDefinition = Omit<ChecklistDefinition, 'sections' | 'resultPolicy'> & {
@@ -132,6 +134,7 @@ const toEditorDefinition = (value: ChecklistDefinition): EditorDefinition => ({
     key: section.key,
     label: section.label,
     _key: nanoid(),
+    _accordionKey: section.key,
     subSections: [
       ...(section.questions.length > 0
         ? [{ key: createLanguageIndependentCode('subsection'), label: { ...section.label }, questions: section.questions }]
@@ -140,6 +143,7 @@ const toEditorDefinition = (value: ChecklistDefinition): EditorDefinition => ({
     ].map(subSection => ({
       ...subSection,
       _key: nanoid(),
+      _accordionKey: subSection.key,
       questions: subSection.questions.map(question => ({
         ...question,
         _key: nanoid(),
@@ -154,10 +158,10 @@ const toEditorDefinition = (value: ChecklistDefinition): EditorDefinition => ({
 })
 
 const toPersistedDefinition = (value: EditorDefinition): ChecklistDefinition => ({
-  sections: value.sections.map(({ _key: _sectionEditorKey, subSections, ...section }) => ({
+  sections: value.sections.map(({ _key: _sectionEditorKey, _accordionKey: _sectionAccordionKey, subSections, ...section }) => ({
     ...section,
     questions: [],
-    subSections: subSections.map(({ _key: _subSectionEditorKey, questions, ...subSection }) => ({
+    subSections: subSections.map(({ _key: _subSectionEditorKey, _accordionKey: _subSectionAccordionKey, questions, ...subSection }) => ({
       ...subSection,
       questions: questions.map(({ _key: _questionEditorKey, help, ...question }) => ({
         ...question,
@@ -309,9 +313,11 @@ const refreshForMutation = async (token: EditorMutationToken) => {
 const addSection = () => {
   if (!definition.value) return
   const number = definition.value.sections.length + 1
+  const key = createLanguageIndependentCode('section')
   definition.value.sections.push({
     _key: nanoid(),
-    key: createLanguageIndependentCode('section'),
+    _accordionKey: key,
+    key,
     label: { en: `Section ${number}`, fr: `Section ${number}` },
     subSections: []
   })
@@ -319,9 +325,11 @@ const addSection = () => {
 const removeSection = (sectionIndex: number) => definition.value?.sections.splice(sectionIndex, 1)
 const addSubSection = (section: EditorSection) => {
   const number = section.subSections.length + 1
+  const key = createLanguageIndependentCode('subsection')
   section.subSections.push({
     _key: nanoid(),
-    key: createLanguageIndependentCode('subsection'),
+    _accordionKey: key,
+    key,
     label: { en: `Subsection ${number}`, fr: `Sous-section ${number}` },
     questions: []
   })
@@ -544,7 +552,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                   <div v-for="(section, sectionIndex) in definition.sections" :key="section._key" class="space-y-0">
                     <AssessmentSchemaAccordionSection
                       :title="getNavigationLabel(section.label, t('checklist_schema.section'))"
-                      :persistence-key="`checklist:${section.key}`">
+                      :persistence-key="`checklist:${section._accordionKey}`">
                       <div class="space-y-6">
                         <div class="flex justify-end gap-1">
                           <CommonActionButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === 0" :aria-label="`${t('checklist_schema.policy.move_up')}: ${getNavigationLabel(section.label, section.key)}`" @click="moveItem(definition.sections, sectionIndex, -1)" />
@@ -565,7 +573,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
 
                         <AssessmentSchemaAccordionSection
                           :title="t('checklist_schema.subsections')"
-                          :persistence-key="`checklist:${section.key}:subsections`"
+                          :persistence-key="`checklist:${section._accordionKey}:subsections`"
                           default-open
                           level="sub">
                           <div class="space-y-4">
@@ -576,7 +584,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
                               v-for="(subSection, subSectionIndex) in section.subSections"
                               :key="subSection._key"
                               :title="getNavigationLabel(subSection.label, t('checklist_schema.subsection'))"
-                              :persistence-key="`checklist:${section.key}:${subSection.key}`"
+                              :persistence-key="`checklist:${section._accordionKey}:subsection:${subSection._accordionKey}`"
                               level="sub">
                               <div class="space-y-6">
                                 <div class="flex justify-end gap-1">
@@ -598,7 +606,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
 
                                 <AssessmentSchemaAccordionSection
                                   :title="t('checklist_schema.checklist_questions')"
-                                  :persistence-key="`checklist:${section.key}:${subSection.key}:questions`"
+                                  :persistence-key="`checklist:${section._accordionKey}:subsection:${subSection._accordionKey}:questions`"
                                   default-open
                                   level="sub">
                                   <ChecklistSchemaQuestionsTable v-model:questions="subSection.questions" />
