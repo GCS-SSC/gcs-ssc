@@ -59,3 +59,8 @@
 	path = extensions/gcs-feedback
 	url = https://github.com/GCS-SSC/gcs-feedback.git
 	branch = main
+[submodule "extensions/gcs-bpmn"]
+	path = extensions/gcs-bpmn
+	url = https://github.com/GCS-SSC/gcs-bpmn.git
+	branch = main
+	ignore = untracked

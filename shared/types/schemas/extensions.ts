@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { GcsExtensionWorkspaceNavigation } from '@gcs-ssc/extensions'
+import type { GcsExtensionWorkspaceNavigation, WorkflowBpmnTask } from '@gcs-ssc/extensions'
 import type { WithId } from './common'
 import type {
   GcsExtensionEntityTabTarget,
@@ -117,6 +117,7 @@ export interface ExtensionRuntimeResponse {
   slot: GcsExtensionSlot
   streamId?: string
   items: ExtensionRuntimeSlotItem[]
+  workflowTasks?: Record<string, WorkflowBpmnTask[]>
 }
 
 export type ExtensionEntityTabContext = {

@@ -687,6 +687,7 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
 
               <AssessmentSchemaPageSection v-if="flowOnly" section-id="workflow-flow" :title="t('workflow.flow.title')">
                 <AgencyWorkflowFlowDiagram
+                  :agency-id="agencyId" :workflow-setup-id="workflowSetupId"
                   :setup="state" :simulation="simulationTrace"
                   :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}" />
                 <UButton v-if="conditionFieldsError || conditionChoicesError" :label="t('common.retry')" color="neutral" variant="ghost" @click="retryConditionCatalogs" />

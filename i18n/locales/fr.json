@@ -4147,6 +4147,10 @@
       }
     },
     "flow": {
+      "bpmn_view": "Vue BPMN",
+      "usual_view": "Vue habituelle",
+      "bpmn_unavailable": "La vue BPMN est indisponible. Le diagramme habituel reste disponible.",
+      "bpmn_reload": "Rechargez cette page pour réessayer la vue BPMN.",
       "start_with_results": "Démarrer et saisir le profil",
       "result_description": "Les valeurs du profil sont saisies au démarrage. Les conditions qui utilisent le résultat d’une étape précédente sont vérifiées au moment d’atteindre l’étape.",
       "at_start": "Saisi au démarrage",

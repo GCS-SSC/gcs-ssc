@@ -338,6 +338,7 @@ const exportDiagram = async (format: 'svg' | 'png') => {
       <div ref="surface" class="flow-surface" :class="{ 'flow-surface--fullscreen': fullscreen }">
         <div class="flow-canvas-toolbar" data-export-ignore>
           <div class="flow-canvas-exports">
+            <slot name="toolbar" />
             <button type="button" class="flow-export" :disabled="exporting" @click="exportDiagram('svg')">
               {{ labels.exportSvg }}
             </button>
@@ -545,7 +546,7 @@ const exportDiagram = async (format: 'svg' | 'png') => {
 .flow-frame { display: block; margin-top: 1rem; }
 .flow-surface { display: block; border: 1px solid var(--ui-border, #33343a); border-radius: .75rem; overflow: hidden; background: var(--ui-bg, #1e1e22); }
 .flow-canvas-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .5rem; padding: .5rem .75rem; border-bottom: 1px solid var(--ui-border, #33343a); background: var(--ui-bg, #1e1e22); }
-.flow-canvas-exports { display: flex; gap: .5rem; margin-inline-end: auto; }
+.flow-canvas-exports { display: flex; flex-wrap: wrap; gap: .5rem; margin-inline-end: auto; }
 .flow-canvas-view-controls { display: flex; align-items: center; gap: .5rem; }
 .flow-canvas-toolbar [role="alert"] { width: 100%; color: var(--ui-error); font-size: .875rem; }
 .flow-zoom-controls { display: flex; border: 1px solid var(--ui-border, #33343a); border-radius: .5rem; background: var(--ui-bg, #1e1e22); }

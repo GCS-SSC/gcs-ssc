@@ -4147,6 +4147,10 @@
       }
     },
     "flow": {
+      "bpmn_view": "BPMN view",
+      "usual_view": "Usual view",
+      "bpmn_unavailable": "The BPMN view is unavailable. The usual diagram is still available.",
+      "bpmn_reload": "Reload this page to try BPMN again.",
       "start_with_results": "Start and capture profile inputs",
       "result_description": "Profile inputs are captured at start. Conditions that use an earlier step’s result are checked when their step is reached.",
       "at_start": "Captured at start",

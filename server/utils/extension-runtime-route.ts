@@ -10,6 +10,9 @@ import type {
   GcsRegisteredExtension
 } from '~~/shared/utils/extensions'
 import { forbidden, notFound } from '~~/server/utils/api-errors'
+import { authorizeAgencyWorkflowSetup } from './agency-workflow-authorization'
+import { readWorkflowBpmnTasks } from './workflow-bpmn-tasks'
+import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { canAccessApplicantRecipient, listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
@@ -30,6 +33,8 @@ export interface ExtensionRuntimeSlotQuery {
   applicantRecipientId?: string
   agreementId?: string
   paymentId?: string
+  workflowSetupId?: string
+  locale?: 'en' | 'fr'
   permissionAction: Extract<AbilityAction, 'create' | 'read' | 'update'>
 }
 
@@ -318,12 +323,39 @@ const resolvePaymentEvidenceRuntimeResponse = async (
   return { slot: query.slot, streamId: owner.streamId, items }
 }
 
+/** Resolves the enabled workflow viewer and its authorized task projection. */
+const resolveWorkflowFlowRuntimeResponse = async (
+  event: H3Event,
+  query: ExtensionRuntimeSlotQuery
+): Promise<ExtensionRuntimeResponse> => {
+  const { agencyId, workflowSetupId, locale } = query
+  if (!agencyId || !workflowSetupId || !locale || query.permissionAction !== 'read'
+    || query.subject !== 'agency' || query.streamId || query.agreementId
+    || query.applicantRecipientId || query.paymentId) return await forbidden(event)
+
+  return await executeFreshReadSnapshot(event, async db => {
+    await authorizeAgencyWorkflowSetup(event, 'read', agencyId, workflowSetupId)
+    const contributors = (await getRegisteredExtensions()).filter(extension =>
+      extension.client.slots.some(slot => slot.slot === query.slot))
+    if (!contributors.length) return emptyRuntimeResponse(query)
+    const configurations = await listAgencyEnabledExtensionConfigurations(db, agencyId)
+    const items = contributors.filter(extension => configurations.has(extension.key))
+      .flatMap(extension => buildExtensionRuntimeSlotItems(extension, query, {}))
+    if (!items.length) return emptyRuntimeResponse(query)
+
+    return { slot: query.slot, items, workflowTasks: await readWorkflowBpmnTasks(db, agencyId, workflowSetupId, locale) }
+  }, { authorization: 'snapshot' })
+}
+
 /** Dispatches runtime configuration loading for agency or stream routes. */
 export const resolveExtensionRuntimeResponse = async (
   event: H3Event,
   query: ExtensionRuntimeSlotQuery
 ): Promise<ExtensionRuntimeResponse> => {
   const db = event.context.$db
+
+  if (query.slot === 'workflow.flow') return await resolveWorkflowFlowRuntimeResponse(event, query)
+  if (query.workflowSetupId !== undefined || query.locale !== undefined) return await forbidden(event)
 
   if (query.slot === 'payment.evidence') return await resolvePaymentEvidenceRuntimeResponse(event, db, query)
   if (query.paymentId !== undefined) return await forbidden(event)

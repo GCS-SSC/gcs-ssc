@@ -44,5 +44,9 @@ const labels = computed<FlowDiagramLabels>(() => ({
   <DiagramRenderer
     :definition="definition" :selected-node-id="selectedNodeId" :filename="filename" :direction="direction"
     :labels="labels" :highlighted-node-ids="highlightedNodeIds" :layout="layout" :editable="editable" :branch-node-ids="branchNodeIds"
-    @select-node="emit('select-node', $event)" @add-node="emit('add-node', $event)" @add-branch="emit('add-branch', $event)" />
+    @select-node="emit('select-node', $event)" @add-node="emit('add-node', $event)" @add-branch="emit('add-branch', $event)">
+    <template v-if="$slots.toolbar" #toolbar>
+      <slot name="toolbar" />
+    </template>
+  </DiagramRenderer>
 </template>

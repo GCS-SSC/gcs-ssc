@@ -11,6 +11,8 @@ const {
   subject,
   streamId,
   agencyId,
+  workflowSetupId,
+  locale,
   permissionAction = 'read',
   context = {}
 } = defineProps<{
@@ -18,6 +20,8 @@ const {
   subject?: 'agency' | 'transfer_payment' | 'agreement' | 'applicant_recipient'
   streamId?: string
   agencyId?: string
+  workflowSetupId?: string
+  locale?: 'en' | 'fr'
   permissionAction?: 'create' | 'read' | 'update'
   context?: GcsExtensionSlotContext
 }>()
@@ -60,6 +64,8 @@ const runtimeQuery = computed(() => ({
   ...(agencyId ? { agencyId } : {}),
   ...(applicantRecipientId.value ? { applicantRecipientId: applicantRecipientId.value } : {}),
   ...(agreementId.value ? { agreementId: agreementId.value } : {}),
+  ...(workflowSetupId ? { workflowSetupId } : {}),
+  ...(locale ? { locale } : {}),
   ...(paymentId.value ? { paymentId: paymentId.value } : {}),
   permissionAction
 }))
@@ -84,6 +90,14 @@ const { data, status, error, refresh } = useResourceRequest<ExtensionRuntimeResp
 })
 
 const items = computed(() => data.value?.items ?? [])
+const workflowViewer = computed(() => {
+  const item = items.value[0]
+  const tasksByNode = data.value?.workflowTasks
+  const component = item ? getGcsExtensionComponent(item.componentName) : null
+  return item && tasksByNode && component
+    ? { extensionKey: item.extensionKey, component, tasksByNode }
+    : null
+})
 
 /**
  * Resolves the registered client component for a runtime extension slot item.
@@ -95,7 +109,8 @@ const resolveComponent = (componentName: string) => getGcsExtensionComponent(com
 </script>
 
 <template>
-  <slot v-if="slotName === 'payment.evidence' && status === 'pending'" name="loading" />
+  <slot v-if="slotName === 'workflow.flow'" name="workflow" :viewer="workflowViewer" :error="error" :retry="refresh" />
+  <slot v-else-if="slotName === 'payment.evidence' && status === 'pending'" name="loading" />
   <slot v-else-if="slotName === 'payment.evidence' && error" name="error" :retry="refresh" />
   <div v-else-if="items.length > 0" class="space-y-4">
     <component
