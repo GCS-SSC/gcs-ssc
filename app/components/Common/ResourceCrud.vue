@@ -93,7 +93,7 @@ const {
   statusFilterLabel?: string
   deleteConfirmKey?: string
   modalFullscreen?: boolean
-  modalUi?: Record<string, string>
+  modalUi?: Record<string, string> | ((state: Partial<T>) => Record<string, string> | undefined)
   embedded?: boolean
 }>()
 
@@ -289,7 +289,7 @@ defineExpose({
       :title="resolvedModalTitle"
       :description="t('common.form_dialog_description')"
       :fullscreen="modalFullscreen"
-      :ui="modalUi"
+      :ui="typeof modalUi === 'function' ? (formState ? modalUi(formState) : undefined) : modalUi"
       @after:enter="completeHelpModal"
       @after:leave="helpCreateCompleted = null">
       <template #body>

@@ -61,7 +61,8 @@ const action: ResourceCrudAction = {
     :can-delete="canDelete"
     :schema="AgencyProponentRelationshipTypeSchema"
     :initial-new-item="initialNewItem"
-    :columns="columns">
+    :columns="columns"
+    :modal-ui="state => state.egcs_ay_inversecode !== null ? { content: 'sm:max-w-4xl' } : undefined">
     <template #role-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
       <p class="text-muted font-mono text-xs">
@@ -89,46 +90,48 @@ const action: ResourceCrudAction = {
         :label="t('agency.proponent_relationship_type.directional')"
         :description="t('agency.proponent_relationship_type.directional_description')"
         @update:model-value="value => setDirectional(state, value === true)" />
-      <fieldset class="space-y-4">
-        <legend class="font-semibold">
-          {{ t('agency.proponent_relationship_type.role') }}
-        </legend>
-        <UFormField
-          :label="t('agency.proponent_relationship_type.code')"
-          :description="t('agency.proponent_relationship_type.code_description')"
-          name="egcs_ay_code">
-          <UInput v-model="state.egcs_ay_code" :readonly="Boolean(state.id)" class="w-full" />
-        </UFormField>
-        <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
-          <UInput v-model="state.egcs_ay_name_en" class="w-full" />
-        </UFormField>
-        <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
-          <UInput v-model="state.egcs_ay_name_fr" class="w-full" />
-        </UFormField>
-      </fieldset>
-      <fieldset v-if="state.egcs_ay_inversecode !== null" class="space-y-4">
-        <legend class="font-semibold">
-          {{ t('agency.proponent_relationship_type.inverse_role') }}
-        </legend>
-        <UFormField
-          :label="t('agency.proponent_relationship_type.code')"
-          name="egcs_ay_inversecode"
-          :required="!state.id">
-          <UInput v-model="state.egcs_ay_inversecode" :readonly="Boolean(state.id)" class="w-full" />
-        </UFormField>
-        <UFormField :label="t('agency.name_en')" name="egcs_ay_inversename_en" required>
-          <UInput
-            :model-value="state.egcs_ay_inversename_en ?? undefined"
-            class="w-full"
-            @update:model-value="state.egcs_ay_inversename_en = $event" />
-        </UFormField>
-        <UFormField :label="t('agency.name_fr')" name="egcs_ay_inversename_fr" required>
-          <UInput
-            :model-value="state.egcs_ay_inversename_fr ?? undefined"
-            class="w-full"
-            @update:model-value="state.egcs_ay_inversename_fr = $event" />
-        </UFormField>
-      </fieldset>
+      <div class="grid gap-4" :class="{ 'md:grid-cols-2': state.egcs_ay_inversecode !== null }">
+        <fieldset class="space-y-4">
+          <legend class="font-semibold">
+            {{ t('agency.proponent_relationship_type.role') }}
+          </legend>
+          <UFormField
+            :label="t('agency.proponent_relationship_type.code')"
+            :description="t('agency.proponent_relationship_type.code_description')"
+            name="egcs_ay_code">
+            <UInput v-model="state.egcs_ay_code" :readonly="Boolean(state.id)" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
+            <UInput v-model="state.egcs_ay_name_en" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
+            <UInput v-model="state.egcs_ay_name_fr" class="w-full" />
+          </UFormField>
+        </fieldset>
+        <fieldset v-if="state.egcs_ay_inversecode !== null" class="space-y-4">
+          <legend class="font-semibold">
+            {{ t('agency.proponent_relationship_type.inverse_role') }}
+          </legend>
+          <UFormField
+            :label="t('agency.proponent_relationship_type.code')"
+            name="egcs_ay_inversecode"
+            :required="!state.id">
+            <UInput v-model="state.egcs_ay_inversecode" :readonly="Boolean(state.id)" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('agency.name_en')" name="egcs_ay_inversename_en" required>
+            <UInput
+              :model-value="state.egcs_ay_inversename_en ?? undefined"
+              class="w-full"
+              @update:model-value="state.egcs_ay_inversename_en = $event" />
+          </UFormField>
+          <UFormField :label="t('agency.name_fr')" name="egcs_ay_inversename_fr" required>
+            <UInput
+              :model-value="state.egcs_ay_inversename_fr ?? undefined"
+              class="w-full"
+              @update:model-value="state.egcs_ay_inversename_fr = $event" />
+          </UFormField>
+        </fieldset>
+      </div>
     </template>
   </CommonResourceCrud>
 </template>
