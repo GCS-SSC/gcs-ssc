@@ -626,6 +626,7 @@ CREATE TABLE "Common_Publication" (
   "egcs_cn_kind" character varying(64) NOT NULL,
   "egcs_cn_state" character varying(32) DEFAULT 'draft'::character varying NOT NULL,
   "egcs_cn_currentversion" bigint,
+  "egcs_cn_authoringimport" jsonb,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "cn_uq_publicationidkind" UNIQUE (id, egcs_cn_kind),
   CONSTRAINT "Common_Publication_pkey" PRIMARY KEY (id),
@@ -634,6 +635,10 @@ CREATE TABLE "Common_Publication" (
   CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['guided_help'::character varying, 'guided_help_catalog'::character varying, 'approval_template'::character varying, 'agency_clause'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'data_collection_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
   CONSTRAINT "cn_chk_publicationstate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'retired'::character varying])::text[])))
 );
+
+CREATE UNIQUE INDEX cn_uq_publication_authoring_import ON "Common_Publication" (
+  (egcs_cn_authoringimport ->> 'agencyId'), (egcs_cn_authoringimport ->> 'requestId')
+) WHERE egcs_cn_authoringimport IS NOT NULL;
 
 CREATE TABLE "Common_Publication_Transition" (
   "id" bigint DEFAULT nextval('"Common_Publication_Transition_id_seq"'::regclass) NOT NULL,
@@ -3226,6 +3231,10 @@ AS $function$
         AND (NEW.egcs_cn_state, NEW.egcs_cn_currentversion) IS DISTINCT FROM (OLD.egcs_cn_state, OLD.egcs_cn_currentversion) THEN
         RAISE EXCEPTION 'Publication lifecycle changes require a transition'
           USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_publicationtransitionrequired';
+      END IF;
+      IF OLD.egcs_cn_authoringimport IS NOT NULL AND NEW.egcs_cn_authoringimport IS DISTINCT FROM OLD.egcs_cn_authoringimport THEN
+        RAISE EXCEPTION 'Authoring import reports are immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_publicationauthoringimportimmutable';
       END IF;
       IF OLD.egcs_cn_state = 'retired' AND to_jsonb(NEW) IS DISTINCT FROM to_jsonb(OLD) THEN
         RAISE EXCEPTION 'Retired publications are immutable'

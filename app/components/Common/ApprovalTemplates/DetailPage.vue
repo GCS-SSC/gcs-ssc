@@ -250,7 +250,11 @@ watch(selectedSection, value => {
           :is-retiring="isRetiring"
           :is-mutation-pending="mutation.isPending.value"
           @publish="publish"
-          @retire="retire" />
+          @retire="retire">
+          <template #actions>
+            <CommonPortableAuthoringExport kind="approval" :endpoint="templateEndpoint" />
+          </template>
+        </CommonApprovalTemplatesDetailHero>
 
         <CommonDesignTimeEditorShell content-test-id="approval-template-detail-content">
           <template #sidebar>

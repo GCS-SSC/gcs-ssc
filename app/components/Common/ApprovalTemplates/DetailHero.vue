@@ -53,7 +53,11 @@ const emit = defineEmits<{ publish: [], retire: [] }>()
       publish-label-key="approval_templates.publish"
       retire-label-key="approval_templates.retire"
       @publish="emit('publish')"
-      @retire="emit('retire')" />
+      @retire="emit('retire')">
+      <template v-if="$slots.actions" #actions>
+        <slot name="actions" />
+      </template>
+    </CommonPublicationDetailHero>
     <div class="flex flex-wrap gap-2 px-1">
       <CommonStatusBadge variant="step" :label="`${stepCount} ${$t('admin_common.resources.approval_steps')}`" />
       <CommonStatusBadge variant="certification" :label="`${certificationCount} ${$t('admin_common.resources.certifications')}`" />

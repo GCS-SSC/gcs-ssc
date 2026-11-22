@@ -292,7 +292,11 @@ const retire = async () => {
           :can-manage="canManagePublication"
           review-type="recommendation"
           @publish="publish"
-          @retire="retire" />
+          @retire="retire">
+          <template #actions>
+            <CommonPortableAuthoringExport kind="recommendation" :endpoint="endpoint" />
+          </template>
+        </AssessmentSchemaDetailHero>
 
         <CommonDesignTimeEditorShell>
           <template #sidebar>

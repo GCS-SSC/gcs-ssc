@@ -1,4 +1,48 @@
 {
+  "portable_authoring": {
+    "duplicate_name": "A schema with this name already exists. Enter a new name to create a separate draft.",
+    "browse": "Browse schemas",
+    "browse_help": "Find a saved draft or published schema in this agency.",
+    "saved_schema": "Saved schema",
+    "open_schema": "Open schema",
+    "name_en": "New name (English)",
+    "name_fr": "New name (French)",
+    "names_hint": "Leave these blank to use the names in the file. Enter new names to import a separate copy in the same agency.",
+    "import": "Import schema",
+    "export": "Export schema",
+    "generate": "Generate from file",
+    "file": "GCS schema file (JSON)",
+    "report": "Schema import report",
+    "pending": "Checking the schema and creating a draft…",
+    "created": "Draft created",
+    "open_draft": "Open draft",
+    "removed": "Removed from the imported draft",
+    "notices": "Review before publishing",
+    "invalid_file": "Choose a readable GCS schema JSON file.",
+    "invalid_schema": "This file does not contain a supported schema for the selected type.",
+    "missing_references": "Some items are unavailable in this agency. Review the items below before removing them.",
+    "import_failed": "The import could not be confirmed. Retry to recover the outcome.",
+    "remove_retry": "Remove and retry",
+    "kind": {
+      "checklist": "Checklist",
+      "assessment": "Assessment",
+      "recommendation": "Recommendation schema",
+      "approval": "Approval template"
+    }
+  },
+  "authoring_generation": {
+    "title": "Generate draft from a file",
+    "disclosure": "When you select Generate draft, this file will be sent to OpenAI for processing.",
+    "file": "Source file",
+    "pending": "OpenAI is processing the source file.",
+    "generate": "Generate draft",
+    "credentials_missing": "Ask an agency manager to configure OpenAI credentials for Author from files.",
+    "file_too_large": "The source file must be 10 MB or smaller.",
+    "file_required": "Choose a non-empty source file.",
+    "file_rejected": "OpenAI rejected the request. Check the source file and agency OpenAI configuration, then try again.",
+    "provider_failed": "OpenAI could not complete generation. Try again.",
+    "invalid_proposal": "OpenAI returned a proposal that GCS could not import."
+  },
   "review_copy": {
     "selected_version_mismatch": "The selected submission uses a different version. Choose a submission that matches this draft.",
     "copied_title": "Answers copied",

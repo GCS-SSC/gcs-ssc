@@ -3,8 +3,8 @@ import { getRouterParam, type H3Event } from 'h3'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import type { JsonValue } from '~~/shared/types/database'
-import { AgencyProfileSchema, AgencyReviewSchemaCreateSchema, AssessmentReviewSchemaPatchSchema, createAssessmentReviewSchemaPatchSchema } from '~~/shared/types/schemas'
-import { AssessmentDefinitionSchema, AssessmentScoringMatrixSchema, createAssessmentDefinitionSchemaForEntityType } from '~~/shared/types/schemas/assessment/assessment'
+import { AssessmentReviewSchemaPatchSchema, createAssessmentReviewSchemaPatchSchema } from '~~/shared/types/schemas'
+import { createAssessmentDefinitionSchemaForEntityType } from '~~/shared/types/schemas/assessment/assessment'
 import { InvalidPersistedAssessmentDefinitionError, normalizeAssessmentRuntimeSchema } from './assessment-runtime-schema'
 import { ChecklistDefinitionSchema } from '~~/shared/types/schemas/checklist/checklist'
 import { authorize } from './authorize'
@@ -19,29 +19,16 @@ import { publishDefinition, retirePublication } from './system-publication'
 import { throwIfMappedConstraintError } from './database-constraint-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
-const AssessmentAuthoringDefinitionSchema = z.union([AssessmentDefinitionSchema, z.object({}).strict()])
+import { PortableReviewImportSchema, ReviewAuthoringCreateSchema, ReviewAuthoringText } from '~~/shared/utils/portable-authoring-schema'
+import { readPortableAuthoringCreate, withPortableAuthoringImport } from './portable-authoring-import'
+import { prepareAssessmentImport } from './portable-authoring-references'
+
 const EMPTY_ASSESSMENT_DEFINITION = { sections: [], sectionMatrix: [], outcomes: [] }
-const StorageText = AgencyProfileSchema.shape.egcs_ay_name_en
-const BilingualText = {
-  egcs_cn_name_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_en.trim().min(1, { error: 'validation.name_en_required' }).pipe(StorageText),
-  egcs_cn_name_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_fr.trim().min(1, { error: 'validation.name_fr_required' }).pipe(StorageText),
-  egcs_cn_outcomename_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_en.trim().min(1, { error: 'validation.outcome_name_en_required' }).pipe(StorageText),
-  egcs_cn_outcomename_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_fr.trim().min(1, { error: 'validation.outcome_name_fr_required' }).pipe(StorageText)
-}
-const CreateSchema = AgencyReviewSchemaCreateSchema.extend({
-  ...BilingualText,
-  egcs_cn_scoringmatrix: AssessmentScoringMatrixSchema.optional(),
-  egcs_cn_assessmentschema: AssessmentAuthoringDefinitionSchema.optional(),
-  egcs_cn_checklistschema: ChecklistDefinitionSchema.optional(),
-  egcs_cn_disablecustomoutcomes: z.boolean().optional().default(false),
-  egcs_cn_disablealignment: z.boolean().optional().default(false),
-  egcs_cn_disablereviewers: z.boolean().optional().default(false)
-}).strict()
 const ChecklistPatchSchema = z.object({
-  egcs_cn_name_en: BilingualText.egcs_cn_name_en.optional(),
-  egcs_cn_name_fr: BilingualText.egcs_cn_name_fr.optional(),
-  egcs_cn_outcomename_en: BilingualText.egcs_cn_outcomename_en.optional(),
-  egcs_cn_outcomename_fr: BilingualText.egcs_cn_outcomename_fr.optional(),
+  egcs_cn_name_en: ReviewAuthoringText.egcs_cn_name_en.optional(),
+  egcs_cn_name_fr: ReviewAuthoringText.egcs_cn_name_fr.optional(),
+  egcs_cn_outcomename_en: ReviewAuthoringText.egcs_cn_outcomename_en.optional(),
+  egcs_cn_outcomename_fr: ReviewAuthoringText.egcs_cn_outcomename_fr.optional(),
   egcs_cn_disablereviewers: z.boolean().optional(),
   egcs_cn_checklistschema: ChecklistDefinitionSchema.optional()
 }).strict()
@@ -55,41 +42,63 @@ const runAgencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 're
   }
   await authorize(event, 'agency', action === 'read' ? 'read' : 'update', { type: 'agency', agencyId })
   if (action === 'create') {
-    const body = await readValidatedBodyI18n(event, CreateSchema)
-    if (body.egcs_cn_reviewtype === 'assessment' && body.egcs_cn_assessmentschema !== undefined) {
-      await parseI18n(event, z.object({ egcs_cn_assessmentschema: z.union([createAssessmentDefinitionSchemaForEntityType(body.egcs_cn_entitytype), z.object({}).strict()]) }), body)
-    }
-    return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
-      const isChecklist = body.egcs_cn_reviewtype === 'checklist'
-      const schema = await trx.insertInto('Common_Review_Schema').values({
-        egcs_cn_agency: agencyId,
-        egcs_cn_reviewtype: body.egcs_cn_reviewtype,
-        egcs_cn_entitytype: body.egcs_cn_entitytype,
-        egcs_cn_name_en: body.egcs_cn_name_en,
-        egcs_cn_name_fr: body.egcs_cn_name_fr,
-        egcs_cn_outcomename_en: body.egcs_cn_outcomename_en,
-        egcs_cn_outcomename_fr: body.egcs_cn_outcomename_fr,
-        egcs_cn_disablecustomoutcomes: isChecklist || body.egcs_cn_disablecustomoutcomes,
-        egcs_cn_disablealignment: isChecklist || body.egcs_cn_disablealignment,
-        egcs_cn_disablereviewers: body.egcs_cn_disablereviewers,
-        egcs_cn_scoringmatrix: isChecklist ? null : (body.egcs_cn_scoringmatrix ?? []) as JsonValue,
-        egcs_cn_assessmentschema: isChecklist ? null : (body.egcs_cn_assessmentschema ?? EMPTY_ASSESSMENT_DEFINITION) as JsonValue,
-        _deleted: false
-      }).returningAll().executeTakeFirstOrThrow()
-      if (isChecklist) {
-        await trx.insertInto('Common_Checklist_Schema').values({ egcs_cn_reviewschema: String(schema.id), egcs_cn_checklistschema: (body.egcs_cn_checklistschema ?? DEFAULT_CHECKLIST_DEFINITION) as unknown as JsonValue, _deleted: false }).execute()
-      } else {
-        await trx.insertInto('Common_Assessment_Schema').values({
-          egcs_cn_reviewschema: String(schema.id), egcs_cn_scoringmatrix: (body.egcs_cn_scoringmatrix ?? []) as JsonValue,
-          egcs_cn_assessmentschema: (body.egcs_cn_assessmentschema ?? EMPTY_ASSESSMENT_DEFINITION) as JsonValue,
-          egcs_cn_outcomename_en: body.egcs_cn_outcomename_en, egcs_cn_outcomename_fr: body.egcs_cn_outcomename_fr,
-          egcs_cn_disablecustomoutcomes: body.egcs_cn_disablecustomoutcomes,
-          egcs_cn_disablealignment: body.egcs_cn_disablealignment, _deleted: false
-        }).execute()
+    const request = await readPortableAuthoringCreate(event, ReviewAuthoringCreateSchema, PortableReviewImportSchema)
+    const validateDefinition = async (body: z.infer<typeof ReviewAuthoringCreateSchema>) => {
+      if (body.egcs_cn_reviewtype === 'assessment' && body.egcs_cn_assessmentschema !== undefined) {
+        await parseI18n(event, z.object({ egcs_cn_assessmentschema: z.union([createAssessmentDefinitionSchemaForEntityType(body.egcs_cn_entitytype), z.object({}).strict()]) }), body)
       }
-      return isChecklist
-        ? await mapChecklistSchema(trx, (await fetchChecklistReviewSchemaForAgency(trx, agencyId, String(schema.id)))!)
-        : await mapAssessmentReviewSchema(trx, schema)
+      return body
+    }
+    const validated = 'portable' in request ? request : await validateDefinition(request)
+    return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
+      const create = async (body: z.infer<typeof ReviewAuthoringCreateSchema>) => {
+        const isChecklist = body.egcs_cn_reviewtype === 'checklist'
+        const schema = await trx.insertInto('Common_Review_Schema').values({
+          egcs_cn_agency: agencyId,
+          egcs_cn_reviewtype: body.egcs_cn_reviewtype,
+          egcs_cn_entitytype: body.egcs_cn_entitytype,
+          egcs_cn_name_en: body.egcs_cn_name_en,
+          egcs_cn_name_fr: body.egcs_cn_name_fr,
+          egcs_cn_outcomename_en: body.egcs_cn_outcomename_en,
+          egcs_cn_outcomename_fr: body.egcs_cn_outcomename_fr,
+          egcs_cn_disablecustomoutcomes: isChecklist || body.egcs_cn_disablecustomoutcomes,
+          egcs_cn_disablealignment: isChecklist || body.egcs_cn_disablealignment,
+          egcs_cn_disablereviewers: body.egcs_cn_disablereviewers,
+          egcs_cn_scoringmatrix: isChecklist ? null : (body.egcs_cn_scoringmatrix ?? []) as JsonValue,
+          egcs_cn_assessmentschema: isChecklist ? null : (body.egcs_cn_assessmentschema ?? EMPTY_ASSESSMENT_DEFINITION) as JsonValue,
+          _deleted: false
+        }).returningAll().executeTakeFirstOrThrow()
+        if (isChecklist) {
+          await trx.insertInto('Common_Checklist_Schema').values({ egcs_cn_reviewschema: String(schema.id), egcs_cn_checklistschema: (body.egcs_cn_checklistschema ?? DEFAULT_CHECKLIST_DEFINITION) as unknown as JsonValue, _deleted: false }).execute()
+        } else {
+          await trx.insertInto('Common_Assessment_Schema').values({
+            egcs_cn_reviewschema: String(schema.id), egcs_cn_scoringmatrix: (body.egcs_cn_scoringmatrix ?? []) as JsonValue,
+            egcs_cn_assessmentschema: (body.egcs_cn_assessmentschema ?? EMPTY_ASSESSMENT_DEFINITION) as JsonValue,
+            egcs_cn_outcomename_en: body.egcs_cn_outcomename_en, egcs_cn_outcomename_fr: body.egcs_cn_outcomename_fr,
+            egcs_cn_disablecustomoutcomes: body.egcs_cn_disablecustomoutcomes,
+            egcs_cn_disablealignment: body.egcs_cn_disablealignment, _deleted: false
+          }).execute()
+        }
+        return isChecklist
+          ? await mapChecklistSchema(trx, (await fetchChecklistReviewSchemaForAgency(trx, agencyId, String(schema.id)))!)
+          : await mapAssessmentReviewSchema(trx, schema)
+      }
+      if ('portable' in validated) {
+        return await withPortableAuthoringImport(
+          event, trx, agencyId, validated,
+          async (definition, removed) => definition.kind === 'assessment'
+            ? await prepareAssessmentImport(event, trx, agencyId, definition, removed)
+            : definition,
+          async definition => {
+            const body = await parseI18n(event, ReviewAuthoringCreateSchema, {
+              ...definition.payload,
+              egcs_cn_reviewtype: definition.kind
+            })
+            return await create(await validateDefinition(body))
+          }
+        )
+      }
+      return await create(validated)
     })
   }
 

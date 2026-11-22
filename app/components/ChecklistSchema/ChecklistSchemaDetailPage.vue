@@ -495,7 +495,11 @@ const formSession = useFormSession({ owner: formOwner, action: { kind: 'remote',
           review-type="checklist"
           @import="isImportOpen = true"
           @publish="publish"
-          @retire="retire" />
+          @retire="retire">
+          <template #actions>
+            <CommonPortableAuthoringExport kind="checklist" :endpoint="endpoint" />
+          </template>
+        </AssessmentSchemaDetailHero>
 
         <ReviewSchemaImportModal
           v-model:open="isImportOpen"

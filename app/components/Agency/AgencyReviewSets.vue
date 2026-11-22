@@ -523,6 +523,10 @@ const preferenceFilters = { entityType: tableFilter(entityTypeFilter, 'all', () 
       @add="onAdd"
       @retry="retry"
       @update:expanded="updateExpandedRows">
+      <template #actions>
+        <CommonPortableAuthoringLibrary :agency-id="agencyId" kind="review" />
+        <CommonPortableAuthoringActions :agency-id="agencyId" :can-create="canUpdateChild" :kinds="['checklist', 'assessment']" />
+      </template>
       <template #filters>
         <UFormField :label="t('transfer_payment.entity_type')" name="reviewSetEntityTypeFilter">
           <CommonEnumSelect

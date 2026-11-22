@@ -332,6 +332,10 @@ const onDeleteMember = async (row: RecommendationRow) => {
       @add="onAdd"
       @retry="refresh()"
       @update:expanded="expandedRows = $event">
+      <template #actions>
+        <CommonPortableAuthoringLibrary :agency-id="agencyId" kind="recommendation" />
+        <CommonPortableAuthoringActions :agency-id="agencyId" :can-create="canUpdateChild" :kinds="['recommendation']" />
+      </template>
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row)" class="contents">
           <div v-if="isSetupGroup(row)" class="flex w-full items-center gap-3 py-1">

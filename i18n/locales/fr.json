@@ -1,4 +1,48 @@
 {
+  "portable_authoring": {
+    "duplicate_name": "Un schéma portant ce nom existe déjà. Saisissez un nouveau nom pour créer un brouillon distinct.",
+    "browse": "Parcourir les schémas",
+    "browse_help": "Trouvez une ébauche enregistrée ou un schéma publié dans cette organisation.",
+    "saved_schema": "Schéma enregistré",
+    "open_schema": "Ouvrir le schéma",
+    "name_en": "Nouveau nom (anglais)",
+    "name_fr": "Nouveau nom (français)",
+    "names_hint": "Laissez ces champs vides pour utiliser les noms du fichier. Saisissez de nouveaux noms pour importer une copie distincte dans le même organisme.",
+    "import": "Importer le schéma",
+    "export": "Exporter le schéma",
+    "generate": "Générer à partir d’un fichier",
+    "file": "Fichier de schéma GCS (JSON)",
+    "report": "Rapport d’importation du schéma",
+    "pending": "Vérification du schéma et création du brouillon…",
+    "created": "Brouillon créé",
+    "open_draft": "Ouvrir le brouillon",
+    "removed": "Éléments retirés du brouillon importé",
+    "notices": "À vérifier avant la publication",
+    "invalid_file": "Sélectionnez un fichier de schéma GCS JSON lisible.",
+    "invalid_schema": "Ce fichier ne contient pas de schéma pris en charge pour le type sélectionné.",
+    "missing_references": "Certains éléments sont indisponibles dans cet organisme. Vérifiez les éléments ci-dessous avant de les retirer.",
+    "import_failed": "Impossible de confirmer l’importation. Réessayez pour obtenir le résultat.",
+    "remove_retry": "Retirer et réessayer",
+    "kind": {
+      "checklist": "Liste de contrôle",
+      "assessment": "Évaluation",
+      "recommendation": "Schéma de recommandation",
+      "approval": "Modèle d’approbation"
+    }
+  },
+  "authoring_generation": {
+    "title": "Générer une ébauche à partir d’un fichier",
+    "disclosure": "Lorsque vous sélectionnez Générer une ébauche, ce fichier est envoyé à OpenAI à des fins de traitement.",
+    "file": "Fichier source",
+    "pending": "OpenAI traite le fichier source.",
+    "generate": "Générer une ébauche",
+    "credentials_missing": "Demandez à un gestionnaire de configurer les identifiants OpenAI pour la création à partir de fichiers.",
+    "file_too_large": "La taille du fichier source doit être de 10 Mo ou moins.",
+    "file_required": "Choisissez un fichier source non vide.",
+    "file_rejected": "OpenAI a rejeté la demande. Vérifiez le fichier source et la configuration OpenAI de votre organisation, puis réessayez.",
+    "provider_failed": "OpenAI n’a pas pu terminer la génération. Réessayez.",
+    "invalid_proposal": "OpenAI a produit une proposition que GCS n’a pas pu importer."
+  },
   "review_copy": {
     "selected_version_mismatch": "La soumission sélectionnée utilise une version différente. Choisissez une soumission qui correspond à ce brouillon.",
     "copied_title": "Réponses copiées",

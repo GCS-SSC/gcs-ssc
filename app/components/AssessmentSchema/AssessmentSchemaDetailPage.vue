@@ -83,7 +83,11 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
           :can-import="canEdit"
           @import="isImportOpen = true"
           @publish="publishSchema"
-          @retire="retireSchema" />
+          @retire="retireSchema">
+          <template #actions>
+            <CommonPortableAuthoringExport kind="assessment" :endpoint="`/api/agency/${agencyId}/review-schemas/${schemaId}`" />
+          </template>
+        </AssessmentSchemaDetailHero>
 
         <ReviewSchemaImportModal
           v-model:open="isImportOpen"

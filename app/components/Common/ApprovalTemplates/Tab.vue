@@ -174,6 +174,9 @@ const deleteTemplate = async (templateId: string) => {
       :show-button="canUpdateChild"
       @add="openCreate"
       @retry="refresh">
+      <template #actions>
+        <CommonPortableAuthoringActions :agency-id="agencyId" :can-create="canUpdateChild" :kinds="['approval']" />
+      </template>
       <template #name-cell="{ row }">
         <button
           type="button"

@@ -1006,6 +1006,7 @@ export interface CommonPublicationTable {
   egcs_cn_kind: PublicationKind
   egcs_cn_state: Generated<PublicationState>
   egcs_cn_currentversion: string | null
+  egcs_cn_authoringimport: Generated<JsonValue | null>
   _deleted: Generated<boolean>
 }
 

@@ -6,4 +6,4 @@ export const LanguageIndependentCodeSchema = z.string({ error: 'validation.requi
   .refine(code => /^[a-z][a-z0-9_]*$/.test(code) && code !== 'constructor' && code !== 'prototype', {
     error: 'validation.invalid_language_independent_code'
   })
-  .meta({ formRequired: true })
+  .meta({ formRequired: true, pattern: '^[a-z][a-z0-9_]*$' })

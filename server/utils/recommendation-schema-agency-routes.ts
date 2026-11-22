@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agency Recommendation Schema route implementations. */
 import type { H3Event } from 'h3'
 import { getRouterParam } from 'h3'
-import { PaginationSchema, CommonRecommendationSchemaCreateSchema, CommonRecommendationSchemaPatchSchema } from '~~/shared/types/schemas'
+import { PaginationSchema, CommonRecommendationSchemaPatchSchema } from '~~/shared/types/schemas'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorize, requireAuthContext } from './authorize'
 import { withActiveAgencyReadTransaction, withActiveAgencyMutationTransaction } from './agency-auth'
@@ -12,7 +12,10 @@ import { throwIfAgencyUniqueConstraintError } from './agency-unique-constraint-e
 import { buildRecommendationSchemaDefinition, resolvePublicationActorId } from './recommendation-setup-versioning'
 import { publishDefinition, readPublicationMetadata, retirePublication } from './system-publication'
 
-const createBodySchema = CommonRecommendationSchemaCreateSchema.omit({ egcs_cn_agency: true }).strict()
+import { PortableRecommendationImportSchema, RecommendationAuthoringCreateSchema } from '~~/shared/utils/portable-authoring-schema'
+import { readPortableAuthoringCreate, withPortableAuthoringImport } from './portable-authoring-import'
+import type { z } from 'zod'
+
 const patchBodySchema = CommonRecommendationSchemaPatchSchema.omit({ egcs_cn_agency: true, _deleted: true }).strict()
 
 const ids = async (event: H3Event, detail = false) => {
@@ -71,14 +74,24 @@ export const listAgencyRecommendationSchemas = async (event: H3Event) => {
 export const createAgencyRecommendationSchema = async (event: H3Event) => {
   const { agencyId } = await ids(event)
   await authorize(event, 'agency', 'update', { type: 'agency', agencyId })
-  const body = await readValidatedBodyI18n(event, createBodySchema)
+  const request = await readPortableAuthoringCreate(event, RecommendationAuthoringCreateSchema, PortableRecommendationImportSchema)
   try {
     return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
-      const created = await trx.insertInto('Common_Recommendation_Schema')
-        .values({ ...body, egcs_cn_agency: agencyId, _deleted: false })
-        .returningAll().executeTakeFirstOrThrow()
-      const metadata = await readPublicationMetadata(trx, String(created.id), buildRecommendationSchemaDefinition(created))
-      return { ...created, id: String(created.id), egcs_cn_agency: String(created.egcs_cn_agency), ...metadata }
+      const create = async (body: z.infer<typeof RecommendationAuthoringCreateSchema>) => {
+        const created = await trx.insertInto('Common_Recommendation_Schema')
+          .values({ ...body, egcs_cn_agency: agencyId, _deleted: false })
+          .returningAll().executeTakeFirstOrThrow()
+        const metadata = await readPublicationMetadata(trx, String(created.id), buildRecommendationSchemaDefinition(created))
+        return { ...created, id: String(created.id), egcs_cn_agency: String(created.egcs_cn_agency), ...metadata }
+      }
+      if ('portable' in request) {
+        return await withPortableAuthoringImport(
+          event, trx, agencyId, request,
+          async definition => definition,
+          async definition => await create(definition.payload)
+        )
+      }
+      return await create(request)
     })
   } catch (error) {
     return await throwIfAgencyUniqueConstraintError(event, error)

@@ -64,5 +64,9 @@ const typeLabelKey = computed(() => reviewType === 'checklist'
     retire-label-key="transfer_payment.retire_schema"
     @import="emit('import')"
     @publish="emit('publish')"
-    @retire="emit('retire')" />
+    @retire="emit('retire')">
+    <template v-if="$slots.actions" #actions>
+      <slot name="actions" />
+    </template>
+  </CommonPublicationDetailHero>
 </template>

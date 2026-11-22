@@ -50,6 +50,7 @@ RUN set -eux; \
   fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments ddbd9f1eb8b353336d7d7d0499541178e1db5396; \
   fetch_workspace https://github.com/GCS-SSC/gcs-bpmn.git extensions/gcs-bpmn 5a9873246127de502dacf20cad120b60eb939f7c; \
   fetch_workspace https://github.com/GCS-SSC/gcs-feedback.git extensions/gcs-feedback 95b1735dea81cca50e0f4805575c925b4b1cefc9; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-file-authoring.git extensions/gcs-file-authoring 658932f8a468b383159c65fae099fd425b946b9f; \
   fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration daf35cb61ff2cd19a7630ea3802da8a0f5a4e320; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation e69302dda77193c0cf44bcd5573d98ca455ff69e; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 3763ddeb60701b44df0e59c8141b8804bac787b2; \

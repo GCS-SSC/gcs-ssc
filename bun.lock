@@ -11,6 +11,7 @@
         "@gcs-ssc/authorization": "workspace:*",
         "@gcs-ssc/diagrams": "workspace:*",
         "@gcs-ssc/extensions": "workspace:*",
+        "@gcs-ssc/gcs-file-authoring": "workspace:*",
         "@gcs-ssc/guided-help": "workspace:*",
         "@iconify-json/lucide": "^1.2.89",
         "@iconify-json/simple-icons": "^1.2.70",
@@ -168,6 +169,14 @@
       },
       "peerDependencies": {
         "vue": "^3.5.28",
+      },
+    },
+    "extensions/gcs-file-authoring": {
+      "name": "@gcs-ssc/gcs-file-authoring",
+      "version": "0.1.0",
+      "dependencies": {
+        "@gcs-ssc/extensions": "^0.4.0",
+        "zod": "^4.3.6",
       },
     },
     "extensions/gcs-gcforms-integration": {
@@ -762,6 +771,8 @@
     "@gcs-ssc/gcs-bpmn": ["@gcs-ssc/gcs-bpmn@workspace:extensions/gcs-bpmn"],
 
     "@gcs-ssc/gcs-feedback": ["@gcs-ssc/gcs-feedback@workspace:extensions/gcs-feedback"],
+
+    "@gcs-ssc/gcs-file-authoring": ["@gcs-ssc/gcs-file-authoring@workspace:extensions/gcs-file-authoring"],
 
     "@gcs-ssc/gcs-gcforms-integration": ["@gcs-ssc/gcs-gcforms-integration@workspace:extensions/gcs-gcforms-integration"],
 
@@ -3258,6 +3269,8 @@
     "@gcs-ssc/gcs-feedback/vue-tsc": ["vue-tsc@3.3.11", "", { "dependencies": { "@volar/typescript": "2.4.28", "@vue/language-core": "3.3.11" }, "peerDependencies": { "typescript": ">=5.0.0" }, "bin": { "vue-tsc": "bin/vue-tsc.js" } }, "sha512-gOb0B9rtU2+f1dszwPqSH5kAieIF9ReeLhD3kSRNHv5WZZUQz/JdVXW0RTdqhNTMlQkqKzrTTviqKr/4FYZraQ=="],
 
     "@gcs-ssc/gcs-feedback/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
+
+    "@gcs-ssc/gcs-file-authoring/zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "@gcs-ssc/gcs-gcforms-integration/@types/pg": ["@types/pg@8.23.1", "", { "dependencies": { "@types/node": "*", "pg-protocol": "*", "pg-types": "^2.2.0" } }, "sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A=="],
 
