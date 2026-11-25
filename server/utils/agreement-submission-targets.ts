@@ -269,6 +269,10 @@ const planBudgetReplacement = async (
     const { egcs_fc_fundingagreementbudgetfiscalyear: _year, ...prepared } = await prepareNewBudgetLine(event, settings, {
       ...line, egcs_fc_fundingagreementbudgetfiscalyear: fiscalYearId
     }, line.egcs_fc_programfunding ?? zeroMoney(currency))
+    if (settings.egcs_tp_hidecostsubsection && existing) {
+      prepared.egcs_fc_costsubsection = existing.egcs_fc_costsubsection
+      prepared.egcs_fc_costsubsection_fr = existing.egcs_fc_costsubsection_fr
+    }
     const sources = fundingSources.map(source => ({
       ...source,
       egcs_fc_description_en: source.egcs_fc_description_en ?? null,
@@ -282,7 +286,9 @@ const planBudgetReplacement = async (
         mode: calculation.egcs_fc_calculationmode, sourceCategoryId: calculation.egcs_fc_sourcecategory,
         percentage: calculation.egcs_fc_percentage,
         programFunding: prepared.egcs_fc_programfunding,
-        totalAmount: prepared.egcs_fc_totalamount,
+        totalAmount: fundingMode === 'program_only' && existing?.egcs_fc_currency === currency
+          ? parseDatabaseMoney(existing.egcs_fc_totalamount, existing.egcs_fc_currency)
+          : prepared.egcs_fc_totalamount,
         otherFunding: sumMoney(sources.map(source => source.egcs_fc_amount), currency),
         description: prepared.egcs_fc_description
       }
