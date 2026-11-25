@@ -21,6 +21,7 @@ import {
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { assertLinkedSubmissionActionAllowed } from './agreement-linked-submission-access'
 import { getAgreementLineFundingCompletionStatus } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls, getAgreementFinancialBudgetViolation } from './agreement-financial-budget-controls'
 
@@ -98,6 +99,7 @@ export const executeAgreementForecastCompletion = async (
 
   const hookPayload = await executeFreshAuthorizedAgreementWrite(event, db, context.agreementId, agreementContext, async (trx, currentContext) => {
     await lockAgreementForecastEditable(event, trx, context.agreementId, forecastId)
+    await assertLinkedSubmissionActionAllowed(event, trx, { kind: 'forecast', id: forecastId }, 'lifecycle')
     const currentLineItem = await trx
       .selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
       .select('id')

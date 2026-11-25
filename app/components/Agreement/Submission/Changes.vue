@@ -1,0 +1,123 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { claimCustomFieldAnswerLabel, compareClaimReference, compareSubmissionValues, fiscalMonthLabels, isSubmissionIdField, sameClaimCustomFieldEvidence, submissionFieldKey } from '~/utils/agreement-submission-view'
+import type { ClaimReferenceComparison, SubmissionPathPart } from '~/utils/agreement-submission-view'
+import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submission'
+import type { AgreementCustomFieldPatch, ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
+
+const { before, after, history = false, beforeFields = [], afterFields = [], beforeAnswers, afterAnswers, claimReferences, target } = defineProps<{
+  before: unknown
+  after: unknown
+  history?: boolean
+  target?: AgreementSubmissionTarget
+  beforeFields?: ClaimCustomFieldSnapshot
+  afterFields?: ClaimCustomFieldSnapshot
+  beforeAnswers?: AgreementCustomFieldPatch
+  afterAnswers?: AgreementCustomFieldPatch
+  claimReferences?: ClaimReferenceComparison
+}>()
+const { t, te, locale } = useI18n()
+/**
+ * Resolves a localized field or row path for a change.
+ * @param path - Field keys and row details from the snapshots.
+ * @returns A readable path.
+ */
+const label = (path: SubmissionPathPart[]) => path.map(part => {
+  if (typeof part === 'string') return te(submissionFieldKey(part)) ? t(submissionFieldKey(part)) : part
+  const context = [locale.value === 'fr' ? part.descriptionFr || part.description : part.description || part.descriptionFr]
+  if (part.month !== undefined) context.push(t(fiscalMonthLabels[part.month]!))
+  if (history) context.push(part.costCategory, part.costSubsection)
+  if (!history && part.reference) {
+    const { field, id } = part.reference
+    context.push(`${t(field === 'id' ? 'common.id' : submissionFieldKey(field))} ${id}`)
+  }
+  return context.filter(Boolean).join(' · ') || t('submission.row', { number: part.row })
+}).join(' / ')
+
+/**
+ * Finds the last field key so the value renderer retains field-specific formatting.
+ * @param path - Change path.
+ * @returns The field key for scalar formatting.
+ */
+const fieldName = (path: SubmissionPathPart[]) => {
+  const field = path.at(-1)
+  return typeof field === 'string' ? field : undefined
+}
+const changes = computed(() => {
+  const data = compareSubmissionValues(before, after, [], history ? 'snapshot' : 'budget_preview', target).map(change => {
+    const field = fieldName(change.path)
+    if (history && change.path.some(part => typeof part === 'string' && isSubmissionIdField(part))) {
+      if (!claimReferences || !field || change.path.length !== 1) return undefined
+      const reference = compareClaimReference({
+        key: field, before: change.before, after: change.after, evidence: claimReferences,
+        locale: locale.value, unavailable: t('common.unavailable')
+      })
+      if (!reference?.changed) return undefined
+      return {
+        title: t(reference.title),
+        field,
+        before: reference.before,
+        after: reference.after
+      }
+    }
+    return { title: label(change.path), field, before: change.before, after: change.after }
+  }).filter(change => change !== undefined)
+  const previous = new Map(beforeFields.map(field => [field.key, field]))
+  const current = new Map(afterFields.map(field => [field.key, field]))
+  for (const key of new Set([...current.keys(), ...previous.keys()])) {
+    const from = previous.get(key)?.value ?? null
+    const to = current.get(key)?.value ?? null
+    if (sameClaimCustomFieldEvidence(
+      { key, displayed: from, answers: beforeAnswers },
+      { key, displayed: to, answers: afterAnswers }
+    )) continue
+    const field = current.get(key) ?? previous.get(key)
+    if (!field) continue
+    data.push({
+      title: [t('agreement.claims.additional_information'), locale.value === 'fr' ? field.labelFr : field.labelEn].join(' / '),
+      field: undefined,
+      before: claimCustomFieldAnswerLabel(from, locale.value) ?? undefined,
+      after: claimCustomFieldAnswerLabel(to, locale.value) ?? undefined
+    })
+  }
+  return data
+})
+</script>
+
+<template>
+  <p v-if="!changes.length" class="text-sm text-muted">
+    {{ t('submission.no_changes') }}
+  </p>
+  <ul v-else class="divide-y divide-default rounded-md border border-default">
+    <li v-for="(change, index) in changes" :key="index" class="space-y-2 px-4 py-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <p class="text-sm font-semibold text-highlighted [overflow-wrap:anywhere]">
+          {{ change.title }}
+        </p>
+        <UBadge v-if="change.before === undefined" color="success" variant="subtle">
+          {{ t('submission.added') }}
+        </UBadge>
+        <UBadge v-else-if="change.after === undefined" color="warning" variant="subtle">
+          {{ t('submission.removed') }}
+        </UBadge>
+        <UBadge v-else color="neutral" variant="subtle">
+          {{ t('submission.changed') }}
+        </UBadge>
+      </div>
+      <dl class="grid gap-3 text-sm sm:grid-cols-2">
+        <div class="min-w-0">
+          <dt class="mb-1 font-medium text-muted">
+            {{ t('submission.before') }}
+          </dt>
+          <dd><AgreementSubmissionValue :value="change.before" :field="change.field" :snapshot="history" /></dd>
+        </div>
+        <div class="min-w-0">
+          <dt class="mb-1 font-medium text-muted">
+            {{ t('submission.after') }}
+          </dt>
+          <dd><AgreementSubmissionValue :value="change.after" :field="change.field" :snapshot="history" /></dd>
+        </div>
+      </dl>
+    </li>
+  </ul>
+</template>

@@ -1,4 +1,6 @@
 import type { Selectable } from 'kysely'
+import type { LinkedSubmissionOverviewReview } from './agreement-submission'
+import type { AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition } from './schemas/agreement-custom-fields'
 import type { AgreementActivityCustomFieldEvidence } from './schemas/agreement-activity-evidence'
 import type { PaymentEvidence } from './payment-evidence'
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
@@ -465,6 +467,7 @@ export type AgreementBudgetCostVisibility = Pick<Selectable<TransferPaymentStrea
 type AgreementBudgetManagementSettings = AgreementBudgetCostVisibility & Pick<Selectable<TransferPaymentStreamTable>, 'egcs_tp_budgetfundingmode'>
 
 export interface FundingCaseAgreementForecastOverviewRow {
+  linkedReview: LinkedSubmissionOverviewReview | null
   budgetManagement?: AgreementBudgetManagementSettings
   forecasts: FundingCaseAgreementForecastRow[]
   budgetLineItems: FundingCaseAgreementBudgetLineItemRow[]
@@ -480,6 +483,8 @@ export type FundingCaseAgreementForecastLineItemForm = Partial<Omit<FundingCaseA
   }>
 
 export interface FundingCaseAgreementClaimRow extends FundingCaseAgreementClaimItem, BusinessRecordStateFields {
+  egcs_fc_customfields?: AgreementCustomFieldValues
+  egcs_fc_customfielddefinitions?: AssignedAgencyCustomFieldDefinition[]
   fiscal_year_id?: string
   fiscal_year_available?: boolean
   hasPositiveCompletionTerminus?: boolean
@@ -527,6 +532,7 @@ export interface FundingCaseAgreementClaimReconcileLineItemRow extends FundingCa
 }
 
 export interface FundingCaseAgreementClaimOverviewRow {
+  linkedReview: LinkedSubmissionOverviewReview | null
   budgetManagement?: AgreementBudgetManagementSettings
   claims: FundingCaseAgreementClaimRow[]
   budgetLineItems: FundingCaseAgreementBudgetLineItemRow[]

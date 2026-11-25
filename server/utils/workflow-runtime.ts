@@ -1,3 +1,5 @@
+import { assertClaimCustomFieldsComplete } from './agreement-claim-custom-fields'
+import { assertLinkedSubmissionLifecycleAllowed } from './agreement-linked-submission-access'
 import { assertAgreementMappedReviewsComplete } from './review-agreement-clauses'
 import { applyAgreementApprovalFinancialNumber } from './agreement-financial-number-provider'
 import { canAdmitWorkflowForTarget } from './workflow-terminalization-admission'
@@ -1464,6 +1466,7 @@ const startWorkflowUnchecked = async (
         return locked ? { statusId: locked.status.statusId, terminal: locked.status.terminal } : null
       })()
   if (!targetStatus) return await badRequest(event, 'WORKFLOW_TARGET_TYPE_NOT_SUPPORTED', 'apiErrors.request.invalid_resource')
+  await assertLinkedSubmissionLifecycleAllowed(event, trx, context)
   if (purpose === 'approval_submission' && context.entityType === 'fundingcaseagreement') {
     await assertAgreementMappedReviewsComplete(event, trx, context.entityId)
   }
@@ -1520,6 +1523,7 @@ const startWorkflowUnchecked = async (
     await assertAgreementPaymentForecastCurrent(trx, context.entityId)
     await assertAgreementPaymentCommitmentCurrent(trx, context.entityId)
   }
+  if (context.entityType === 'fundingcaseagreementclaim') await assertClaimCustomFieldsComplete(event, trx, context.entityId)
   if (context.agreementId && ['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingclaimreconcile'].includes(context.entityType)) {
     const kind = context.entityType === 'fundingcaseagreementclaim' ? 'claim' : context.entityType === 'fundingcaseforecast' ? 'forecast' : 'reconciliation'
     await assertAgreementFinancialBudgetControls(trx, context.agreementId, { kind, id: context.entityId })

@@ -33,7 +33,7 @@ export default defineEventHandler(async event => {
       receivedDate: validated.egcs_fc_receiveddate,
       submissionUuid: null,
       lineItems: []
-    }, current.agencyId, creatorId)
+    }, current.agencyId, creatorId, undefined, event)
     if (result.status === 'initial_approval_required') return await throwAgreementInitialApprovalRequired(event)
     if (result.status === 'applicant_recipient_unavailable') return await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
     if (result.status === 'fiscal_year_unavailable') {

@@ -1,3 +1,4 @@
+import { assertLinkedSubmissionActionAllowed } from './agreement-linked-submission-access'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported forecast helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -187,6 +188,7 @@ export const executeAgreementForecastMutation = async <T>(
           for (const action of actions) {
             await authorizeFreshAssignedItem(event, trx, authContext, 'fundingcaseforecast', lock.id, action)
           }
+          await assertLinkedSubmissionActionAllowed(event, trx, { kind: 'forecast', id: lock.id }, 'edit')
         }
       }
     }

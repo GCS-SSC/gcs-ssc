@@ -1,3 +1,4 @@
+import { readLinkedSubmissionOverviewReview } from '~~/server/utils/agreement-linked-submission-targets'
 import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
@@ -271,6 +272,9 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
   }))
   const forecastsWithState = await withBusinessRecordState(db, 'fundingcaseforecast', forecasts)
   return {
+    linkedReview: forecastId && forecasts.length
+      ? await readLinkedSubmissionOverviewReview(db, { agreementId, target: 'forecast', targetId: forecastId })
+      : null,
     budgetManagement: await loadAgreementBudgetManagement(db, agreementId),
     forecasts: await Promise.all(forecastsWithState.map(async forecast => ({
       ...forecast,

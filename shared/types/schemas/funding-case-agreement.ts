@@ -813,8 +813,22 @@ export const FundingCaseAgreementClaimCreateSchema = FundingCaseAgreementClaimBa
 )
 
 export const FundingCaseAgreementClaimPatchSchema = FundingCaseAgreementClaimBaseSchema.partial()
-  .extend({ egcs_fc_status: ForbiddenBusinessStatusMutation() })
+  .extend({
+    egcs_fc_status: ForbiddenBusinessStatusMutation(),
+    egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
+    customFieldPrecondition: z.strictObject({
+      submissionRevision: z.int32({ error: 'validation.invalid_number' }).positive({ error: 'validation.invalid_number' }).nullable(),
+      previousAnswers: AgreementCustomFieldValuesSchema
+    }).optional()
+  })
   .superRefine(validatePeriodRange)
+  .refine(({ egcs_fc_customfields, customFieldPrecondition }) => {
+    if (!customFieldPrecondition) return true
+    const changedKeys = Object.keys(egcs_fc_customfields ?? {})
+    const previous = customFieldPrecondition.previousAnswers
+    return changedKeys.length > 0 && changedKeys.length === Object.keys(previous).length
+      && changedKeys.every(key => Object.hasOwn(previous, key))
+  }, { error: 'validation.invalid_selection', path: ['customFieldPrecondition', 'previousAnswers'] })
 
 export type FundingCaseAgreementClaim = z.infer<typeof FundingCaseAgreementClaimCreateSchema>
 export type FundingCaseAgreementClaimPatch = z.infer<typeof FundingCaseAgreementClaimPatchSchema>

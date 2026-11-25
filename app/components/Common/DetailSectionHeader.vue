@@ -1,14 +1,24 @@
 <script setup lang="ts">
-const { title, description } = defineProps<{
+const { title, description, heading = 'h2' } = defineProps<{
   title: string
   description?: string
+  heading?: 'h2' | 'h3'
 }>()
 </script>
 
 <template>
   <header class="flex flex-wrap items-start justify-between gap-4">
     <div class="min-w-0">
-      <h2 class="break-words text-xl font-semibold text-highlighted [overflow-wrap:anywhere]" data-testid="detail-section-title">
+      <h3
+        v-if="heading === 'h3'"
+        class="break-words text-lg font-semibold text-highlighted [overflow-wrap:anywhere]"
+        data-testid="detail-section-title">
+        {{ title }}
+      </h3>
+      <h2
+        v-else
+        class="break-words text-xl font-semibold text-highlighted [overflow-wrap:anywhere]"
+        data-testid="detail-section-title">
         {{ title }}
       </h2>
       <p v-if="description" class="mt-1 break-words text-sm text-muted [overflow-wrap:anywhere]">

@@ -1,9 +1,11 @@
+import { shallowReactive } from 'vue'
 import TransferPaymentStreamClausesTab from '~/components/TransferPayment/TransferPaymentStreamClausesTab.vue'
 import { useStreamClauseLinks } from '~/composables/useStreamClauseLinks'
 import TransferPaymentStreamBudgetManagementTab from '~/components/TransferPayment/TransferPaymentStreamBudgetManagementTab.vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import CustomFieldsTab from '~/components/TransferPayment/CustomFieldsTab.vue'
+import StreamSubmissionPolicy from '~/components/TransferPayment/StreamSubmissionPolicy.vue'
 import type { FetchError } from 'ofetch'
 import type { TransferPaymentStreamBudgetManagement, TransferPaymentStreamRiskManagement, TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
 import type { TabMap } from '~~/shared/types/ui'
@@ -34,6 +36,8 @@ import { appRouteLocations } from '~/utils/route-locations'
 export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   customFields: 'custom_fields.title',
   activityCustomFields: 'custom_fields.activity_title',
+  claimCustomFields: 'custom_fields.claim_title',
+  submissionPolicy: 'submission.policy.title',
   general: 'agency.tabs.general',
   holdbackBases: 'transfer_payment.holdback_bases',
   budgets: 'transfer_payment.budgets',
@@ -120,6 +124,7 @@ export const useTransferPaymentStreamDetailState = (
     eligible: () => profile.value?.id === id && stream.value?.id === streamId
   })
   const settingsPending = ref(false)
+  const submissionPolicyPendingRequests = shallowReactive(new Map<string, symbol>())
   /**
    * Persists Stream settings and accepts the acknowledged draft even if the section closes.
    * @param draft - Settings captured by the currently mounted editor.
@@ -219,6 +224,8 @@ export const useTransferPaymentStreamDetailState = (
     ],
     ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ key: 'custom-fields', transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     ['activityCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields, value: 'activity-custom-fields', icon: 'i-lucide-list-todo', component: CustomFieldsTab, getProps: () => ({ key: 'activity-custom-fields', transferPaymentId: id, streamId, target: 'activity', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
+    ['claimCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.claimCustomFields, value: 'claim-custom-fields', icon: 'i-lucide-receipt', component: CustomFieldsTab, getProps: () => ({ key: 'claim-custom-fields', transferPaymentId: id, streamId, target: 'claim', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
+    ['submissionPolicy', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.submissionPolicy, value: 'submission-policy', icon: 'i-lucide-inbox', component: StreamSubmissionPolicy, getProps: () => ({ programId: id, streamId, canUpdate: canDeleteChild.value, pendingRequests: submissionPolicyPendingRequests }) }],
     [
       'risk-management',
       {

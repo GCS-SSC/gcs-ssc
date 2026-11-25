@@ -116,6 +116,15 @@ export type AssignedAgencyCustomFieldDefinition = z.infer<typeof AgencyCustomFie
   options: Array<z.infer<typeof AgencyCustomFieldOptionCreateSchema> & { id: string }>
 }
 
+export const ClaimCustomFieldSnapshotSchema = z.array(z.object({
+  key: PositivePostgresBigintIdSchema,
+  labelEn: z.string(),
+  labelFr: z.string(),
+  value: z.union([z.string(), z.number(), z.array(z.object({ en: z.string(), fr: z.string() })), z.null()])
+}))
+
+export type ClaimCustomFieldSnapshot = z.infer<typeof ClaimCustomFieldSnapshotSchema>
+
 /** Agency-owned definition used by portable Workflow catalog authoring. */
 export type AgencyCustomFieldDefinition = z.infer<typeof AgencyCustomFieldCreateSchema> & {
   id: string
@@ -148,16 +157,42 @@ const decimalPlaces = (value: number): number => {
   return Math.max(0, (coefficient.split('.')[1]?.length ?? 0) - Number(exponent))
 }
 
+/**
+ * Checks whether an active numeric definition admits a finite answer at its configured precision.
+ * @param definition - Numeric bounds and decimal places.
+ * @returns Whether at least one allowed answer exists.
+ */
+export const customFieldNumberHasAnswer = (
+  definition: Pick<AssignedAgencyCustomFieldDefinition, 'egcs_ay_minimum' | 'egcs_ay_maximum' | 'egcs_ay_decimalplaces'>
+): boolean => {
+  const { egcs_ay_minimum: minimum, egcs_ay_maximum: maximum, egcs_ay_decimalplaces: places } = definition
+  if (minimum == null || maximum == null) return true
+  if (minimum > maximum) return false
+  if (places == null || decimalPlaces(minimum) <= places || decimalPlaces(maximum) <= places) return true
+
+  // Scale the canonical decimal digits exactly to avoid binary rounding and overflow.
+  const [coefficient = '0'] = String(minimum).split('e')
+  const digits = BigInt(coefficient.replace('.', ''))
+  const divisor = BigInt(10) ** BigInt(decimalPlaces(minimum) - places)
+  const roundedUp = digits / divisor + (digits % divisor > BigInt(0) ? BigInt(1) : BigInt(0))
+  const candidate = Number(`${roundedUp}e-${places}`)
+  return candidate >= minimum && candidate <= maximum && decimalPlaces(candidate) <= places
+}
+
 export type AgreementCustomFieldPatch = z.infer<typeof AgreementCustomFieldValuesSchema>
 /**
  * Validates the merged record, preserving formatting and unchanged retired selections.
  * @returns A schema producing merged canonical values.
  * @param definitions - Authoritative stream definitions.
- * @param current - Stored Agreement values.
+ * @param current - Stored values.
+ * @param options - Required answer validation settings.
+ * @param options.requireAnswers - Validate that required fields have answers.
+ * @param options.labelRequiredAnswers - Include the bilingual field label in required-answer errors.
  */
 export const agreementCustomFieldMergeSchema = (
   definitions: AssignedAgencyCustomFieldDefinition[],
-  current: AgreementCustomFieldValues
+  current: AgreementCustomFieldValues,
+  { requireAnswers = true, labelRequiredAnswers = false }: { requireAnswers?: boolean; labelRequiredAnswers?: boolean } = {}
 ) => AgreementCustomFieldValuesSchema.transform((patch, ctx): AgreementCustomFieldValues => {
   const merged = { ...current }
   const fields = new Map(definitions.map(field => [field.id, field]))
@@ -225,7 +260,13 @@ export const agreementCustomFieldMergeSchema = (
   }
   for (const field of definitions) {
     if (field.egcs_ay_kind === 'relational' && merged[field.id] !== undefined && !Array.isArray(merged[field.id])) issue(field.id, 'validation.invalid_selection')
-    if (field.egcs_tp_active && field.egcs_tp_required && !customFieldHasValue(merged[field.id])) issue(field.id, 'validation.required')
+    if (!requireAnswers || !field.egcs_tp_active || !field.egcs_tp_required || customFieldHasValue(merged[field.id])) continue
+    if (labelRequiredAnswers) {
+      ctx.addIssue({
+        code: 'custom', path: [field.id], message: 'validation.custom_field_named_required',
+        params: { field_en: field.egcs_ay_name_en, field_fr: field.egcs_ay_name_fr }
+      })
+    } else issue(field.id, 'validation.required')
   }
   return merged
 })

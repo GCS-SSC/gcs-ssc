@@ -86,6 +86,18 @@ export const findAgreementBudgetFinancialLimitViolation = (
   return stackingRatio !== null && compareScaledMoney(stacking, one, totalCost, stackingRatio) > 0 ? { kind: 'stacking' } : null
 }
 
+export const loadAgreementBudgetFinancialLimits = async (db: Db, streamId: string) => await db.selectFrom('Transfer_Payment_Financial_Limits')
+  .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Financial_Limits.egcs_tp_transferpaymentstream')
+  .select([
+    'Transfer_Payment_Stream.egcs_tp_budgetfundingmode',
+    databaseMoneyText(sql.ref('egcs_tp_maxallowableperrecipient')).as('maxPerProponent'),
+    sql<string>`egcs_tp_maxpercentofsupportavailableperrecipient::text`.as('supportRatio'),
+    sql<string>`egcs_tp_stackinglimit::text`.as('stackingRatio')
+  ])
+  .where('egcs_tp_transferpaymentstream', '=', streamId)
+  .where('Transfer_Payment_Financial_Limits.egcs_tp_active', '=', true).where('Transfer_Payment_Financial_Limits._deleted', '=', false)
+  .executeTakeFirst()
+
 /**
  * Validates the complete saved version after proposed and calculated writes.
  * @param db - Owning authorized write transaction.
@@ -104,17 +116,7 @@ export const assertAgreementBudgetFinancialLimits = async (
   proposed?: { amounts: ReadonlyMap<string, Money>, totals: ReadonlyMap<string, Money>, pendingLineId?: string }
 ): Promise<void> => {
   const { agreementId, versionId, streamId } = target
-  const limits = await db.selectFrom('Transfer_Payment_Financial_Limits')
-    .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Financial_Limits.egcs_tp_transferpaymentstream')
-    .select([
-      'Transfer_Payment_Stream.egcs_tp_budgetfundingmode',
-      databaseMoneyText(sql.ref('egcs_tp_maxallowableperrecipient')).as('maxPerProponent'),
-      sql<string>`egcs_tp_maxpercentofsupportavailableperrecipient::text`.as('supportRatio'),
-      sql<string>`egcs_tp_stackinglimit::text`.as('stackingRatio')
-    ])
-    .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('Transfer_Payment_Financial_Limits.egcs_tp_active', '=', true).where('Transfer_Payment_Financial_Limits._deleted', '=', false)
-    .executeTakeFirst()
+  const limits = await loadAgreementBudgetFinancialLimits(db, streamId)
   if (!limits) return
   const rows = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item as line')
     .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as year', 'year.id', 'line.egcs_fc_fundingagreementbudgetfiscalyear')

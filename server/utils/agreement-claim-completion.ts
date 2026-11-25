@@ -1,3 +1,5 @@
+import { assertClaimCustomFieldsComplete } from './agreement-claim-custom-fields'
+import { assertLinkedSubmissionActionAllowed } from './agreement-linked-submission-access'
 /* eslint-disable jsdoc/require-jsdoc -- Agreement Claim completion follows the shared completion runtime contract. */
 import type { H3Event } from 'h3'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
@@ -104,11 +106,13 @@ export const executeAgreementClaimCompletion = async (
         return await notFound(event, 'AGREEMENT_CLAIM_NOT_FOUND', 'apiErrors.agreement.claim_not_found')
       }
 
+      await assertLinkedSubmissionActionAllowed(event, trx, { kind: 'claim', id: claimId }, 'lifecycle')
       const protection = await resolveBusinessStatusProtection(trx, 'fundingcaseagreementclaim', claimId)
       if (!protection || protection.locked) {
         return await badRequest(event, 'AGREEMENT_CLAIM_LOCKED', 'apiErrors.request.invalid_status')
       }
 
+      await assertClaimCustomFieldsComplete(event, trx, claimId)
       const claimLines = await trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
         .select(['id', 'egcs_fc_fundingagreementbudgetlineitem'])
         .where('egcs_fc_fundingagreementclaim', '=', claimId)

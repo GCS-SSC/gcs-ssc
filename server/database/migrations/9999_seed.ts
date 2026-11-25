@@ -11,6 +11,7 @@ import { upgradeNciaGaRiskAssessment } from '../ncia-ga-risk-assessment'
 import { seedReviewCopyDemo } from '../review-copy-demo-seed'
 import { seedHealthCanadaCatalogs } from '../health-canada-catalog-seed'
 import { seedHealthCanadaClauses } from '../health-canada-clause-seed'
+import { seedAgreementSubmissionDemo } from '../agreement-submission-demo-seed'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: string | number }> }
 
@@ -139,6 +140,7 @@ export const up: Migration['up'] = async db => {
     await seedReviewCopyDemo(demo)
     await seedHealthCanadaCatalogs(demo)
     await seedHealthCanadaClauses(demo)
+    await seedAgreementSubmissionDemo(demo)
   }
   if (db.isTransaction) await seed(db as Transaction<unknown>)
   else await db.transaction().execute(seed)

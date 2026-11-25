@@ -168,6 +168,8 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Funding_Case_Agreement_Budget_Line_Item': parent('egcs_fc_fundingagreementbudgetfiscalyear', 'public.Funding_Case_Agreement_Budget_Fiscal_Year'),
   'public.Funding_Case_Agreement_Budget_Line_Item_Funding': parent('egcs_fc_budgetlineitem', 'public.Funding_Case_Agreement_Budget_Line_Item'),
   'public.Funding_Case_Agreement_Budget_Version': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
+  'public.Funding_Case_Agreement_Submission': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
+  'public.Funding_Case_Agreement_Submission_Event': parent('egcs_fc_submission', 'public.Funding_Case_Agreement_Submission'),
   'public.Funding_Case_Agreement_Claim': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
   'public.Funding_Case_Agreement_Claim_Line_Item': parent('egcs_fc_fundingagreementclaim', 'public.Funding_Case_Agreement_Claim'),
   'public.Funding_Case_Agreement_Claim_Line_Item_Funding': parent('egcs_fc_claimlineitem', 'public.Funding_Case_Agreement_Claim_Line_Item'),

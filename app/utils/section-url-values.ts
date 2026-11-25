@@ -42,6 +42,9 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
   'corrections': { fr: 'corrections' },
   'forecasts': { fr: 'previsions' },
   'claims': { fr: 'demandes-de-remboursement' },
+  'submissions': { fr: 'soumissions' },
+  'additional': { fr: 'renseignements-supplementaires' },
+  'submission-policy': { fr: 'politique-de-soumission' },
   'monitors': { fr: 'suivis' },
   'activities': { fr: 'activites' },
   'amendments': { fr: 'modifications' },
@@ -60,6 +63,7 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
   'field-help': { fr: 'aide-aux-champs' },
   'custom-fields': { fr: 'champs-personnalises' },
   'activity-custom-fields': { fr: 'champs-personnalises-des-activites' },
+  'claim-custom-fields': { fr: 'champs-personnalises-des-demandes-de-remboursement' },
   'approval-templates': { fr: 'modeles-d-approbation', aliases: ['approvalTemplates'] },
   'review-setups': { fr: 'configurations-d-examen', aliases: ['reviewSets'] },
   'recommendation-setups': { fr: 'configurations-de-recommandation', aliases: ['recommendationSets'] },
@@ -116,6 +120,9 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
 }
 
 const SECTION_TAB_KEYS: Record<string, string> = {
+  'submission.title': 'submissions',
+  'submission.history_tab': 'history',
+  'submission.policy.title': 'submission-policy',
   'agreement.payments.evidence.title': 'payment-evidence',
   'agency.tabs.general': 'general',
   'guided_help.steps': 'steps',
@@ -127,6 +134,7 @@ const SECTION_TAB_KEYS: Record<string, string> = {
   'clauses.title': 'clauses',
   'custom_fields.title': 'custom-fields',
   'custom_fields.activity_title': 'activity-custom-fields',
+  'custom_fields.claim_title': 'claim-custom-fields',
   'agency.tabs.approval_templates': 'approval-templates',
   'agency.tabs.workflow_setups': 'workflows',
   'transfer_payment.review_setups': 'review-setups',

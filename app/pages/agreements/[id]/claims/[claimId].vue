@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSubmissionAnswerEditor } from '~/composables/useSubmissionAnswerEditor'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
@@ -6,6 +7,7 @@ import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
 import { FundingCaseAgreementClaimLineItemBaseSchema, FundingCaseAgreementClaimReconcileLineItemBaseSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
+import { useLinkedAgreementSubmissionReview } from '~/composables/useLinkedAgreementSubmissionReview'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -15,6 +17,7 @@ import CommonCompletionSection from '~/components/Common/Completions/Section.vue
 import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import CommonSelectableTable from '~/components/Common/SelectableTable.vue'
 import AgreementClaimReconciliationLinesTable from '~/components/Agreement/AgreementClaimReconciliationLinesTable.vue'
+import AgreementFieldsCustomField from '~/components/Agreement/Fields/CustomField.vue'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { useActionContext } from '~/composables/useActionContext'
 import { useFormSession } from '~/composables/useFormSession'
@@ -190,7 +193,6 @@ const isCurrentPage = () => claimPageState === 'active'
 watch(() => route.path, disposeClaimPage, { flush: 'sync' })
 onScopeDispose(disposeClaimPage)
 const isHeroCollapsed = getHeroCollapsed('agreement-claim-detail')
-const selectedClaimTab: Ref<string> = ref('submission')
 const authorizedClaimId = computed(() => profileStatus.value === 'success' ? claimId : undefined)
 const {
   tabs: extensionTabs,
@@ -206,6 +208,11 @@ const {
   status: overviewStatus,
   refresh: refreshOverview
 } = useFetch<FundingCaseAgreementClaimOverviewRow, FetchError, string>(`/api/agreements/${agreementId}/claims-overview?claimId=${claimId}`)
+const submissionReview = useLinkedAgreementSubmissionReview(agreementId, 'claim', claimId, {
+  read: () => overview.value ? overview.value.linkedReview ?? null : undefined,
+  status: () => overviewStatus.value,
+  refresh: refreshOverview
+})
 usePageResourceError({
   identity: () => route.path,
   errors: [profileError, overviewError],
@@ -224,6 +231,8 @@ const claimLineItems = computed<FundingCaseAgreementClaimOverviewRow['lineItems'
 const reconciles = computed<FundingCaseAgreementClaimOverviewRow['reconciles']>(() => overview.value?.reconciles ?? [])
 const reconcileLineItems = computed<FundingCaseAgreementClaimOverviewRow['reconcileLineItems']>(() => overview.value?.reconcileLineItems ?? [])
 const activeClaim = computed(() => claims.value.find((claim: FundingCaseAgreementClaimOverviewRow['claims'][number]) => String(claim.id) === claimId) ?? null)
+const additionalInformationFields = computed(() => activeClaim.value?.egcs_fc_customfielddefinitions?.filter(field => field.egcs_tp_active) ?? [])
+const additionalInformationValues = computed(() => activeClaim.value?.egcs_fc_customfields ?? {})
 const claimFundingMode = computed(() => overview.value?.budgetManagement?.egcs_tp_budgetfundingmode ?? 'manual')
 const isHistoricalClaim = computed(() => Boolean(activeClaim.value?.isCompleted || activeClaim.value?.hasPositiveCompletionTerminus
   || getDefinition(activeClaim.value?.egcs_fc_status)?.readOnly || isTerminalStatus(activeClaim.value?.egcs_fc_status)))
@@ -258,7 +267,7 @@ watch(() => {
 })
 const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow, clearOnly = false) => {
   if (claimFundingMode.value === 'program_only') return
-  if (isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
+  if (isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimSubmissionEditWarning.value)) return
   if (!clearOnly && warnHistoricalClaimLine(line)) return
   fundingEditorSession.value += 1
   fundingEditorClearOnly.value = clearOnly
@@ -280,7 +289,7 @@ const saveFundingEditor = async () => {
   if (!isCurrentPage()) return
   const line = fundingEditorLine.value
   const mode = claimFundingMode.value
-  if (mode === 'program_only' || !line || isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
+  if (mode === 'program_only' || !line || isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimSubmissionEditWarning.value)) return
   const clearOnly = fundingEditorClearOnly.value
   if (!clearOnly && warnHistoricalClaimLine(line)) return
   const session = fundingEditorSession.value
@@ -357,6 +366,14 @@ const claimWorkflowPrerequisiteWarning = computed(() => claimSourcePrerequisiteW
   ?? (isTerminalStatus(activeClaim.value?.egcs_fc_status) ? toast.localized('agreement.claims.action_unavailable') : undefined))
 const claimEditPrerequisiteWarning = computed(() => claimWorkflowPrerequisiteWarning.value
   ?? (activeClaimIsLocked.value ? toast.localized('agreement.claims.action_unavailable') : undefined))
+const submissionLifecycleWarning = computed(() => submissionReview.canAdvanceLifecycle.value
+  ? undefined
+  : toast.localized(submissionReview.warning.value ?? 'submission.errors.acceptance_required'))
+const claimCompletionWarning = computed(() => claimEditPrerequisiteWarning.value ?? submissionLifecycleWarning.value)
+const claimSubmissionEditWarning = computed(() => claimEditPrerequisiteWarning.value
+  ?? (!submissionReview.canEdit.value
+    ? toast.localized(submissionReview.warning.value ?? (submissionReview.state.value === 'returned' ? 'submission.waiting' : 'submission.review_to_edit'))
+    : undefined))
 const claimEditReady = computed(() => canUpdateClaim.value && !claimEditPrerequisiteWarning.value)
 const guardClaimAction = (roleAllowed: boolean, warning: LocalizedToastText | undefined): boolean => {
   if (!isCurrentPage()) return false
@@ -442,7 +459,7 @@ const isLoadingDetail = computed(() => profileStatus.value === 'pending' || over
   || (!activeClaimStatus.value && statusCatalog.state.value.status === 'pending'))
 const retryLoad = async () => {
   if (!isCurrentPage()) return
-  await Promise.all([refreshProfile(), refreshOverview()])
+  await Promise.all([refreshProfile(), submissionReview.refresh()])
 }
 
 const breadcrumbItems = computed(() => [
@@ -454,17 +471,43 @@ const breadcrumbItems = computed(() => [
   { label: activeClaim.value ? t('agreement.claims.claim_label', { id: activeClaim.value.id }) : claimId }
 ])
 
+const submissionReviewBusy = computed(() =>
+  isLoadingDetail.value || isSavingSubmission.value || isSavingAdditionalInformation.value || isSavingFunding.value || allocatingClaimLineId.value !== null)
+const submissionReviewActionsBlocked = computed(() => submissionReviewBusy.value || additionalInformationDirty.value)
+const claimHeroActions = computed(() => [
+  ...(isClaimSubmissionSection.value && submissionReview.detail.value?.canReview && submissionReview.state.value === 'submitted'
+    ? [{
+        label: t('submission.start'), icon: 'i-lucide-play', loading: submissionReview.pending.value,
+        disabled: submissionReviewActionsBlocked.value || !submissionReview.actionReady.value,
+        onClick: () => submissionReview.run({ action: 'start' })
+      }]
+    : []),
+  ...(receivableEntry.canCreate.value
+    ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', loading: receivableEntry.starting.value, onClick: receivableEntry.start }]
+    : [])
+])
+
+const claimSubmissionTabStyle = 'ps-12 hover:bg-transparent data-[state=active]:bg-transparent'
 const claimTabs = computed(() => [
   {
-    key: 'agreement.claims.submission_title',
+    key: 'agreement.claims.amounts_tab',
     value: 'submission',
-    icon: 'i-lucide-file-input'
+    ui: { trigger: claimSubmissionTabStyle }
+  },
+  {
+    key: 'agreement.claims.additional_tab',
+    value: 'additional',
+    ui: { trigger: claimSubmissionTabStyle }
   },
   {
     key: 'agreement.claims.reconcile_title',
     value: 'reconciliation',
     icon: 'i-lucide-list-checks'
   },
+  ...(submissionReview.detail.value || (submissionReview.status.value !== 'success'
+    && ['history', 'historique'].some(section => section === route.query.section))
+    ? [{ key: 'submission.history_tab', value: 'history', icon: 'i-lucide-history' }]
+    : []),
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   {
     key: 'workflow.title',
@@ -484,6 +527,8 @@ const claimTabs = computed(() => [
   },
   ...extensionTabs.value
 ])
+const { selectedTab: selectedClaimTab } = useUrlTabState({ tabs: claimTabs, defaultTab: 'submission' })
+const isClaimSubmissionSection = computed(() => ['submission', 'additional'].includes(selectedClaimTab.value))
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedClaimTab.value))
 
 const claimLinesByBudgetId = computed(() => {
@@ -522,17 +567,17 @@ const hasSelectedSubmissionLine = () => {
   return Boolean(target && claimLinesByBudgetId.value.get(target.budgetLineId)?.some(line => String(line.id) === target.claimLineId))
 }
 const ownsSubmissionAdmission = () => isCurrentPage() && activeClaim.value?.id === claimId
-  && !claimEditPrerequisiteWarning.value
+  && !claimSubmissionEditWarning.value
   && activeBudgetLineItems.value.some(line => String(line.id) === submissionTarget.value?.budgetLineId)
 const submissionCollectionCreateContext = useActionContext({
   identity: [() => route.params.id, () => route.params.claimId],
   authority: canCreateClaimLineItems,
-  eligible: () => isCurrentPage() && activeClaim.value?.id === claimId && !claimEditPrerequisiteWarning.value
+  eligible: () => isCurrentPage() && activeClaim.value?.id === claimId && !claimSubmissionEditWarning.value
 })
 const submissionCollectionUpdateContext = useActionContext({
   identity: [() => route.params.id, () => route.params.claimId],
   authority: canUpdateClaim,
-  eligible: () => isCurrentPage() && activeClaim.value?.id === claimId && !claimEditPrerequisiteWarning.value
+  eligible: () => isCurrentPage() && activeClaim.value?.id === claimId && !claimSubmissionEditWarning.value
 })
 const submissionCreateContext = useActionContext({
   identity: [() => route.params.id, () => route.params.claimId, () => submissionTarget.value?.budgetLineId, () => submissionTarget.value?.claimLineId],
@@ -617,8 +662,8 @@ const loadSelectedReconcileDetail = async (reconcile: FundingCaseAgreementClaimR
   }
 }
 
-const { user: reconciliationActor, permissionRevision: reconciliationPermissionRevision } = useAuth()
-watch([() => activeReconcile.value?.id, () => reconciliationActor.value?.id, reconciliationPermissionRevision], () => {
+const { user: claimPageActor, permissionRevision: claimPermissionRevision } = useAuth()
+watch([() => activeReconcile.value?.id, () => claimPageActor.value?.id, claimPermissionRevision], () => {
   selectedReconcileRole.value = null
   reconcileLineModal.close()
   return loadSelectedReconcileDetail()
@@ -681,13 +726,21 @@ const claimHeroMetaItems = computed(() => [
   `${t('agreement.claims.fiscal_year')}: ${activeClaimFiscalYearLabel.value}`,
   `${t('agreement.claims.period')}: ${activeClaimPeriodLabel.value}`
 ])
-const claimHeroBadges = computed(() => activeClaim.value
-  ? [{
-      statusId: activeClaim.value.egcs_fc_status,
-      isCompleted: activeClaim.value.isCompleted
-    }]
-  : []
-)
+const claimHeroBadges = computed(() => [
+  ...(activeClaim.value
+    ? [{
+        statusId: activeClaim.value.egcs_fc_status,
+        isCompleted: activeClaim.value.isCompleted
+      }]
+    : []),
+  ...(submissionReview.state.value
+    ? [{
+        variant: 'code',
+        label: t(`submission.state.${submissionReview.state.value}`),
+        prefixLabel: t('agreement.claims.submission_title')
+      }]
+    : [])
+])
 
 const setDraftAllocation = (claimLineId: string, value: string | number | null | undefined) => {
   draftAllocations.value = { ...draftAllocations.value, [claimLineId]: value === null || value === undefined ? null : String(value) }
@@ -955,7 +1008,7 @@ const canEditActiveReconcileFinal = computed(() =>
 
 const openSubmissionEditor = (line: ClaimSubmissionTableRow) => {
   if (isLoadingDetail.value || isSavingSubmission.value || !line.budgetLineId
-    || !guardClaimAction(canEditClaimSubmissionAmount(line.budgetLineId), claimEditPrerequisiteWarning.value)) return
+    || !guardClaimAction(canEditClaimSubmissionAmount(line.budgetLineId), claimSubmissionEditWarning.value)) return
   submissionModal.openUpdate(line)
 }
 
@@ -969,7 +1022,7 @@ const saveSubmission = async () => {
     return
   }
 
-  if (!guardClaimAction(canEditClaimSubmissionAmount(String(budgetLine.id)), claimEditPrerequisiteWarning.value)) return
+  if (!guardClaimAction(canEditClaimSubmissionAmount(String(budgetLine.id)), claimSubmissionEditWarning.value)) return
   const operation = (target.claimLineId !== null ? submissionUpdateContext : submissionCreateContext).capture()
   if (!operation?.canDispatch()) return
   const settlement = (target.claimLineId !== null ? submissionCollectionUpdateContext : submissionCollectionCreateContext).capture()
@@ -1015,7 +1068,59 @@ const saveSubmission = async () => {
     isSavingSubmission.value = false
   }
 }
-const submissionFormSession = useFormSession({ owner: submissionModal, action: { kind: 'remote', context: () => submissionTarget.value?.claimLineId != null ? submissionUpdateContext : submissionCreateContext }, submit: saveSubmission, onDenied: () => guardClaimAction(submissionTarget.value?.budgetLineId ? canEditClaimSubmissionAmount(submissionTarget.value.budgetLineId) : false, claimEditPrerequisiteWarning.value) })
+const submissionFormSession = useFormSession({ owner: submissionModal, action: { kind: 'remote', context: () => submissionTarget.value?.claimLineId != null ? submissionUpdateContext : submissionCreateContext }, submit: saveSubmission, onDenied: () => guardClaimAction(submissionTarget.value?.budgetLineId ? canEditClaimSubmissionAmount(submissionTarget.value.budgetLineId) : false, claimSubmissionEditWarning.value) })
+
+const additionalInformationContext = useActionContext({
+  identity: [() => route.params.id, () => route.params.claimId],
+  authority: canUpdateClaim,
+  eligible: () => isCurrentPage() && activeClaim.value?.id === claimId && !claimSubmissionEditWarning.value
+})
+const {
+  draft: additionalInformationDraft,
+  isDirty: additionalInformationDirty,
+  canSave: canSaveAdditionalInformation,
+  isSaving: isSavingAdditionalInformation,
+  isStale: isAdditionalInformationStale,
+  formSession: additionalInformationFormSession,
+  validate: validateAdditionalInformation,
+  setEditing: setAdditionalInformationEditing,
+  discardStaleDraft: discardStaleAdditionalInformation
+} = useSubmissionAnswerEditor({
+  context: additionalInformationContext,
+  readAnswers: () => additionalInformationValues.value,
+  readSubmissionRevision: () => overview.value?.linkedReview?.revision ?? null,
+  readDefinitions: () => additionalInformationFields.value,
+  isBlocked: () => submissionReviewBusy.value || submissionReview.pending.value,
+  persist: async (changes, customFieldPrecondition) => {
+    const result = await sendJson<{ customFieldsChanged: boolean }>(`/api/agreements/${agreementId}/claims/${claimId}`, 'PATCH', {
+      egcs_fc_customfields: changes,
+      customFieldPrecondition
+    })
+    return result.customFieldsChanged
+  },
+  readback: async () => {
+    await refreshOverview()
+    return overviewStatus.value === 'success'
+      ? { kind: 'available' }
+      : { kind: 'unavailable', error: overviewError.value }
+  },
+  onDenied: () => { guardClaimAction(canUpdateClaim.value, claimSubmissionEditWarning.value) },
+  isConflict: error => {
+    const payload = error && typeof error === 'object' && 'data' in error ? error.data : undefined
+    const data = payload && typeof payload === 'object' && 'data' in payload ? payload.data : payload
+    const code = data && typeof data === 'object' && 'code' in data ? data.code : undefined
+    return code === 'CLAIM_ANSWERS_STALE' || code === 'SUBMISSION_STALE' || code === 'SUBMISSION_REVIEW_REQUIRED'
+  },
+  onError: showError,
+  onSaved: () => toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_additional_information'), color: 'success' })
+})
+
+const reloadStaleAdditionalInformation = async () => {
+  if (discardStaleAdditionalInformation()) await submissionReview.refresh()
+}
+
+const isAdditionalInformationLoading = computed(() => assignmentStatus.value === 'idle'
+  || submissionReview.status.value === 'idle' || submissionReview.reloading.value)
 
 const allocateClaimLine = async (line: FundingCaseAgreementClaimLineItemRow) => {
   if (!isCurrentPage()) return
@@ -1026,7 +1131,7 @@ const allocateClaimLine = async (line: FundingCaseAgreementClaimLineItemRow) => 
     return
   }
 
-  if (!guardClaimAction(canAllocateClaimLines.value, claimEditPrerequisiteWarning.value
+  if (!guardClaimAction(canAllocateClaimLines.value, claimSubmissionEditWarning.value
     ?? (!budgetLineItemId ? toast.localized('agreement.claims.action_unavailable') : undefined))) return
 
   try {
@@ -1258,12 +1363,27 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-receipt-text"
-            :actions="receivableEntry.canCreate.value ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', loading: receivableEntry.starting.value, onClick: receivableEntry.start }] : []"
+            :actions="claimHeroActions"
             :title="claimHeroTitle"
             :meta-items="claimHeroMetaItems"
             :badges="claimHeroBadges" />
 
-          <CommonDetailWorkspace v-model="selectedClaimTab" help-navigation-group-target="casework.claims.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="claimTabs" content-test-id="agreement-claim-detail-content">
+          <CommonDetailWorkspace v-model="selectedClaimTab" help-navigation-group-target="casework.claims.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="claimTabs" :priority-values="['submission', 'additional']" content-test-id="agreement-claim-detail-content">
+            <template #navigation-leading>
+              <div class="flex items-center gap-2.5 px-3 py-2 text-sm font-semibold text-highlighted">
+                <UIcon name="i-lucide-file-input" class="size-4 shrink-0 text-muted" aria-hidden="true" />
+                {{ t('agreement.claims.submission_title') }}
+              </div>
+            </template>
+            <template v-if="isClaimSubmissionSection" #notices>
+              <AgreementSubmissionLinkedReview
+                :review="submissionReview"
+                :busy="submissionReviewActionsBlocked"
+                :start-in-hero="!isHeroCollapsed" />
+            </template>
+            <template v-else-if="selectedClaimTab === 'reconciliation' || selectedClaimTab === 'workflows'" #notices>
+              <AgreementSubmissionLinkedReview :review="submissionReview" :busy="submissionReviewActionsBlocked" notice-only lifecycle />
+            </template>
             <div v-if="selectedClaimTab === 'submission'" data-help-target="casework.claims.submission.content" data-help-kind="section" data-help-view="casework.claims.submission" class="w-full min-w-0">
               <div class="space-y-8">
                 <div class="space-y-4">
@@ -1373,7 +1493,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                                   label-en-key="label_en"
                                   label-fr-key="label_fr"
                                   searchable
-                                  :disabled="!claimEditReady"
+                                  :disabled="Boolean(claimSubmissionEditWarning)"
                                   @update:model-value="value => setDraftAllocation(String(row.original.claimLine!.id), value)" />
                               </UFormField>
                               <UButton
@@ -1469,6 +1589,86 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               </div>
             </div>
 
+            <div v-else-if="selectedClaimTab === 'additional'" class="space-y-4">
+              <template v-if="additionalInformationFields.length">
+                <div v-if="canUpdateClaim" class="flex justify-end">
+                  <USwitch
+                    data-field-exclude="The switch controls inline editing and is not saved with the Claim."
+                    :model-value="additionalInformationDraft !== null"
+                    :label="t('agreement.claims.edit_additional_information')"
+                    :disabled="submissionReviewBusy || isAdditionalInformationLoading || submissionReview.pending.value || isAdditionalInformationStale"
+                    @update:model-value="setAdditionalInformationEditing" />
+                </div>
+                <CommonNotice v-if="isAdditionalInformationStale" tone="warning" :title="t('apiErrors.agreement.claim_answers_stale')">
+                  <template #actions>
+                    <UButton color="warning" variant="outline" :disabled="submissionReviewBusy || submissionReview.pending.value" @click="reloadStaleAdditionalInformation">
+                      {{ t('agreement.claims.discard_and_reload_answers') }}
+                    </UButton>
+                  </template>
+                </CommonNotice>
+                <UForm
+                  v-if="additionalInformationDraft"
+                  v-bind="additionalInformationFormSession"
+                  :state="additionalInformationDraft"
+                  :validate="validateAdditionalInformation"
+                  novalidate
+                  class="space-y-5"
+                  data-field-exclude="Agency-defined custom inputs have separate configuration; outside static field help.">
+                  <p v-if="additionalInformationFields.some(field => field.egcs_tp_required)" class="text-sm text-muted">
+                    {{ t('agreement.claims.additional_information_draft_hint') }}
+                  </p>
+                  <fieldset :disabled="isSavingAdditionalInformation" class="min-w-0 divide-y divide-default">
+                    <AgreementFieldsCustomField
+                      v-for="field in additionalInformationFields"
+                      :key="field.id"
+                      v-model="additionalInformationDraft.egcs_fc_customfields[field.id]"
+                      class="py-4 first:pt-0"
+                      :field="field"
+                      :options="field.options.filter(option => option.egcs_ay_active)"
+                      :disabled="isSavingAdditionalInformation" />
+                  </fieldset>
+                  <div class="flex justify-end">
+                    <CommonSaveButton :label="t('common.save')" :disabled="!canSaveAdditionalInformation || submissionReviewBusy || submissionReview.pending.value" :loading="isSavingAdditionalInformation" />
+                  </div>
+                </UForm>
+                <dl v-else class="divide-y divide-default" data-field-exclude="Read-only display of Agency-defined custom fields.">
+                  <AgreementFieldsCustomField
+                    v-for="field in additionalInformationFields"
+                    :key="field.id"
+                    class="py-4 first:pt-0"
+                    :field="field"
+                    :options="field.options"
+                    :model-value="additionalInformationValues[field.id]"
+                    readonly>
+                    <template #answer="{ label, answer }">
+                      <dt class="text-sm font-medium text-highlighted">
+                        {{ label }}
+                      </dt>
+                      <dd class="whitespace-pre-wrap text-sm text-default [overflow-wrap:anywhere]">
+                        {{ answer || t('supplementary_information.no_answer') }}
+                      </dd>
+                    </template>
+                  </AgreementFieldsCustomField>
+                </dl>
+              </template>
+              <p v-else class="text-sm text-muted">
+                {{ t('agreement.claims.no_additional_information') }}
+              </p>
+            </div>
+
+            <div v-else-if="selectedClaimTab === 'history'" class="space-y-4">
+              <AgreementSubmissionLinkedReview
+                v-if="submissionReview.error.value || submissionReview.stale.value || submissionReview.failed.value"
+                :review="submissionReview"
+                :busy="submissionReviewActionsBlocked"
+                notice-only />
+              <AgreementSubmissionHistory
+                v-if="submissionReview.detail.value"
+                :events="submissionReview.detail.value.events"
+                target="claim"
+                :source="submissionReview.detail.value.submission.egcs_fc_sourcesystem" />
+            </div>
+
             <CommonReviewsTab
               v-else-if="selectedClaimTab === 'reviews'"
               data-help-view="casework.claims.reviews"
@@ -1487,6 +1687,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               :can-edit="isAssigned"
               :action-role-allowed="canUpdateClaim"
               :action-prerequisite-warning="claimWorkflowPrerequisiteWarning"
+              :start-prerequisite-warning="submissionLifecycleWarning"
               :refresh-key="approvalsRefreshKey"
               @changed="refreshPage" />
 
@@ -1522,11 +1723,11 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                 :is-locked="!claimEditReady"
                 :action-role-allowed="canUpdateClaim"
                 :action-prerequisite-warning="claimWorkflowPrerequisiteWarning"
-                :completion-prerequisite-warning="claimEditPrerequisiteWarning"
+                :completion-prerequisite-warning="claimCompletionWarning"
                 show-when-unconfigured
                 title-key="agreement.claims.completion.title"
                 description-key="agreement.claims.completion.description"
-                action-label-key="agreement.claims.ready_for_review"
+                action-label-key="agreement.claims.start_reconcile"
                 completed-success-key="agreement.claims.completion.completed_success"
                 @changed="refreshPage" />
               <div v-else class="space-y-10">

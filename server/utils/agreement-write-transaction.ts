@@ -129,7 +129,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
     assignmentTarget?: ExactEntityTarget<AssignableEntityType> | ((trx: Transaction<Database>) => Promise<ExactEntityTarget<AssignableEntityType> | null>)
     blocksApprovalSubmission?: boolean
     allowDuringCloseout?: boolean
-    businessStatusMode?: BusinessStatusMutationMode
+    businessStatusMode?: BusinessStatusMutationMode | 'submission_evidence'
     businessStatusTarget?: ExactEntityTarget<CoreLifecycleEntityType>
     correctionFinancialMutation?: boolean
     correctionId?: string
@@ -243,18 +243,20 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
         }
 
         try {
-          if (!receivableCollection) await lockBusinessStatus(
+          const statusMode = options.businessStatusMode
+          const submissionEvidenceOnly = statusMode === 'submission_evidence'
+          if (!receivableCollection && !submissionEvidenceOnly) await lockBusinessStatus(
             trx,
             'fundingcaseagreement',
             agreementId,
-            options.businessStatusMode ?? (options.allowDuringCloseout === true ? 'engine' : 'ordinary')
+            statusMode ?? (options.allowDuringCloseout === true ? 'engine' : 'ordinary')
           )
-          if (options.businessStatusTarget && options.businessStatusTarget.entityType !== 'fundingcaseagreement') {
+          if (!submissionEvidenceOnly && options.businessStatusTarget && options.businessStatusTarget.entityType !== 'fundingcaseagreement') {
             const targetStatus = await lockBusinessStatus(
               trx,
               options.businessStatusTarget.entityType,
               options.businessStatusTarget.entityId,
-              options.businessStatusMode ?? (options.allowDuringCloseout === true ? 'engine' : 'ordinary')
+              statusMode ?? (options.allowDuringCloseout === true ? 'engine' : 'ordinary')
             )
             if (targetStatus.agreementId !== agreementId) {
               throw new BusinessStatusViolation('BUSINESS_STATUS_AGENCY_MISMATCH', 'Business status target belongs to another Agreement')

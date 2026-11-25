@@ -40,7 +40,7 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
 const baseUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}`)
 const hasSections = computed(() => target === 'agreement')
-const assignmentUrl = computed(() => `${baseUrl.value}/${hasSections.value ? 'custom-fields' : 'activity-custom-fields'}`)
+const assignmentUrl = computed(() => `${baseUrl.value}/${hasSections.value ? 'custom-fields' : `${target}-custom-fields`}`)
 const { data, refresh, status } = await useAsyncData<{ items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }>(assignmentUrl, async () => {
   const response = await fetch(getClientRequestUrl(assignmentUrl.value))
   if (!response.ok) await throwFetchResponseError(response)

@@ -246,6 +246,12 @@ CREATE TABLE "Transfer_Payment_Stream" (
   "egcs_tp_requireconsistentproponenttype" boolean DEFAULT false NOT NULL,
   "egcs_tp_active" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
+  egcs_tp_submissionpolicy jsonb NOT NULL DEFAULT '{}'::jsonb
+    CONSTRAINT tp_chk_stream_submission_policy CHECK (jsonb_typeof(egcs_tp_submissionpolicy) = 'object'
+      AND egcs_tp_submissionpolicy - ARRAY['claim','forecast','amendment_budget'] = '{}'::jsonb
+      AND (NOT egcs_tp_submissionpolicy ? 'claim' OR COALESCE(egcs_tp_submissionpolicy->>'claim' IN ('review','automatic'), false))
+      AND (NOT egcs_tp_submissionpolicy ? 'forecast' OR COALESCE(egcs_tp_submissionpolicy->>'forecast' IN ('review','automatic'), false))
+      AND (NOT egcs_tp_submissionpolicy ? 'amendment_budget' OR COALESCE(egcs_tp_submissionpolicy->>'amendment_budget' IN ('review','automatic'), false))),
   "egcs_tp_budgetfundingmode" text DEFAULT 'manual' NOT NULL
     CONSTRAINT tp_chk_stream_budget_funding_mode CHECK ("egcs_tp_budgetfundingmode" IN ('program_only', 'manual', 'automatic')),
   "egcs_tp_hidecostcategory" boolean DEFAULT false NOT NULL,
@@ -369,7 +375,7 @@ CREATE TABLE "Transfer_Payment_Stream_Field_Assignment" (
   CONSTRAINT "Transfer_Payment_Stream_Field_Assignment_pkey" PRIMARY KEY (id),
   CONSTRAINT "tp_chk_stream_field_assignment_displayorder" CHECK ((egcs_tp_displayorder >= 0)),
   CONSTRAINT "tp_chk_stream_field_assignment_target" CHECK (
-    egcs_tp_target = 'agreement' OR (egcs_tp_target = 'activity' AND egcs_tp_section IS NULL)
+    egcs_tp_target = 'agreement' OR (egcs_tp_target IN ('activity', 'claim') AND egcs_tp_section IS NULL)
   )
 );
 

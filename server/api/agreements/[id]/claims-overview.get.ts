@@ -1,3 +1,4 @@
+import { readLinkedSubmissionOverviewReview } from '~~/server/utils/agreement-linked-submission-targets'
 import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
@@ -129,6 +130,10 @@ const readRoute = async (event: H3Event, claimId?: string) => {
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
       ])
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
+      .$if(Boolean(claimId), query => query.select([
+        'Funding_Case_Agreement_Claim.egcs_fc_customfields',
+        'Funding_Case_Agreement_Claim.egcs_fc_customfielddefinitions'
+      ]))
       .orderBy('Funding_Case_Agreement_Claim.egcs_fc_receiveddate', 'asc')
       .execute(),
     budgetLineQuery
@@ -343,6 +348,9 @@ const readRoute = async (event: H3Event, claimId?: string) => {
   const budgetFundingSources = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, budgetLineItems.map(line => String(line.budget_row_id))))
 
   return {
+    linkedReview: claimId && claims.length
+      ? await readLinkedSubmissionOverviewReview(db, { agreementId, target: 'claim', targetId: claimId })
+      : null,
     budgetManagement: await loadAgreementBudgetManagement(db, agreementId),
     claims: claimsWithState,
     budgetLineItems: budgetLineItems.map(line => ({

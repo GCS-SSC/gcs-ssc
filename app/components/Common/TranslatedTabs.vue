@@ -173,6 +173,9 @@ const onMobilePanelClick = async (event: MouseEvent) => {
           :content="content"
           :ui="ui"
           @update:model-value="onMobileTabUpdate">
+          <template v-if="$slots['list-leading']" #list-leading>
+            <slot name="list-leading" />
+          </template>
           <template #leading="{ item }">
             <UIcon v-if="item.icon" :name="item.icon" class="mr-2 size-4" />
           </template>
@@ -196,6 +199,9 @@ const onMobilePanelClick = async (event: MouseEvent) => {
         :orientation="orientation"
         :content="content"
         :ui="ui">
+        <template v-if="$slots['list-leading']" #list-leading>
+          <slot name="list-leading" />
+        </template>
         <template #leading="{ item }">
           <UIcon v-if="item.icon" :name="item.icon" class="mr-2 size-4" />
         </template>
@@ -219,6 +225,9 @@ const onMobilePanelClick = async (event: MouseEvent) => {
     :orientation="orientation"
     :content="content"
     :ui="ui">
+    <template v-if="$slots['list-leading']" #list-leading>
+      <slot name="list-leading" />
+    </template>
     <template #leading="{ item }">
       <UIcon v-if="item.icon" :name="item.icon" class="mr-2 size-4" />
     </template>

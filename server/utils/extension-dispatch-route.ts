@@ -542,7 +542,9 @@ const createExtensionWriteAuthorization = (
         db,
         input,
         agreementContext.agencyId,
-        creatorId
+        creatorId,
+        undefined,
+        event
       )
       if (result.status !== 'created') return result
       return {

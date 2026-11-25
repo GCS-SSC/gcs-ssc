@@ -1,0 +1,137 @@
+/* eslint-disable jsdoc/require-jsdoc -- The returned actions implement the editor lifecycle described below. */
+import { computed, ref, watch } from 'vue'
+import type { Ref } from 'vue'
+import { z } from 'zod'
+import type { ActionContext } from '~/composables/useActionContext'
+import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
+import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
+import { useFormSession } from '~/composables/useFormSession'
+import { useZodI18n } from '~/composables/useZodI18n'
+import { agreementCustomFieldMergeSchema } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { AgreementCustomFieldPatch, AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { FundingCaseAgreementClaimPatch } from '~~/shared/types/schemas/funding-case-agreement'
+import { changedCustomFieldAnswers } from '~~/shared/utils/agreement-custom-field-answers'
+
+type AnswerDraft = { egcs_fc_customfields: AgreementCustomFieldPatch }
+type AnswerPrecondition = NonNullable<FundingCaseAgreementClaimPatch['customFieldPrecondition']>
+type AnswerEditorState =
+  | { kind: 'reading' }
+  | { kind: 'editing'; session: number; status: 'current' | 'stale'; submissionRevision: number | null; baseline: AgreementCustomFieldPatch; draft: AnswerDraft }
+
+const copyAnswers = (answers: AgreementCustomFieldPatch): AgreementCustomFieldPatch =>
+  Object.fromEntries(Object.entries(answers).map(([key, answer]) => [key, Array.isArray(answer) ? [...answer] : answer]))
+
+/**
+ * Owns an inline answer draft and its single write through committed readback.
+ * The page supplies authorization, transport and its authoritative read.
+ * @param options - Answer resource and action bindings.
+ * @param options.context - Page-owned action identity and authorization.
+ * @param options.readAnswers - Last accepted answers for a new opening.
+ * @param options.readSubmissionRevision - Last accepted linked Submission revision, or null for an unlinked Claim.
+ * @param options.readDefinitions - Pinned definitions for validation.
+ * @param options.isBlocked - Other active operations that block editing.
+ * @param options.persist - Writes changed keys and reports whether values changed.
+ * @param options.readback - Refreshes the live page after acknowledgment.
+ * @param options.onDenied - Reports an unavailable edit action.
+ * @param options.isConflict - Identifies an outdated opening that must be reloaded.
+ * @param options.onError - Reports a rejected save to its current editor.
+ * @param options.onSaved - Reports a confirmed change after successful readback.
+ * @returns Toggle, form session, save eligibility, and write state for the view.
+ */
+export const useSubmissionAnswerEditor = (options: {
+  context: ActionContext
+  readAnswers: () => AgreementCustomFieldValues
+  readSubmissionRevision: () => number | null
+  readDefinitions: () => AssignedAgencyCustomFieldDefinition[]
+  isBlocked: () => boolean
+  persist: (changes: AgreementCustomFieldPatch, precondition: AnswerPrecondition) => Promise<boolean>
+  readback: () => Promise<CommittedReadbackResult>
+  onDenied: () => void
+  isConflict: (error: unknown) => boolean
+  onError: (error: unknown) => void
+  onSaved: () => void
+}) => {
+  const editor: Ref<AnswerEditorState> = ref({ kind: 'reading' })
+  const isSaving = ref(false)
+  const { createValidator } = useZodI18n()
+  const validate = computed(() => createValidator(z.object({
+    egcs_fc_customfields: agreementCustomFieldMergeSchema(options.readDefinitions(), options.readAnswers(), { requireAnswers: false })
+  })))
+  const captureSettlement = useCommittedSettlement({ context: options.context, settle: options.readback })
+  let nextSession = 0
+  const draft = computed(() => editor.value.kind === 'editing' ? editor.value.draft : null)
+  const changes = computed(() => editor.value.kind === 'editing'
+    ? changedCustomFieldAnswers(editor.value.baseline, editor.value.draft.egcs_fc_customfields)
+    : {})
+  const isDirty = computed(() => Object.keys(changes.value).length > 0)
+  const isStale = computed(() => editor.value.kind === 'editing' && editor.value.status === 'stale')
+  const canSave = computed(() => !isStale.value && isDirty.value && !options.readDefinitions().some(field =>
+    field.egcs_ay_kind === 'number' && typeof changes.value[field.id] === 'string'
+  ))
+  const captureSession = () => editor.value.kind === 'editing' ? editor.value.session : null
+  const isCurrentSession = (session: number | null) => session !== null && session === captureSession()
+  const close = () => {
+    editor.value = { kind: 'reading' }
+  }
+
+  watch(options.context.version, close, { flush: 'sync' })
+
+  const setEditing = (enabled: boolean) => {
+    if (isSaving.value || options.isBlocked() || isStale.value) return
+    if (!enabled) {
+      close()
+      return
+    }
+    if (draft.value) return
+    if (!options.context.capture()?.canDispatch()) {
+      options.onDenied()
+      return
+    }
+    const baseline = copyAnswers(options.readAnswers())
+    editor.value = {
+      kind: 'editing', session: ++nextSession, status: 'current', baseline,
+      submissionRevision: options.readSubmissionRevision(),
+      draft: { egcs_fc_customfields: copyAnswers(baseline) }
+    }
+  }
+
+  const save = async () => {
+    const opening = editor.value
+    if (opening.kind !== 'editing' || isSaving.value || options.isBlocked() || !canSave.value) return
+    const { session, submissionRevision, baseline } = opening
+    const settlement = captureSettlement()
+    if (!settlement?.canDispatch()) return
+    const patch = copyAnswers(changes.value)
+    const previousAnswers = Object.fromEntries(Object.keys(patch).map(key => [key, baseline[key] ?? null]))
+    isSaving.value = true
+    try {
+      const changed = await options.persist(patch, { submissionRevision, previousAnswers })
+      const ownsEditor = isCurrentSession(session)
+      if (ownsEditor) close()
+      const readback = await settlement.settle()
+      if (changed && ownsEditor && readback.kind === 'refreshed' && nextSession === session) options.onSaved()
+    } catch (error: unknown) {
+      if (isCurrentSession(session)) {
+        if (options.isConflict(error)) opening.status = 'stale'
+        else options.onError(error)
+      }
+    } finally {
+      isSaving.value = false
+    }
+  }
+
+  const formSession = useFormSession({
+    owner: { captureSession, isCurrentSession },
+    action: { kind: 'remote', context: options.context },
+    submit: save,
+    onDenied: options.onDenied
+  })
+
+  const discardStaleDraft = () => {
+    if (!isStale.value || isSaving.value || options.isBlocked()) return false
+    close()
+    return true
+  }
+
+  return { draft, isDirty, canSave, isSaving, isStale, setEditing, discardStaleDraft, formSession, validate }
+}

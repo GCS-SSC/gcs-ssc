@@ -72,19 +72,19 @@ export const assertTransferPaymentCostCategoryLineItemNotInUse = async (
 }
 
 /** Resolves a budget definition while preserving a saved row's unchanged reference.
- * Call inside the existing Agency/Stream-locked Agreement write transaction.
- * @param db - Locked write transaction.
+ * @param db - Locked Agreement write transaction or authorized read snapshot.
  * @param streamId - Agreement stream.
  * @param costCategoryId - Requested stream definition.
  * @param options - Existing row reference for retention.
  * @param options.retainedCostCategoryId - Stored reference, never supplied by the client.
+ * @param options.lock - Skip definition locks for a read-only preview.
  * @returns The permitted definition, or undefined when unavailable.
  */
 export const fetchAgreementBudgetCostCategory = async (
   db: Kysely<Database>,
   streamId: string,
   costCategoryId: string,
-  options: { retainedCostCategoryId?: string } = {}
+  options: { retainedCostCategoryId?: string, lock?: 'read_only' } = {}
 ) => {
   let query = db.selectFrom('Transfer_Payment_Stream_Cost_Category_Line_Item')
     .innerJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
@@ -102,6 +102,7 @@ export const fetchAgreementBudgetCostCategory = async (
   return await query.select([
     'Transfer_Payment_Stream_Cost_Category_Line_Item.id as id',
     'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
-    'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr'
-  ]).forUpdate('Transfer_Payment_Stream_Cost_Category_Line_Item').executeTakeFirst()
+    'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr',
+    'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory as categoryId'
+  ]).$if(options.lock !== 'read_only', builder => builder.forUpdate('Transfer_Payment_Stream_Cost_Category_Line_Item')).executeTakeFirst()
 }

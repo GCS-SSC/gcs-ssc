@@ -1,5 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest } from '~~/server/utils/api-errors'
+import { assertLinkedSubmissionActionAllowed } from '~~/server/utils/agreement-linked-submission-access'
 import {
   assertAgreementClaimEditable,
   executeAgreementClaimMutation,
@@ -25,6 +26,7 @@ export default defineEventHandler(async event => {
   await executeAgreementClaimMutation(event, db, agreementId, agreementContext, [{ type: 'claim', id: claimId }], async trx => {
     const claim = await assertAgreementClaimEditable(event, trx, agreementId, claimId)
     if (!claim || typeof claim !== 'object' || !('id' in claim)) return claim
+    await assertLinkedSubmissionActionAllowed(event, trx, { kind: 'claim', id: claimId }, 'lifecycle')
 
     const deleted = await trx
       .updateTable('Funding_Case_Agreement_Claim')

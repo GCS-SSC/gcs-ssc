@@ -224,6 +224,11 @@ export const cleanDevArtifacts = async (repositoryRoot: string): Promise<void> =
  */
 const main = async (): Promise<void> => {
   const args = process.argv.slice(2)
+  if (args.includes('--clear')) {
+    console.error('[dev] Use --clean to reset the local development database.')
+    process.exitCode = 1
+    return
+  }
   const shouldClean = args.includes('--clean')
   const forwardedArgs = args.filter(arg => arg !== '--clean')
 

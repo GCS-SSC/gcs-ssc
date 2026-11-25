@@ -13,6 +13,7 @@ import type { TransferPaymentBudgetFundingMode } from './schemas/transfer-paymen
 import type { TablePreferences } from './schemas/table-preferences'
 import type { StatusId } from './status'
 import type { PaymentEvidence } from './payment-evidence'
+import type { AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition } from './schemas/agreement-custom-fields'
 
 /** NUMERIC reads remain exact text; nonmonetary writes may use validated numbers. */
 export type DecimalColumn = ColumnType<string, string | number, string | number>
@@ -368,6 +369,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Workflow_Publication_Condition: WorkflowPublicationConditionTable
   Transfer_Payment_Stream_Field_Section: TransferPaymentStreamFieldSectionTable
   Transfer_Payment_Stream_Field_Assignment: TransferPaymentStreamFieldAssignmentTable
+  Funding_Case_Agreement_Submission: import('./agreement-submission-database').AgreementSubmissionTable
+  Funding_Case_Agreement_Submission_Event: import('./agreement-submission-database').AgreementSubmissionEventTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
   Funding_Opportunity_Profile: FundingOpportunityProfileTable
   Funding_Opportunity_Stream: FundingOpportunityStreamTable
@@ -1628,6 +1631,8 @@ export interface FundingCaseAgreementClaimTable {
   egcs_fc_periodstart: number
   egcs_fc_receiveddate: Date
   egcs_fc_gcformssubmissionuuid?: string | null
+  egcs_fc_customfields: Generated<AgreementCustomFieldValues>
+  egcs_fc_customfielddefinitions: Generated<AssignedAgencyCustomFieldDefinition[]>
   egcs_fc_status: StatusId
   _deleted: Generated<boolean>
 }
@@ -1641,6 +1646,7 @@ export interface FundingCaseAgreementClaimLineItemTable {
   egcs_fc_submittedcostsubsection?: string | null
   egcs_fc_submittedlineitem?: string | null
   egcs_fc_description: string
+  egcs_fc_sourcesubmissionlineid?: string | null
   egcs_fc_amount: string
   egcs_fc_totalamount: string
   egcs_fc_currency: Currency_Codes
@@ -2406,6 +2412,7 @@ export interface TransferPaymentStreamTable {
   egcs_tp_applyamendmentrisktotheagreement: Generated<boolean>
   egcs_tp_amendmentriskworkflow: Generated<string | null>
   egcs_tp_requireconsistentproponenttype: Generated<boolean>
+  egcs_tp_submissionpolicy: Generated<Partial<Record<import('./agreement-submission').AgreementSubmissionTarget, import('./agreement-submission').AgreementSubmissionMode>>>
   egcs_tp_budgetfundingmode: Generated<TransferPaymentBudgetFundingMode>
   egcs_tp_hidecostcategory: Generated<boolean>
   egcs_tp_hidecostsubsection: Generated<boolean>
@@ -2708,7 +2715,7 @@ export interface AgencyCustomFieldOptionTable {
   egcs_ay_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
-export type StreamFieldAssignmentTarget = 'agreement' | 'activity'
+export type StreamFieldAssignmentTarget = 'agreement' | 'activity' | 'claim'
 export interface TransferPaymentStreamFieldAssignmentTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string

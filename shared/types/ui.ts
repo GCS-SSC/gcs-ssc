@@ -45,6 +45,7 @@ export interface TranslatedTabItem {
   icon?: string
   value: string
   panelId?: string
+  ui?: { trigger?: string }
 }
 
 export interface TranslatedTabsProps {

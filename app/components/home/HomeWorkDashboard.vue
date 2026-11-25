@@ -241,6 +241,7 @@ const claimGroupItem = async (item: GroupItem) => {
               {{ t('home_dashboard.stat_scope') }}
             </p>
             <div class="grid gap-6 lg:grid-cols-2">
+              <HomeSubmissionWork />
               <section aria-labelledby="direct-work-heading" class="min-w-0 border-t-4 border-primary pt-4">
                 <h2 id="direct-work-heading" class="text-xl font-semibold text-highlighted">
                   {{ t('home_dashboard.direct_work') }}

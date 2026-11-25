@@ -1,6 +1,7 @@
 import { defineEventHandler, getRouterParam } from 'h3'
 import { AgreementForecastRevisionRequired, getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 import { badRequest } from '~~/server/utils/api-errors'
+import { assertLinkedSubmissionActionAllowed } from '~~/server/utils/agreement-linked-submission-access'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import {
   assertAgreementForecastEditable,
@@ -30,6 +31,7 @@ export default defineEventHandler(async event => {
   const result = await executeAgreementForecastMutation(event, db, agreementId, agreementContext, [{ type: 'forecast', id: forecastId }], async trx => {
     const editable = await assertAgreementForecastEditable(event, trx, agreementId, forecastId)
     if (!editable || typeof editable !== 'object' || !('id' in editable)) return editable
+    await assertLinkedSubmissionActionAllowed(event, trx, { kind: 'forecast', id: forecastId }, 'lifecycle')
 
     if (editable.egcs_fc_active) {
       const violation = await getAgreementFinancialBudgetViolation(trx, agreementId, { kind: 'forecast', id: forecastId })

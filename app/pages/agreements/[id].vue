@@ -31,6 +31,7 @@ import AgreementPaymentsTab from '~/components/Agreement/AgreementPaymentsTab.vu
 import AgreementForecastsTab from '~/components/Agreement/AgreementForecastsTab.vue'
 import AgreementMonitorsTab from '~/components/Agreement/AgreementMonitorsTab.vue'
 import AgreementClaimsTab from '~/components/Agreement/AgreementClaimsTab.vue'
+import AgreementSubmissionsTab from '~/components/Agreement/AgreementSubmissionsTab.vue'
 import AgreementDocumentsTab from '~/components/Agreement/AgreementDocumentsTab.vue'
 import AgreementAmendmentsTab from '~/components/Agreement/AgreementAmendmentsTab.vue'
 import AgreementCloseoutsTab from '~/components/Agreement/AgreementCloseoutsTab.vue'
@@ -269,6 +270,11 @@ const tabs = computed(() => {
       key: 'agreement.forecasts.title',
       value: 'forecasts',
       icon: 'i-lucide-chart-no-axes-column-increasing'
+    })
+    nextTabs.push({
+      key: 'submission.title',
+      value: 'submissions',
+      icon: 'i-lucide-inbox'
     })
     nextTabs.push({
       key: 'agreement.claims.title',
@@ -708,6 +714,11 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               :currency="profile.egcs_fc_currency"
               :can-create-role="canCreateFinancialChildRole"
               :can-delete-role="canDeleteFinancialChildRole" />
+
+            <AgreementSubmissionsTab
+              v-else-if="selectedTab === 'submissions'"
+              :agreement-id="id"
+              :currency="profile.egcs_fc_currency" />
 
             <AgreementClaimsTab
               v-else-if="selectedTab === 'claims'"

@@ -1,13 +1,14 @@
+import { assertLinkedSubmissionActionAllowed } from './agreement-linked-submission-access'
 import { assertAgreementCurrency, assertCurrencyMoneyValues, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported claim helpers are intentionally documented by their descriptive names. */
 import { createHash } from 'node:crypto'
 import { getRouterParam, type H3Event } from 'h3'
-import { sql, type Insertable, type Kysely, type Selectable, type Transaction } from 'kysely'
+import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
 import type {
   GcsExtensionAgreementClaimCreateInput,
   GcsExtensionAgreementClaimCreateResult
 } from '@gcs-ssc/extensions/server'
-import { badRequest, forbidden, unauthorized } from '~~/server/utils/api-errors'
+import { badRequest, forbidden, throwApiError, unauthorized } from '~~/server/utils/api-errors'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeAgreementResource, type AgreementScopeContext } from '~~/server/utils/agreement'
 import {
@@ -43,6 +44,7 @@ import {
   lockAgencyDraftStatus
 } from '~~/server/utils/business-status-runtime'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { changedCustomFieldAnswers, sameCustomFieldAnswer } from '~~/shared/utils/agreement-custom-field-answers'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareMoney, isPersistableMoney, maxMoney, parseMoney, subtractMoney, zeroMoney, type Money } from '~~/shared/utils/money'
@@ -50,6 +52,13 @@ import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 import { hasSuccessfulInitialAgreementApproval } from '~~/server/utils/agreement-approval-submission'
+import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
+import { assertClaimCustomFieldDefinitionsAnswerable, validateClaimCustomFields } from './agreement-claim-custom-fields'
+import type { AgreementCustomFieldPatch, AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
+
+type AgreementClaimAggregateCreateInput = Omit<GcsExtensionAgreementClaimCreateInput, 'lineItems'> & {
+  lineItems: (GcsExtensionAgreementClaimCreateInput['lineItems'][number] & { sourceLineId?: string })[]
+}
 
 type AgreementClaimDb = Kysely<Database> | Transaction<Database>
 
@@ -68,13 +77,19 @@ export type AgreementClaimAggregateCreateResult =
  * @param input - Host SDK Claim aggregate input.
  * @param agencyId - Freshly resolved owning Agency.
  * @param creatorId - Active Common User identity for the authenticated actor.
+ * @param receipt - External Submission custom field validation context.
+ * @param receipt.event - Localized source request.
+ * @param receipt.answers - Supplied external answers.
+ * @param event - Localized request for an ordinary Draft creation.
  * @returns Created identities or the stable unavailable result detected under lock.
  */
 export const createAgreementClaimAggregate = async (
   trx: Transaction<Database>,
-  input: GcsExtensionAgreementClaimCreateInput,
+  input: AgreementClaimAggregateCreateInput,
   agencyId: string,
-  creatorId: string
+  creatorId: string,
+  receipt?: { event: H3Event; answers?: AgreementCustomFieldPatch },
+  event?: H3Event
 ): Promise<AgreementClaimAggregateCreateResult> => {
   if (!await hasSuccessfulInitialAgreementApproval(trx, input.agreementId)) return { status: 'initial_approval_required' }
   if (!await isAgreementClaimProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) return { status: 'applicant_recipient_unavailable' }
@@ -153,7 +168,17 @@ export const createAgreementClaimAggregate = async (
     }
   }
 
+  const definitions = (await readAssignedAgencyCustomFieldDefinitions(trx, input.streamId, 'claim'))
+    .filter(field => field.egcs_tp_active)
+  await assertClaimCustomFieldDefinitionsAnswerable(definitions, receipt?.event ?? event)
+  const answers = receipt
+    ? await validateClaimCustomFields(receipt.event, definitions, {
+        answers: receipt.answers ?? {}, requireAnswers: true, path: 'customFields'
+      })
+    : {}
   const claim = await trx.insertInto('Funding_Case_Agreement_Claim').values({
+    egcs_fc_customfielddefinitions: sql<AssignedAgencyCustomFieldDefinition[]>`${JSON.stringify(definitions)}::jsonb`,
+    egcs_fc_customfields: answers,
     egcs_fc_fundingagreement: input.agreementId,
     egcs_fc_applicantrecipient: input.applicantRecipientId,
     egcs_fc_fiscalyear: input.fiscalYearId,
@@ -163,7 +188,7 @@ export const createAgreementClaimAggregate = async (
     egcs_fc_receiveddate: input.receivedDate,
     egcs_fc_gcformssubmissionuuid: input.submissionUuid,
     egcs_fc_status: draftStatusId
-  } satisfies Insertable<Database['Funding_Case_Agreement_Claim']>)
+  })
     .returningAll()
     .executeTakeFirstOrThrow()
 
@@ -176,6 +201,7 @@ export const createAgreementClaimAggregate = async (
       egcs_fc_submittedcostsubsection: line.submittedCostSubsection,
       egcs_fc_submittedlineitem: line.submittedLineItem,
       egcs_fc_description: line.description,
+      egcs_fc_sourcesubmissionlineid: receipt ? line.sourceLineId : undefined,
       egcs_fc_amount: databaseMoneyValue(parseMoney(line.amount)),
       egcs_fc_totalamount: databaseMoneyValue(parseMoney(line.amount)),
       egcs_fc_currency: line.currency as Database['Funding_Case_Agreement_Claim_Line_Item']['egcs_fc_currency']
@@ -298,6 +324,8 @@ export const getAgreementClaim = async (
     'egcs_fc_fiscalyear',
     'egcs_fc_periodstart',
     'egcs_fc_periodend',
+    'egcs_fc_customfields',
+    'egcs_fc_customfielddefinitions',
     'egcs_fc_status'
   ])
   .where('id', '=', claimId)
@@ -490,6 +518,7 @@ export const executeAgreementClaimMutation = async <T>(
           const entityType = lock.type === 'claim' ? 'fundingcaseagreementclaim' : 'fundingclaimreconcile'
           await assertBusinessStatusMutationAllowed(event, trx, entityType, lock.id, options.businessStatusMode)
           await authorizeFreshAssignedItem(event, trx, authContext, entityType, lock.id, options.action ?? 'update')
+          if (lock.type === 'claim') await assertLinkedSubmissionActionAllowed(event, trx, { kind: 'claim', id: lock.id }, 'edit')
         }
       }
     }
@@ -871,9 +900,50 @@ export const patchAgreementClaimForRoute = async (
       }
     }
 
+    const { egcs_fc_customfields: fieldChanges, customFieldPrecondition, ...claimChanges } = patchValues
+    if (customFieldPrecondition) {
+      const submission = await trx.selectFrom('Funding_Case_Agreement_Submission').select('egcs_fc_revision')
+        .where('egcs_fc_target', '=', 'claim')
+        .where('egcs_fc_result', '=', claimId)
+        .where('_deleted', '=', false)
+        .executeTakeFirst()
+      if (customFieldPrecondition.submissionRevision !== (submission?.egcs_fc_revision ?? null)) {
+        return await throwApiError(event, { statusCode: 409, code: 'SUBMISSION_STALE', key: 'submission.errors.stale' })
+      }
+    }
+    const answers = fieldChanges === undefined
+      ? undefined
+      : await validateClaimCustomFields(event, claim.egcs_fc_customfielddefinitions, {
+          current: claim.egcs_fc_customfields,
+          answers: fieldChanges,
+          requireAnswers: false,
+          path: 'egcs_fc_customfields'
+        })
+    const answerChanges = answers === undefined ? undefined : changedCustomFieldAnswers(claim.egcs_fc_customfields, answers)
+    if (customFieldPrecondition && Object.keys(answerChanges ?? {}).some(key =>
+      !sameCustomFieldAnswer(claim.egcs_fc_customfields[key], customFieldPrecondition.previousAnswers[key])
+    )) {
+      return await throwApiError(event, { statusCode: 409, code: 'CLAIM_ANSWERS_STALE', key: 'apiErrors.agreement.claim_answers_stale' })
+    }
+    const customFieldsChanged = answerChanges !== undefined && Object.keys(answerChanges).length > 0
+    const answerResult = answerChanges === undefined ? {} : { customFieldsChanged }
+    if (!customFieldsChanged && Object.keys(claimChanges).length === 0) {
+      const current = await trx.selectFrom('Funding_Case_Agreement_Claim').selectAll()
+        .where('id', '=', claimId)
+        .where('egcs_fc_fundingagreement', '=', agreementId)
+        .where('_deleted', '=', false)
+        .executeTakeFirstOrThrow()
+      return { ...current, ...answerResult }
+    }
+
+    // Keep the saved ordering of equivalent selections when other answers change.
+    const savedAnswers = answers && Object.fromEntries(Object.entries(answers).map(([key, answer]) => {
+      const previous = claim.egcs_fc_customfields[key]
+      return [key, previous !== undefined && sameCustomFieldAnswer(previous, answer) ? previous : answer]
+    }))
     const updated = await trx
       .updateTable('Funding_Case_Agreement_Claim')
-      .set(patchValues)
+      .set({ ...claimChanges, ...(customFieldsChanged ? { egcs_fc_customfields: savedAnswers } : {}) })
       .where('id', '=', claimId)
       .where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false)
@@ -881,7 +951,7 @@ export const patchAgreementClaimForRoute = async (
       .executeTakeFirstOrThrow()
 
     await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'claim', id: claimId })
-    return updated
+    return { ...updated, ...answerResult }
   })
 }
 

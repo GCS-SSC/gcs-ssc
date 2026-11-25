@@ -6,6 +6,7 @@ import type { FetchError } from 'ofetch'
 import { useActionContext, type CapturedActionContext } from '~/composables/useActionContext'
 import { useStatusCatalog } from '~/composables/useStatusCatalog'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
+import { useLinkedAgreementSubmissionReview } from '~/composables/useLinkedAgreementSubmissionReview'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
 import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -129,15 +130,32 @@ const breakdownReloadRequired = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
 const completionComments = ref('')
 
-const tabs = [
-  { key: 'agreement.forecasts.breakdown_title', value: 'breakdown', icon: 'i-lucide-chart-no-axes-column-increasing' },
+const {
+  data: overview,
+  error: overviewError,
+  status: overviewStatus,
+  refresh: refreshOverview
+} = useFetch<FundingCaseAgreementForecastOverviewRow, FetchError, string>(`/api/agreements/${agreementId}/forecasts-overview?forecastId=${forecastId}`)
+const submissionReview = useLinkedAgreementSubmissionReview(agreementId, 'forecast', forecastId, {
+  read: () => overview.value ? overview.value.linkedReview ?? null : undefined,
+  status: () => overviewStatus.value,
+  refresh: refreshOverview
+})
+
+const breakdownTitle = computed(() => submissionReview.detail.value ? 'agreement.claims.submission_title' : 'agreement.forecasts.breakdown_title')
+const tabs = computed(() => [
+  { key: breakdownTitle.value, value: 'breakdown', icon: 'i-lucide-chart-no-axes-column-increasing' },
   { key: 'agreement.forecasts.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
+  ...(submissionReview.detail.value || (submissionReview.status.value !== 'success'
+    && ['history', 'historique'].some(section => section === route.query.section))
+    ? [{ key: 'submission.history_tab', value: 'history', icon: 'i-lucide-history' }]
+    : []),
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
-]
+])
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'breakdown' })
 const isHeroCollapsed = getHeroCollapsed('agreement-forecast-detail')
 
@@ -152,13 +170,6 @@ const getCurrency = (): string => {
   if (!currency) throw new Error('Agreement currency is unavailable.')
   return currency
 }
-const {
-  data: overview,
-  error: overviewError,
-  status: overviewStatus,
-  refresh: refreshOverview
-} = useFetch<FundingCaseAgreementForecastOverviewRow, FetchError, string>(`/api/agreements/${agreementId}/forecasts-overview?forecastId=${forecastId}`)
-
 usePageResourceError({
   identity: () => route.path,
   errors: [profileError, overviewError],
@@ -231,7 +242,8 @@ const canUpdateForecast = computed(() => profile.value?.can_update_agreement_rol
 const canEditForecastBreakdown = computed(() => canCreateForecastLineItems.value || canUpdateForecast.value)
 const breakdownAction = useActionContext({
   identity: [() => agreementId, () => forecastId, canCreateForecastLineItems, canUpdateForecast],
-  authority: canEditForecastBreakdown
+  authority: canEditForecastBreakdown,
+  eligible: submissionReview.canEdit
 })
 watch([selectedTab, breakdownAction.version], () => {
   completionComments.value = ''
@@ -241,15 +253,20 @@ const workflowPrerequisiteWarning = computed(() => {
   if (!activeForecast.value || isTerminalStatus(activeForecast.value.egcs_fc_status)) return toast.localized('apiErrors.request.invalid_status')
   return undefined
 })
-const completionPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
+const editPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
   ?? (activeForecastIsLocked.value ? toast.localized('apiErrors.request.invalid_status') : undefined))
+const submissionLifecycleWarning = computed(() => submissionReview.canAdvanceLifecycle.value
+  ? undefined
+  : toast.localized(submissionReview.warning.value ?? 'submission.errors.acceptance_required'))
+const completionPrerequisiteWarning = computed(() => editPrerequisiteWarning.value ?? submissionLifecycleWarning.value)
 const warnPrerequisite = (warning: LocalizedToastText | undefined): boolean => {
   if (!warning) return false
   toast.add({ title: toast.localized('common.warning'), description: warning, color: 'warning' })
   return true
 }
 const canMutateForecast = (roleAllowed: boolean): boolean => !isLoadingDetail.value && roleAllowed
-  && !warnPrerequisite(completionPrerequisiteWarning.value)
+  && !warnPrerequisite(editPrerequisiteWarning.value
+    ?? (!submissionReview.canEdit.value ? toast.localized(submissionReview.warning.value ?? (submissionReview.state.value === 'returned' ? 'submission.waiting' : 'submission.review_to_edit')) : undefined))
 const hasLoadError = computed(() =>
   Boolean(profileError.value)
   || Boolean(overviewError.value)
@@ -261,7 +278,7 @@ const isLoadingDetail = computed(() => profileStatus.value === 'pending' || over
   || (statusCatalog.state.value.status === 'pending' && !statusCatalog.getById(activeForecast.value?.egcs_fc_status)))
 const retryLoad = async () => {
   if (isSavingBreakdown.value) return
-  await Promise.all([refreshProfile(), refreshOverview()])
+  await Promise.all([refreshProfile(), submissionReview.refresh()])
   if (!disposed && overviewStatus.value === 'success') breakdownReloadRequired.value = false
 }
 
@@ -279,7 +296,7 @@ const lineItemByBudgetMonth = computed(() => {
 
 const canEditForecastAmount = (budgetLineId: string, month: number): boolean => {
   const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
-  return activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)
+  return submissionReview.canEdit.value && activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)
     && (!existing || existing.budget_line_available) && isAssigned.value && !activeForecastIsLocked.value
     && (existing ? canUpdateForecast.value : canCreateForecastLineItems.value)
 }
@@ -314,7 +331,7 @@ const openMonthlyEditor = (row: ForecastBreakdownTableRow) => {
 }
 const isMonthlyEditorMonthEditable = (row: ForecastBreakdownTableRow, month: number) =>
   !isSavingBreakdown.value && Boolean(monthlyEditorOwner.value?.isCurrent()) && (breakdownReloadRequired.value && !overview.value
-    ? isAssigned.value && canEditForecastBreakdown.value && monthlyEditorEditableMonths.value.includes(month)
+    ? submissionReview.canEdit.value && isAssigned.value && canEditForecastBreakdown.value && monthlyEditorEditableMonths.value.includes(month)
     : canEditForecastRowAmount(row, month))
 
 const isMonthlyEditorAmountInvalid = (month: number) => {
@@ -405,7 +422,14 @@ const forecastHeroBadges = computed(() => [
     statusId: activeForecast.value?.egcs_fc_status,
     isCompleted: activeForecast.value?.isCompleted ?? false,
     prefixLabel: t('common.status')
-  }
+  },
+  ...(submissionReview.state.value
+    ? [{
+        variant: 'code',
+        label: t(`submission.state.${submissionReview.state.value}`),
+        prefixLabel: t('agreement.claims.submission_title')
+      }]
+    : [])
 ])
 const breadcrumbItems = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
@@ -542,7 +566,7 @@ const removeForecastSource = (row: ForecastBreakdownTableRow) => {
 }
 const canClearRetiredForecastSources = (row: ForecastBreakdownTableRow) => row.historical
   && showForecastFunding.value && !isHistoricalForecast.value && !activeForecastIsLocked.value
-  && isAssigned.value && canUpdateForecast.value
+  && submissionReview.canEdit.value && isAssigned.value && canUpdateForecast.value
   && activeForecastLineItems.value.some(line => getStableBudgetLineId(line) === row.budgetLineId
     && getProposedFundingSources(row.budgetLineId, line.egcs_fc_month).length > 0)
 const clearRetiredForecastSources = (row: ForecastBreakdownTableRow) => {
@@ -884,8 +908,14 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
             :badges="forecastHeroBadges" />
 
           <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.forecasts.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-forecast-detail-content">
-            <CommonSection v-if="selectedTab === 'breakdown'" data-help-view="casework.forecasts.breakdown" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
-              <div class="space-y-4">
+            <template v-if="selectedTab === 'completion' || selectedTab === 'workflows'" #notices>
+              <AgreementSubmissionLinkedReview :review="submissionReview" :busy="isLoadingDetail || isSavingBreakdown || monthlyEditorOpen" notice-only lifecycle />
+            </template>
+            <CommonSection v-if="selectedTab === 'breakdown'" data-help-view="casework.forecasts.breakdown" :show-header="false" :title="t(breakdownTitle)" :grid-cols="1">
+              <div class="space-y-6">
+                <AgreementSubmissionLinkedReview
+                  :review="submissionReview"
+                  :busy="isLoadingDetail || isSavingBreakdown || monthlyEditorOpen" />
                 <section data-help-target="casework.forecasts.breakdown.records">
                   <CommonResourceLayout
                     v-model:search="breakdownSearch"
@@ -1055,6 +1085,19 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
               </div>
             </CommonSection>
 
+            <div v-else-if="selectedTab === 'history'" class="space-y-4">
+              <AgreementSubmissionLinkedReview
+                v-if="submissionReview.error.value || submissionReview.stale.value || submissionReview.failed.value"
+                :review="submissionReview"
+                :busy="isLoadingDetail || isSavingBreakdown || monthlyEditorOpen"
+                notice-only />
+              <AgreementSubmissionHistory
+                v-if="submissionReview.detail.value"
+                :events="submissionReview.detail.value.events"
+                target="forecast"
+                :source="submissionReview.detail.value.submission.egcs_fc_sourcesystem" />
+            </div>
+
             <section v-else-if="selectedTab === 'completion'" data-help-view="casework.forecasts.completion" data-help-target="casework.forecasts.detail.completion" data-help-kind="section" class="space-y-6">
               <CommonCompletionWorkflowPreAction
                 mode="completion"
@@ -1109,7 +1152,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
               :can-update="canUpdateForecast && isAssigned && !activeForecastIsLocked"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canUpdateForecast" data-help-view="casework.forecasts.workflows" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :mutation-role-allowed="canUpdateForecast" data-help-view="casework.forecasts.workflows" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :start-prerequisite-warning="submissionLifecycleWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.forecasts.supplementary-information" data-help-target="casework.forecasts.supplementary-information.content">
               <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             </section>

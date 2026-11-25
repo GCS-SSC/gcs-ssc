@@ -60,7 +60,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
   const body = operation === 'create'
     ? await readValidatedBodyI18n(event, StreamFieldAssignmentCreateSchema)
     : operation === 'update' ? await readValidatedBodyI18n(event, StreamFieldAssignmentPatchSchema) : null
-  if (target === 'activity' && body?.egcs_tp_section != null) {
+  if (target !== 'agreement' && body?.egcs_tp_section != null) {
     return await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
   }
   if (operation === 'update' && body && !Object.keys(body).length) {

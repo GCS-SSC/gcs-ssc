@@ -171,6 +171,8 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Funding_Case_Agreement_Relationship',
   'public.Funding_Case_Agreement_Responsible_Party_Activity',
   'public.Funding_Case_Agreement_Revision',
+  'public.Funding_Case_Agreement_Submission',
+  'public.Funding_Case_Agreement_Submission_Event',
   'public.Funding_Case_Intake_Profile',
   'public.Funding_Opportunity_Attachment_Type',
   'public.Funding_Opportunity_Profile',

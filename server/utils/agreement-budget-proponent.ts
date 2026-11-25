@@ -5,25 +5,26 @@ import type { Database } from '~~/shared/types/database'
 import { validationError } from './api-errors'
 
 /**
- * Resolves a budget line's existing Agreement Proponent under its aggregate write lock.
+ * Resolves a budget line's existing Agreement Proponent.
  * @param event - Authorized request.
- * @param trx - Owning Agreement write transaction.
+ * @param trx - Owning Agreement write transaction or authorized read snapshot.
  * @param input - Proposed and retained Proponent identity.
  * @param input.agreementId - Owning Agreement.
  * @param input.proponentId - Explicitly proposed profile ID.
  * @param input.savedProponentId - Retained profile ID for omitted PATCH input.
+ * @param input.lock - Skip relation locks for a read-only preview.
  * @returns Validated linked profile ID, defaulting a sole relationship on create.
  */
 export const resolveAgreementBudgetProponent = async (
   event: H3Event,
-  trx: Transaction<Database>,
-  input: { agreementId: string, proponentId?: string, savedProponentId?: string }
+  trx: Kysely<Database>,
+  input: { agreementId: string, proponentId?: string, savedProponentId?: string, lock?: 'read_only' }
 ): Promise<string> => {
   const proponents = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
     .select(sql<string>`egcs_fc_applicantrecipient::text`.as('egcs_fc_applicantrecipient'))
     .where('egcs_fc_fundingagreement', '=', input.agreementId)
     .where('_deleted', '=', false)
-    .forShare()
+    .$if(input.lock !== 'read_only', query => query.forShare())
     .execute()
   const selectedId = input.proponentId ?? input.savedProponentId
   const [soleProponent] = proponents
