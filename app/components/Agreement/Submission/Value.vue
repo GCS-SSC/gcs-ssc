@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatMoneyText, isCanonicalMoney } from '~~/shared/utils/money'
-import { compareClaimReference, compareSubmissionValues, pairSubmissionRows, fiscalMonthLabels, isSubmissionIdField, isSubmissionObject, submissionFieldKey } from '~/utils/agreement-submission-view'
+import { compareClaimReference, compareSubmissionValues, compareUnlabeledSubmissionReference, pairSubmissionRows, fiscalMonthLabels, isSubmissionIdField, isSubmissionObject, submissionFieldKey } from '~/utils/agreement-submission-view'
 import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submission'
 import type { ClaimReferenceComparison } from '~/utils/agreement-submission-view'
 
-const { value, field, snapshot = false, lineItem = false, previous, replacePrevious = false, claimReferences, target } = defineProps<{
+const { value, field, snapshot = false, showReferences = false, lineItem = false, previous, replacePrevious = false, claimReferences, target } = defineProps<{
   value: unknown
   field?: string
   snapshot?: boolean
+  showReferences?: boolean
   target?: AgreementSubmissionTarget
   lineItem?: boolean
   previous?: unknown
@@ -36,11 +37,14 @@ const objectEntries = computed(() => {
   const entries = Object.keys(fields).map(key => {
     const current = Object.hasOwn(value, key) ? value[key] : undefined
     const prior = previousObject.value && Object.hasOwn(previousObject.value, key) ? previousObject.value[key] : undefined
-    const reference = claimReferences && compareClaimReference({
+    const claimReference = claimReferences && compareClaimReference({
       key, before: prior, after: current, evidence: claimReferences,
       locale: locale.value, unavailable: t('common.unavailable')
     })
-    if (reference) {
+    const reference = claimReference || (snapshot && showReferences && compareUnlabeledSubmissionReference({
+      key, before: prior, after: current, unavailable: t('common.unavailable')
+    }))
+    if (reference && (claimReference || reference.before !== undefined || reference.after !== undefined)) {
       return {
         key,
         title: t(reference.title),
@@ -75,11 +79,11 @@ const month = computed(() => typeof value === 'number' && (field === 'periodStar
   <div v-if="showReplacement" class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
     <del class="text-error">
       <span class="sr-only">{{ t('submission.before') }} </span>
-      <AgreementSubmissionValue :value="previous" :field="field" snapshot />
+      <AgreementSubmissionValue :value="previous" :field="field" :show-references="showReferences" snapshot />
     </del>
     <ins v-if="value !== undefined" class="font-medium text-highlighted no-underline">
       <span class="sr-only">{{ t('submission.after') }} </span>
-      <AgreementSubmissionValue :value="value" :field="field" snapshot />
+      <AgreementSubmissionValue :value="value" :field="field" :show-references="showReferences" snapshot />
     </ins>
   </div>
   <span v-else-if="money !== null">{{ money }}</span>
@@ -90,7 +94,7 @@ const month = computed(() => typeof value === 'number' && (field === 'periodStar
   <span v-else-if="typeof value === 'string' || typeof value === 'number'" class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ value === '' ? t('submission.blank') : value }}</span>
   <ol v-else-if="snapshot && rows.length" class="divide-y divide-default border-y border-default" role="list">
     <li v-for="(row, index) in rows" :key="index" class="min-w-0 py-3">
-      <AgreementSubmissionValue :value="row.after" :previous="row.before" snapshot :line-item="field === 'lineItems'" />
+      <AgreementSubmissionValue :value="row.after" :previous="row.before" :show-references="showReferences" snapshot :line-item="field === 'lineItems'" />
     </li>
   </ol>
   <ol v-else-if="Array.isArray(value) && value.length" class="list-decimal space-y-3 pl-5">
@@ -110,7 +114,7 @@ const month = computed(() => typeof value === 'number' && (field === 'periodStar
           {{ title }}
         </dt>
         <dd class="min-w-0 text-default">
-          <AgreementSubmissionValue :value="fieldValue" :field="key" :previous="prior" :replace-previous="replaceField" :target="field === undefined ? target : undefined" snapshot />
+          <AgreementSubmissionValue :value="fieldValue" :field="key" :previous="prior" :replace-previous="replaceField" :target="field === undefined ? target : undefined" :show-references="showReferences" snapshot />
         </dd>
       </div>
     </dl>

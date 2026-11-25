@@ -46,7 +46,7 @@ const readClaim = (db: Kysely<Database>, { agreementId, targetId }: LinkedTarget
   .where('_deleted', '=', false).executeTakeFirst()
 
 const readForecast = (db: Kysely<Database>, { agreementId, targetId }: LinkedTarget) => db
-  .selectFrom('Funding_Case_Agreement_Forecast').select(['egcs_fc_fiscalyear', 'egcs_fc_active'])
+  .selectFrom('Funding_Case_Agreement_Forecast').select(['egcs_fc_fiscalyear', 'egcs_fc_active', 'egcs_fc_customfields', 'egcs_fc_customfielddefinitions'])
   .where('id', '=', targetId).where('egcs_fc_fundingagreement', '=', agreementId)
   .where('_deleted', '=', false).executeTakeFirst()
 
@@ -118,28 +118,21 @@ const readLineFunding = async (
 const isPayloadObject = (json: JsonValue): json is AgreementSubmissionPayload => json !== null
   && typeof json === 'object' && !Array.isArray(json)
 
-const matchingSourceLine = (source: AgreementSubmissionPayload[], budgetLineId: string | null, month?: number) => {
-  const index = source.findIndex(line => (line.budgetLineItemId ?? null) === budgetLineId
-    && (month === undefined || line.month === month))
-  if (index === -1) return {}
-  return source.splice(index, 1)[0] ?? {}
-}
-
 const optionalSnapshotValue = (source: AgreementSubmissionPayload, key: string, value: JsonValue | undefined) => {
   return value != null || Object.hasOwn(source, key) ? { [key]: value ?? null } : {}
 }
 
 const lineAmountsSnapshot = (
   line: { egcs_fc_amount: string; egcs_fc_totalamount: string; egcs_fc_currency: string },
-  source: AgreementSubmissionPayload,
+  source: AgreementSubmissionPayload | undefined,
   fundingSources: LineFunding[]
 ): AgreementSubmissionPayload => {
   const amount = parseDatabaseMoney(line.egcs_fc_amount, line.egcs_fc_currency)
   const total = parseDatabaseMoney(line.egcs_fc_totalamount, line.egcs_fc_currency)
   return {
     amount,
-    ...optionalSnapshotValue(source, 'totalAmount', compareMoney(amount, total) === 0 && !Object.hasOwn(source, 'totalAmount') ? undefined : total),
-    ...optionalSnapshotValue(source, 'fundingSources', fundingSources.length || Object.hasOwn(source, 'fundingSources') ? fundingSources : undefined)
+    ...(!source || Object.hasOwn(source, 'totalAmount') || compareMoney(amount, total) !== 0 ? { totalAmount: total } : {}),
+    ...optionalSnapshotValue(source ?? {}, 'fundingSources', fundingSources.length || (source && Object.hasOwn(source, 'fundingSources')) ? fundingSources : undefined)
   }
 }
 
@@ -147,7 +140,7 @@ export const readLinkedSubmissionSnapshot = async (
   db: Kysely<Database>,
   input: LinkedTarget & { sourcePayload: AgreementSubmissionPayload }
 ): Promise<AgreementSubmissionPayload> => {
-  const { target, targetId, sourcePayload } = input
+  const { agreementId, target, targetId, sourcePayload } = input
   const sourceLines = Array.isArray(sourcePayload.lineItems) ? sourcePayload.lineItems.filter(isPayloadObject) : []
   if (target === 'claim') {
     const claim = await readClaim(db, input)
@@ -185,19 +178,39 @@ export const readLinkedSubmissionSnapshot = async (
   }
   const forecast = await readForecast(db, input)
   if (!forecast) throw missingTarget()
+  const definitions = await parsePersistedClaimCustomFieldDefinitions(forecast.egcs_fc_customfielddefinitions, undefined, 'forecast')
   const lines = await readForecastLines(db, targetId)
   const lineFunding = await readLineFunding(db, target, lines)
-  const lineItems = []
-  for (const line of lines) {
-    const source = matchingSourceLine(sourceLines, line.egcs_fc_fundingagreementbudgetlineitem, line.egcs_fc_month)
-    lineItems.push({
+  const currentChoices = new Map<string, ReturnType<typeof readAgreementBudgetLineReference>>()
+  const lineItems = await Promise.all(lines.map(async line => {
+    const budgetLineId = line.egcs_fc_fundingagreementbudgetlineitem
+    const matches = sourceLines.filter(source => {
+      const sourceId = source.budgetLineItemId
+      const normalizedId = typeof sourceId === 'number' && Number.isSafeInteger(sourceId) ? String(sourceId) : sourceId
+      return normalizedId === budgetLineId && source.month === line.egcs_fc_month
+    })
+    let source = matches.length === 1 ? matches[0] : undefined
+    if (!source && line.egcs_fc_amount === line.egcs_fc_totalamount) {
+      let current = currentChoices.get(budgetLineId)
+      if (!current) {
+        current = readAgreementBudgetLineReference(db, agreementId, forecast.egcs_fc_fiscalyear, budgetLineId, 'current-choice')
+        currentChoices.set(budgetLineId, current)
+      }
+      if (await current) source = {}
+    }
+    return {
       ...source,
-      budgetLineItemId: line.egcs_fc_fundingagreementbudgetlineitem,
+      budgetLineItemId: budgetLineId,
       month: line.egcs_fc_month,
       ...lineAmountsSnapshot(line, source, lineFunding.get(line.id) ?? [])
-    })
+    }
+  }))
+  return {
+    ...sourcePayload, fiscalYearId: forecast.egcs_fc_fiscalyear,
+    ...optionalSnapshotValue(sourcePayload, 'customFields',
+      Object.hasOwn(sourcePayload, 'customFields') || definitions.length ? forecast.egcs_fc_customfields : undefined),
+    lineItems
   }
-  return { ...sourcePayload, fiscalYearId: forecast.egcs_fc_fiscalyear, lineItems }
 }
 
 export const linkedSubmissionDecisionDigest = (snapshot: AgreementSubmissionPayload) =>
@@ -241,7 +254,12 @@ const removeClaimLine = async (trx: Transaction<Database>, lineId: string) => {
 
 export const applyLinkedSubmissionRevision = async (
   trx: Transaction<Database>,
-  input: LinkedTarget & { event: H3Event; payload: AgreementSubmissionPayload; previousSourcePayload: AgreementSubmissionPayload }
+  input: LinkedTarget & {
+    event: H3Event
+    payload: AgreementSubmissionPayload
+    previousSourcePayload: AgreementSubmissionPayload
+    returnedPayload?: AgreementSubmissionPayload
+  }
 ): Promise<void> => {
   const { event, agreementId, target, targetId, payload } = input
   await assertLinkedSubmissionTargetEditable(trx, input)
@@ -370,6 +388,11 @@ export const applyLinkedSubmissionRevision = async (
     if (!forecast || forecast.egcs_fc_fiscalyear !== revised.fiscalYearId) {
       return await badRequest(event, 'INVALID_AGREEMENT_FORECAST_FISCAL_YEAR', 'apiErrors.agreement.invalid_forecast_fiscal_year')
     }
+    const answers = await validateClaimCustomFields(event, forecast.egcs_fc_customfielddefinitions, {
+      target: 'forecast', answers: revised.customFields ?? {}, requireAnswers: true, path: 'customFields', currency
+    })
+    await trx.updateTable('Funding_Case_Agreement_Forecast').set({ egcs_fc_customfields: answers })
+      .where('id', '=', targetId).executeTakeFirstOrThrow()
     const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient').select('id')
       .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_applicantrecipient', '=', revised.applicantRecipientId)
       .where('_deleted', '=', false).executeTakeFirst()
@@ -380,6 +403,11 @@ export const applyLinkedSubmissionRevision = async (
       throw new SubmissionTargetError('SUBMISSION_FORECAST_DUPLICATE_MONTH', 'The Forecast repeats a month on the same budget line.')
     }
     await assertCurrencyMoneyValues(event, currency, revised.lineItems.flatMap(line => line.totalAmount ? [line.amount, line.totalAmount] : [line.amount]))
+    const sameSourceScope = previous.applicantRecipientId === revised.applicantRecipientId
+      && previous.fiscalYearId === revised.fiscalYearId
+    const returned = mode === 'program_only' && input.returnedPayload
+      ? schemas.forecast.safeParse(input.returnedPayload)
+      : undefined
     const remaining = await readForecastLines(trx, targetId)
     const lineFunding = await readLineFunding(trx, target, remaining)
     if (remaining.some(line => lineFunding.has(line.id)
@@ -405,12 +433,28 @@ export const applyLinkedSubmissionRevision = async (
       } else {
         await assertAgreementForecastBudgetLineItem(event, trx, agreementId, forecast.egcs_fc_fiscalyear, line.budgetLineItemId)
       }
+      if (mode === 'program_only' && line.totalAmount) {
+        const returnedMatches = returned?.success && returned.data.applicantRecipientId === revised.applicantRecipientId
+          && returned.data.fiscalYearId === revised.fiscalYearId
+          ? returned.data.lineItems.filter(cell => matchesCell(cell.budgetLineItemId, cell.month))
+          : []
+        const returnedCell = returnedMatches.length === 1 ? returnedMatches[0] : undefined
+        if (sameSourceScope && existing?.egcs_fc_currency === currency
+          && returnedCell?.amount.amount === line.amount.amount && returnedCell.amount.currency === line.amount.currency
+          && returnedCell.totalAmount?.amount === line.totalAmount.amount && returnedCell.totalAmount.currency === line.totalAmount.currency
+          && line.amount.amount === existing.egcs_fc_amount && line.totalAmount.amount === existing.egcs_fc_totalamount
+          && compareMoney(line.totalAmount, line.amount) > 0) continue
+        return await badRequest(event, 'AGREEMENT_FORECAST_TOTAL_COST_INVALID', 'apiErrors.agreement.total_cost_read_only')
+      }
+      if (sameSourceScope && echoesPrior && existing?.egcs_fc_currency === currency) continue
       const sources = existing ? lineFunding.get(existing.id) ?? [] : []
       const calculated = sumMoney([line.amount, ...sources.map(source => source.egcs_fc_amount)], currency)
       let total: Money = line.totalAmount ?? calculated
       if (mode === 'program_only') {
-        if (line.totalAmount) return await badRequest(event, 'AGREEMENT_FORECAST_TOTAL_COST_INVALID', 'apiErrors.agreement.total_cost_read_only')
-        total = line.amount
+        const savedTotal = existing?.egcs_fc_currency === currency
+          ? parseDatabaseMoney(existing.egcs_fc_totalamount, currency)
+          : line.amount
+        total = compareMoney(savedTotal, line.amount) > 0 ? savedTotal : line.amount
       }
       if (!isPersistableMoney(total)) {
         return await badRequest(event, 'AGREEMENT_FORECAST_TOTAL_COST_INVALID', 'apiErrors.agreement.forecast_total_cost_range')

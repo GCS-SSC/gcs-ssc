@@ -10,9 +10,7 @@ const { review, busy = false, startInHero = false, noticeOnly = false, lifecycle
   lifecycle?: boolean
 }>()
 const { t } = useI18n()
-const returnOpen = ref(false)
-const returnText = ref('')
-const returnError = ref(false)
+const { returnOpen, returnText, returnError, openReturn, closeReturn } = review
 const summary = ref<HTMLElement | null>(null)
 const detail = review.detail
 const state = review.state
@@ -23,7 +21,6 @@ const notice = computed(() => {
   return null
 })
 const reloading = review.reloading
-const canReturn = computed(() => detail.value?.canReturn === true)
 watch(state, (current, previous) => {
   if (startInHero && previous === 'submitted' && current === 'reviewing') summary.value?.focus()
 }, { flush: 'post' })
@@ -34,16 +31,8 @@ watch(state, (current, previous) => {
  */
 const execute = async (action: 'start' | 'return' | 'accept') => {
   if (locked.value) return
-  const description = returnText.value.trim()
-  if (action === 'return' && !description) {
-    returnError.value = true
-    return
-  }
-  const changed = await review.run(action === 'return' ? { action, description } : { action })
+  const changed = action === 'return' ? await review.confirmReturn() : await review.run({ action })
   if (!changed) return
-  returnOpen.value = false
-  returnText.value = ''
-  returnError.value = false
   await nextTick()
   summary.value?.focus()
 }
@@ -67,11 +56,11 @@ const execute = async (action: 'start' | 'return' | 'accept') => {
       <UButton v-if="!notice" color="neutral" variant="outline" icon="i-lucide-refresh-cw" :loading="reloading" :disabled="busy || review.pending.value" @click="review.refresh">
         {{ t('submission.reload') }}
       </UButton>
-      <UButton v-if="!startInHero && detail.canReview && state === 'submitted'" icon="i-lucide-play" :loading="review.pending.value" :disabled="locked" @click="execute('start')">
+      <UButton v-if="!startInHero && state === 'submitted' && review.canReviewRole.value" icon="i-lucide-play" :loading="review.pending.value" :disabled="locked" @click="execute('start')">
         {{ t('submission.start') }}
       </UButton>
-      <template v-else-if="detail.canReview && state === 'reviewing'">
-        <UButton v-if="canReturn" color="warning" variant="outline" :disabled="locked" @click="returnOpen = true">
+      <template v-else-if="state === 'reviewing' && review.canReviewRole.value">
+        <UButton color="warning" variant="outline" :disabled="locked" @click="openReturn">
           {{ t('submission.return') }}
         </UButton>
         <UButton icon="i-lucide-check" :loading="review.pending.value" :disabled="locked" @click="execute('accept')">
@@ -80,7 +69,7 @@ const execute = async (action: 'start' | 'return' | 'accept') => {
       </template>
     </div>
     <CommonNotice v-if="state === 'returned'" tone="warning" :title="t('submission.waiting')" :description="waiting?.egcs_fc_description ?? undefined" />
-    <section v-if="returnOpen && state === 'reviewing' && canReturn" class="space-y-4 rounded-md border border-default p-4">
+    <section v-if="returnOpen && state === 'reviewing'" class="space-y-4 rounded-md border border-default p-4">
       <UFormField data-field-scope="agreement.linked-submission" name="description" required :label="t('submission.return_description')" :error="returnError ? t('validation.required') : undefined">
         <UTextarea v-model="returnText" class="w-full" required :maxlength="500" :disabled="locked" @update:model-value="returnError = false" />
       </UFormField>
@@ -88,7 +77,7 @@ const execute = async (action: 'start' | 'return' | 'accept') => {
         <UButton color="warning" :loading="review.pending.value" :disabled="locked" @click="execute('return')">
           {{ t('submission.confirm_return') }}
         </UButton>
-        <UButton color="neutral" variant="outline" :disabled="locked" @click="returnOpen = false">
+        <UButton color="neutral" variant="outline" :disabled="locked" @click="closeReturn">
           {{ t('common.cancel') }}
         </UButton>
       </div>

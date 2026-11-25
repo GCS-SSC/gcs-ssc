@@ -295,6 +295,7 @@
     "maximum_hint": "Maximum : {maximum}",
     "activity_title": "Champs personnalisés des activités",
     "claim_title": "Champs personnalisés des demandes de remboursement",
+    "forecast_title": "Champs personnalisés des prévisions",
     "assign_field": "Associer un champ de l’organisme",
     "agency_field": "Champ de l’organisme",
     "unsectioned": "Sans section",
@@ -342,7 +343,7 @@
     "option_number": "Option {number}",
     "required_cell": "Cellule obligatoire",
     "required_answer": "Réponse obligatoire",
-    "claim_only": "Disponible uniquement pour les demandes de remboursement.",
+    "claims_and_forecasts_only": "Disponible uniquement pour les demandes de remboursement et les prévisions.",
     "move_up": "Monter",
     "move_down": "Descendre",
     "remove_column": "Retirer la colonne",
@@ -1893,6 +1894,8 @@
       "custom_fields_invalid": "Les sélections de champs personnalisés enregistrées de l’entente sont invalides.",
       "claim_custom_field_unanswerable": "Le champ obligatoire « {field} » de la demande de remboursement n’accepte aucune réponse valide. Modifiez la configuration du champ avant de créer la demande.",
       "claim_custom_field_definitions_invalid": "Les définitions enregistrées des champs personnalisés de la demande de remboursement sont invalides.",
+      "forecast_custom_field_unanswerable": "Le champ obligatoire « {field} » de la prévision n’accepte aucune réponse valide. Modifiez la configuration du champ avant de créer la prévision.",
+      "forecast_custom_field_definitions_invalid": "Les définitions enregistrées des champs personnalisés de la prévision sont invalides.",
       "invalid_coding_allocation": "Les lignes de codage doivent appartenir à ce volet, correspondre au montant total et couvrir les montants déjà payés.",
       "invalid_financial_id": "Sélectionnez un identifiant financier actif pour ce promoteur auprès de l'organisme de l'entente.",
       "financial_id_required": "Sélectionnez un identifiant financier pour chaque promoteur de cette entente.",
@@ -2034,6 +2037,7 @@
       "initial_approval_required": "Terminez la soumission initiale de l’entente pour approbation avant de créer une demande de remboursement ou un paiement.",
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",
       "claim_answers_stale": "La demande de remboursement ou sa soumission a changé. Rechargez les réponses à jour avant d’enregistrer de nouveau.",
+      "forecast_answers_stale": "La prévision ou sa soumission a changé. Rechargez les réponses à jour avant d’enregistrer de nouveau.",
       "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
       "forecast_cell_occupied": "Une ligne de prévision existe déjà pour cette ligne budgétaire et ce mois.",
       "forecast_breakdown_conflict": "La ventilation des prévisions a changé. Rechargez les montants enregistrés pour vérifier vos modifications. Un nouvel enregistrement remplacera les montants enregistrés dans les cellules modifiées.",
@@ -2047,7 +2051,7 @@
       "funding_subtype_link_not_found": "Sous-type de financement du volet introuvable.",
       "profile_not_found": "Programme introuvable.",
       "profile_scope_changed": "La portée du programme a changé pendant le traitement de cette demande. Actualisez la page et réessayez.",
-      "custom_field_claim_only": "Les tableaux et les ensembles répétitifs peuvent uniquement être attribués aux demandes de remboursement.",
+      "structured_custom_field_target_invalid": "Les tableaux et les ensembles répétitifs peuvent uniquement être attribués aux demandes de remboursement et aux prévisions.",
       "stream_not_found": "Volet de programme introuvable.",
       "stream_clause_unavailable": "Sélectionnez une clause active et publiée de cette agence.",
       "stream_clause_already_linked": "Cette clause est déjà liée au volet.",
@@ -3562,6 +3566,7 @@
       }
     },
     "forecasts": {
+      "no_additional_information": "Aucun champ supplémentaire n’est configuré pour cette prévision.",
       "program_only_copy_title": "Financement du programme copié",
       "program_only_copy_notice": "Cette ébauche comprend uniquement le financement du programme. La prévision précédente conserve ses autres sources de financement.",
       "historical_budget_line_read_only": "Cette ligne enregistrée est en lecture seule, car sa ligne budgétaire n’est plus disponible dans le budget courant.",
@@ -4533,6 +4538,7 @@
       "risk_rating": "Évaluation du risque"
     },
     "completion_blockers": {
+      "custom_fields_incomplete": "Remplissez les champs obligatoires et corrigez les réponses invalides dans Renseignements supplémentaires.",
       "annual_budget_exceeded": "Les montants annuels du programme dépassent le budget courant de financement du programme de l’entente. Réduisez les montants ou augmentez le financement du programme dans le budget.",
       "active_workflow": "L’achèvement n’est pas disponible pendant qu’un processus est actif.",
       "approval_workflow_missing": "Un processus d’approbation publié est requis avant que cet élément puisse être achevé.",

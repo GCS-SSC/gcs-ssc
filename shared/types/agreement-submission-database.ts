@@ -48,6 +48,7 @@ export interface AgreementSubmissionEventTable {
   egcs_fc_sourcerevision: string
   egcs_fc_formatversion: number
   egcs_fc_payload: AgreementSubmissionPayload | null
+  egcs_fc_forecastcustomfields: Generated<ClaimCustomFieldSnapshot | null>
   egcs_fc_claimcustomfields: Generated<ClaimCustomFieldSnapshot | null>
   egcs_fc_claimreferences: Generated<ClaimSubmissionReferenceSnapshot | null>
   egcs_fc_description: string | null

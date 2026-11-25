@@ -1,6 +1,9 @@
+import type { H3Event } from 'h3'
+import type { AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
+import { captureForecastCustomFields } from './agreement-claim-custom-fields'
 import { nextAgreementForecastVersion } from './agreement-forecast-versions'
 import { resolveAgreementCurrency } from './agreement-currency'
-import type { Insertable, Transaction } from 'kysely'
+import type { Transaction } from 'kysely'
 import type {
   GcsExtensionAgreementForecastCreateInput,
   GcsExtensionAgreementForecastCreateResult
@@ -20,13 +23,19 @@ import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
  * @param input - Forecast header and monthly lines.
  * @param agencyId - Owning Agency.
  * @param creatorId - Active Common User receiving the primary assignment.
+ * @param receipt - Source answers when creating a linked Forecast.
+ * @param receipt.event - Request that received the submission.
+ * @param receipt.answers - Answers supplied by the source.
+ * @param event - Interactive creation request used to localize configuration errors.
  * @returns Created Forecast and line identifiers, or an unavailable-domain outcome.
  */
 export const createAgreementForecastAggregate = async (
   trx: Transaction<Database>,
   input: GcsExtensionAgreementForecastCreateInput,
   agencyId: string,
-  creatorId: string
+  creatorId: string,
+  receipt?: { event: H3Event; answers?: AgreementCustomFieldPatch },
+  event?: H3Event
 ): Promise<GcsExtensionAgreementForecastCreateResult> => {
   const currency = await resolveAgreementCurrency(trx, input.agreementId)
   if (!currency) return { status: 'agreement_unavailable' }
@@ -116,12 +125,13 @@ export const createAgreementForecastAggregate = async (
   }
 
   const forecast = await trx.insertInto('Funding_Case_Agreement_Forecast').values({
+    ...await captureForecastCustomFields(trx, input.streamId, receipt && { ...receipt, currency }, event),
     egcs_fc_fundingagreement: input.agreementId,
     egcs_fc_fiscalyear: input.fiscalYearId,
     egcs_fc_status: draftStatusId,
     egcs_fc_version: await nextAgreementForecastVersion(trx, input.agreementId, input.fiscalYearId),
     egcs_fc_active: false
-  } satisfies Insertable<Database['Funding_Case_Agreement_Forecast']>)
+  })
     .returning(['id', 'egcs_fc_version']).executeTakeFirstOrThrow()
   const lineItemIds: string[] = []
   for (const line of input.lineItems) {

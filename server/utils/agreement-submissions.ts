@@ -19,6 +19,7 @@ import type {
 } from '~~/shared/types/agreement-submission'
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 import { agreementSubmissionTargetSchemas } from '~~/shared/types/schemas/agreement-submission-targets'
+import { claimCustomFieldSnapshot } from '~~/shared/utils/claim-custom-field-snapshot'
 import { readClaimSubmissionEvidence } from './agreement-submission-claim-evidence'
 import { assertClaimCustomFieldsComplete, parsePersistedClaimCustomFieldDefinitions } from './agreement-claim-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -101,7 +102,7 @@ const submissionDto = ({
   egcs_fc_updatedat: new Date(row.egcs_fc_updatedat).toISOString()
 })
 
-const detail = async (db: SubmissionDb, submission: Submission, canReview: boolean, canReturn: boolean = canReview) => {
+const detail = async (db: SubmissionDb, submission: Submission, canReview: boolean, returnAllowed = true) => {
   const events = await db.selectFrom('Funding_Case_Agreement_Submission_Event as entry')
     .leftJoin('Common_User as actor', 'actor.id', 'entry.egcs_fc_actor')
     .selectAll('entry').select('actor.egcs_cn_name as actorName')
@@ -115,7 +116,8 @@ const detail = async (db: SubmissionDb, submission: Submission, canReview: boole
     updatedByName: updatedBy?.egcs_cn_name ?? null,
     events: events.map(entry => ({ ...entry, egcs_fc_createdat: new Date(entry.egcs_fc_createdat).toISOString() })),
     canReview,
-    canReturn
+    canReturn: canReview && returnAllowed,
+    returnAllowed
   }
 }
 
@@ -126,9 +128,25 @@ const appendEvent = async (
   description: string | null = null
 ) => {
   const evidence = kind !== 'review_started' && submission.egcs_fc_target === 'claim' && submission.egcs_fc_result
-    ? await readClaimSubmissionEvidence(trx, submission.egcs_fc_result, parsePersistedClaimCustomFieldDefinitions)
+    ? await readClaimSubmissionEvidence(
+        trx,
+        submission.egcs_fc_result,
+        parsePersistedClaimCustomFieldDefinitions,
+        kind === 'received' ? agreementSubmissionTargetSchemas.claim.parse(submission.egcs_fc_payload) : undefined
+      )
     : null
+  let forecastFields: ClaimCustomFieldSnapshot = []
+  if (kind !== 'review_started' && submission.egcs_fc_target === 'forecast' && submission.egcs_fc_result) {
+    const forecast = await trx.selectFrom('Funding_Case_Agreement_Forecast')
+      .select(['egcs_fc_customfielddefinitions', 'egcs_fc_customfields'])
+      .where('id', '=', submission.egcs_fc_result).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    forecastFields = claimCustomFieldSnapshot(
+      await parsePersistedClaimCustomFieldDefinitions(forecast.egcs_fc_customfielddefinitions, undefined, 'forecast'),
+      forecast.egcs_fc_customfields
+    )
+  }
   await trx.insertInto('Funding_Case_Agreement_Submission_Event').values({
+    egcs_fc_forecastcustomfields: forecastFields.length ? sql<ClaimCustomFieldSnapshot>`${JSON.stringify(forecastFields)}::jsonb` : null,
     egcs_fc_claimcustomfields: evidence?.fields.length ? sql<ClaimCustomFieldSnapshot>`${JSON.stringify(evidence.fields)}::jsonb` : null,
     egcs_fc_claimreferences: evidence ? sql<ClaimSubmissionReferenceSnapshot>`${JSON.stringify(evidence.references)}::jsonb` : null,
     egcs_fc_submission: submission.id,
@@ -281,7 +299,7 @@ export const getAgreementSubmission = async (event: H3Event, agreementId: string
     const linked = financialTarget(row)
     if (!linked) return await detail(db, row, canReview)
     const allowed = await canReviewLinkedTarget(db, authorization, context, linked.target, linked.targetId)
-    return await detail(db, row, allowed, allowed && await allowsReturn(db, context.streamId, linked.target))
+    return await detail(db, row, allowed, await allowsReturn(db, context.streamId, linked.target))
   })
 
 export const commandAgreementSubmission = async (
@@ -323,7 +341,7 @@ export const commandAgreementSubmission = async (
       if (action !== 'start' && command.expectedDecisionDigest !== linkedSubmissionDecisionDigest(snapshot)) {
         return await conflict(event, 'SUBMISSION_FINANCIAL_STALE', 'submission.errors.financial_stale')
       }
-      if (action === 'accept' && linked.target === 'claim') await assertClaimCustomFieldsComplete(event, trx, linked.targetId)
+      if (action === 'accept') await assertClaimCustomFieldsComplete(event, trx, linked.targetId, linked.target)
       const state = action === 'start' ? 'reviewing' : action === 'return' ? 'returned' : 'accepted'
       const row = await trx.updateTable('Funding_Case_Agreement_Submission').set({
         egcs_fc_state: state,
@@ -525,7 +543,8 @@ export const receiveAgreementSubmission = async (
           }
           const revision = {
             event, agreementId, target: targetKind, targetId: existing.egcs_fc_result,
-            payload: input.payload, previousSourcePayload: previousReceipt.egcs_fc_payload
+            payload: input.payload, previousSourcePayload: previousReceipt.egcs_fc_payload,
+            returnedPayload: existing.egcs_fc_payload
           }
           await applyLinkedSubmissionRevision(trx, revision)
           return existing.egcs_fc_result

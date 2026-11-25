@@ -40,7 +40,7 @@ export const useEntityAssignmentRoster = (
     `/api/entity-assignments/${toValue(entityType)}/${toValue(entityId)}`
   )
   const enabled = computed(() => options.enabled === undefined || toValue(options.enabled))
-  const { data, error, status, refresh } = useFetch<EntityAssignmentRoster, Error, string>(endpoint, {
+  const { data, error, status, refresh, clear } = useFetch<EntityAssignmentRoster, Error, string>(endpoint, {
     immediate: false,
     watch: false
   })
@@ -53,6 +53,7 @@ export const useEntityAssignmentRoster = (
     error,
     status,
     refresh,
+    clear,
     isAssigned: computed(() => data.value?.is_assigned === true),
     isPrimary: computed(() => data.value?.is_primary === true),
     canManageAssignments: computed(() => data.value?.can_manage_assignments === true)

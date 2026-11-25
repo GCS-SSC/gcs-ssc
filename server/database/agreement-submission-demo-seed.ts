@@ -129,6 +129,16 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       egcs_tp_displayorder: index + 1
     } satisfies Insertable<Database['Transfer_Payment_Stream_Field_Assignment']>))
   ).execute()
+  await db.insertInto('Transfer_Payment_Stream_Field_Assignment').values(
+    [volunteerHours, deliveryMethod].map((field, index) => ({
+      egcs_tp_transferpaymentstream: agreement.egcs_fc_transferpaymentstream,
+      egcs_tp_agencyfield: field.id,
+      egcs_tp_target: 'forecast',
+      egcs_tp_required: false,
+      egcs_tp_displayorder: index + 1
+    }))
+  ).execute()
+  const forecastDefinitions = await readAssignedAgencyCustomFieldDefinitions(db, agreement.egcs_fc_transferpaymentstream, 'forecast')
   const claimDefinitions = await readAssignedAgencyCustomFieldDefinitions(db, agreement.egcs_fc_transferpaymentstream, 'claim')
   const customFields = {
     [supportingDetails.id]: 'The supplier invoice includes furniture and installation.',
@@ -150,6 +160,10 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
     }]
   }
   const forecast = {
+    customFields: {
+      [volunteerHours.id]: 18,
+      [deliveryMethod.id]: [supplierDelivery.id]
+    } satisfies AgreementCustomFieldValues,
     applicantRecipientId: '119',
     fiscalYearId: '7',
     lineItems: [{
@@ -238,14 +252,17 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
   /**
    * Creates the Draft Forecast with its current submitted amount.
    * @param amount - Current amount in minor units.
+   * @param answers - Current pinned answers.
    * @returns Draft Forecast identifier for the demo fiscal year.
    */
-  const createForecast = async (amount = '800000') => {
+  const createForecast = async (amount = '800000', answers: AgreementCustomFieldValues = forecast.customFields) => {
     const version = await db.selectFrom('Funding_Case_Agreement_Forecast')
       .select(eb => eb.fn.max('egcs_fc_version').as('version'))
       .where('egcs_fc_fundingagreement', '=', agreement.id).where('egcs_fc_fiscalyear', '=', forecast.fiscalYearId)
       .executeTakeFirstOrThrow()
     const draft = await db.insertInto('Funding_Case_Agreement_Forecast').values({
+      egcs_fc_customfielddefinitions: sql<AssignedAgencyCustomFieldDefinition[]>`${JSON.stringify(forecastDefinitions)}::jsonb`,
+      egcs_fc_customfields: answers,
       egcs_fc_fundingagreement: agreement.id, egcs_fc_fiscalyear: forecast.fiscalYearId,
       egcs_fc_version: String(BigInt(version.version ?? '-1') + BigInt(1)), egcs_fc_status: draftStatus.id
     }).returning('id').executeTakeFirstOrThrow()
@@ -309,7 +326,11 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       { ...fittings, submittedCostCategory: 'Installation supplies', submittedCostSubsection: 'Safety fittings' }
     ]
   }
-  const acceptedForecast = { ...forecast, lineItems: forecast.lineItems.map(line => ({ ...line, amount: { ...line.amount, amount: '725000' } })) }
+  const acceptedForecast = {
+    ...forecast,
+    customFields: { ...forecast.customFields, [volunteerHours.id]: 24 },
+    lineItems: forecast.lineItems.map(line => ({ ...line, amount: { ...line.amount, amount: '725000' } }))
+  }
   const samples: Insertable<AgreementSubmissionTable>[] = [
     { ...sampleDefaults, egcs_fc_sourceid: 'CLAIM-JUNE', egcs_fc_target: 'claim', egcs_fc_payload: claim, egcs_fc_result: await createClaim(claim) },
     { ...sampleDefaults, egcs_fc_sourceid: 'FORECAST-JULY', egcs_fc_target: 'forecast', egcs_fc_payload: forecast, egcs_fc_result: await createForecast() },
@@ -355,7 +376,7 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       egcs_fc_revision: 3,
       egcs_fc_updatedby: actor,
       egcs_fc_payload: acceptedForecast,
-      egcs_fc_result: await createForecast('725000')
+      egcs_fc_result: await createForecast('725000', acceptedForecast.customFields)
     }
   ]
   await sql`SET CONSTRAINTS trg_enforce_fundingcaseagreementclaim_assignment_roster, trg_enforce_fundingcaseforecast_assignment_roster IMMEDIATE`.execute(db)
@@ -400,7 +421,13 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       ? (await readClaimSubmissionEvidence(db, row.egcs_fc_result)).references
       : null
     await db.insertInto('Funding_Case_Agreement_Submission_Event').values(history.map(entry => {
-      if (row.egcs_fc_target !== 'claim' || !entry.egcs_fc_payload) return entry
+      if (!entry.egcs_fc_payload) return entry
+      if (row.egcs_fc_target === 'forecast') {
+        const answers = entry.egcs_fc_kind === 'accepted' ? acceptedForecast.customFields : forecast.customFields
+        const snapshot = claimCustomFieldSnapshot(forecastDefinitions, answers)
+        return { ...entry, egcs_fc_forecastcustomfields: sql<ClaimCustomFieldSnapshot>`${JSON.stringify(snapshot)}::jsonb` }
+      }
+      if (row.egcs_fc_target !== 'claim') return entry
       const answers = entry.egcs_fc_kind === 'returned'
         ? returnedClaim.customFields
         : claimJourney && entry.egcs_fc_sourcerevision === '2' ? correctedClaim.customFields : customFields

@@ -1,8 +1,7 @@
+import { captureForecastCustomFields } from '~~/server/utils/agreement-claim-custom-fields'
 import { defineEventHandler } from 'h3'
 import { nextAgreementForecastVersion, copyActiveAgreementForecastLines } from '~~/server/utils/agreement-forecast-versions'
-import type { Insertable } from 'kysely'
 import { FundingCaseAgreementForecastCreateSchema } from '~~/shared/types/schemas'
-import type { FundingCaseAgreementForecastTable } from '~~/shared/types/database'
 import {
   assertAgreementForecastBudgetFiscalYear,
   prepareAgreementForecastRoute
@@ -35,11 +34,12 @@ export default defineEventHandler(async event => {
     const forecast = await trx
       .insertInto('Funding_Case_Agreement_Forecast')
       .values({
+        ...await captureForecastCustomFields(trx, current.streamId, undefined, event),
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fiscalyear: String(fiscalYear.id),
         egcs_fc_version: await nextAgreementForecastVersion(trx, agreementId, String(fiscalYear.id)),
         egcs_fc_status: draftStatusId
-      } satisfies Insertable<FundingCaseAgreementForecastTable>)
+      })
       .returningAll()
       .executeTakeFirstOrThrow()
     let otherFundingOmitted = false

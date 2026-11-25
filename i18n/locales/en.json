@@ -295,6 +295,7 @@
     "maximum_hint": "Maximum: {maximum}",
     "activity_title": "Activity custom fields",
     "claim_title": "Claim custom fields",
+    "forecast_title": "Forecast custom fields",
     "assign_field": "Assign agency field",
     "agency_field": "Agency field",
     "unsectioned": "No section",
@@ -342,7 +343,7 @@
     "option_number": "Option {number}",
     "required_cell": "Required cell",
     "required_answer": "Required answer",
-    "claim_only": "Available on Claims only.",
+    "claims_and_forecasts_only": "Available on Claims and Forecasts only.",
     "move_up": "Move up",
     "move_down": "Move down",
     "remove_column": "Remove column",
@@ -1893,6 +1894,8 @@
       "custom_fields_invalid": "The saved Agreement custom-field selections are invalid.",
       "claim_custom_field_unanswerable": "The required Claim field “{field}” has no valid answer. Update the field configuration before creating a Claim.",
       "claim_custom_field_definitions_invalid": "The stored Claim custom field definitions are invalid.",
+      "forecast_custom_field_unanswerable": "The required Forecast field “{field}” has no valid answer. Update the field configuration before creating a Forecast.",
+      "forecast_custom_field_definitions_invalid": "The stored Forecast custom field definitions are invalid.",
       "invalid_coding_allocation": "Coding lines must belong to this stream, match the total amount, and cover amounts already paid.",
       "invalid_financial_id": "Select an active financial ID for this Proponent from the Agreement’s agency.",
       "financial_id_required": "Select a financial ID for every Proponent on this Agreement.",
@@ -2034,6 +2037,7 @@
       "initial_approval_required": "Complete the initial Agreement approval submission before creating a Claim or Payment.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
       "claim_answers_stale": "The Claim or its submission has changed. Reload the latest answers before saving again.",
+      "forecast_answers_stale": "The Forecast or its submission has changed. Reload the latest answers before saving again.",
       "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
       "forecast_cell_occupied": "A forecast line already exists for this budget line and month.",
       "forecast_breakdown_conflict": "The forecast breakdown changed. Reload the saved amounts to review your edits. Saving again will replace the saved amounts in your edited cells.",
@@ -2047,7 +2051,7 @@
       "funding_subtype_link_not_found": "Stream funding subtype not found.",
       "profile_not_found": "Program not found.",
       "profile_scope_changed": "The program scope changed while this request was being processed. Refresh and try again.",
-      "custom_field_claim_only": "Tables and repeating sets can only be assigned to Claims.",
+      "structured_custom_field_target_invalid": "Tables and repeating sets can only be assigned to Claims and Forecasts.",
       "stream_not_found": "Program stream not found.",
       "stream_clause_unavailable": "Select an active published clause from this agency.",
       "stream_clause_already_linked": "This clause is already linked to the stream.",
@@ -3562,6 +3566,7 @@
       }
     },
     "forecasts": {
+      "no_additional_information": "No additional fields are configured for this forecast.",
       "program_only_copy_title": "Program funding copied",
       "program_only_copy_notice": "This draft includes Program Funding only. The previous forecast retains its Other Funding.",
       "historical_budget_line_read_only": "This saved line is read-only because its budget line is no longer available in the current budget.",
@@ -4533,6 +4538,7 @@
       "risk_rating": "Risk Rating"
     },
     "completion_blockers": {
+      "custom_fields_incomplete": "Complete the required fields and correct any invalid answers in Additional information.",
       "annual_budget_exceeded": "The annual program amounts exceed the current Agreement program funding budget. Reduce the amounts or increase program funding in the budget.",
       "active_workflow": "Completion is unavailable while a workflow is active.",
       "approval_workflow_missing": "A published approval workflow is required before this item can be completed.",

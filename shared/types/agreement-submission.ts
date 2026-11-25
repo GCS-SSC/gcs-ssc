@@ -143,6 +143,7 @@ export interface AgreementSubmissionDetail {
   updatedByName: string | null
   canReview: boolean
   canReturn: boolean
+  returnAllowed: boolean
 }
 export interface AgreementSubmissionList {
   items: AgreementSubmissionListItem[]

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useSubmissionAnswerEditor } from '~/composables/useSubmissionAnswerEditor'
+import { useSubmissionAnswerContexts, useSubmissionAnswerEditor } from '~/composables/useSubmissionAnswerEditor'
+import AgreementSubmissionAdditional from '~/components/Agreement/Submission/Additional.vue'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
@@ -8,6 +9,7 @@ import { FundingCaseAgreementClaimLineItemBaseSchema, FundingCaseAgreementClaimR
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { useLinkedAgreementSubmissionReview } from '~/composables/useLinkedAgreementSubmissionReview'
+import { useNativeSubmissionReads } from '~/composables/useNativeSubmissionReads'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -17,9 +19,6 @@ import CommonCompletionSection from '~/components/Common/Completions/Section.vue
 import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import CommonSelectableTable from '~/components/Common/SelectableTable.vue'
 import AgreementClaimReconciliationLinesTable from '~/components/Agreement/AgreementClaimReconciliationLinesTable.vue'
-import AgreementFieldsCustomField from '~/components/Agreement/Fields/CustomField.vue'
-import AgreementFieldsStructuredCustomField from '~/components/Agreement/Fields/StructuredCustomField.vue'
-import type { AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { useActionContext } from '~/composables/useActionContext'
 import { useFormSession } from '~/composables/useFormSession'
@@ -107,11 +106,13 @@ const statusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const claimId = route.params.claimId as string
+const { user: claimPageActor, permissionRevision: claimPermissionRevision } = useAuth()
 const {
   data: contextProfile,
   error: profileError,
   status: profileStatus,
-  refresh: refreshProfile
+  refresh: refreshProfile,
+  clear: clearProfile
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcaseagreementclaim/${claimId}/context`)
 const profile = computed(() => contextProfile.value?.can_read_agreement === false ? null : contextProfile.value)
 const getCurrency = (): string => {
@@ -135,6 +136,10 @@ const submissionModal = useCrudModal<ClaimSubmissionTableRow, ClaimSubmissionTab
 })
 const selectedSubmissionLine = submissionModal.selected
 const isSubmissionModalOpen = submissionModal.isOpen
+watch([() => claimPageActor.value?.id, claimPermissionRevision], () => {
+  submissionModal.close()
+  submissionTarget.value = null
+}, { flush: 'sync' })
 const fundingEditorLine: Ref<FundingCaseAgreementClaimLineItemRow | null> = ref(null)
 const fundingEditorOpen: Ref<boolean> = ref(false)
 const fundingEditorSession = ref(0)
@@ -209,24 +214,36 @@ const {
   data: overview,
   error: overviewError,
   status: overviewStatus,
-  refresh: refreshOverview
+  refresh: refreshOverview,
+  clear: clearOverview
 } = useFetch<FundingCaseAgreementClaimOverviewRow, FetchError, string>(`/api/agreements/${agreementId}/claims-overview?claimId=${claimId}`)
 const submissionReview = useLinkedAgreementSubmissionReview(agreementId, 'claim', claimId, {
   read: () => overview.value ? overview.value.linkedReview ?? null : undefined,
   status: () => overviewStatus.value,
-  refresh: refreshOverview
+  refresh: refreshOverview,
+  canReviewRole: () => canUpdateClaim.value,
+  isAssigned: () => isAssigned.value
 })
-usePageResourceError({
-  identity: () => route.path,
-  errors: [profileError, overviewError],
-  pending: () => profileStatus.value === 'pending' || overviewStatus.value === 'pending',
-  hasContent: () => Boolean(profile.value && overview.value)
-})
-const { isAssigned, status: assignmentStatus } = useEntityAssignmentRoster(
+const { isAssigned, status: assignmentStatus, clear: clearAssignmentRoster } = useEntityAssignmentRoster(
   'fundingcaseagreementclaim',
   claimId,
   { enabled: computed(() => overviewStatus.value === 'success') }
 )
+useNativeSubmissionReads({
+  actorId: () => claimPageActor.value?.id,
+  permissionRevision: claimPermissionRevision,
+  reads: [
+    { clear: clearProfile, refresh: refreshProfile },
+    { clear: clearOverview, refresh: refreshOverview },
+    { clear: clearAssignmentRoster }
+  ]
+})
+usePageResourceError({
+  identity: () => JSON.stringify([route.path, claimPageActor.value?.id, claimPermissionRevision.value]),
+  errors: [profileError, overviewError],
+  pending: () => profileStatus.value === 'pending' || overviewStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && overview.value)
+})
 
 const claims = computed<FundingCaseAgreementClaimOverviewRow['claims']>(() => overview.value?.claims ?? [])
 const budgetLineItems = computed<FundingCaseAgreementClaimOverviewRow['budgetLineItems']>(() => overview.value?.budgetLineItems ?? [])
@@ -236,8 +253,6 @@ const reconcileLineItems = computed<FundingCaseAgreementClaimOverviewRow['reconc
 const activeClaim = computed(() => claims.value.find((claim: FundingCaseAgreementClaimOverviewRow['claims'][number]) => String(claim.id) === claimId) ?? null)
 const additionalInformationFields = computed(() => activeClaim.value?.egcs_fc_customfielddefinitions?.filter(field => field.egcs_tp_active) ?? [])
 const additionalInformationValues = computed(() => activeClaim.value?.egcs_fc_customfields ?? {})
-const structuredAnswer = (value: AgreementCustomFieldPatch[string] | undefined) =>
-  value && typeof value === 'object' && 'rows' in value ? value : null
 const claimFundingMode = computed(() => overview.value?.budgetManagement?.egcs_tp_budgetfundingmode ?? 'manual')
 const isHistoricalClaim = computed(() => Boolean(activeClaim.value?.isCompleted || activeClaim.value?.hasPositiveCompletionTerminus
   || getDefinition(activeClaim.value?.egcs_fc_status)?.readOnly || isTerminalStatus(activeClaim.value?.egcs_fc_status)))
@@ -481,7 +496,7 @@ const submissionReviewBusy = computed(() =>
   isLoadingDetail.value || isSavingSubmission.value || isSavingAdditionalInformation.value || isSavingFunding.value || allocatingClaimLineId.value !== null)
 const submissionReviewActionsBlocked = computed(() => submissionReviewBusy.value || additionalInformationDirty.value)
 const claimHeroActions = computed(() => [
-  ...(isClaimSubmissionSection.value && submissionReview.detail.value?.canReview && submissionReview.state.value === 'submitted'
+  ...(isClaimSubmissionSection.value && submissionReview.state.value === 'submitted' && canUpdateClaim.value
     ? [{
         label: t('submission.start'), icon: 'i-lucide-play', loading: submissionReview.pending.value,
         disabled: submissionReviewActionsBlocked.value || !submissionReview.actionReady.value,
@@ -668,7 +683,6 @@ const loadSelectedReconcileDetail = async (reconcile: FundingCaseAgreementClaimR
   }
 }
 
-const { user: claimPageActor, permissionRevision: claimPermissionRevision } = useAuth()
 watch([() => activeReconcile.value?.id, () => claimPageActor.value?.id, claimPermissionRevision], () => {
   selectedReconcileRole.value = null
   reconcileLineModal.close()
@@ -1077,46 +1091,14 @@ const saveSubmission = async () => {
 }
 const submissionFormSession = useFormSession({ owner: submissionModal, action: { kind: 'remote', context: () => submissionTarget.value?.claimLineId != null ? submissionUpdateContext : submissionCreateContext }, submit: saveSubmission, onDenied: () => guardClaimAction(submissionTarget.value?.budgetLineId ? canEditClaimSubmissionAmount(submissionTarget.value.budgetLineId) : false, claimSubmissionEditWarning.value) })
 
-const additionalInformationRoleAccepted = ref(false)
-/**
- * @param error - Failure from the Claim overview or context request.
- * @returns Whether the response conclusively retires accepted editor authority.
- */
-const isDefinitiveClaimReadError = (error: FetchError | null | undefined) =>
-  [401, 403, 404, 410].some(code => code === (error?.statusCode ?? error?.status ?? error?.response?.status))
-
-watch(() => [profileStatus.value, profile.value, profileError.value, overviewStatus.value, activeClaim.value, overviewError.value], () => {
-  if (isDefinitiveClaimReadError(profileError.value) || isDefinitiveClaimReadError(overviewError.value)
-    || (overviewStatus.value === 'success' && !activeClaim.value)) {
-    additionalInformationRoleAccepted.value = false
-  } else if (profileStatus.value === 'success') {
-    additionalInformationRoleAccepted.value = canUpdateClaim.value
-  }
-}, { immediate: true, flush: 'sync' })
-
-const additionalInformationOwner = {
+const additionalInformationContexts = useSubmissionAnswerContexts({
   identity: [() => route.params.id, () => route.params.claimId],
-  authority: additionalInformationRoleAccepted
-}
-const additionalInformationOpeningContext = useActionContext(additionalInformationOwner)
-const additionalInformationContext = useActionContext({
-  ...additionalInformationOwner,
-  eligible: () => isCurrentPage() && profileStatus.value === 'success' && overviewStatus.value === 'success'
-    && activeClaim.value?.id === claimId && !claimSubmissionEditWarning.value
+  profile: () => ({ status: profileStatus.value, error: profileError.value, canUpdate: canUpdateClaim.value }),
+  record: () => ({ status: overviewStatus.value, error: overviewError.value, matches: activeClaim.value?.id === claimId }),
+  eligible: () => isCurrentPage() && !claimSubmissionEditWarning.value
 })
-const {
-  draft: additionalInformationDraft,
-  isDirty: additionalInformationDirty,
-  canSave: canSaveAdditionalInformation,
-  isSaving: isSavingAdditionalInformation,
-  isStale: isAdditionalInformationStale,
-  formSession: additionalInformationFormSession,
-  validate: validateAdditionalInformation,
-  setEditing: setAdditionalInformationEditing,
-  discardStaleDraft: discardStaleAdditionalInformation
-} = useSubmissionAnswerEditor({
-  context: additionalInformationContext,
-  openingContext: additionalInformationOpeningContext,
+const additionalInformationEditor = useSubmissionAnswerEditor({
+  ...additionalInformationContexts,
   readAnswers: () => additionalInformationValues.value,
   readSubmissionRevision: () => overview.value?.linkedReview?.revision ?? null,
   readDefinitions: () => additionalInformationFields.value,
@@ -1144,6 +1126,7 @@ const {
   onError: showError,
   onSaved: () => toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_additional_information'), color: 'success' })
 })
+const { isDirty: additionalInformationDirty, isSaving: isSavingAdditionalInformation, discardStaleDraft: discardStaleAdditionalInformation } = additionalInformationEditor
 
 const reloadStaleAdditionalInformation = async () => {
   if (discardStaleAdditionalInformation()) await submissionReview.refresh()
@@ -1619,98 +1602,19 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               </div>
             </div>
 
-            <div v-else-if="selectedClaimTab === 'additional'" class="space-y-4">
-              <template v-if="additionalInformationFields.length">
-                <div v-if="canUpdateClaim" class="flex justify-end">
-                  <USwitch
-                    data-field-exclude="The switch controls inline editing and is not saved with the Claim."
-                    :model-value="additionalInformationDraft !== null"
-                    :label="t('agreement.claims.edit_additional_information')"
-                    :disabled="submissionReviewBusy || isAdditionalInformationLoading || submissionReview.pending.value || isAdditionalInformationStale"
-                    @update:model-value="setAdditionalInformationEditing" />
-                </div>
-                <CommonNotice v-if="isAdditionalInformationStale" tone="warning" :title="t('apiErrors.agreement.claim_answers_stale')">
-                  <template #actions>
-                    <UButton color="warning" variant="outline" :disabled="submissionReviewBusy || submissionReview.pending.value" @click="reloadStaleAdditionalInformation">
-                      {{ t('agreement.claims.discard_and_reload_answers') }}
-                    </UButton>
-                  </template>
-                </CommonNotice>
-                <UForm
-                  v-if="additionalInformationDraft"
-                  v-bind="additionalInformationFormSession"
-                  :state="additionalInformationDraft"
-                  :validate="validateAdditionalInformation"
-                  novalidate
-                  class="space-y-5"
-                  data-field-exclude="Agency-defined custom inputs have separate configuration; outside static field help.">
-                  <p v-if="additionalInformationFields.some(field => field.egcs_tp_required)" class="text-sm text-muted">
-                    {{ t('agreement.claims.additional_information_draft_hint') }}
-                  </p>
-                  <fieldset :disabled="isSavingAdditionalInformation" class="min-w-0 divide-y divide-default">
-                    <template v-for="field in additionalInformationFields" :key="field.id">
-                      <AgreementFieldsStructuredCustomField
-                        v-if="field.egcs_ay_structure"
-                        :model-value="structuredAnswer(additionalInformationDraft.egcs_fc_customfields[field.id])"
-                        class="py-4 first:pt-0"
-                        :field="field"
-                        :currency="profile?.egcs_fc_currency"
-                        :structure="field.egcs_ay_structure"
-                        :disabled="isSavingAdditionalInformation"
-                        @update:model-value="additionalInformationDraft.egcs_fc_customfields[field.id] = $event ?? null" />
-                      <AgreementFieldsCustomField
-                        v-else
-                        v-model="additionalInformationDraft.egcs_fc_customfields[field.id]"
-                        class="py-4 first:pt-0"
-                        :field="field"
-                        :currency="profile?.egcs_fc_currency"
-                        :options="field.options.filter(option => option.egcs_ay_active)"
-                        :disabled="isSavingAdditionalInformation" />
-                    </template>
-                  </fieldset>
-                  <div class="flex justify-end">
-                    <CommonSaveButton :label="t('common.save')" :disabled="profileStatus !== 'success' || overviewStatus !== 'success' || !canSaveAdditionalInformation || submissionReviewBusy || submissionReview.pending.value" :loading="isSavingAdditionalInformation" />
-                  </div>
-                </UForm>
-                <dl v-else class="divide-y divide-default" data-field-exclude="Read-only display of Agency-defined custom fields.">
-                  <template v-for="field in additionalInformationFields" :key="field.id">
-                    <div v-if="field.egcs_ay_structure" class="min-w-0 py-4 first:pt-0">
-                      <dt class="text-sm font-medium text-highlighted">
-                        {{ locale === 'fr' ? field.egcs_ay_name_fr : field.egcs_ay_name_en }}
-                      </dt>
-                      <dd>
-                        <AgreementFieldsStructuredCustomField
-                          :field="field"
-                          :currency="profile?.egcs_fc_currency"
-                          :structure="field.egcs_ay_structure"
-                          :model-value="structuredAnswer(additionalInformationValues[field.id])"
-                          readonly />
-                      </dd>
-                    </div>
-                    <AgreementFieldsCustomField
-                      v-else
-                      class="py-4 first:pt-0"
-                      :field="field"
-                      :currency="profile?.egcs_fc_currency"
-                      :options="field.options"
-                      :model-value="additionalInformationValues[field.id]"
-                      readonly>
-                      <template #answer="{ label, answer }">
-                        <dt class="text-sm font-medium text-highlighted">
-                          {{ label }}
-                        </dt>
-                        <dd class="whitespace-pre-wrap text-sm text-default [overflow-wrap:anywhere]">
-                          {{ answer || t('supplementary_information.no_answer') }}
-                        </dd>
-                      </template>
-                    </AgreementFieldsCustomField>
-                  </template>
-                </dl>
-              </template>
-              <p v-else class="text-sm text-muted">
-                {{ t('agreement.claims.no_additional_information') }}
-              </p>
-            </div>
+            <AgreementSubmissionAdditional
+              v-else-if="selectedClaimTab === 'additional'"
+              :editor="additionalInformationEditor"
+              :fields="additionalInformationFields"
+              :answers="additionalInformationValues"
+              :currency="profile?.egcs_fc_currency"
+              :can-update="canUpdateClaim"
+              :blocked="submissionReviewBusy || submissionReview.pending.value"
+              :loading="isAdditionalInformationLoading"
+              :ready="profileStatus === 'success' && overviewStatus === 'success'"
+              stale-message="apiErrors.agreement.claim_answers_stale"
+              empty-message="agreement.claims.no_additional_information"
+              @reload="reloadStaleAdditionalInformation" />
 
             <div v-else-if="selectedClaimTab === 'history'" class="space-y-4">
               <AgreementSubmissionLinkedReview
@@ -1998,7 +1902,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               data-help-view="casework.claims.assignments"
               :show-header="false"
               entity-type="fundingcaseagreementclaim"
-              :entity-id="claimId" />
+              :entity-id="claimId"
+              @changed="submissionReview.refresh" />
 
             <CommonAttachmentsTab
               v-else-if="selectedClaimTab === 'attachments'"

@@ -375,7 +375,7 @@ CREATE TABLE "Transfer_Payment_Stream_Field_Assignment" (
   CONSTRAINT "Transfer_Payment_Stream_Field_Assignment_pkey" PRIMARY KEY (id),
   CONSTRAINT "tp_chk_stream_field_assignment_displayorder" CHECK ((egcs_tp_displayorder >= 0)),
   CONSTRAINT "tp_chk_stream_field_assignment_target" CHECK (
-    egcs_tp_target = 'agreement' OR (egcs_tp_target IN ('activity', 'claim') AND egcs_tp_section IS NULL)
+    egcs_tp_target = 'agreement' OR (egcs_tp_target IN ('activity', 'claim', 'forecast') AND egcs_tp_section IS NULL)
   )
 );
 
@@ -593,8 +593,8 @@ AS $function$
         RAISE EXCEPTION 'Assigned field must belong to the Stream Agency'
           USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_field_assignment_agency';
       END IF;
-      IF field_kind IN ('table', 'repeating') AND NEW.egcs_tp_target <> 'claim' THEN
-        RAISE EXCEPTION 'Structured custom fields can only be assigned to Claims'
+      IF field_kind IN ('table', 'repeating') AND NEW.egcs_tp_target NOT IN ('claim', 'forecast') THEN
+        RAISE EXCEPTION 'Structured custom fields can only be assigned to Claims and Forecasts'
           USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_field_assignment_kind';
       END IF;
       RETURN NEW;

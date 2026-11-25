@@ -883,6 +883,10 @@ CREATE TABLE "Funding_Case_Agreement_Forecast" (
   "egcs_fc_status" bigint NOT NULL,
   "egcs_fc_active" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
+  "egcs_fc_customfields" jsonb NOT NULL DEFAULT '{}'::jsonb,
+  "egcs_fc_customfielddefinitions" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  CONSTRAINT "fc_chk_forecast_customfields_object" CHECK (jsonb_typeof(egcs_fc_customfields) = 'object'),
+  CONSTRAINT "fc_chk_forecast_customfielddefinitions_array" CHECK (jsonb_typeof(egcs_fc_customfielddefinitions) = 'array'),
   CONSTRAINT "fc_chk_forecastversion" CHECK (egcs_fc_version >= 0),
   CONSTRAINT "fc_unq_forecastversion" UNIQUE (egcs_fc_fundingagreement, egcs_fc_fiscalyear, egcs_fc_version),
   CONSTRAINT "fc_unq_forecastidfundingagreement" UNIQUE (id, egcs_fc_fundingagreement),
@@ -1381,6 +1385,8 @@ CREATE TABLE "Funding_Case_Agreement_Submission_Event" (
   egcs_fc_formatversion integer NOT NULL CONSTRAINT fc_chk_submission_event_formatversion CHECK (egcs_fc_formatversion > 0),
   egcs_fc_payload jsonb CONSTRAINT fc_chk_submission_event_payload_object CHECK (jsonb_typeof(egcs_fc_payload) = 'object'),
   egcs_fc_claimcustomfields jsonb,
+  egcs_fc_forecastcustomfields jsonb,
+  CONSTRAINT fc_chk_submission_event_forecastcustomfields_array CHECK (jsonb_typeof(egcs_fc_forecastcustomfields) = 'array'),
   egcs_fc_claimreferences jsonb,
   CONSTRAINT "fc_chk_submission_event_claimreferences_object" CHECK (jsonb_typeof(egcs_fc_claimreferences) = 'object'),
   CONSTRAINT "fc_chk_submission_event_claimcustomfields_array" CHECK (jsonb_typeof(egcs_fc_claimcustomfields) = 'array'),
@@ -3186,6 +3192,16 @@ BEGIN
 END;
 $function$;
 
+CREATE FUNCTION guard_forecast_custom_field_definitions_immutable() RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+  IF NEW.egcs_fc_customfielddefinitions IS DISTINCT FROM OLD.egcs_fc_customfielddefinitions THEN
+    RAISE EXCEPTION 'Forecast custom field definitions cannot change'
+      USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_forecast_customfielddefinitions_immutable';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
 CREATE FUNCTION guard_reconciliation_claim_immutable() RETURNS trigger LANGUAGE plpgsql AS $function$
 BEGIN
   IF NEW.egcs_fc_fundingagreementclaim IS DISTINCT FROM OLD.egcs_fc_fundingagreementclaim THEN
@@ -3786,6 +3802,7 @@ CREATE CONSTRAINT TRIGGER trg_enforce_fundingcaseagreementclaim_assignment_roste
 CREATE TRIGGER trg_register_fundingcaseagreementclaim BEFORE INSERT ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION register_entity('fundingcaseagreementclaim');
 
 CREATE TRIGGER guard_claim_custom_field_definitions_immutable BEFORE UPDATE OF egcs_fc_customfielddefinitions ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION guard_claim_custom_field_definitions_immutable();
+CREATE TRIGGER guard_forecast_custom_field_definitions_immutable BEFORE UPDATE OF egcs_fc_customfielddefinitions ON "Funding_Case_Agreement_Forecast" FOR EACH ROW EXECUTE FUNCTION guard_forecast_custom_field_definitions_immutable();
 
 CREATE TRIGGER trg_soft_delete_fundingcaseagreementclaim_assignments AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseagreementclaim');
 

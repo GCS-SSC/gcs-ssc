@@ -1524,6 +1524,7 @@ const startWorkflowUnchecked = async (
     await assertAgreementPaymentCommitmentCurrent(trx, context.entityId)
   }
   if (context.entityType === 'fundingcaseagreementclaim') await assertClaimCustomFieldsComplete(event, trx, context.entityId)
+  if (context.entityType === 'fundingcaseforecast') await assertClaimCustomFieldsComplete(event, trx, context.entityId, 'forecast')
   if (context.agreementId && ['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingclaimreconcile'].includes(context.entityType)) {
     const kind = context.entityType === 'fundingcaseagreementclaim' ? 'claim' : context.entityType === 'fundingcaseforecast' ? 'forecast' : 'reconciliation'
     await assertAgreementFinancialBudgetControls(trx, context.agreementId, { kind, id: context.entityId })

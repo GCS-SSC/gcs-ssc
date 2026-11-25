@@ -8,16 +8,19 @@ const { events, source, target } = defineProps<{ events: SubmissionEventRow[]; s
 const { t, locale } = useI18n()
 const snapshots = computed(() => events.filter(event => event.egcs_fc_payload !== null))
 const evidenceAnswers = computed(() => new Map(snapshots.value.map(event => [event.id, claimCustomFieldEvidenceAnswers(event.egcs_fc_payload)])))
+const snapshotFields = (event?: SubmissionEventRow) => target === 'forecast'
+  ? event?.egcs_fc_forecastcustomfields
+  : event?.egcs_fc_claimcustomfields
 const earlier = ref('')
 const later = ref('')
 /**
- * Hides the Claim answer IDs when the pinned labels are rendered separately.
+ * Hides the custom field IDs when the pinned labels are rendered separately.
  * @param event - Submission event selected for display.
  * @returns The part of the evidence rendered by the general snapshot view.
  */
 const snapshotPayload = (event?: SubmissionEventRow) => {
   const payload = event?.egcs_fc_payload
-  if (!payload || !event?.egcs_fc_claimcustomfields?.length) return payload
+  if (!payload || !snapshotFields(event)?.length) return payload
   const { customFields: _customFields, ...snapshot } = payload
   return snapshot
 }
@@ -38,7 +41,7 @@ const claimReferences = (beforeEvent: SubmissionEventRow | undefined, afterEvent
  */
 const previousFieldAnswer = (index: number, field: ClaimCustomFieldSnapshot[number]) => {
   const previous = snapshots.value[index - 1]
-  const priorField = previous?.egcs_fc_claimcustomfields?.find(item => item.key === field.key)
+  const priorField = snapshotFields(previous)?.find(item => item.key === field.key)
   if (!previous || !priorField || sameClaimCustomFieldEvidence(
     { key: field.key, displayed: priorField.value, answers: evidenceAnswers.value.get(previous.id) },
     { key: field.key, displayed: field.value, answers: evidenceAnswers.value.get(snapshots.value[index]?.id ?? '') }
@@ -100,9 +103,9 @@ const dateTime = (date: string) => dateFormatter.value.format(new Date(date))
         v-if="before && after"
         :before="snapshotPayload(before)"
         :after="snapshotPayload(after)"
-        :before-fields="before.egcs_fc_claimcustomfields ?? undefined"
+        :before-fields="snapshotFields(before) ?? undefined"
         :before-answers="evidenceAnswers.get(before.id)"
-        :after-fields="after.egcs_fc_claimcustomfields ?? undefined"
+        :after-fields="snapshotFields(after) ?? undefined"
         :after-answers="evidenceAnswers.get(after.id)"
         :target="target"
         :claim-references="claimReferences(before, after)"
@@ -123,12 +126,12 @@ const dateTime = (date: string) => dateFormatter.value.format(new Date(date))
             :target="target"
             :claim-references="claimReferences(snapshots[index - 1], snapshot)"
             snapshot />
-          <section v-if="snapshot.egcs_fc_claimcustomfields?.length" class="space-y-3 border-t border-default pt-4">
+          <section v-if="snapshotFields(snapshot)?.length" class="space-y-3 border-t border-default pt-4">
             <h4 class="font-semibold text-highlighted">
               {{ t('agreement.claims.additional_information') }}
             </h4>
             <dl class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-x-6 gap-y-4">
-              <div v-for="field in snapshot.egcs_fc_claimcustomfields" :key="field.key" class="min-w-0">
+              <div v-for="field in snapshotFields(snapshot)" :key="field.key" class="min-w-0">
                 <dt class="mb-1 text-xs font-medium text-muted [overflow-wrap:anywhere]">
                   {{ locale === 'fr' ? field.labelFr : field.labelEn }}
                 </dt>

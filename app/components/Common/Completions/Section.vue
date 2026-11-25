@@ -20,7 +20,8 @@ type CompletionItem = {
 type CompletionResponse = {
   item: CompletionItem | null
   can_complete: boolean
-  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'allocation_total' | 'annual_budget_exceeded' | 'funding_breakdown_required' | 'payment_total_mismatch' | 'forecast_revision_required' | 'commitment_revision_required' | 'payment_recovery_control' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_source_stale' | null
+  blockerDetails?: unknown[]
+  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'allocation_total' | 'annual_budget_exceeded' | 'funding_breakdown_required' | 'custom_fields_incomplete' | 'payment_total_mismatch' | 'forecast_revision_required' | 'commitment_revision_required' | 'payment_recovery_control' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_source_stale' | null
 }
 
 const {
@@ -103,7 +104,11 @@ const completionIdentity = computed(() => `${entityType}:${entityId}`)
 
 const completionResponse: Ref<CompletionResponse | null> = ref(null)
 const completionError: Ref<unknown> = ref(null)
-const completionErrorDetails = computed(() => resolveDetails(completionError.value))
+const completionErrorDetails = computed(() => resolveDetails(completionError.value ?? (
+  completionResponse.value?.blocker === 'custom_fields_incomplete'
+    ? { data: { details: completionResponse.value.blockerDetails } }
+    : null
+)))
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 const state: Ref<{ comments: string }> = ref({
   comments: ''

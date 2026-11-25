@@ -431,6 +431,8 @@ export interface FundingCaseAgreementMonitorDetailRow extends FundingCaseAgreeme
 }
 
 export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementForecastItem, BusinessRecordStateFields {
+  egcs_fc_customfields?: AgreementCustomFieldValues
+  egcs_fc_customfielddefinitions?: AssignedAgencyCustomFieldDefinition[]
   fiscal_year_display?: string | null
   forecast_revision_required: boolean
 }

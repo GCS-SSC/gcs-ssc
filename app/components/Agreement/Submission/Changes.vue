@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { compareClaimReference, compareSubmissionValues, fiscalMonthLabels, isSubmissionIdField, sameClaimCustomFieldEvidence, submissionFieldKey } from '~/utils/agreement-submission-view'
+import { compareClaimReference, compareSubmissionValues, compareUnlabeledSubmissionReference, fiscalMonthLabels, isSubmissionIdField, sameClaimCustomFieldEvidence, submissionFieldKey } from '~/utils/agreement-submission-view'
 import type { ClaimReferenceComparison, SubmissionPathPart } from '~/utils/agreement-submission-view'
 import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submission'
 import type { AgreementCustomFieldPatch, ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
@@ -20,9 +20,11 @@ const { t, te, locale } = useI18n()
 /**
  * Resolves a localized field or row path for a change.
  * @param path - Field keys and row details from the snapshots.
+ * @param fieldTitle - Localized title for a business reference at the end of the path.
  * @returns A readable path.
  */
-const label = (path: SubmissionPathPart[]) => path.map(part => {
+const label = (path: SubmissionPathPart[], fieldTitle?: string) => path.map((part, index) => {
+  if (fieldTitle && index === path.length - 1) return fieldTitle
   if (typeof part === 'string') return te(submissionFieldKey(part)) ? t(submissionFieldKey(part)) : part
   const context = [locale.value === 'fr' ? part.descriptionFr || part.description : part.description || part.descriptionFr]
   if (part.month !== undefined) context.push(t(fiscalMonthLabels[part.month]!))
@@ -51,15 +53,16 @@ const changes = computed(() => {
   const data = compareSubmissionValues(before, after, [], history ? 'snapshot' : 'budget_preview', target).map((change): Change | undefined => {
     const field = fieldName(change.path)
     if (history && change.path.some(part => typeof part === 'string' && isSubmissionIdField(part))) {
-      if (!claimReferences || !field || change.path.length !== 1) return undefined
-      const reference = compareClaimReference({
-        key: field, before: change.before, after: change.after, evidence: claimReferences,
-        locale: locale.value, unavailable: t('common.unavailable')
-      })
+      if (!field) return undefined
+      const input = { key: field, before: change.before, after: change.after, unavailable: t('common.unavailable') }
+      const claimReference = claimReferences && change.path.length === 1
+        ? compareClaimReference({ ...input, evidence: claimReferences, locale: locale.value })
+        : undefined
+      const reference = claimReference ?? compareUnlabeledSubmissionReference(input)
       if (!reference?.changed) return undefined
       return {
         kind: 'submission',
-        title: t(reference.title),
+        title: label(change.path, t(reference.title)),
         field,
         before: reference.before,
         after: reference.after
@@ -116,7 +119,7 @@ const changes = computed(() => {
           </dt>
           <dd>
             <AgreementSubmissionCustomFieldEvidence v-if="change.kind === 'custom'" :value="change.before" />
-            <AgreementSubmissionValue v-else :value="change.before" :field="change.field" :snapshot="history" />
+            <AgreementSubmissionValue v-else :value="change.before" :field="change.field" :snapshot="history" :show-references="history" />
           </dd>
         </div>
         <div class="min-w-0">
@@ -125,7 +128,7 @@ const changes = computed(() => {
           </dt>
           <dd>
             <AgreementSubmissionCustomFieldEvidence v-if="change.kind === 'custom'" :value="change.after" />
-            <AgreementSubmissionValue v-else :value="change.after" :field="change.field" :snapshot="history" />
+            <AgreementSubmissionValue v-else :value="change.after" :field="change.field" :snapshot="history" :show-references="history" />
           </dd>
         </div>
       </dl>

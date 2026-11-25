@@ -48,6 +48,7 @@ const claim = z.object({
 })
 
 const forecast = z.object({
+  customFields: AgreementCustomFieldValuesSchema.optional(),
   applicantRecipientId: id,
   fiscalYearId: id,
   lineItems: z.array(z.object({

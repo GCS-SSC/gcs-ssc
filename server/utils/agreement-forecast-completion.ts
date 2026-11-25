@@ -1,3 +1,4 @@
+import { assertClaimCustomFieldsComplete, getFinancialCustomFieldCompletionDetails } from './agreement-claim-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- Existing helpers use descriptive names and narrow types. */
 import type { H3Event } from 'h3'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -39,13 +40,19 @@ export const getAgreementForecastCompletionRuntime = async (
     const funding = await getAgreementLineFundingCompletionStatus(trx, { kind: 'forecast', id: forecastId })
     const budgetViolation = item ? null : await getAgreementFinancialBudgetViolation(trx, context.agreementId, { kind: 'forecast', id: forecastId })
 
+    const canComplete = item === null
+      && Boolean(lineItem)
+      && funding.complete
+      && !budgetViolation
+      && Boolean(protection && !protection.locked)
+    if (canComplete) {
+      const blockerDetails = await getFinancialCustomFieldCompletionDetails(event, trx, forecastId, 'forecast')
+      if (blockerDetails.length) return { item, can_complete: false, blocker: 'custom_fields_incomplete' as const, blockerDetails }
+    }
+
     return {
       item,
-      can_complete: item === null
-        && Boolean(lineItem)
-        && funding.complete
-        && !budgetViolation
-        && Boolean(protection && !protection.locked),
+      can_complete: canComplete,
       blocker: item ? null : !lineItem ? 'lines_required' as const : !funding.complete ? 'funding_breakdown_required' as const : budgetViolation ? 'annual_budget_exceeded' as const : !protection || protection.locked ? 'business_status' as const : null
     }
   })
@@ -113,6 +120,7 @@ export const executeAgreementForecastCompletion = async (
       return await badRequest(event, 'AGREEMENT_FORECAST_FUNDING_BREAKDOWN_REQUIRED', 'apiErrors.agreement.funding_breakdown_required')
     }
 
+    await assertClaimCustomFieldsComplete(event, trx, forecastId, 'forecast')
     await assertAgreementFinancialBudgetControls(trx, context.agreementId, { kind: 'forecast', id: forecastId })
     const { completion: createdCompletion } = await createCompletionTransition(
       event,

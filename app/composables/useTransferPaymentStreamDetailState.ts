@@ -37,6 +37,7 @@ export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   customFields: 'custom_fields.title',
   activityCustomFields: 'custom_fields.activity_title',
   claimCustomFields: 'custom_fields.claim_title',
+  forecastCustomFields: 'custom_fields.forecast_title',
   submissionPolicy: 'submission.policy.title',
   general: 'agency.tabs.general',
   holdbackBases: 'transfer_payment.holdback_bases',
@@ -225,6 +226,7 @@ export const useTransferPaymentStreamDetailState = (
     ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ key: 'custom-fields', transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     ['activityCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields, value: 'activity-custom-fields', icon: 'i-lucide-list-todo', component: CustomFieldsTab, getProps: () => ({ key: 'activity-custom-fields', transferPaymentId: id, streamId, target: 'activity', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     ['claimCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.claimCustomFields, value: 'claim-custom-fields', icon: 'i-lucide-receipt', component: CustomFieldsTab, getProps: () => ({ key: 'claim-custom-fields', transferPaymentId: id, streamId, target: 'claim', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
+    ['forecastCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.forecastCustomFields, value: 'forecast-custom-fields', icon: 'i-lucide-chart-column', component: CustomFieldsTab, getProps: () => ({ key: 'forecast-custom-fields', transferPaymentId: id, streamId, target: 'forecast', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     ['submissionPolicy', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.submissionPolicy, value: 'submission-policy', icon: 'i-lucide-inbox', component: StreamSubmissionPolicy, getProps: () => ({ programId: id, streamId, canUpdate: canDeleteChild.value, pendingRequests: submissionPolicyPendingRequests }) }],
     [
       'risk-management',

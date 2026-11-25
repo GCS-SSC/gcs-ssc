@@ -8,7 +8,7 @@ import type {
   GcsExtensionAgreementClaimCreateInput,
   GcsExtensionAgreementClaimCreateResult
 } from '@gcs-ssc/extensions/server'
-import { badRequest, forbidden, throwApiError, unauthorized } from '~~/server/utils/api-errors'
+import { badRequest, forbidden, unauthorized } from '~~/server/utils/api-errors'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeAgreementResource, type AgreementScopeContext } from '~~/server/utils/agreement'
 import {
@@ -44,7 +44,6 @@ import {
   lockAgencyDraftStatus
 } from '~~/server/utils/business-status-runtime'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { changedCustomFieldAnswers, sameCustomFieldAnswer } from '~~/shared/utils/agreement-custom-field-answers'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareMoney, isPersistableMoney, maxMoney, parseMoney, subtractMoney, zeroMoney, type Money } from '~~/shared/utils/money'
@@ -53,7 +52,7 @@ import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolve
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 import { hasSuccessfulInitialAgreementApproval } from '~~/server/utils/agreement-approval-submission'
 import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
-import { assertClaimCustomFieldDefinitionsAnswerable, parsePersistedClaimCustomFieldDefinitions, validateClaimCustomFields } from './agreement-claim-custom-fields'
+import { assertClaimCustomFieldDefinitionsAnswerable, parsePersistedClaimCustomFieldDefinitions, prepareFinancialCustomFieldPatch, validateClaimCustomFields } from './agreement-claim-custom-fields'
 import type { AgreementCustomFieldPatch, AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 
 type AgreementClaimAggregateCreateInput = Omit<GcsExtensionAgreementClaimCreateInput, 'lineItems'> & {
@@ -902,33 +901,13 @@ export const patchAgreementClaimForRoute = async (
     }
 
     const { egcs_fc_customfields: fieldChanges, customFieldPrecondition, ...claimChanges } = patchValues
-    if (customFieldPrecondition) {
-      const submission = await trx.selectFrom('Funding_Case_Agreement_Submission').select('egcs_fc_revision')
-        .where('egcs_fc_target', '=', 'claim')
-        .where('egcs_fc_result', '=', claimId)
-        .where('_deleted', '=', false)
-        .executeTakeFirst()
-      if (customFieldPrecondition.submissionRevision !== (submission?.egcs_fc_revision ?? null)) {
-        return await throwApiError(event, { statusCode: 409, code: 'SUBMISSION_STALE', key: 'submission.errors.stale' })
-      }
-    }
-    const answers = fieldChanges === undefined
-      ? undefined
-      : await validateClaimCustomFields(event, claim.egcs_fc_customfielddefinitions, {
-          current: claim.egcs_fc_customfields,
-          answers: fieldChanges,
-          requireAnswers: false,
-          path: 'egcs_fc_customfields',
-          currency: await assertAgreementCurrency(event, trx, agreementId)
-        })
-    const answerChanges = answers === undefined ? undefined : changedCustomFieldAnswers(claim.egcs_fc_customfields, answers)
-    if (customFieldPrecondition && Object.keys(answerChanges ?? {}).some(key =>
-      !sameCustomFieldAnswer(claim.egcs_fc_customfields[key], customFieldPrecondition.previousAnswers[key])
-    )) {
-      return await throwApiError(event, { statusCode: 409, code: 'CLAIM_ANSWERS_STALE', key: 'apiErrors.agreement.claim_answers_stale' })
-    }
-    const customFieldsChanged = answerChanges !== undefined && Object.keys(answerChanges).length > 0
-    const answerResult = answerChanges === undefined ? {} : { customFieldsChanged }
+    const savedAnswers = await prepareFinancialCustomFieldPatch(event, trx, {
+      target: 'claim', id: claimId, agreementId,
+      definitions: claim.egcs_fc_customfielddefinitions, current: claim.egcs_fc_customfields,
+      patch: { egcs_fc_customfields: fieldChanges, customFieldPrecondition }
+    })
+    const customFieldsChanged = savedAnswers !== undefined
+    const answerResult = fieldChanges === undefined ? {} : { customFieldsChanged }
     if (!customFieldsChanged && Object.keys(claimChanges).length === 0) {
       const current = await trx.selectFrom('Funding_Case_Agreement_Claim').selectAll()
         .where('id', '=', claimId)
@@ -938,11 +917,6 @@ export const patchAgreementClaimForRoute = async (
       return { ...current, ...answerResult }
     }
 
-    // Keep the saved ordering of equivalent selections when other answers change.
-    const savedAnswers = answers && Object.fromEntries(Object.entries(answers).map(([key, answer]) => {
-      const previous = claim.egcs_fc_customfields[key]
-      return [key, previous !== undefined && sameCustomFieldAnswer(previous, answer) ? previous : answer]
-    }))
     const updated = await trx
       .updateTable('Funding_Case_Agreement_Claim')
       .set({ ...claimChanges, ...(customFieldsChanged ? { egcs_fc_customfields: savedAnswers } : {}) })

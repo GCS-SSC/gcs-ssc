@@ -11,7 +11,8 @@ type CompletionResponse = {
   item: { id: string } | null
   can_complete: boolean
   blockerParameters?: { name_en?: string, name_fr?: string, purpose?: string }
-  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'annual_budget_exceeded' | 'funding_breakdown_required' | 'payment_total_mismatch' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_source_stale' | 'risk_rating_frozen' | 'forecast_revision_required' | 'commitment_revision_required' | 'payment_recovery_control' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported' | null
+  blockerDetails?: unknown[]
+  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'annual_budget_exceeded' | 'funding_breakdown_required' | 'custom_fields_incomplete' | 'payment_total_mismatch' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_source_stale' | 'risk_rating_frozen' | 'forecast_revision_required' | 'commitment_revision_required' | 'payment_recovery_control' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported' | null
 }
 
 type RecommendationSubmissionResponse = {
@@ -55,7 +56,11 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
   const readiness: Ref<CompletionReadinessState> = shallowRef({ kind: 'idle' })
   const completionResponse = computed(() => readiness.value.kind === 'success' ? readiness.value.response : null)
   const completionError: Ref<unknown> = ref(null)
-  const completionErrorDetails = computed(() => resolveDetails(completionError.value))
+  const completionErrorDetails = computed(() => resolveDetails(completionError.value ?? (
+    completionResponse.value?.blocker === 'custom_fields_incomplete'
+      ? { data: { details: completionResponse.value.blockerDetails } }
+      : null
+  )))
   const isLoading = computed(() => readiness.value.kind === 'pending')
   const isSubmitting: Ref<boolean> = ref(false)
   const loadStatus = computed(() => readiness.value.kind === 'disposed' ? 'idle' : readiness.value.kind)

@@ -481,7 +481,7 @@ const createExtensionWriteAuthorization = (
       if (!creatorId) {
         throw new Error('Extension Forecast creation requires an active Common User for the authenticated actor.')
       }
-      return await createAgreementForecastAggregate(db, input, agreementContext.agencyId, creatorId)
+      return await createAgreementForecastAggregate(db, input, agreementContext.agencyId, creatorId, undefined, event)
     },
     createAgreementClaim: async (rawDb, input) => {
       const db = rawDb as Transaction<Database>

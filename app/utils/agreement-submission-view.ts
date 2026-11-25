@@ -22,15 +22,21 @@ export type SubmissionPathPart = string | RowReference
 export type SubmissionChange = { path: SubmissionPathPart[]; before: unknown; after: unknown }
 type Comparison = 'snapshot' | 'budget_preview'
 
+const businessReferenceTitles = new Map([
+  ['applicantRecipientId', 'agreement.applicant_recipients.applicant_recipient'],
+  ['egcs_fc_applicantrecipient', 'agreement.applicant_recipients.applicant_recipient'],
+  ['fiscalYearId', 'agreement.claims.fiscal_year'],
+  ['budgetLineItemId', 'agreement.financial_summary.budget_line'],
+  ['egcs_fc_organizationcostcategory', 'agreement.claims.cost_category'],
+  ['egcs_fc_fundingsubtype', 'agreement.funding_sources.subtype']
+])
+
 /**
- * Identifies references retained for matching and hidden in History.
+ * Identifies fields whose raw identifiers are hidden in History.
  * @param key - Saved field name.
- * @returns Whether the field stores an internal reference.
+ * @returns Whether the field stores a business or row-matching identifier.
  */
-export const isSubmissionIdField = (key: string) => [
-  'id', 'sourceLineId', 'budgetLineItemId', 'fiscalYearId', 'applicantRecipientId',
-  'egcs_fc_applicantrecipient', 'egcs_fc_organizationcostcategory', 'egcs_fc_fundingsubtype'
-].includes(key)
+export const isSubmissionIdField = (key: string) => key === 'id' || key === 'sourceLineId' || businessReferenceTitles.has(key)
 
 type ClaimAnswerDisplay = ClaimCustomFieldSnapshot[number]['value']
 type ClaimScalarAnswerDisplay = Exclude<ClaimAnswerDisplay, { rows: unknown }>
@@ -181,6 +187,33 @@ export type ClaimReferenceComparison = {
 const claimReferenceTitle = (key: string) => {
   if (key === 'applicantRecipientId') return 'agreement.claims.submitting_proponent'
   if (key === 'fiscalYearId') return 'agreement.claims.fiscal_year'
+}
+
+/**
+ * Reports saved business-reference changes when the snapshot has no captured label.
+ * @param input - Saved field, reference values and localized placeholder.
+ * @param input.key - Saved field name.
+ * @param input.before - Previous reference ID.
+ * @param input.after - Current reference ID.
+ * @param input.unavailable - Display text for a missing captured label.
+ * @returns The display values and change status for business references only.
+ */
+export const compareUnlabeledSubmissionReference = (input: {
+  key: string
+  before: unknown
+  after: unknown
+  unavailable: string
+}) => {
+  const title = businessReferenceTitles.get(input.key)
+  if (!title) return undefined
+  const from = PositivePostgresBigintIdSchema.safeParse(input.before).data
+  const to = PositivePostgresBigintIdSchema.safeParse(input.after).data
+  return {
+    title,
+    changed: from !== to,
+    before: from ? input.unavailable : undefined,
+    after: to ? input.unavailable : undefined
+  }
 }
 
 /**

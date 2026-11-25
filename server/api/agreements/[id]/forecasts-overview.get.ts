@@ -1,3 +1,4 @@
+import { parsePersistedClaimCustomFieldDefinitions } from '~~/server/utils/agreement-claim-custom-fields'
 import { readLinkedSubmissionOverviewReview } from '~~/server/utils/agreement-linked-submission-targets'
 import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
@@ -61,6 +62,10 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         'Funding_Case_Agreement_Forecast.egcs_fc_version as egcs_fc_version',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
       ])
+      .$if(Boolean(forecastId), query => query.select([
+        'Funding_Case_Agreement_Forecast.egcs_fc_customfields',
+        'Funding_Case_Agreement_Forecast.egcs_fc_customfielddefinitions'
+      ]))
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
       .orderBy('Funding_Case_Agreement_Forecast.id', 'asc')
       .execute(),
@@ -278,6 +283,11 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
     budgetManagement: await loadAgreementBudgetManagement(db, agreementId),
     forecasts: await Promise.all(forecastsWithState.map(async forecast => ({
       ...forecast,
+      ...(forecastId
+        ? {
+            egcs_fc_customfielddefinitions: await parsePersistedClaimCustomFieldDefinitions(forecast.egcs_fc_customfielddefinitions, event, 'forecast')
+          }
+        : {}),
       forecast_revision_required: Boolean(forecast.egcs_fc_active
         && await getAgreementFinancialBudgetViolation(db, agreementId, { kind: 'forecast', id: String(forecast.id) }))
     }))),

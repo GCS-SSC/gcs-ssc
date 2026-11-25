@@ -4,8 +4,10 @@ import type { AgreementSubmissionDetail, AgreementSubmissionList, LinkedSubmissi
 import { allowsLinkedSubmissionAction } from '~~/shared/utils/agreement-linked-submission-policy'
 import { useResourceRequest } from './useResourceRequest'
 import { useActionContext } from './useActionContext'
+import type { CapturedActionContext } from './useActionContext'
 
-type ReviewCommand = { action: 'start' | 'accept' } | { action: 'return', description: string }
+type ReviewCommand = { action: 'start' | 'accept' } | { action: 'return', description: string, opening: CapturedActionContext }
+type ReviewAction = ReviewCommand['action']
 
 /**
  * Loads and settles review actions for a single native Agreement editor.
@@ -16,15 +18,20 @@ type ReviewCommand = { action: 'start' | 'accept' } | { action: 'return', descri
  * @param native.read - Linked review evidence from the financial snapshot.
  * @param native.status - Status of the financial overview request.
  * @param native.refresh - Refreshes the native values on the current page.
+ * @param native.canReviewRole - Whether the actor has update permission at the owning scope.
+ * @param native.isAssigned - Whether the actor is assigned to the exact financial record.
  * @returns Review evidence, native editing admission, and review actions.
  */
 export const useLinkedAgreementSubmissionReview = (agreementId: string, target: 'claim' | 'forecast', targetId: string, native: {
   read: () => LinkedSubmissionOverviewReview | null | undefined
   status: () => 'idle' | 'pending' | 'success' | 'error'
   refresh: () => Promise<unknown>
+  canReviewRole: () => boolean
+  isAssigned: () => boolean
 }) => {
   const { user, permissionRevision } = useAuth()
   const { showError } = useApiErrorToast()
+  const toast = useLocalizedToast()
   const fetchJson: $Fetch = $fetch as $Fetch
   const identity = computed(() => JSON.stringify([agreementId, target, targetId, user.value?.id, permissionRevision.value]))
   const base = `/api/agreements/${agreementId}/submissions`
@@ -73,12 +80,68 @@ export const useLinkedAgreementSubmissionReview = (agreementId: string, target: 
   const reviewReady = computed(() => operation.value === 'idle' && nativeReview.value !== undefined
     && resource.status.value === 'success' && !stale.value && !failed.value)
   const actionReady = computed(() => reviewReady.value && native.status() === 'success')
+  const canReviewRole = computed(native.canReviewRole)
   const canEdit = computed(() => reviewReady.value && allowsLinkedSubmissionAction(state.value ?? null, 'edit'))
   const canAdvanceLifecycle = computed(() => actionReady.value && allowsLinkedSubmissionAction(state.value ?? null, 'lifecycle'))
   const commandContext = useActionContext({
     identity: [() => detail.value?.submission.id],
     authority: () => detail.value?.canReview === true
   })
+  const returnDecisionDigest = ref<string | null>(null)
+  watch([native.status, native.read], ([status, overview]) => {
+    if (status === 'success') returnDecisionDigest.value = overview?.decisionDigest ?? null
+  }, { immediate: true, flush: 'sync' })
+  const returnContext = useActionContext({
+    identity: [
+      () => detail.value?.submission.id,
+      () => detail.value?.submission.egcs_fc_revision,
+      state,
+      returnDecisionDigest
+    ],
+    authority: () => detail.value?.canReturn === true
+  })
+
+  /**
+   * Checks the visible action's prerequisites before opening an editor or sending a command.
+   * @param action - The selected review action.
+   * @returns Whether the current actor may proceed.
+   */
+  const canActivate = (action: ReviewAction) => {
+    if (!detail.value || !canReviewRole.value || !actionReady.value) return false
+    const warning = !native.isAssigned()
+      ? 'assignments.read_only_description'
+      : action === 'return' && !detail.value.returnAllowed ? 'submission.errors.return_disabled' : undefined
+    if (warning) {
+      toast.add({ title: toast.localized('common.warning'), description: toast.localized(warning), color: 'warning' })
+      return false
+    }
+    return action === 'return' ? detail.value.canReturn : detail.value.canReview
+  }
+
+  const returnOpening = shallowRef<CapturedActionContext | null>(null)
+  const returnText = ref('')
+  const returnError = ref(false)
+  const returnOpen = computed(() => returnOpening.value !== null)
+
+  /** Discards the current inline return draft. */
+  const closeReturn = () => {
+    returnOpening.value = null
+    returnText.value = ''
+    returnError.value = false
+  }
+  watch(returnContext.version, closeReturn, { flush: 'sync' })
+
+  /** Opens a fresh inline return draft after prerequisites are checked. */
+  const openReturn = () => {
+    if (returnOpening.value || !canActivate('return') || state.value !== 'reviewing' || !returnDecisionDigest.value) return
+    const owner = returnContext.capture()
+    if (!owner) return
+    const opening = {
+      isCurrent: () => returnOpening.value === opening && owner.isCurrent(),
+      canDispatch: () => returnOpening.value === opening && owner.canDispatch()
+    }
+    returnOpening.value = opening
+  }
 
   /** @returns Whether a fresh read established the review state. */
   const refresh = async () => {
@@ -104,6 +167,8 @@ export const useLinkedAgreementSubmissionReview = (agreementId: string, target: 
    * @returns Whether the currently selected review adopted the result.
    */
   const run = async (command: ReviewCommand) => {
+    if (command.action === 'return' && !command.opening.canDispatch()) return false
+    if (!canActivate(command.action)) return false
     const current = detail.value
     const owner = commandContext.capture()
     if (!current || !owner?.canDispatch() || !actionReady.value) return false
@@ -115,7 +180,8 @@ export const useLinkedAgreementSubmissionReview = (agreementId: string, target: 
       const response = await fetchJson<AgreementSubmissionDetail>(`${base}/${current.submission.id}`, {
         method: 'POST',
         body: {
-          ...command,
+          action: command.action,
+          ...(command.action === 'return' ? { description: command.description } : {}),
           revision: current.submission.egcs_fc_revision,
           ...(command.action !== 'start' ? { expectedDecisionDigest: proof } : {})
         }
@@ -141,5 +207,21 @@ export const useLinkedAgreementSubmissionReview = (agreementId: string, target: 
     }
   }
 
-  return { detail, state, actionReady, canEdit, canAdvanceLifecycle, pending, reloading, failed, stale, warning, status: resource.status, error: resource.error, refresh, run }
+  /** @returns Whether the open return completed and was adopted by the linked review. */
+  const confirmReturn = async () => {
+    const opening = returnOpening.value
+    if (!opening?.canDispatch()) return false
+    const description = returnText.value.trim()
+    if (!description) {
+      returnError.value = true
+      return false
+    }
+    return await run({ action: 'return', description, opening })
+  }
+
+  return {
+    detail, state, actionReady, canReviewRole, canEdit, canAdvanceLifecycle, pending, reloading, failed, stale, warning,
+    status: resource.status, error: resource.error, refresh, run,
+    returnOpen, returnText, returnError, openReturn, closeReturn, confirmReturn
+  }
 }

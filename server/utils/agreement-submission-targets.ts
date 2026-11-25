@@ -532,7 +532,7 @@ export const applyAgreementSubmissionTarget = async (trx: Transaction<Database>,
     agreementId,
     streamId,
     lineItems: candidate.lineItems.map(line => ({ ...line, currency }))
-  }, agencyId, primaryUserId)
+  }, agencyId, primaryUserId, { event, answers: candidate.customFields })
   if (result.status === 'created') return { id: result.forecastId }
   if (result.status === 'fiscal_year_unavailable') {
     return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')

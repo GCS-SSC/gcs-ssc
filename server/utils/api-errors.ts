@@ -150,9 +150,24 @@ export const notFound = async (
  * @returns Never returns.
  */
 export const validationError = async (event: H3Event, error: ZodError): Promise<never> => {
+  return await throwApiError(event, {
+    statusCode: 400,
+    code: 'VALIDATION_FAILED',
+    key: 'apiErrors.validation.failed',
+    details: await resolveValidationDetails(event, error)
+  })
+}
+
+/**
+ * Presents validation details for an error response or a readiness blocker.
+ * @param event - Current H3 event.
+ * @param error - Answer validation issues.
+ * @returns Details with display text and any translation metadata.
+ */
+export const resolveValidationDetails = async (event: H3Event, error: ZodError): Promise<ApiErrorDetail[]> => {
   const t = await useTranslation(event)
   const locale = resolveRequestLocale(event)
-  const details = error.issues.map(issue => ({
+  return error.issues.map(issue => ({
     path: issue.path.join('.'),
     code: issue.code,
     ...resolveZodIssuePresentation(issue.message, issue, (key, params) => t(
@@ -160,11 +175,4 @@ export const validationError = async (event: H3Event, error: ZodError): Promise<
       localizeBilingualIssueParams(params ?? {}, locale)
     ))
   }))
-
-  return await throwApiError(event, {
-    statusCode: 400,
-    code: 'VALIDATION_FAILED',
-    key: 'apiErrors.validation.failed',
-    details
-  })
 }

@@ -1592,6 +1592,8 @@ export interface FundingCaseAgreementBudgetLineItemFundingTable {
 }
 
 export interface FundingCaseAgreementForecastTable {
+  egcs_fc_customfields: Generated<AgreementCustomFieldValues>
+  egcs_fc_customfielddefinitions: Generated<AssignedAgencyCustomFieldDefinition[]>
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_fiscalyear: string
@@ -2716,7 +2718,7 @@ export interface AgencyCustomFieldOptionTable {
   egcs_ay_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
-export type StreamFieldAssignmentTarget = 'agreement' | 'activity' | 'claim'
+export type StreamFieldAssignmentTarget = 'agreement' | 'activity' | 'claim' | 'forecast'
 export interface TransferPaymentStreamFieldAssignmentTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string

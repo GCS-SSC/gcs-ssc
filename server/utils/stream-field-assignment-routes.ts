@@ -73,8 +73,8 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
         .where('id', '=', create.egcs_tp_agencyfield).where('egcs_ay_agency', '=', fresh.agencyId)
         .where('_deleted', '=', false).forShare().executeTakeFirst()
       if (!field) return await badRequest(event, 'INVALID_AGENCY_FIELD', 'apiErrors.request.invalid_resource')
-      if (target !== 'claim' && (field.egcs_ay_kind === 'table' || field.egcs_ay_kind === 'repeating')) {
-        return await badRequest(event, 'FIELD_CLAIM_ONLY', 'apiErrors.transfer_payment.custom_field_claim_only')
+      if (target !== 'claim' && target !== 'forecast' && (field.egcs_ay_kind === 'table' || field.egcs_ay_kind === 'repeating')) {
+        return await badRequest(event, 'STRUCTURED_FIELD_TARGET_INVALID', 'apiErrors.transfer_payment.structured_custom_field_target_invalid')
       }
       await assertSection(event, trx, streamId, create.egcs_tp_section)
       try {

@@ -39,7 +39,7 @@ const moveColumn = (index: number, direction: -1 | 1) => {
 <template>
   <div class="space-y-4 border-t border-default pt-4" data-field-scope="agency.custom-field-structure">
     <p class="text-sm text-muted">
-      {{ t('custom_fields.claim_only') }}
+      {{ t('custom_fields.claims_and_forecasts_only') }}
     </p>
     <div class="grid gap-4 sm:grid-cols-2">
       <UFormField

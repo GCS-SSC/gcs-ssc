@@ -14,6 +14,7 @@ import type { Entity_Type } from '~~/shared/types/database'
 import { isCoreEntityType, requiresApprovalSubmissionAtCompletion } from '~~/shared/constants/entity-registry'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import type { ApiErrorDetail } from '~~/server/utils/api-errors'
 
 type CompletionTarget = {
   entityType: Entity_Type
@@ -29,13 +30,14 @@ type CompletionTarget = {
  * @param runtime.item Existing immutable Completion evidence.
  * @param runtime.can_complete Whether domain rules otherwise permit Completion.
  * @param runtime.blocker Domain-specific reason Completion is unavailable.
+ * @param runtime.blockerDetails Validation details attached to the domain blocker.
  * @returns The projection with an active-workflow or Closeout-configuration blocker.
  */
 const withCompletionBlocker = async (
   event: H3Event,
   completionTarget: CompletionTarget,
   runtimeEntity: Awaited<ReturnType<typeof resolveCompletionRuntimeEntityFromEntity>>,
-  runtime: { item: unknown, can_complete: boolean, blocker?: string | null }
+  runtime: { item: unknown, can_complete: boolean, blocker?: string | null, blockerDetails?: ApiErrorDetail[] }
 ) => {
   if (!runtimeEntity || runtime.item || typeof event.context.$db.selectFrom !== 'function') return runtime
   const active = await event.context.$db.selectFrom('Common_Runtime').select('id')
@@ -44,11 +46,13 @@ const withCompletionBlocker = async (
     .where('egcs_cn_entityid', '=', completionTarget.entityId)
     .where('egcs_cn_state', 'in', ['pending', 'active', 'awaiting_action', 'paused'])
     .where('_deleted', '=', false).executeTakeFirst()
-  if (active) return { ...runtime, can_complete: false, blocker: 'active_workflow' as const }
+  const { blockerDetails, ...runtimeWithoutDetails } = runtime
+  const blockedRuntime = blockerDetails ? runtimeWithoutDetails : runtime
+  if (active) return { ...blockedRuntime, can_complete: false, blocker: 'active_workflow' as const }
   if (isCoreEntityType(runtimeEntity.entityType)
     && requiresApprovalSubmissionAtCompletion(runtimeEntity.entityType)
     && !await resolveActiveWorkflowSetup(event.context.$db, runtimeEntity, 'approval_submission')) {
-    return { ...runtime, can_complete: false, blocker: 'approval_workflow_missing' as const }
+    return { ...blockedRuntime, can_complete: false, blocker: 'approval_workflow_missing' as const }
   }
   return runtime
 }

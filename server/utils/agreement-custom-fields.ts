@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { Kysely, Selectable } from 'kysely'
 import type { H3Event } from 'h3'
-import type { Database, StreamFieldAssignmentTarget } from '~~/shared/types/database'
+import type { Database } from '~~/shared/types/database'
 import { agreementCustomFieldMergeSchema, type AgreementCustomFieldPatch, type AgreementCustomFieldValues, type AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { assertAgreementCurrency } from './agreement-currency'
 import { parseI18n } from './api-validate'
@@ -29,7 +29,7 @@ export const readActivityCustomFieldDefinitions = async (db: Kysely<Database>, s
 export const mergeAgreementCustomFields = async (
   event: H3Event, db: Kysely<Database>, streamId: string,
   current: ScalarCustomFieldValues, patch: AgreementCustomFieldPatch, currency: string,
-  target: Exclude<StreamFieldAssignmentTarget, 'claim'> = 'agreement'
+  target: 'agreement' | 'activity' = 'agreement'
 ): Promise<ScalarCustomFieldValues> => {
   const definitions = await readAssignedAgencyCustomFieldDefinitions(db, streamId, target)
   const scalarFields = agreementCustomFieldMergeSchema(definitions, current, { currency }).transform((values, ctx) => {

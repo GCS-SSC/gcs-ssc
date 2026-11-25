@@ -2,7 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { z } from 'zod'
-import type { ActionContext } from '~/composables/useActionContext'
+import type { FetchError } from 'ofetch'
+import { useActionContext, type ActionContext } from '~/composables/useActionContext'
 import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
 import { useFormSession } from '~/composables/useFormSession'
@@ -11,6 +12,47 @@ import { agreementCustomFieldMergeSchema } from '~~/shared/types/schemas/agreeme
 import type { AgreementCustomFieldPatch, AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { FundingCaseAgreementClaimPatch } from '~~/shared/types/schemas/funding-case-agreement'
 import { changedCustomFieldAnswers } from '~~/shared/utils/agreement-custom-field-answers'
+
+type AnswerReadStatus = 'idle' | 'pending' | 'success' | 'error'
+type AnswerReadEvidence = { status: AnswerReadStatus; error?: FetchError | null }
+
+const isDefinitiveReadError = (error?: FetchError | null) =>
+  [401, 403, 404, 410].some(code => code === (error?.statusCode ?? error?.status ?? error?.response?.status))
+
+/**
+ * Retains accepted role authority through transient reads, while requiring fresh
+ * evidence and normal business prerequisites for each new editing operation.
+ * @param options - Page-owned evidence and resource identities.
+ * @param options.identity - Reactive owner identifiers.
+ * @param options.profile - Current context request status, error and role.
+ * @param options.record - Current overview request status, error and target containment.
+ * @param options.eligible - Live page and business eligibility.
+ * @returns Separate draft lifetime and write admission contexts.
+ */
+export const useSubmissionAnswerContexts = (options: {
+  identity: Parameters<typeof useActionContext>[0]['identity']
+  profile: () => AnswerReadEvidence & { canUpdate: boolean }
+  record: () => AnswerReadEvidence & { matches: boolean }
+  eligible: () => boolean
+}) => {
+  const authority = ref(false)
+  watch([options.profile, options.record], ([profile, record]) => {
+    if (isDefinitiveReadError(profile.error) || isDefinitiveReadError(record.error)
+      || (record.status === 'success' && !record.matches)) {
+      authority.value = false
+    } else if (profile.status === 'success') {
+      authority.value = profile.canUpdate
+    }
+  }, { immediate: true, flush: 'sync' })
+  const owner = { identity: options.identity, authority }
+  return {
+    openingContext: useActionContext(owner),
+    context: useActionContext({
+      ...owner,
+      eligible: () => options.profile().status === 'success' && options.record().status === 'success' && options.eligible()
+    })
+  }
+}
 
 type AnswerDraft = { egcs_fc_customfields: AgreementCustomFieldPatch }
 type AnswerPrecondition = NonNullable<FundingCaseAgreementClaimPatch['customFieldPrecondition']>
@@ -39,7 +81,7 @@ const copyAnswers = (answers: AgreementCustomFieldPatch): AgreementCustomFieldPa
  * @param options.context - Page-owned action identity and authorization.
  * @param options.openingContext - Actor, security, record and role lifetime independent of read eligibility.
  * @param options.readAnswers - Last accepted answers for a new opening.
- * @param options.readSubmissionRevision - Last accepted linked Submission revision, or null for an unlinked Claim.
+ * @param options.readSubmissionRevision - Last accepted linked Submission revision, or null for an unlinked financial record.
  * @param options.readDefinitions - Pinned definitions for validation.
  * @param options.isBlocked - Other active operations that block editing.
  * @param options.persist - Writes changed keys and reports whether values changed.

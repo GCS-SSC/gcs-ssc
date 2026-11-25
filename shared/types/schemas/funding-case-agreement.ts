@@ -812,23 +812,35 @@ export const FundingCaseAgreementClaimCreateSchema = FundingCaseAgreementClaimBa
   }
 )
 
+const customFieldAnswerPatch = {
+  egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
+  customFieldPrecondition: z.strictObject({
+    submissionRevision: z.int32({ error: 'validation.invalid_number' }).positive({ error: 'validation.invalid_number' }).nullable(),
+    previousAnswers: AgreementCustomFieldValuesSchema
+  }).optional()
+}
+
+const validateAnswerPrecondition = ({
+  egcs_fc_customfields, customFieldPrecondition
+}: z.infer<z.ZodObject<typeof customFieldAnswerPatch>>) => {
+  if (!customFieldPrecondition) return true
+  const changedKeys = Object.keys(egcs_fc_customfields ?? {})
+  const previous = customFieldPrecondition.previousAnswers
+  return changedKeys.length > 0 && changedKeys.length === Object.keys(previous).length
+    && changedKeys.every(key => Object.hasOwn(previous, key))
+}
+
+const answerPreconditionIssue = {
+  error: 'validation.invalid_selection', path: ['customFieldPrecondition', 'previousAnswers']
+}
+
+export const FundingCaseAgreementForecastPatchSchema = z.strictObject(customFieldAnswerPatch)
+  .refine(validateAnswerPrecondition, answerPreconditionIssue)
+
 export const FundingCaseAgreementClaimPatchSchema = FundingCaseAgreementClaimBaseSchema.partial()
-  .extend({
-    egcs_fc_status: ForbiddenBusinessStatusMutation(),
-    egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
-    customFieldPrecondition: z.strictObject({
-      submissionRevision: z.int32({ error: 'validation.invalid_number' }).positive({ error: 'validation.invalid_number' }).nullable(),
-      previousAnswers: AgreementCustomFieldValuesSchema
-    }).optional()
-  })
+  .extend({ egcs_fc_status: ForbiddenBusinessStatusMutation(), ...customFieldAnswerPatch })
   .superRefine(validatePeriodRange)
-  .refine(({ egcs_fc_customfields, customFieldPrecondition }) => {
-    if (!customFieldPrecondition) return true
-    const changedKeys = Object.keys(egcs_fc_customfields ?? {})
-    const previous = customFieldPrecondition.previousAnswers
-    return changedKeys.length > 0 && changedKeys.length === Object.keys(previous).length
-      && changedKeys.every(key => Object.hasOwn(previous, key))
-  }, { error: 'validation.invalid_selection', path: ['customFieldPrecondition', 'previousAnswers'] })
+  .refine(validateAnswerPrecondition, answerPreconditionIssue)
 
 export type FundingCaseAgreementClaim = z.infer<typeof FundingCaseAgreementClaimCreateSchema>
 export type FundingCaseAgreementClaimPatch = z.infer<typeof FundingCaseAgreementClaimPatchSchema>

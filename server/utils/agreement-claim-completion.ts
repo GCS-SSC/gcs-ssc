@@ -1,4 +1,4 @@
-import { assertClaimCustomFieldsComplete } from './agreement-claim-custom-fields'
+import { assertClaimCustomFieldsComplete, getFinancialCustomFieldCompletionDetails } from './agreement-claim-custom-fields'
 import { assertLinkedSubmissionActionAllowed } from './agreement-linked-submission-access'
 /* eslint-disable jsdoc/require-jsdoc -- Agreement Claim completion follows the shared completion runtime contract. */
 import type { H3Event } from 'h3'
@@ -51,9 +51,15 @@ export const getAgreementClaimCompletionRuntime = async (
   const funding = await getAgreementLineFundingCompletionStatus(event.context.$db, { kind: 'claim', id: claimId })
   const budgetViolation = item ? null : await getAgreementFinancialBudgetViolation(event.context.$db, context.agreementId, { kind: 'claim', id: claimId })
 
+  const canComplete = item === null && claimLinesReady && funding.complete && !budgetViolation && Boolean(protection && !protection.locked)
+  if (canComplete) {
+    const blockerDetails = await getFinancialCustomFieldCompletionDetails(event, event.context.$db, claimId, 'claim')
+    if (blockerDetails.length) return { item, can_complete: false, blocker: 'custom_fields_incomplete' as const, blockerDetails }
+  }
+
   return {
     item,
-    can_complete: item === null && claimLinesReady && funding.complete && !budgetViolation && Boolean(protection && !protection.locked),
+    can_complete: canComplete,
     blocker: item
       ? null
       : !hasClaimLines
