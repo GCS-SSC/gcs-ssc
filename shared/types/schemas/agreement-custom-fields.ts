@@ -200,6 +200,7 @@ export const ClaimCustomFieldSnapshotSchema = z.array(z.object({
   key: PositivePostgresBigintIdSchema,
   labelEn: z.string(),
   labelFr: z.string(),
+  presentation: z.literal('multiline').optional(),
   value: z.union([ClaimCustomFieldScalarEvidenceSchema, ClaimCustomFieldRowsEvidenceSchema])
 }))
 

@@ -7,7 +7,7 @@ import type {
 import type { JsonValue } from './database'
 import { PositivePostgresBigintIdSchema } from './schemas/common'
 
-export const AGREEMENT_SUBMISSION_TARGETS = ['claim', 'forecast', 'amendment_budget'] as const
+export const AGREEMENT_SUBMISSION_TARGETS = ['claim', 'forecast'] as const
 export const AGREEMENT_SUBMISSION_MODES = ['automatic', 'review'] as const
 export const AGREEMENT_SUBMISSION_STATES = ['submitted', 'reviewing', 'returned', 'proponent_editing', 'accepted'] as const
 export type AgreementSubmissionTarget = typeof AGREEMENT_SUBMISSION_TARGETS[number]
@@ -55,22 +55,13 @@ export const AgreementSubmissionPayloadSchema = z.unknown().transform((value, co
 const sourceIdentity = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
   .max(255, { error: 'validation.max_length' }).refine(postgresText, { error: 'validation.invalid_text_character' })
 const revision = z.number({ error: 'validation.invalid_number' }).int().positive().max(2147483647, { error: 'validation.invalid_number' })
-const budgetRevision = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
-  .max(512, { error: 'validation.max_length' }).refine(postgresText, { error: 'validation.invalid_text_character' })
-
 export const AgreementSubmissionReceiptSchema = z.strictObject({
   target: z.enum(AGREEMENT_SUBMISSION_TARGETS, { error: 'validation.required' }),
   sourceSystem: sourceIdentity,
   sourceId: sourceIdentity,
   sourceRevision: sourceIdentity,
   formatVersion: revision,
-  payload: AgreementSubmissionPayloadSchema,
-  amendmentId: PositivePostgresBigintIdSchema.nullish(),
-  expectedBudgetRevision: budgetRevision.nullish()
-}).superRefine((input, context) => {
-  if (input.target !== 'amendment_budget' && (input.amendmentId != null || input.expectedBudgetRevision != null)) {
-    context.addIssue({ code: 'custom', path: ['amendmentId'], message: 'validation.invalid_selection' })
-  }
+  payload: AgreementSubmissionPayloadSchema
 })
 
 const decisionDigest = z.string().regex(/^[a-f0-9]{64}$/, { error: 'validation.invalid_selection' })
@@ -99,10 +90,7 @@ export const AgreementSubmissionCommandSchema = z.discriminatedUnion('action', [
     action: z.literal('accept'),
     revision,
     expectedDecisionDigest: decisionDigest.optional(),
-    payload: AgreementSubmissionPayloadSchema.optional(),
-    amendmentId: PositivePostgresBigintIdSchema.optional(),
-    expectedBudgetRevision: budgetRevision.optional(),
-    expectedBudgetConfirmation: z.string().regex(/^[a-f0-9]{64}$/, { error: 'validation.invalid_selection' }).optional()
+    payload: AgreementSubmissionPayloadSchema.optional()
   })
 ])
 
@@ -116,24 +104,10 @@ export const AgreementSubmissionListQuerySchema = z.union([
 
 export type AgreementSubmissionListQuery = z.infer<typeof AgreementSubmissionListQuerySchema>
 
-export const AgreementSubmissionBudgetPreviewSchema = z.strictObject({
-  amendmentId: PositivePostgresBigintIdSchema,
-  payload: AgreementSubmissionPayloadSchema
-})
-
-export type AgreementSubmissionBudgetPreview = {
-  budgetVersionId: string
-  revision: string
-  confirmation: string
-  current: Record<string, unknown>
-  replacement: Record<string, unknown>
-}
-
 export type AgreementSubmissionCommand = z.infer<typeof AgreementSubmissionCommandSchema>
 export type AgreementSubmissionReceipt = z.infer<typeof AgreementSubmissionReceiptSchema>
-export type AgreementSubmissionBudgetPreviewInput = z.infer<typeof AgreementSubmissionBudgetPreviewSchema>
 export type SubmissionRow = Omit<Selectable<AgreementSubmissionTable>,
-  'egcs_fc_updatedat' | 'egcs_fc_resultamendment' | 'egcs_fc_resultforecast' | 'egcs_fc_resultclaim'
+  'egcs_fc_updatedat' | 'egcs_fc_resultforecast' | 'egcs_fc_resultclaim'
 > & { egcs_fc_updatedat: string }
 export type SubmissionEventRow = Omit<Selectable<AgreementSubmissionEventTable>, 'egcs_fc_createdat' | 'egcs_fc_editsection'> & {
   egcs_fc_editsection?: Selectable<AgreementSubmissionEventTable>['egcs_fc_editsection']

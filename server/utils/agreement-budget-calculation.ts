@@ -2,7 +2,7 @@
 import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
 import type { H3Event } from 'h3'
 import type { Database } from '~~/shared/types/database'
-import { calculateBudgetPercentages, type PercentageBudgetRow } from '~~/shared/utils/budget-percentage'
+import { calculateBudgetPercentages } from '~~/shared/utils/budget-percentage'
 import { addMoney, compareMoney, isPersistableMoney, zeroMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { badRequest, throwApiError } from './api-errors'
@@ -10,7 +10,6 @@ import { assertAgreementBudgetProgramFundingCapacity } from './agreement-budget'
 import { AgreementBudgetFinancialLimitError, assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { assertAgreementCurrentBudgetUsage } from './agreement-financial-budget-controls'
 import { assertAgreementFundingModeInput } from './agreement-funding-breakdown'
-import type { TransferPaymentBudgetFundingMode } from '~~/shared/types/schemas/transfer-payment'
 import { parseI18n } from './api-validate'
 import { FundingCaseAgreementBudgetLineDescriptionSchema, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, FundingCaseAgreementBudgetLineTextSchema, type FundingCaseAgreementBudgetLineItem, type FundingCaseAgreementBudgetLineItemPatch } from '~~/shared/types/schemas'
 import { validateMergedBudgetLineItemFundingPatch, validateMergedBudgetLineTextPatch } from './agreement-financial-patch-validation'
@@ -58,19 +57,17 @@ export const validateBudgetLinePatch = async (event: H3Event, settings: BudgetSe
   if (mode === 'manual') await validateMergedBudgetLineItemFundingPatch(event, existing, patch)
 }
 
-const loadBudgetCalculationConfiguration = async (db: Db, categoryId: string, rowId?: string) => rowId
-  ? await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item').select([
-      'egcs_fc_calculationmode as mode', 'egcs_fc_percentage as percentage',
-      'egcs_fc_sourcecategory as source', 'egcs_fc_allowpercentageoverride as override'
-    ]).where('id', '=', rowId).executeTakeFirstOrThrow()
-  : await db.selectFrom('Transfer_Payment_Stream_Cost_Category_Line_Item')
-      .innerJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
-      .select(['egcs_ay_calculationmode as mode', 'egcs_ay_percentage as percentage', 'egcs_ay_sourcecategory as source', 'egcs_ay_allowpercentageoverride as override'])
-      .where('Transfer_Payment_Stream_Cost_Category_Line_Item.id', '=', categoryId)
-      .executeTakeFirstOrThrow()
-
-export const prepareBudgetCalculationConfiguration = async (event: H3Event, db: Db, input: Input, rowId?: string) => {
-  const config = await loadBudgetCalculationConfiguration(db, input.egcs_fc_organizationcostcategory!, rowId)
+export const prepareBudgetCalculation = async (event: H3Event, db: Db, input: Input, rowId?: string, createYearRowId?: string) => {
+  const config = rowId
+    ? await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item').select([
+        'egcs_fc_calculationmode as mode', 'egcs_fc_percentage as percentage',
+        'egcs_fc_sourcecategory as source', 'egcs_fc_allowpercentageoverride as override'
+      ]).where('id', '=', rowId).executeTakeFirstOrThrow()
+    : await db.selectFrom('Transfer_Payment_Stream_Cost_Category_Line_Item')
+        .innerJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
+        .select(['egcs_ay_calculationmode as mode', 'egcs_ay_percentage as percentage', 'egcs_ay_sourcecategory as source', 'egcs_ay_allowpercentageoverride as override'])
+        .where('Transfer_Payment_Stream_Cost_Category_Line_Item.id', '=', input.egcs_fc_organizationcostcategory!)
+        .executeTakeFirstOrThrow()
   if ((config.mode !== 'manual' && input.egcs_fc_programfunding !== undefined)
     || (input.egcs_fc_percentage != null && (config.mode === 'manual' || !config.override))) {
     await badRequest(event, 'BUDGET_CALCULATION_READ_ONLY', 'apiErrors.agreement.budget_calculation_read_only')
@@ -78,18 +75,8 @@ export const prepareBudgetCalculationConfiguration = async (event: H3Event, db: 
   if (config.mode === 'manual' && !rowId && input.egcs_fc_programfunding === undefined) {
     await badRequest(event, 'PROGRAM_FUNDING_REQUIRED', 'apiErrors.agreement.program_funding_required')
   }
-  return {
-    egcs_fc_calculationmode: config.mode,
-    egcs_fc_sourcecategory: config.source,
-    egcs_fc_percentage: input.egcs_fc_percentage ?? config.percentage,
-    egcs_fc_allowpercentageoverride: config.override
-  }
-}
-
-export const prepareBudgetCalculation = async (event: H3Event, db: Db, input: Input, rowId?: string, createYearRowId?: string) => {
-  const config = await prepareBudgetCalculationConfiguration(event, db, input, rowId)
   let programFunding: Money | undefined
-  if (config.egcs_fc_calculationmode !== 'manual') {
+  if (config.mode !== 'manual') {
     const existing = rowId ? await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item').select(['egcs_fc_budgetversion', 'egcs_fc_fundingagreementbudgetfiscalyear', 'egcs_fc_organizationcostcategory', 'egcs_fc_currency']).where('id', '=', rowId).executeTakeFirstOrThrow() : undefined
     const year = await db.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year').selectAll()
       .$if(Boolean(existing), query => query.where('egcs_fc_budgetversion', '=', existing!.egcs_fc_budgetversion))
@@ -109,14 +96,17 @@ export const prepareBudgetCalculation = async (event: H3Event, db: Db, input: In
         ...rows.filter(row => row.id !== draftId).map(row => ({ ...row, programFunding: parseDatabaseMoney(row.programFunding, row.currency) })),
         { id: draftId, versionId: year.egcs_fc_budgetversion, fiscalYearId: year.egcs_fc_fiscalyear,
           currency: input.egcs_fc_currency ?? existing!.egcs_fc_currency, categoryId: definition.categoryId,
-          mode: config.egcs_fc_calculationmode, sourceCategoryId: config.egcs_fc_sourcecategory, percentage: config.egcs_fc_percentage,
+          mode: config.mode, sourceCategoryId: config.source, percentage: input.egcs_fc_percentage ?? config.percentage,
           programFunding: zeroMoney(input.egcs_fc_currency ?? existing!.egcs_fc_currency) }
       ])
       programFunding = amounts.get(draftId)!
     } catch { await badRequest(event, 'INVALID_BUDGET_CALCULATION', 'apiErrors.agreement.invalid_budget_calculation') }
   }
   return {
-    ...config,
+    egcs_fc_calculationmode: config.mode,
+    egcs_fc_sourcecategory: config.source,
+    egcs_fc_percentage: input.egcs_fc_percentage ?? config.percentage,
+    egcs_fc_allowpercentageoverride: config.override,
     ...(programFunding === undefined ? {} : { egcs_fc_programfunding: programFunding })
   }
 }
@@ -151,33 +141,6 @@ const loadCalculationRows = async (
 
 type BudgetLineFundingState = 'pending' | 'active'
 
-export const calculateAgreementBudgetFunding = async (
-  event: H3Event,
-  fundingMode: TransferPaymentBudgetFundingMode,
-  rows: (PercentageBudgetRow & { totalAmount: Money, otherFunding: Money, description: string })[]
-) => {
-  let amounts: Map<string, Money>
-  try {
-    amounts = calculateBudgetPercentages(rows)
-  } catch {
-    return await badRequest(event, 'INVALID_BUDGET_CALCULATION', 'apiErrors.agreement.invalid_budget_calculation')
-  }
-  const totals = new Map<string, Money>()
-  for (const row of rows) {
-    const programFunding = amounts.get(row.id)!
-    const savedTotal = row.totalAmount
-    const funding = fundingMode === 'program_only'
-      ? programFunding
-      : addMoney(programFunding, row.otherFunding)
-    const exceedsSavedTotal = compareMoney(funding, savedTotal) > 0
-    if (!isPersistableMoney(programFunding) || !isPersistableMoney(funding) || (fundingMode === 'manual' && exceedsSavedTotal)) {
-      await throwApiError(event, { statusCode: 400, code: 'VALIDATION_FAILED', key: 'apiErrors.agreement.calculated_funding_exceeds_total', params: { row: row.description }, details: [{ path: `lineItems.${row.id}.egcs_fc_totalamount`, message: row.description }] })
-    }
-    totals.set(row.id, fundingMode === 'automatic' || (fundingMode === 'program_only' && exceedsSavedTotal) ? funding : savedTotal)
-  }
-  return { amounts, totals }
-}
-
 export const recalculateAgreementBudget = async (
   event: H3Event,
   db: Db,
@@ -193,12 +156,25 @@ export const recalculateAgreementBudget = async (
     includeOtherFunding: fundingMode !== 'program_only',
     pendingLineId
   })
-  const { amounts, totals } = await calculateAgreementBudgetFunding(event, fundingMode, rows.map(row => ({
-    ...row,
-    programFunding: parseDatabaseMoney(row.programFunding, row.currency),
-    totalAmount: parseDatabaseMoney(row.totalAmount, row.currency),
-    otherFunding: parseDatabaseMoney(row.otherFunding, row.currency)
-  })))
+  let amounts: Map<string, Money>
+  try {
+    amounts = calculateBudgetPercentages(rows.map(row => ({ ...row, programFunding: parseDatabaseMoney(row.programFunding, row.currency) })))
+  } catch {
+    return await badRequest(event, 'INVALID_BUDGET_CALCULATION', 'apiErrors.agreement.invalid_budget_calculation')
+  }
+  const totals = new Map<string, Money>()
+  for (const row of rows) {
+    const programFunding = amounts.get(row.id)!
+    const savedTotal = parseDatabaseMoney(row.totalAmount, row.currency)
+    const funding = fundingMode === 'program_only'
+      ? programFunding
+      : addMoney(programFunding, parseDatabaseMoney(row.otherFunding, row.currency))
+    const exceedsSavedTotal = compareMoney(funding, savedTotal) > 0
+    if (!isPersistableMoney(programFunding) || !isPersistableMoney(funding) || (fundingMode === 'manual' && exceedsSavedTotal)) {
+      await throwApiError(event, { statusCode: 400, code: 'VALIDATION_FAILED', key: 'apiErrors.agreement.calculated_funding_exceeds_total', params: { row: row.description }, details: [{ path: `lineItems.${row.id}.egcs_fc_totalamount`, message: row.description }] })
+    }
+    totals.set(row.id, fundingMode === 'automatic' || (fundingMode === 'program_only' && exceedsSavedTotal) ? funding : savedTotal)
+  }
   const version = await db.selectFrom('Funding_Case_Agreement_Budget_Version').select(['egcs_fc_iscurrent', 'egcs_fc_fundingagreement']).where('id', '=', anchor.egcs_fc_budgetversion).executeTakeFirstOrThrow()
 
   try {

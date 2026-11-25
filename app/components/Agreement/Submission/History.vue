@@ -93,8 +93,7 @@ const snapshotLabel = (event: SubmissionEventRow, index: number) =>
         :after-fields="snapshotFields(after) ?? undefined"
         :after-answers="evidenceAnswers.get(after.id)"
         :target="target"
-        :claim-references="claimReferences(before, after)"
-        history />
+        :claim-references="claimReferences(before, after)" />
     </template>
 
     <template #snapshot="{ snapshot, previous, index }">
@@ -113,7 +112,7 @@ const snapshotLabel = (event: SubmissionEventRow, index: number) =>
             v-for="field in snapshotFields(snapshot)"
             :key="field.key"
             class="min-w-0"
-            :class="{ 'col-span-full': isSubmissionStructuredEvidence(field.value) || isSubmissionStructuredEvidence(previousFieldAnswer(index, field)) }">
+            :class="{ 'col-span-full': field.presentation === 'multiline' || isSubmissionStructuredEvidence(field.value) || isSubmissionStructuredEvidence(previousFieldAnswer(index, field)) }">
             <dt class="mb-1 text-xs font-medium text-muted [overflow-wrap:anywhere]">
               {{ locale === 'fr' ? field.labelFr : field.labelEn }}
             </dt>

@@ -10,16 +10,15 @@ import type {
   AgreementSubmissionListItem, AgreementSubmissionState
 } from '~~/shared/types/agreement-submission'
 
-const { agreementId, currency, owner } = defineProps<{
+const { agreementId, owner } = defineProps<{
   agreementId: string
-  currency: string
   owner: ReturnType<typeof useAgreementSubmissionCollection>
 }>()
 const route = useRoute()
 const localePath = useLocalePath()
 const { t } = useI18n()
 const fetchJson: $Fetch = $fetch as $Fetch
-const { collection, identity, apiPath, sendCommand, isPending } = owner
+const { collection, identity, apiPath } = owner
 const selectedId = computed(() => {
   const id = PositivePostgresBigintIdSchema.safeParse(route.query.submission)
   return id.success ? id.data : null
@@ -53,7 +52,6 @@ type Selection =
   | { kind: 'list' }
   | { kind: 'loading' }
   | { kind: 'missing' }
-  | { kind: 'standalone'; id: string }
   | { kind: 'history' }
   | { kind: 'linked'; item: AgreementSubmissionListItem }
 const selection = computed<Selection>(() => {
@@ -61,7 +59,6 @@ const selection = computed<Selection>(() => {
   if (!id) return { kind: 'list' }
   const item = collection.data.value?.items.find(item => item.id === id)
   if (!item) return { kind: collection.status.value === 'success' ? 'missing' : 'loading' }
-  if (item.egcs_fc_target === 'amendment_budget') return { kind: 'standalone', id }
   return item.targetAvailable ? { kind: 'linked', item } : { kind: 'history' }
 })
 const evidence = useResourceRequest<AgreementSubmissionDetail>({
@@ -127,9 +124,6 @@ const refresh = () => collection.refresh()
             <UBadge :color="states[item.egcs_fc_state]" variant="subtle">
               {{ t(`submission.state.${item.egcs_fc_state}`) }}
             </UBadge>
-            <p v-if="item.egcs_fc_blocker && item.egcs_fc_state === 'submitted'" class="mt-1 text-xs text-muted">
-              {{ t('submission.needs_attention') }}
-            </p>
           </td>
           <td class="px-4 py-3 text-right">
             <UButton
@@ -152,15 +146,7 @@ const refresh = () => collection.refresh()
           </UButton>
         </template>
       </CommonErrorNotice>
-      <AgreementSubmissionDetail
-        v-if="selection.kind === 'standalone'"
-        :key="selectionIdentity"
-        :agreement-id="agreementId"
-        :submission-id="selection.id"
-        :currency="currency"
-        :command-pending="isPending(selection.id)"
-        :send-command="sendCommand" />
-      <template v-else-if="selection.kind === 'history' && !collection.error.value">
+      <template v-if="selection.kind === 'history' && !collection.error.value">
         <CommonErrorNotice v-if="evidence.error.value" :title="t('submission.detail_failed')">
           <template #actions>
             <UButton color="error" variant="outline" @click="evidence.refresh">

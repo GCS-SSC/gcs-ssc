@@ -625,36 +625,19 @@
     "list_failed": "Submissions could not be loaded.",
     "detail_failed": "This submission could not be loaded.",
     "action_failed": "The submission action could not be completed.",
-    "reload": "Reload submission",
-    "record": "Submission {reference}",
-    "record_description": "{target} · {source} · {state}",
     "review_to_edit": "Select Start editing to make changes.",
     "last_updated_by": "Last updated by {name}",
-    "working_copy": "Working copy",
-    "validation_issues": "Resolve these issues before accepting",
-    "payload": "Submission data",
     "additional": "Additional source data",
     "received_value": "Received value",
     "start": "Start editing",
     "save": "Save draft",
-    "save_success": "Draft changes saved.",
     "return": "Return for changes",
     "withdraw_return": "Withdraw return",
     "return_description": "Short description",
     "confirm_return": "Confirm return",
     "accept": "Accept",
-    "open_result": "Open {target}",
     "waiting": "Returned · Waiting for a revised submission",
     "proponent_editing": "Proponent editing · Waiting for a revised submission",
-    "needs_attention": "Needs attention",
-    "budget_preview": "Proposed budget replacement",
-    "replacement_notice": "This replaces the full proposed budget. Fiscal years, lines and funding sources omitted from the submission are removed from the proposal.",
-    "select_amendment": "Draft amendment",
-    "amendments_failed": "Draft amendments could not be loaded.",
-    "no_eligible_amendments": "There are no writable draft amendments that allow budget changes and are assigned to you.",
-    "preview": "Preview replacement",
-    "preview_failed": "The budget replacement could not be previewed.",
-    "confirm_replacement": "I confirmed the proposed budget replacement.",
     "history_tab": "History",
     "history": "Submission history",
     "compare": "Compare snapshots",
@@ -666,10 +649,6 @@
     "no": "No",
     "row": "Row {number}",
     "no_rows": "No rows",
-    "add_row": "Add row",
-    "add_named_row": "Add row to {field}",
-    "remove_row": "Remove row",
-    "remove_row_number": "Remove row {number}",
     "before": "Before",
     "after": "After",
     "added": "Added",
@@ -678,8 +657,7 @@
     "no_changes": "No differences between these snapshots.",
     "target": {
       "claim": "Claim",
-      "forecast": "Forecast",
-      "amendment_budget": "Amendment budget"
+      "forecast": "Forecast"
     },
     "state": {
       "submitted": "Submitted",
@@ -701,9 +679,7 @@
       "return_review": "Returns allowed",
       "return_automatic": "Returns disabled",
       "title": "Submission policy",
-      "description": "Choose whether staff can return Claims and Forecasts for revision, and how Amendment Budgets are processed in this stream.",
-      "automatic": "Automatic",
-      "review": "Manual processing",
+      "description": "Choose whether staff can return Claims and Forecasts for revision in this stream.",
       "save": "Save policy",
       "saved": "Submission policy saved."
     },
@@ -721,15 +697,10 @@
       "state": "This action is unavailable in the current state.",
       "source_conflict": "The source revision conflicts with the saved submission.",
       "format": "This submission uses an unsupported format. You can view the received data and return it for correction.",
-      "amendment_required": "Select a writable draft amendment that allows budget changes.",
-      "primary_required": "The agreement needs an active primary assignee before the destination can be created.",
-      "blocked": "The destination could not be updated. Check the submission data and destination before accepting."
+      "primary_required": "The agreement needs an active primary assignee before the destination can be created."
     },
     "blocker": {
       "VALIDATION_FAILED": "Some submission fields are missing or invalid.",
-      "SUBMISSION_AMENDMENT_UNAVAILABLE": "The selected amendment is unavailable or its budget cannot be changed.",
-      "SUBMISSION_BUDGET_REVISION": "The draft budget revision does not match. Choose the amendment and preview its current budget.",
-      "SUBMISSION_BUDGET_LINE_IDENTITY": "A budget line could not be matched to the selected amendment.",
       "SUBMISSION_CLAIM_UNAVAILABLE": "The claim could not be created. Check the claim fields and the agreement’s initial approval.",
       "SUBMISSION_FORECAST_UNAVAILABLE": "The forecast could not be created. Check the forecast fields and the agreement budget.",
       "SUBMISSION_CLAIM_LINE_IDENTITY": "A claim line with staff funding could not be matched. Resend its original source line ID or, for a line without an ID, the same budget line, labels, and description. If several lines without IDs share a budget reference, contact the agreement team to resolve the funding allocation.",
@@ -742,10 +713,8 @@
       "AGREEMENT_INITIAL_APPROVAL_REQUIRED": "The agreement needs initial approval before a claim can be created.",
       "AGREEMENT_CLOSEOUT_LOCKED": "The agreement is locked for closeout.",
       "SUBMISSION_FORMAT": "The format is unsupported.",
-      "SUBMISSION_AMENDMENT_REQUIRED": "A writable draft amendment that allows budget changes is required.",
       "SUBMISSION_PRIMARY_REQUIRED": "An active primary assignee is required.",
-      "SUBMISSION_TARGET_UNAVAILABLE": "This Claim or Forecast is no longer a writable Draft.",
-      "SUBMISSION_TARGET_BLOCKED": "Automatic processing could not update the destination. Open this submission to resolve the issue."
+      "SUBMISSION_TARGET_UNAVAILABLE": "This Claim or Forecast is no longer a writable Draft."
     },
     "fields": {
       "applicantRecipientId": "Applicant or recipient ID",
@@ -763,23 +732,7 @@
       "amount": "Amount",
       "totalAmount": "Total amount",
       "month": "Month",
-      "fiscalYears": "Fiscal years",
-      "id": "Existing budget line ID",
-      "egcs_fc_applicantrecipient": "Applicant or recipient ID",
-      "egcs_fc_organizationcostcategory": "Cost category ID",
-      "egcs_fc_costsubsection": "Cost subsection (English)",
-      "egcs_fc_costsubsection_fr": "Cost subsection (French)",
-      "egcs_fc_description_en": "Description (English)",
-      "egcs_fc_description": "Description (English)",
-      "egcs_fc_description_fr": "Description (French)",
-      "egcs_fc_totalamount": "Total amount",
-      "egcs_fc_programfunding": "Program funding",
-      "egcs_fc_pendingfunding": "Pending funding",
-      "egcs_fc_calculationmode": "Calculation",
-      "egcs_fc_percentage": "Percentage",
-      "egcs_fc_currency": "Currency",
-      "egcs_fc_fundingsources": "Funding sources",
-      "egcs_fc_fundingsubtype": "Funding subtype ID",
+      "fundingSources": "Funding sources",
       "egcs_fc_amount": "Funding amount"
     }
   },
@@ -1359,12 +1312,12 @@
         "agency": {
           "viewer": "See an agency’s profile and the shared lists and templates its program teams use, such as cost categories, agreement templates, and review forms.",
           "contributor": "Maintain shared lists and templates, change agency settings, and publish items such as review sets. Creating an agency requires a system-wide role.",
-          "manager": "Remove agency records or shared list entries where allowed. You can change protected settings, such as whether a record status locks a file against editing. You can receive external agreement submissions for the agency and get the budget revision needed for automatic submission processing."
+          "manager": "Remove agency records or shared list entries where allowed. You can change protected settings, such as whether a record status locks a file against editing. You can receive external agreement submissions for the agency."
         },
         "transfer_payment": {
           "viewer": "See how a transfer payment program is set up, including its streams, budgets, objectives, and funding opportunities.",
           "contributor": "Update program details and set up streams and funding opportunities. For example, add a stream budget or update the results a stream tracks. To create a program, you need this permission for the agency.",
-          "manager": "Remove programs, streams, or funding opportunities where allowed. Configure Claim and Forecast returns and Amendment Budget processing for each stream. Opening an agreement file or working on an intake also requires the corresponding permission."
+          "manager": "Remove programs, streams, or funding opportunities where allowed. Configure Claim and Forecast returns for each stream. Opening an agreement file or working on an intake also requires the corresponding permission."
         },
         "role": {
           "viewer": "See which permissions a role includes and which agency or programs it covers.",

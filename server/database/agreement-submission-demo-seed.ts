@@ -26,57 +26,6 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
   const draftStatus = await db.selectFrom('Common_Status').select('id')
     .where('egcs_cn_agency', '=', '21').where('egcs_cn_isdraft', '=', true)
     .where('_deleted', '=', false).executeTakeFirstOrThrow()
-  const type = await db.insertInto('Transfer_Payment_Amendment_Type').values({
-    egcs_tp_transferpaymentstream: agreement.egcs_fc_transferpaymentstream,
-    egcs_tp_amended: 'budget',
-    egcs_tp_name_en: 'Submission budget revision',
-    egcs_tp_name_fr: 'Révision budgétaire de la soumission',
-    egcs_tp_requiresamendmentsubtype: false
-  }).returning('id').executeTakeFirstOrThrow()
-  await sql`SET CONSTRAINTS trg_enforce_fundingcaseamendment_assignment_roster DEFERRED`.execute(db)
-  const amendment = await db.insertInto('Funding_Case_Agreement_Amendment').values({
-    egcs_fc_fundingagreement: agreement.id,
-    egcs_fc_amendmentnumber: 1,
-    egcs_fc_name_en: 'Community centre budget revision',
-    egcs_fc_name_fr: 'Révision budgétaire du centre communautaire',
-    egcs_fc_status: draftStatus.id
-  }).returning('id').executeTakeFirstOrThrow()
-  await db.insertInto('Funding_Case_Agreement_Amendment_Type').values({
-    egcs_fc_amendment: amendment.id,
-    egcs_fc_amendmenttype: type.id
-  }).execute()
-  await db.insertInto('Common_Entity_Assignment').values({
-    egcs_cn_entitytype: 'fundingcaseamendment',
-    egcs_cn_entityid: amendment.id,
-    egcs_cn_user: actor,
-    egcs_cn_createdby: actor,
-    egcs_cn_isprimary: true
-  }).execute()
-  await sql`SET CONSTRAINTS trg_enforce_fundingcaseamendment_assignment_roster IMMEDIATE`.execute(db)
-  const live = await db.selectFrom('Funding_Case_Agreement_Budget_Version').select('id')
-    .where('egcs_fc_fundingagreement', '=', agreement.id).where('egcs_fc_iscurrent', '=', true)
-    .where('_deleted', '=', false).executeTakeFirstOrThrow()
-  const proposal = await db.insertInto('Funding_Case_Agreement_Budget_Version').values({
-    egcs_fc_fundingagreement: agreement.id,
-    egcs_fc_amendment: amendment.id,
-    egcs_fc_sourceversion: live.id,
-    egcs_fc_iscurrent: false
-  }).returning('id').executeTakeFirstOrThrow()
-  const year = await db.insertInto('Funding_Case_Agreement_Budget_Fiscal_Year').values({
-    egcs_fc_fundingagreement: agreement.id,
-    egcs_fc_budgetversion: proposal.id,
-    egcs_fc_originalbudgetfiscalyear: '7',
-    egcs_fc_fiscalyear: '41'
-  }).returning('id').executeTakeFirstOrThrow()
-  const { id: lineId, ...line } = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item').selectAll()
-    .where('id', '=', '14').where('egcs_fc_budgetversion', '=', live.id).executeTakeFirstOrThrow()
-  await db.insertInto('Funding_Case_Agreement_Budget_Line_Item').values({
-    ...line,
-    egcs_fc_budgetversion: proposal.id,
-    egcs_fc_originalbudgetlineitem: lineId,
-    egcs_fc_fundingagreementbudgetfiscalyear: year.id
-  }).execute()
-
   const deliveryTable: CustomFieldStructure = {
     kind: 'table',
     maxRows: 10,
@@ -228,24 +177,6 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       amount: { amount: '800000', currency: 'CAD' }
     }]
   }
-  const proposedBudget = {
-    fiscalYears: [{
-      fiscalYearId: '41',
-      lineItems: [{
-        id: '14',
-        egcs_fc_applicantrecipient: '119',
-        egcs_fc_organizationcostcategory: '89',
-        egcs_fc_costsubsection: 'Community centre equipment',
-        egcs_fc_costsubsection_fr: 'Équipement du centre communautaire',
-        egcs_fc_description: 'Equipment, furniture, and installation',
-        egcs_fc_description_fr: 'Équipement, mobilier et installation',
-        egcs_fc_totalamount: { amount: '14900000', currency: 'CAD' },
-        egcs_fc_programfunding: { amount: '14900000', currency: 'CAD' },
-        egcs_fc_currency: 'cad'
-      }]
-    }]
-  }
-
   const sampleDefaults = {
     egcs_fc_fundingagreement: agreement.id,
     egcs_fc_sourcesystem: 'demo',
@@ -254,9 +185,6 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
     egcs_fc_state: 'submitted',
     egcs_fc_mode: 'review',
     egcs_fc_revision: 1,
-    egcs_fc_amendment: null,
-    egcs_fc_budgetrevision: null,
-    egcs_fc_blocker: null,
     egcs_fc_result: null,
     egcs_fc_updatedby: null
   } satisfies Partial<Insertable<AgreementSubmissionTable>>
@@ -398,14 +326,6 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       egcs_fc_target: 'claim',
       egcs_fc_payload: claimToReturn,
       egcs_fc_result: await createClaim(claimToReturn)
-    },
-    {
-      ...sampleDefaults,
-      egcs_fc_sourceid: 'BUDGET-REPLACEMENT',
-      egcs_fc_target: 'amendment_budget',
-      egcs_fc_mode: 'automatic',
-      egcs_fc_blocker: 'SUBMISSION_AMENDMENT_REQUIRED',
-      egcs_fc_payload: proposedBudget
     },
     {
       ...sampleDefaults,

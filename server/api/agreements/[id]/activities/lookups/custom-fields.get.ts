@@ -33,6 +33,6 @@ export default defineEventHandler(async event => {
       if (!('id' in amendment)) return amendment
     }
 
-    return { items: await readActivityCustomFieldDefinitions(db, context.streamId), sections: [] }
+    return { items: await readActivityCustomFieldDefinitions(db, context.streamId, amendment_id ? 'amendment' : 'agreement'), sections: [] }
   })
 })

@@ -48,7 +48,7 @@ export default defineEventHandler(async event => {
       ? activityValues
       : {
           ...activityValues,
-          egcs_fc_customfields: await validateActivityCustomFieldWrite(event, trx, agreementId, current.streamId, existing.egcs_fc_customfields, customFieldPatch)
+          egcs_fc_customfields: await validateActivityCustomFieldWrite(event, trx, current.streamId, existing.egcs_fc_customfields, customFieldPatch)
         }
     const updated = Object.keys(values).length > 0
       ? await trx.updateTable('Funding_Case_Agreement_Activity').set(values).where('id', '=', childId).where('egcs_fc_activityversion', '=', versionId).where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()

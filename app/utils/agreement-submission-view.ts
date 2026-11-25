@@ -7,8 +7,6 @@ import { matchClaimSubmissionLines } from '~~/shared/utils/agreement-submission-
 import { formatMoneyText, isCanonicalMoney } from '~~/shared/utils/money'
 
 export type SubmissionObject = Record<string, unknown>
-type InputKind = 'text' | 'boolean' | 'month' | 'date' | 'money' | 'percent' | 'id'
-export type SubmissionFields = Record<string, InputKind | { rows: SubmissionFields; required: readonly string[] }>
 type RowReference = {
   row: number
   description?: string
@@ -20,7 +18,6 @@ type RowReference = {
 }
 export type SubmissionPathPart = string | RowReference
 export type SubmissionChange = { path: SubmissionPathPart[]; before: unknown; after: unknown }
-type Comparison = 'snapshot' | 'budget_preview'
 
 const businessReferenceTitles = new Map([
   ['applicantRecipientId', 'agreement.applicant_recipients.applicant_recipient'],
@@ -114,64 +111,8 @@ export const sameClaimCustomFieldEvidence = (before: ClaimAnswerEvidence, after:
     ? sameCustomFieldAnswer(before.answers[before.key], after.answers[after.key])
     : sameCustomFieldAnswer(evidenceValue(before.displayed), evidenceValue(after.displayed))
 
-const fundingSource: SubmissionFields = {
-  egcs_fc_fundingsubtype: 'id',
-  egcs_fc_amount: 'money',
-  egcs_fc_description_en: 'text',
-  egcs_fc_description_fr: 'text'
-}
-const budgetLine: SubmissionFields = {
-  id: 'id',
-  egcs_fc_applicantrecipient: 'id',
-  egcs_fc_organizationcostcategory: 'id',
-  egcs_fc_costsubsection: 'text',
-  egcs_fc_costsubsection_fr: 'text',
-  egcs_fc_description: 'text',
-  egcs_fc_description_fr: 'text',
-  egcs_fc_totalamount: 'money',
-  egcs_fc_programfunding: 'money',
-  egcs_fc_percentage: 'percent',
-  egcs_fc_currency: 'text',
-  egcs_fc_fundingsources: { rows: fundingSource, required: ['egcs_fc_fundingsubtype', 'egcs_fc_amount'] }
-}
-
-export const submissionFields = {
-  claim: {
-    applicantRecipientId: 'id',
-    fiscalYearId: 'id',
-    isFinalForYear: 'boolean',
-    periodStart: 'month',
-    periodEnd: 'month',
-    receivedDate: 'date',
-    lineItems: {
-      rows: {
-        budgetLineItemId: 'id', submittedCostCategory: 'text', submittedCostSubsection: 'text',
-        submittedLineItem: 'text', description: 'text', amount: 'money'
-      },
-      required: ['description', 'amount']
-    }
-  },
-  forecast: {
-    applicantRecipientId: 'id',
-    fiscalYearId: 'id',
-    lineItems: { rows: { budgetLineItemId: 'id', month: 'month', amount: 'money', totalAmount: 'money' }, required: ['budgetLineItemId', 'month', 'amount'] }
-  },
-  amendment_budget: {
-    fiscalYears: {
-      rows: { fiscalYearId: 'id', lineItems: { rows: budgetLine, required: ['egcs_fc_organizationcostcategory', 'egcs_fc_currency'] } },
-      required: ['fiscalYearId']
-    }
-  }
-} satisfies Record<string, SubmissionFields>
-
 const fiscalMonths = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 export const fiscalMonthLabels = fiscalMonths.map(month => `agreement.claims.months.${month}`)
-
-export const requiredSubmissionFields: Record<AgreementSubmissionTarget, readonly string[]> = {
-  claim: ['applicantRecipientId', 'fiscalYearId', 'isFinalForYear', 'periodStart', 'periodEnd', 'receivedDate'],
-  forecast: ['applicantRecipientId', 'fiscalYearId'],
-  amendment_budget: []
-}
 
 /**
  * Recognizes a nested field group in a payload, leaving other values to the scalar viewer.
@@ -283,13 +224,12 @@ const rowIdentity = (value: unknown): string | undefined => {
 /**
  * Indexes repeated values by stable row identity when every row can be matched.
  * @param rows Values on one side of a comparison.
- * @param comparison - Budget preview lines without retained IDs are independent additions or removals.
  * @returns Stable row map when the comparison can match by identity.
  */
-const keyedRows = (rows: unknown[], comparison: Comparison) => {
-  const result = new Map<string | symbol, { value: unknown; index: number }>()
+const keyedRows = (rows: unknown[]) => {
+  const result = new Map<string, { value: unknown; index: number }>()
   for (const [index, value] of rows.entries()) {
-    const key = rowIdentity(value) ?? (comparison === 'budget_preview' ? Symbol() : undefined)
+    const key = rowIdentity(value)
     if (key === undefined || result.has(key)) return null
     result.set(key, { value, index })
   }
@@ -323,19 +263,17 @@ const pairClaimLines = (before: SubmissionObject[], after: SubmissionObject[]) =
  * @param before - Previous rows.
  * @param after - Current rows.
  * @param field - Saved field containing these rows.
- * @param comparison - Snapshot or Draft budget replacement preview.
  * @param target - The financial target whose History contains these rows.
  * @returns Pairs in current order, followed by removed rows.
  */
 export const pairSubmissionRows = (
-  before: unknown[], after: unknown[], field?: string, comparison: Comparison = 'snapshot', target?: AgreementSubmissionTarget
+  before: unknown[], after: unknown[], field?: string, target?: AgreementSubmissionTarget
 ) => {
   if (target === 'claim' && field === 'lineItems' && before.every(isSubmissionObject) && after.every(isSubmissionObject)) {
     return pairClaimLines(before, after)
   }
-  const rowComparison = field === 'lineItems' ? comparison : 'snapshot'
-  const oldRows = keyedRows(before, rowComparison)
-  const newRows = keyedRows(after, rowComparison)
+  const oldRows = keyedRows(before)
+  const newRows = keyedRows(after)
   if (oldRows && newRows) {
     return [...new Set([...newRows.keys(), ...oldRows.keys()])].map(key => {
       const oldRow = oldRows.get(key)
@@ -384,24 +322,22 @@ const describeRow = (value: unknown, row: number): RowReference => {
  * @param after - Newer row value.
  * @param path - Parent field path.
  * @param index - Zero-based row position.
- * @param comparison - Snapshot or Draft budget replacement preview.
  * @returns Changes beneath the identified row.
  */
 const compareRows = (
-  before: unknown, after: unknown, path: SubmissionPathPart[], index: number, comparison: Comparison
-): SubmissionChange[] => compareSubmissionValues(before, after, [...path, describeRow(after ?? before, index + 1)], comparison)
+  before: unknown, after: unknown, path: SubmissionPathPart[], index: number
+): SubmissionChange[] => compareSubmissionValues(before, after, [...path, describeRow(after ?? before, index + 1)])
 
 /**
  * Compares two JSON values as field and row changes. Missing values indicate additions or removals.
  * @param before Older snapshot value.
  * @param after Newer snapshot value.
  * @param path Parent field path.
- * @param comparison - Snapshot or Draft budget replacement preview.
  * @param target - The financial target whose History is being compared.
  * @returns The changed values in display order.
  */
 export const compareSubmissionValues = (
-  before: unknown, after: unknown, path: SubmissionPathPart[] = [], comparison: Comparison = 'snapshot',
+  before: unknown, after: unknown, path: SubmissionPathPart[] = [],
   target?: AgreementSubmissionTarget
 ): SubmissionChange[] => {
   if (Object.is(before, after)) return []
@@ -414,13 +350,12 @@ export const compareSubmissionValues = (
         Object.hasOwn(before, key) ? before[key] : undefined,
         Object.hasOwn(after, key) ? after[key] : undefined,
         [...path, key],
-        comparison,
         target
       ))
   }
   if (Array.isArray(before) && Array.isArray(after)) {
     const field = path.at(-1) === 'lineItems' ? 'lineItems' : undefined
-    return pairSubmissionRows(before, after, field, comparison, path.length === 1 ? target : undefined).flatMap(row => compareRows(row.before, row.after, path, row.index, comparison))
+    return pairSubmissionRows(before, after, field, path.length === 1 ? target : undefined).flatMap(row => compareRows(row.before, row.after, path, row.index))
   }
   return [{ path, before, after }]
 }

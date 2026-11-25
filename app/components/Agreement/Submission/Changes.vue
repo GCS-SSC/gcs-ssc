@@ -5,10 +5,9 @@ import type { ClaimReferenceComparison, SubmissionPathPart } from '~/utils/agree
 import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submission'
 import type { AgreementCustomFieldPatch, ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 
-const { before, after, history = false, beforeFields = [], afterFields = [], beforeAnswers, afterAnswers, claimReferences, target } = defineProps<{
+const { before, after, beforeFields = [], afterFields = [], beforeAnswers, afterAnswers, claimReferences, target } = defineProps<{
   before: unknown
   after: unknown
-  history?: boolean
   target?: AgreementSubmissionTarget
   beforeFields?: ClaimCustomFieldSnapshot
   afterFields?: ClaimCustomFieldSnapshot
@@ -28,11 +27,7 @@ const label = (path: SubmissionPathPart[], fieldTitle?: string) => path.map((par
   if (typeof part === 'string') return te(submissionFieldKey(part)) ? t(submissionFieldKey(part)) : part
   const context = [locale.value === 'fr' ? part.descriptionFr || part.description : part.description || part.descriptionFr]
   if (part.month !== undefined) context.push(t(fiscalMonthLabels[part.month]!))
-  if (history) context.push(part.costCategory, part.costSubsection)
-  if (!history && part.reference) {
-    const { field, id } = part.reference
-    context.push(`${t(field === 'id' ? 'common.id' : submissionFieldKey(field))} ${id}`)
-  }
+  context.push(part.costCategory, part.costSubsection)
   return context.filter(Boolean).join(' · ') || t('submission.row', { number: part.row })
 }).join(' / ')
 
@@ -50,9 +45,9 @@ type Change = { title: string; before: unknown; after: unknown } & (
   | { kind: 'custom'; before: ClaimCustomFieldSnapshot[number]['value'] | undefined; after: ClaimCustomFieldSnapshot[number]['value'] | undefined }
 )
 const changes = computed(() => {
-  const data = compareSubmissionValues(before, after, [], history ? 'snapshot' : 'budget_preview', target).map((change): Change | undefined => {
+  const data = compareSubmissionValues(before, after, [], target).map((change): Change | undefined => {
     const field = fieldName(change.path)
-    if (history && change.path.some(part => typeof part === 'string' && isSubmissionIdField(part))) {
+    if (change.path.some(part => typeof part === 'string' && isSubmissionIdField(part))) {
       if (!field) return undefined
       const input = { key: field, before: change.before, after: change.after, unavailable: t('common.unavailable') }
       const claimReference = claimReferences && change.path.length === 1
@@ -124,7 +119,7 @@ const changes = computed(() => {
           </dt>
           <dd>
             <AgreementSubmissionCustomFieldEvidence v-if="change.kind === 'custom'" :value="change.before" />
-            <AgreementSubmissionValue v-else :value="change.before" :field="change.field" :snapshot="history" :show-references="history" />
+            <AgreementSubmissionValue v-else :value="change.before" :field="change.field" snapshot show-references />
           </dd>
         </div>
         <div class="min-w-0">
@@ -133,7 +128,7 @@ const changes = computed(() => {
           </dt>
           <dd>
             <AgreementSubmissionCustomFieldEvidence v-if="change.kind === 'custom'" :value="change.after" />
-            <AgreementSubmissionValue v-else :value="change.after" :field="change.field" :snapshot="history" :show-references="history" />
+            <AgreementSubmissionValue v-else :value="change.after" :field="change.field" snapshot show-references />
           </dd>
         </div>
       </dl>

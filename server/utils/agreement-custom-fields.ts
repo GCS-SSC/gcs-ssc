@@ -12,26 +12,33 @@ export { readStreamCustomFieldSections, readAssignedAgencyCustomFieldDefinitions
 
 type ScalarCustomFieldValues = Selectable<Database['Funding_Case_Agreement_Profile']>['egcs_fc_customfields']
 
-export const readActivityCustomFieldDefinitions = async (db: Kysely<Database>, streamId: string) =>
-  await readAssignedAgencyCustomFieldDefinitions(db, streamId, 'activity')
+/**
+ * Reads the Stream's Activity fields for the owning workspace.
+ * @param db - Current database connection.
+ * @param streamId - Owning Stream identity.
+ * @param scope - The Amendment workspace uses the original scalar field kinds.
+ * @returns Applicable Activity field definitions.
+ */
+export const readActivityCustomFieldDefinitions = async (db: Kysely<Database>, streamId: string, scope: 'agreement' | 'amendment' = 'agreement') => {
+  const definitions = await readAssignedAgencyCustomFieldDefinitions(db, streamId, 'activity')
+  return scope === 'amendment'
+    ? definitions.filter(field => ['text', 'number', 'relational'].includes(field.egcs_ay_kind))
+    : definitions
+}
 
 /**
- * Caller must hold the owning stream and, for updates, Agreement locks.
- * @returns Validated, merged custom-field values.
- * @param event - Localized request event.
- * @param db - Current database transaction.
- * @param streamId - Owning stream identity.
- * @param current - Stored Agreement values.
- * @param patch - Supplied custom-field changes.
- * @param currency - Native denomination of the owning Agreement.
- * @param target - Record type receiving the answers.
+ * Applies scalar custom field validation to a patch.
+ * @param event - Authorized request.
+ * @param definitions - Available field definitions.
+ * @param current - Stored values.
+ * @param patch - Supplied changes.
+ * @param currency - Native denomination when the workspace supports currency fields.
+ * @returns Validated scalar values.
  */
-export const mergeAgreementCustomFields = async (
-  event: H3Event, db: Kysely<Database>, streamId: string,
-  current: ScalarCustomFieldValues, patch: AgreementCustomFieldPatch, currency: string,
-  target: 'agreement' | 'activity' = 'agreement'
+const mergeScalarCustomFields = async (
+  event: H3Event, definitions: AssignedAgencyCustomFieldDefinition[],
+  current: ScalarCustomFieldValues, patch: AgreementCustomFieldPatch, currency?: string
 ): Promise<ScalarCustomFieldValues> => {
-  const definitions = await readAssignedAgencyCustomFieldDefinitions(db, streamId, target)
   const scalarFields = agreementCustomFieldMergeSchema(definitions, current, { currency }).transform((values, ctx) => {
     const result: ScalarCustomFieldValues = {}
     for (const [id, value] of Object.entries(values)) {
@@ -47,10 +54,38 @@ export const mergeAgreementCustomFields = async (
   return result.egcs_fc_customfields
 }
 
+/**
+ * Validates an Agreement custom field patch using the owning Stream's assignments.
+ * @param event - Authorized request.
+ * @param db - Current transaction or connection.
+ * @param streamId - Owning Stream identity.
+ * @param current - Stored values.
+ * @param patch - Supplied changes.
+ * @param currency - Native denomination of the Agreement.
+ * @returns Validated scalar values.
+ */
+export const mergeAgreementCustomFields = async (
+  event: H3Event, db: Kysely<Database>, streamId: string,
+  current: ScalarCustomFieldValues, patch: AgreementCustomFieldPatch, currency: string
+) => await mergeScalarCustomFields(event, await readAssignedAgencyCustomFieldDefinitions(db, streamId), current, patch, currency)
+
+/**
+ * Validates an Activity patch against the owning workspace's fields.
+ * @param event - Authorized request.
+ * @param db - Current database connection.
+ * @param streamId - Owning Stream identity.
+ * @param current - Stored values.
+ * @param patch - Supplied changes.
+ * @param agreementId - Native Agreement identity for writes outside an Amendment.
+ * @returns Validated scalar values.
+ */
 export const validateActivityCustomFieldWrite = async (
-  event: H3Event, db: Kysely<Database>, agreementId: string, streamId: string,
-  current: ScalarCustomFieldValues, patch: AgreementCustomFieldPatch
-) => await mergeAgreementCustomFields(event, db, streamId, current, patch, await assertAgreementCurrency(event, db, agreementId), 'activity')
+  event: H3Event, db: Kysely<Database>, streamId: string,
+  current: ScalarCustomFieldValues, patch: AgreementCustomFieldPatch, agreementId?: string
+) => await mergeScalarCustomFields(
+  event, await readActivityCustomFieldDefinitions(db, streamId, agreementId ? 'agreement' : 'amendment'),
+  current, patch, agreementId ? await assertAgreementCurrency(event, db, agreementId) : undefined
+)
 
 /**
  * Rejects malformed stored relational selections before projecting them to callers.

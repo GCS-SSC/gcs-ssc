@@ -794,7 +794,6 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <AgreementSubmissionsTab
               v-else-if="selectedTab === 'submissions'"
               :agreement-id="id"
-              :currency="profile.egcs_fc_currency"
               :owner="submissionCollection" />
 
             <AgreementClaimsTab

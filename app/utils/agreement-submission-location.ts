@@ -2,7 +2,7 @@ import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submis
 import { appRouteLocations } from './route-locations'
 
 /**
- * Resolves the native Submission workspace for financial records and the Agreement workspace for budget proposals.
+ * Resolves the native Submission workspace or the Agreement history for an unavailable record.
  * @param source - Submission and linked record identities.
  * @param source.agreementId - Owning Agreement.
  * @param source.id - Submission identifier.

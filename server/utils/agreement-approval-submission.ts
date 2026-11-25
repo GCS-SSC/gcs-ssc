@@ -501,10 +501,14 @@ export const buildAgreementApprovalSnapshot = async (
     name: bilingualValue(clause.nameEn, clause.nameFr),
     rows: clause.rows.map(row => bilingualValue(row.textEn, row.textFr))
   }))
-  const activityFieldDefinitions = activities.length ? await readActivityCustomFieldDefinitions(trx, streamId) : []
+  const activityFieldDefinitions = activities.length
+    ? await readActivityCustomFieldDefinitions(trx, streamId, amendment ? 'amendment' : 'agreement')
+    : []
   const activityFieldsById = new Map(activityFieldDefinitions.map(field => [field.id, field]))
   const activityFieldIssues = activities.flatMap(activity => {
-    const result = agreementCustomFieldMergeSchema(activityFieldDefinitions, activity.egcs_fc_customfields, { currency: agreement.egcs_fc_currency }).safeParse({})
+    const result = agreementCustomFieldMergeSchema(
+      activityFieldDefinitions, activity.egcs_fc_customfields, amendment ? undefined : { currency: agreement.egcs_fc_currency }
+    ).safeParse({})
     return result.error?.issues.map((issue): z.ZodIssue => {
       const fieldId = String(issue.path[0])
       const field = activityFieldsById.get(fieldId)

@@ -1,9 +1,5 @@
 import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from './common'
-import {
-  FundingCaseAgreementBudgetLineItemBaseSchema,
-  FundingCaseAgreementBudgetLineDescriptionSchema
-} from './funding-case-agreement'
 import { NonNegativeMoneySchema } from './money'
 import { AgreementCustomFieldValuesSchema } from './agreement-custom-fields'
 
@@ -59,43 +55,5 @@ const forecast = z.object({
   })).min(1).max(2400)
 })
 
-const budgetLine = FundingCaseAgreementBudgetLineItemBaseSchema
-  .omit({ egcs_fc_fundingagreementbudgetfiscalyear: true })
-  .extend({
-    id: id.optional(),
-    egcs_fc_totalamount: NonNegativeMoneySchema.optional(),
-    egcs_fc_costsubsection: z.string().max(255).default(''),
-    egcs_fc_costsubsection_fr: z.string().max(255).default(''),
-    egcs_fc_description: z.string().default(''),
-    egcs_fc_description_fr: z.string().default('')
-  })
-  .refine(value => FundingCaseAgreementBudgetLineDescriptionSchema.safeParse(value).success, {
-    error: 'validation.required',
-    path: ['egcs_fc_description']
-  })
-
-const amendment_budget = z.object({
-  fiscalYears: z.array(z.object({
-    fiscalYearId: id,
-    lineItems: z.array(budgetLine).max(500)
-  })).max(100)
-}).superRefine(({ fiscalYears }, ctx) => {
-  const years = new Set<string>()
-  const retainedLines = new Set<string>()
-  fiscalYears.forEach((year, yearIndex) => {
-    if (years.has(year.fiscalYearId)) {
-      ctx.addIssue({ code: 'custom', path: ['fiscalYears', yearIndex, 'fiscalYearId'], message: 'validation.invalid_selection' })
-    }
-    years.add(year.fiscalYearId)
-    year.lineItems.forEach((line, lineIndex) => {
-      if (line.id === undefined) return
-      if (retainedLines.has(line.id)) {
-        ctx.addIssue({ code: 'custom', path: ['fiscalYears', yearIndex, 'lineItems', lineIndex, 'id'], message: 'validation.invalid_selection' })
-      }
-      retainedLines.add(line.id)
-    })
-  })
-})
-
-export const agreementSubmissionTargetSchemas = { claim, forecast, amendment_budget }
+export const agreementSubmissionTargetSchemas = { claim, forecast }
 export type AgreementSubmissionTargetKind = keyof typeof agreementSubmissionTargetSchemas

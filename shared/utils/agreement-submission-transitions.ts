@@ -16,11 +16,6 @@ export const agreementSubmissionReviewTransitions = {
   accept: { from: 'reviewing', ...agreementSubmissionAcceptance }
 } as const satisfies Record<AgreementSubmissionCommand['action'], AgreementSubmissionTransition & { from: AgreementSubmissionState }>
 
-export const automaticBudgetSubmissionTransitions = {
-  from: 'submitted',
-  block: { state: 'submitted', event: null }
-} as const satisfies { from: AgreementSubmissionState, block: AgreementSubmissionTransition }
-
 /**
  * Resolves a new source revision after the adapter rules out a replay.
  * @param state - Current lifecycle state, or null for the first receipt.

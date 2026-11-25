@@ -28,14 +28,10 @@ export interface AgreementSubmissionTable {
   egcs_fc_mode: AgreementSubmissionMode
   egcs_fc_revision: number
   egcs_fc_payload: AgreementSubmissionPayload
-  egcs_fc_amendment: string | null
-  egcs_fc_budgetrevision: string | null
-  egcs_fc_blocker: string | null
   egcs_fc_result: string | null
-  egcs_fc_resultamendment: GeneratedAlways<string | null>
   egcs_fc_resultforecast: GeneratedAlways<string | null>
   egcs_fc_resultclaim: GeneratedAlways<string | null>
-  egcs_fc_resulttype: GeneratedAlways<'fundingcaseagreementclaim' | 'fundingcaseforecast' | 'fundingcaseamendment'>
+  egcs_fc_resulttype: GeneratedAlways<'fundingcaseagreementclaim' | 'fundingcaseforecast'>
   egcs_fc_updatedat: Generated<Date>
   egcs_fc_updatedby: string | null
   _deleted: Generated<boolean>
@@ -59,8 +55,6 @@ export interface AgreementSubmissionEventTable {
   egcs_fc_claimreferences: Generated<ClaimSubmissionReferenceSnapshot | null>
   egcs_fc_description: string | null
   egcs_fc_editsection: Generated<AgreementSubmissionEditSection | null>
-  egcs_fc_amendment: Generated<string | null>
-  egcs_fc_budgetrevision: Generated<string | null>
   egcs_fc_actor: string | null
   egcs_fc_createdat: Generated<Date>
   _deleted: Generated<boolean>

@@ -848,7 +848,6 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             <AgreementActivitiesTab
               v-if="amendment.has_activity_snapshot"
               :agreement-id="agreementId"
-              :currency="profile?.egcs_fc_currency"
               :date-range="amendment.activity_date_range"
               :action-target="{ kind: 'amendment', agreementId, amendmentId }"
               :api-base="amendmentApiBase"

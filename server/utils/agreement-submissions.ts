@@ -1,16 +1,12 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agreement Submission command boundary. */
-import { isDeepStrictEqual } from 'node:util'
-import { isError, type H3Event } from 'h3'
+import type { H3Event } from 'h3'
 import { sql, type Kysely, type Selectable, type Transaction, type Updateable } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type {
-  AgreementSubmissionPayload,
   AgreementSubmissionTable,
   ClaimSubmissionReferenceSnapshot
 } from '~~/shared/types/agreement-submission-database'
 import type {
-  AgreementSubmissionBudgetPreview,
-  AgreementSubmissionBudgetPreviewInput,
   AgreementSubmissionCommand,
   AgreementSubmissionList,
   AgreementSubmissionListQuery,
@@ -19,9 +15,7 @@ import type {
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 import { agreementSubmissionTargetSchemas } from '~~/shared/types/schemas/agreement-submission-targets'
 import {
-  agreementSubmissionAcceptance,
   agreementSubmissionReviewTransitions,
-  automaticBudgetSubmissionTransitions,
   resolveAgreementSubmissionReceiptTransition,
   type AgreementSubmissionTransition
 } from '~~/shared/utils/agreement-submission-transitions'
@@ -30,10 +24,8 @@ import { readClaimSubmissionEvidence } from './agreement-submission-claim-eviden
 import { assertClaimCustomFieldsComplete, parsePersistedClaimCustomFieldDefinitions } from './agreement-claim-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource, canAccessAgreement, resolveAgreementScopeContext, type AgreementScopeContext } from './agreement'
-import { hasActiveAgreementCloseoutWorkflow } from './agreement-closeout'
 import {
   assertAgreementCloseoutWriteAllowed,
-  authorizeFreshAgreementUpdate,
   executeFreshAuthorizedAgreementWrite
 } from './agreement-write-transaction'
 import { authorize, authorizeWithFreshAuthContext, requireAuthContext, type AuthContext } from './authorize'
@@ -42,8 +34,6 @@ import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import { resolveAssignmentCommonUserId } from './entity-assignment'
 import {
   applyAgreementSubmissionTarget,
-  previewAgreementSubmissionBudget,
-  readAgreementSubmissionBudgetRevision,
   SubmissionTargetError
 } from './agreement-submission-targets'
 import { assertBusinessStatusMutationAllowed, BusinessStatusViolation } from './business-status-runtime'
@@ -74,7 +64,7 @@ const targetAssignment = (target: 'claim' | 'forecast', targetId: string) => ({
 
 const financialTarget = (submission: Submission) => {
   const { egcs_fc_target: target, egcs_fc_result: targetId } = submission
-  return target !== 'amendment_budget' && targetId ? { target, targetId } : null
+  return targetId ? { target, targetId } : null
 }
 
 const readSubmissionPolicy = async (db: SubmissionDb, streamId: string) =>
@@ -99,7 +89,6 @@ const readSubmission = async (event: H3Event, db: SubmissionDb, agreementId: str
 }
 
 const submissionDto = ({
-  egcs_fc_resultamendment: _resultAmendment,
   egcs_fc_resultforecast: _resultForecast,
   egcs_fc_resultclaim: _resultClaim,
   ...row
@@ -162,9 +151,7 @@ const appendEvent = async (
     egcs_fc_formatversion: submission.egcs_fc_formatversion,
     egcs_fc_payload: capturesSnapshot ? submission.egcs_fc_payload : null,
     egcs_fc_description: description,
-    egcs_fc_actor: submission.egcs_fc_updatedby,
-    egcs_fc_amendment: submission.egcs_fc_amendment,
-    egcs_fc_budgetrevision: submission.egcs_fc_budgetrevision
+    egcs_fc_actor: submission.egcs_fc_updatedby
   }).execute()
 }
 
@@ -179,7 +166,7 @@ const persistSubmissionTransition = async (
   submission: Submission,
   transition: AgreementSubmissionTransition,
   changes: Updateable<Pick<AgreementSubmissionTable,
-    'egcs_fc_payload' | 'egcs_fc_updatedby' | 'egcs_fc_mode' | 'egcs_fc_amendment' | 'egcs_fc_budgetrevision' | 'egcs_fc_blocker' | 'egcs_fc_result'
+    'egcs_fc_payload' | 'egcs_fc_updatedby'
   >>,
   description?: string
 ) => {
@@ -207,21 +194,6 @@ const currentPrimary = async (trx: Transaction<Database>, agreementId: string) =
   return primary?.egcs_cn_user ?? null
 }
 
-const expectedTargetError = (error: unknown): string | null => {
-  if (error instanceof SubmissionTargetError) {
-    return error.code
-  }
-  if (error instanceof BusinessStatusViolation) {
-    return error.code
-  }
-  if (isError(error) && [400, 404, 409, 422].includes(error.statusCode)) {
-    const data = error.data
-    const code = typeof data === 'object' && data !== null && 'code' in data ? data.code : null
-    if (typeof code === 'string') return code
-  }
-  return null
-}
-
 const surfaceTargetError = async <T>(event: H3Event, work: () => Promise<T>) => {
   try {
     return await work()
@@ -234,50 +206,6 @@ const surfaceTargetError = async <T>(event: H3Event, work: () => Promise<T>) => 
     }
     throw error
   }
-}
-
-const materializeAmendment = async (
-  event: H3Event,
-  trx: Transaction<Database>,
-  submission: Submission,
-  owner: { agencyId: string, streamId: string },
-  accepted: {
-    payload: AgreementSubmissionPayload
-    amendmentId: string | null
-    expectedBudgetRevision: string | null
-    expectedBudgetConfirmation?: string
-    actorUserId: string | null
-    actor: string | null
-  }
-) => {
-  if (submission.egcs_fc_formatversion !== 1) return await conflict(event, 'SUBMISSION_FORMAT', 'submission.errors.format')
-  if (!accepted.amendmentId) {
-    return await conflict(event, 'SUBMISSION_AMENDMENT_REQUIRED', 'submission.errors.amendment_required')
-  }
-  const agreementId = submission.egcs_fc_fundingagreement
-  const result = await applyAgreementSubmissionTarget(trx, {
-    event,
-    agreementId,
-    ...owner,
-    target: 'amendment_budget',
-    payload: accepted.payload,
-    amendmentId: accepted.amendmentId,
-    expectedBudgetRevision: accepted.expectedBudgetRevision,
-    expectedBudgetConfirmation: accepted.expectedBudgetConfirmation,
-    budgetReview: accepted.expectedBudgetConfirmation
-      ? { submissionId: submission.id, revision: submission.egcs_fc_revision, actorUserId: accepted.actorUserId }
-      : undefined,
-    primaryUserId: null,
-    actorUserId: accepted.actorUserId
-  })
-  return await persistSubmissionTransition(trx, submission, agreementSubmissionAcceptance, {
-    egcs_fc_payload: accepted.payload,
-    egcs_fc_amendment: accepted.amendmentId,
-    egcs_fc_budgetrevision: accepted.expectedBudgetRevision,
-    egcs_fc_updatedby: accepted.actor,
-    egcs_fc_blocker: null,
-    egcs_fc_result: result.id
-  })
 }
 
 const readAccess = async <T>(event: H3Event, agreementId: string, work: (
@@ -335,7 +263,8 @@ export const commandAgreementSubmission = async (
   if (!await authorizeAgreementResource(event, 'read', agreementId, db)) return await missingAgreement(event)
   const preliminary = await readSubmission(event, db, agreementId, submissionId)
   const linked = financialTarget(preliminary)
-  const assignmentTarget = linked ? targetAssignment(linked.target, linked.targetId) : undefined
+  if (!linked) return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
+  const assignmentTarget = targetAssignment(linked.target, linked.targetId)
   const initial = await authorizeAgreementResource(event, 'update', agreementId, db, { assignmentTarget })
   if (!initial) return await missingAgreement(event)
 
@@ -350,7 +279,7 @@ export const commandAgreementSubmission = async (
     if (!actor) return await forbidden(event)
 
     if (command.action === 'withdraw_return') {
-      if (!linked || submission.egcs_fc_state !== transition.from) {
+      if (submission.egcs_fc_state !== transition.from) {
         return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
       }
       const receipt = await trx.selectFrom('Funding_Case_Agreement_Submission_Event')
@@ -367,121 +296,32 @@ export const commandAgreementSubmission = async (
       return await detail(trx, row, true, await allowsReturn(trx, current.streamId, linked.target))
     }
 
-    if (linked) {
-      if (command.action === 'save' || ('payload' in command && command.payload !== undefined)
-        || (command.action === 'accept' && (command.amendmentId || command.expectedBudgetRevision || command.expectedBudgetConfirmation))) {
-        return await badRequest(event, 'SUBMISSION_NATIVE_EDITOR_REQUIRED', 'validation.invalid_selection')
-      }
-      const canReturn = await allowsReturn(trx, current.streamId, linked.target)
-      if (command.action === 'return' && !canReturn) {
-        return await conflict(event, 'SUBMISSION_RETURN_DISABLED', 'submission.errors.return_disabled')
-      }
-      if (command.action !== 'return') {
-        await surfaceTargetError(event, () => assertLinkedSubmissionTargetEditable(trx, { event, agreementId, ...linked }))
-      }
-      const action = command.action
-      const snapshot = action === 'start'
-        ? submission.egcs_fc_payload
-        : await surfaceTargetError(event, () =>
-            readLinkedSubmissionSnapshot(trx, { agreementId, ...linked, sourcePayload: submission.egcs_fc_payload }))
-      if (action !== 'start' && command.expectedDecisionDigest !== linkedSubmissionDecisionDigest(snapshot)) {
-        return await conflict(event, 'SUBMISSION_FINANCIAL_STALE', 'submission.errors.financial_stale')
-      }
-      if (action === 'accept') await assertClaimCustomFieldsComplete(event, trx, linked.targetId, linked.target)
-      const row = await persistSubmissionTransition(trx, submission, transition, {
-        egcs_fc_payload: snapshot,
-        egcs_fc_updatedby: actor
-      }, action === 'return' ? command.description : undefined)
-      return await detail(trx, row, true, canReturn)
+    if (command.action === 'save' || ('payload' in command && command.payload !== undefined)) {
+      return await badRequest(event, 'SUBMISSION_NATIVE_EDITOR_REQUIRED', 'validation.invalid_selection')
     }
-
-    if ('expectedDecisionDigest' in command && command.expectedDecisionDigest !== undefined) {
-      return await badRequest(event, 'SUBMISSION_INVALID_DECISION_PROOF', 'validation.invalid_selection')
+    const canReturn = await allowsReturn(trx, current.streamId, linked.target)
+    if (command.action === 'return' && !canReturn) {
+      return await conflict(event, 'SUBMISSION_RETURN_DISABLED', 'submission.errors.return_disabled')
     }
-
-    if (submission.egcs_fc_formatversion !== 1 && (
-      command.action === 'save' || (command.action === 'return' && command.payload
-        && !isDeepStrictEqual(command.payload, submission.egcs_fc_payload))
-    )) return await conflict(event, 'SUBMISSION_FORMAT', 'submission.errors.format')
-
-    if (command.action === 'accept') {
-      const amendmentId = command.amendmentId ?? submission.egcs_fc_amendment
-      if (!amendmentId) return await conflict(event, 'SUBMISSION_AMENDMENT_REQUIRED', 'submission.errors.amendment_required')
-      await authorizeFreshAgreementUpdate(event, trx, current, auth, { entityType: 'fundingcaseamendment', entityId: amendmentId })
-      if (!command.expectedBudgetConfirmation) {
-        return await conflict(event, 'SUBMISSION_BUDGET_REVISION', 'submission.blocker.SUBMISSION_BUDGET_REVISION')
-      }
-      const row = await surfaceTargetError(event, () => materializeAmendment(event, trx, submission, { agencyId: current.agencyId, streamId: current.streamId }, {
-        payload: command.payload ?? submission.egcs_fc_payload,
-        amendmentId,
-        expectedBudgetRevision: command.expectedBudgetRevision ?? null,
-        expectedBudgetConfirmation: command.expectedBudgetConfirmation,
-        actorUserId: auth.userId,
-        actor
-      }))
-      return await detail(trx, row, true)
+    if (command.action !== 'return') {
+      await surfaceTargetError(event, () => assertLinkedSubmissionTargetEditable(trx, { event, agreementId, ...linked }))
     }
-
+    const action = command.action
+    const snapshot = action === 'start'
+      ? submission.egcs_fc_payload
+      : await surfaceTargetError(event, () =>
+          readLinkedSubmissionSnapshot(trx, { agreementId, ...linked, sourcePayload: submission.egcs_fc_payload }))
+    if (action !== 'start' && command.expectedDecisionDigest !== linkedSubmissionDecisionDigest(snapshot)) {
+      return await conflict(event, 'SUBMISSION_FINANCIAL_STALE', 'submission.errors.financial_stale')
+    }
+    if (action === 'accept') await assertClaimCustomFieldsComplete(event, trx, linked.targetId, linked.target)
     const row = await persistSubmissionTransition(trx, submission, transition, {
-      egcs_fc_mode: 'review',
-      egcs_fc_payload: command.action === 'start' ? submission.egcs_fc_payload : (command.payload ?? submission.egcs_fc_payload),
+      egcs_fc_payload: snapshot,
       egcs_fc_updatedby: actor
-    }, command.action === 'return' ? command.description : undefined)
-    return await detail(trx, row, true)
+    }, action === 'return' ? command.description : undefined)
+    return await detail(trx, row, true, canReturn)
   }, { ...(command.action === 'accept' ? {} : evidenceOnly), assignmentTarget })
 }
-
-export const listAgreementSubmissionAmendments = async (event: H3Event, agreementId: string, submissionId: string) =>
-  await readAccess(event, agreementId, async (db, auth, canReview) => {
-    if (!canReview) return await forbidden(event)
-    const row = await readSubmission(event, db, agreementId, submissionId)
-    if (row.egcs_fc_target !== 'amendment_budget') return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
-    const candidates = await db.selectFrom('Funding_Case_Agreement_Amendment as amendment')
-      .innerJoin('Common_Status as status', 'status.id', 'amendment.egcs_fc_status')
-      .innerJoin('Funding_Case_Agreement_Budget_Version as budget', 'budget.egcs_fc_amendment', 'amendment.id')
-      .select(['amendment.id', 'amendment.egcs_fc_name_en as nameEn', 'amendment.egcs_fc_name_fr as nameFr'])
-      .where('amendment.egcs_fc_fundingagreement', '=', agreementId)
-      .where('amendment.egcs_fc_isopen', '=', true).where('amendment._deleted', '=', false)
-      .where('status.egcs_cn_isdraft', '=', true).where('status.egcs_cn_readonly', '=', false)
-      .where('status.egcs_cn_terminal', '=', false).where('status._deleted', '=', false)
-      .where('budget.egcs_fc_iscurrent', '=', false).where('budget._deleted', '=', false)
-      .where(eb => eb.exists(eb.selectFrom('Funding_Case_Agreement_Amendment_Type as type')
-        .innerJoin('Transfer_Payment_Amendment_Type as allowed', 'allowed.id', 'type.egcs_fc_amendmenttype')
-        .select('type.id').whereRef('type.egcs_fc_amendment', '=', 'amendment.id')
-        .where('type._deleted', '=', false).where('allowed._deleted', '=', false).where('allowed.egcs_tp_amended', '=', 'budget')))
-      .where(eb => eb.not(eb.exists(eb.selectFrom('Common_Completion as completion').select('completion.id')
-        .where('completion.egcs_cn_entitytype', '=', 'fundingcaseamendment')
-        .whereRef('completion.egcs_cn_entityid', '=', 'amendment.id').where('completion._deleted', '=', false))))
-      .execute()
-    const options = await Promise.all(candidates.map(async candidate => {
-      const grant = await resolveAssignedItemTargetGrant(auth.userId, {
-        entityType: 'fundingcaseamendment', entityId: candidate.id
-      }, db)
-      return grant?.actions.has('update') ? candidate : null
-    }))
-    return { options: options.filter(option => option !== null) }
-  })
-
-export const previewSubmissionBudget = async (
-  event: H3Event, agreementId: string, submissionId: string, input: AgreementSubmissionBudgetPreviewInput
-): Promise<AgreementSubmissionBudgetPreview> => await readAccess(event, agreementId, async (db, auth, canReview) => {
-  if (!canReview) return await forbidden(event)
-  const row = await readSubmission(event, db, agreementId, submissionId)
-  if (row.egcs_fc_target !== 'amendment_budget' || row.egcs_fc_state !== agreementSubmissionReviewTransitions.accept.from) {
-    return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
-  }
-  if (row.egcs_fc_formatversion !== 1) return await conflict(event, 'SUBMISSION_FORMAT', 'submission.errors.format')
-  const context = await authorizeAgreementResource(event, 'update', agreementId, db, {
-    assignmentTarget: { entityType: 'fundingcaseamendment', entityId: input.amendmentId },
-    freshAuth: true,
-    freshAuthContext: auth
-  })
-  if (!context) return await missingAgreement(event)
-  return await surfaceTargetError(event, () => previewAgreementSubmissionBudget(db, {
-    event, agreementId, streamId: context.streamId, ...input,
-    budgetReview: { submissionId, revision: row.egcs_fc_revision, actorUserId: auth.userId }
-  }))
-})
 
 const agencyManager = async (
   event: H3Event,
@@ -492,20 +332,6 @@ const agencyManager = async (
   if (auth) return await authorizeWithFreshAuthContext(event, auth, 'agency', 'delete', scope)
   return await authorize(event, 'agency', 'delete', scope)
 }
-
-export const getAutomaticSubmissionBudgetRevision = async (event: H3Event, agreementId: string, amendmentId: string) =>
-  await executeFreshReadSnapshot(event, async db => {
-    const owner = await resolveAgreementScopeContext(agreementId, db)
-    if (!owner) return await missingAgreement(event)
-    await agencyManager(event, owner.agencyId)
-    if ((await readSubmissionPolicy(db, owner.streamId)).amendment_budget !== 'automatic') {
-      return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
-    }
-    if (await hasActiveAgreementCloseoutWorkflow(db, agreementId)) {
-      return await conflict(event, 'AGREEMENT_CLOSEOUT_LOCKED', 'apiErrors.agreement.closeout_locked')
-    }
-    return await surfaceTargetError(event, () => readAgreementSubmissionBudgetRevision(db, { event, agreementId, amendmentId }))
-  }, { authorization: 'snapshot' })
 
 export const receiveAgreementSubmission = async (
   event: H3Event, agreementId: string, input: AgreementSubmissionReceipt
@@ -534,14 +360,12 @@ export const receiveAgreementSubmission = async (
         return await conflict(event, 'SUBMISSION_SOURCE_CONFLICT', 'submission.errors.source_conflict')
       }
       const oldReceipt = await trx.selectFrom('Funding_Case_Agreement_Submission_Event')
-        .select(['egcs_fc_formatversion', 'egcs_fc_amendment', 'egcs_fc_budgetrevision'])
+        .select('egcs_fc_formatversion')
         .select(sql<boolean>`egcs_fc_payload = ${JSON.stringify(input.payload)}::jsonb`.as('samePayload'))
         .where('egcs_fc_submission', '=', existing.id).where('egcs_fc_kind', '=', 'received')
         .where('egcs_fc_sourcerevision', '=', input.sourceRevision).executeTakeFirst()
       if (oldReceipt) {
-        if (!oldReceipt.samePayload || oldReceipt.egcs_fc_formatversion !== input.formatVersion
-          || oldReceipt.egcs_fc_amendment !== (input.amendmentId ?? null)
-          || oldReceipt.egcs_fc_budgetrevision !== (input.expectedBudgetRevision ?? null)) {
+        if (!oldReceipt.samePayload || oldReceipt.egcs_fc_formatversion !== input.formatVersion) {
           return await conflict(event, 'SUBMISSION_SOURCE_CONFLICT', 'submission.errors.source_conflict')
         }
         return existing
@@ -550,68 +374,53 @@ export const receiveAgreementSubmission = async (
     const transition = resolveAgreementSubmissionReceiptTransition(existing?.egcs_fc_state ?? null)
     if (!transition) return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
 
-    const amendmentId = input.amendmentId
-      ? (await trx.selectFrom('Funding_Case_Agreement_Amendment').select('id')
-          .where('id', '=', input.amendmentId).where('egcs_fc_fundingagreement', '=', agreementId)
-          .where('_deleted', '=', false).executeTakeFirst())?.id ?? null
-      : null
-    const policy = await readSubmissionPolicy(trx, owner.streamId)
-    let resultId: string | null = null
-    const targetKind = input.target
-    if (targetKind !== 'amendment_budget') {
-      if (input.formatVersion !== 1) return await conflict(event, 'SUBMISSION_FORMAT', 'submission.errors.format')
-      const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_status')
-        .where('id', '=', agreementId).executeTakeFirstOrThrow()
-      await assertAgreementCloseoutWriteAllowed(event, trx, agreementId, agreement.egcs_fc_status)
-      await assertBusinessStatusMutationAllowed(event, trx, 'fundingcaseagreement', agreementId)
-      resultId = await surfaceTargetError(event, async () => {
-        if (existing?.egcs_fc_result) {
-          const previousReceipt = await trx.selectFrom('Funding_Case_Agreement_Submission_Event')
-            .select(['egcs_fc_formatversion', 'egcs_fc_payload'])
-            .where('egcs_fc_submission', '=', existing.id).where('egcs_fc_kind', '=', 'received')
-            .where('egcs_fc_sourcerevision', '=', existing.egcs_fc_sourcerevision)
-            .where('_deleted', '=', false).executeTakeFirst()
-          if (previousReceipt?.egcs_fc_formatversion !== 1
-            || existing.egcs_fc_formatversion !== previousReceipt.egcs_fc_formatversion
-            || !previousReceipt.egcs_fc_payload
-            || !agreementSubmissionTargetSchemas[targetKind].safeParse(previousReceipt.egcs_fc_payload).success) {
-            return await conflict(event, 'SUBMISSION_SOURCE_CONFLICT', 'submission.errors.source_conflict')
-          }
-          const revision = {
-            event, agreementId, target: targetKind, targetId: existing.egcs_fc_result,
-            payload: input.payload, previousSourcePayload: previousReceipt.egcs_fc_payload,
-            returnedPayload: existing.egcs_fc_payload
-          }
-          await applyLinkedSubmissionRevision(trx, revision)
-          return existing.egcs_fc_result
+    if (input.formatVersion !== 1) return await conflict(event, 'SUBMISSION_FORMAT', 'submission.errors.format')
+    const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_status')
+      .where('id', '=', agreementId).executeTakeFirstOrThrow()
+    await assertAgreementCloseoutWriteAllowed(event, trx, agreementId, agreement.egcs_fc_status)
+    await assertBusinessStatusMutationAllowed(event, trx, 'fundingcaseagreement', agreementId)
+    const resultId = await surfaceTargetError(event, async () => {
+      if (existing?.egcs_fc_result) {
+        const previousReceipt = await trx.selectFrom('Funding_Case_Agreement_Submission_Event')
+          .select(['egcs_fc_formatversion', 'egcs_fc_payload'])
+          .where('egcs_fc_submission', '=', existing.id).where('egcs_fc_kind', '=', 'received')
+          .where('egcs_fc_sourcerevision', '=', existing.egcs_fc_sourcerevision)
+          .where('_deleted', '=', false).executeTakeFirst()
+        if (previousReceipt?.egcs_fc_formatversion !== 1
+          || existing.egcs_fc_formatversion !== previousReceipt.egcs_fc_formatversion
+          || !previousReceipt.egcs_fc_payload
+          || !agreementSubmissionTargetSchemas[input.target].safeParse(previousReceipt.egcs_fc_payload).success) {
+          return await conflict(event, 'SUBMISSION_SOURCE_CONFLICT', 'submission.errors.source_conflict')
         }
-        const primaryUserId = await currentPrimary(trx, agreementId)
-        if (!primaryUserId) return await conflict(event, 'SUBMISSION_PRIMARY_REQUIRED', 'submission.errors.primary_required')
-        const target = await applyAgreementSubmissionTarget(trx, {
-          event,
-          agreementId,
-          agencyId: owner.agencyId,
-          streamId: owner.streamId,
-          target: targetKind,
-          payload: input.payload,
-          amendmentId: null,
-          expectedBudgetRevision: null,
-          primaryUserId,
-          actorUserId: null
-        })
-        return target.id
+        const revision = {
+          event, agreementId, target: input.target, targetId: existing.egcs_fc_result,
+          payload: input.payload, previousSourcePayload: previousReceipt.egcs_fc_payload,
+          returnedPayload: existing.egcs_fc_payload
+        }
+        await applyLinkedSubmissionRevision(trx, revision)
+        return existing.egcs_fc_result
+      }
+      const primaryUserId = await currentPrimary(trx, agreementId)
+      if (!primaryUserId) return await conflict(event, 'SUBMISSION_PRIMARY_REQUIRED', 'submission.errors.primary_required')
+      const target = await applyAgreementSubmissionTarget(trx, {
+        event,
+        agreementId,
+        agencyId: owner.agencyId,
+        streamId: owner.streamId,
+        target: input.target,
+        payload: input.payload,
+        primaryUserId
       })
-    }
+      return target.id
+    })
+    const policy = await readSubmissionPolicy(trx, owner.streamId)
     const updates = {
+      egcs_fc_mode: existing?.egcs_fc_mode ?? policy[input.target] ?? 'review',
       egcs_fc_sourcerevision: input.sourceRevision,
       egcs_fc_formatversion: input.formatVersion,
       egcs_fc_state: transition.state,
-      egcs_fc_mode: existing?.egcs_fc_mode ?? policy[input.target] ?? 'review',
       ...nextSubmissionRevision(existing),
       egcs_fc_payload: input.payload,
-      egcs_fc_amendment: amendmentId,
-      egcs_fc_budgetrevision: input.expectedBudgetRevision ?? null,
-      egcs_fc_blocker: null,
       egcs_fc_result: resultId,
       egcs_fc_updatedby: null
     }
@@ -625,45 +434,9 @@ export const receiveAgreementSubmission = async (
           egcs_fc_sourcesystem: input.sourceSystem,
           egcs_fc_sourceid: input.sourceId
         }).returningAll().executeTakeFirstOrThrow()
-    await appendEvent(trx, { ...row, egcs_fc_amendment: input.amendmentId ?? null }, transition.event)
+    await appendEvent(trx, row, transition.event)
     return row
   }, { ...evidenceOnly, ...authOptions })
 
-  const automaticPending = (row: Submission) =>
-    row.egcs_fc_target === 'amendment_budget' && row.egcs_fc_state === automaticBudgetSubmissionTransitions.from
-    && row.egcs_fc_mode === 'automatic' && row.egcs_fc_blocker == null
-    && row.egcs_fc_sourcerevision === input.sourceRevision
-  if (!automaticPending(received)) return submissionDto(received)
-  try {
-    const result = await executeFreshAuthorizedAgreementWrite(event, db, agreementId, initial, async (trx, current) => {
-      const row = await readSubmission(event, trx, agreementId, received.id, true)
-      if (!automaticPending(row)) return row
-      return await materializeAmendment(event, trx, row, { agencyId: current.agencyId, streamId: current.streamId }, {
-        payload: row.egcs_fc_payload,
-        amendmentId: row.egcs_fc_amendment,
-        expectedBudgetRevision: row.egcs_fc_budgetrevision,
-        actorUserId: null,
-        actor: null
-      })
-    }, authOptions)
-    return submissionDto(result)
-  } catch (error: unknown) {
-    if (isError(error) && [401, 403].includes(error.statusCode)) throw error
-    const blocker = expectedTargetError(error)
-    if (!blocker) {
-      console.error({
-        event: 'agreement.submission_automatic_failed',
-        agreementId,
-        submissionId: received.id,
-        errorName: error instanceof Error ? error.name : 'Unknown'
-      })
-      throw error
-    }
-    const result = await executeFreshAuthorizedAgreementWrite(event, db, agreementId, initial, async trx => {
-      const row = await readSubmission(event, trx, agreementId, received.id, true)
-      if (!automaticPending(row)) return row
-      return await persistSubmissionTransition(trx, row, automaticBudgetSubmissionTransitions.block, { egcs_fc_blocker: blocker })
-    }, { ...evidenceOnly, ...authOptions })
-    return submissionDto(result)
-  }
+  return submissionDto(received)
 }

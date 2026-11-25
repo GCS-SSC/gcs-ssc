@@ -22,9 +22,7 @@ export default defineEventHandler(async event => {
         .innerJoin('Transfer_Payment_Profile as program', 'program.id', 'stream.egcs_tp_transferpaymentprofile')
         .innerJoin('Agency_Profile as agency', 'agency.id', 'program.egcs_tp_agency')
         .innerJoin('Common_Entity_Assignment as assignment', join => join.on(sql<boolean>`(
-          (submission.egcs_fc_target = 'amendment_budget'
-            AND assignment.egcs_cn_entitytype = 'fundingcaseagreement' AND assignment.egcs_cn_entityid = agreement.id)
-          OR (submission.egcs_fc_target = 'claim'
+          (submission.egcs_fc_target = 'claim'
             AND assignment.egcs_cn_entitytype = 'fundingcaseagreementclaim' AND assignment.egcs_cn_entityid = submission.egcs_fc_result)
           OR (submission.egcs_fc_target = 'forecast'
             AND assignment.egcs_cn_entitytype = 'fundingcaseforecast' AND assignment.egcs_cn_entityid = submission.egcs_fc_result)

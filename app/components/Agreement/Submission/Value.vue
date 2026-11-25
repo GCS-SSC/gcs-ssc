@@ -19,7 +19,7 @@ const { value, field, snapshot = false, showReferences = false, lineItem = false
 const { t, te, locale } = useI18n()
 const snapshotFieldOrder = ['periodStart', 'periodEnd', 'receivedDate', 'isFinalForYear', 'fiscalYearId', 'applicantRecipientId']
 const previousObject = computed(() => isSubmissionObject(previous) ? previous : undefined)
-const rows = computed(() => Array.isArray(value) ? pairSubmissionRows(Array.isArray(previous) ? previous : [], value, field, 'snapshot', target) : [])
+const rows = computed(() => Array.isArray(value) ? pairSubmissionRows(Array.isArray(previous) ? previous : [], value, field, target) : [])
 const showReplacement = computed(() => snapshot && previous !== undefined
   && (replacePrevious || (
     !(Array.isArray(previous) && Array.isArray(value))
@@ -88,7 +88,6 @@ const month = computed(() => typeof value === 'number' && (field === 'periodStar
   </div>
   <span v-else-if="money !== null">{{ money }}</span>
   <span v-else-if="month">{{ t(month) }}</span>
-  <span v-else-if="field === 'egcs_fc_calculationmode' && typeof value === 'string' && te(`budget_calculation.${value}`)">{{ t(`budget_calculation.${value}`) }}</span>
   <span v-else-if="value === null || value === undefined" class="text-muted">{{ t('submission.blank') }}</span>
   <span v-else-if="typeof value === 'boolean'">{{ t(value ? 'submission.yes' : 'submission.no') }}</span>
   <span v-else-if="typeof value === 'string' || typeof value === 'number'" class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ value === '' ? t('submission.blank') : value }}</span>

@@ -37,10 +37,6 @@ const actionContext = useActionContext({
   authority: () => canUpdate,
   eligible: () => canEdit.value && draft.value !== null
 })
-const choices = computed(() => AGREEMENT_SUBMISSION_MODES.map(value => ({
-  value,
-  label: t(`submission.policy.${value}`)
-})))
 const financialChoices = computed(() => AGREEMENT_SUBMISSION_MODES.map(value => ({
   value,
   label: t(`submission.policy.return_${value}`)
@@ -96,15 +92,12 @@ const form = useFormSession({ owner: formOwner, action: { kind: 'remote', contex
       </template>
     </CommonErrorNotice>
     <UForm v-if="draft" v-bind="form" :state="draft" :validate="validate" class="space-y-6">
-      <div class="grid gap-4 lg:grid-cols-3">
+      <div class="grid gap-4 lg:grid-cols-2">
         <UFormField :label="t('submission.target.claim')" name="claim" required>
           <USelect v-model="draft.claim" :items="financialChoices" :disabled="!canEdit" required class="w-full" />
         </UFormField>
         <UFormField :label="t('submission.target.forecast')" name="forecast" required>
           <USelect v-model="draft.forecast" :items="financialChoices" :disabled="!canEdit" required class="w-full" />
-        </UFormField>
-        <UFormField :label="t('submission.target.amendment_budget')" name="amendment_budget" required>
-          <USelect v-model="draft.amendment_budget" :items="choices" :disabled="!canEdit" required class="w-full" />
         </UFormField>
       </div>
       <div v-if="canUpdate" class="flex justify-end">

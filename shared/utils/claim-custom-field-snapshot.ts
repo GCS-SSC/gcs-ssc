@@ -55,5 +55,6 @@ export const claimCustomFieldSnapshot = (
   key: field.id,
   labelEn: field.egcs_ay_name_en,
   labelFr: field.egcs_ay_name_fr,
+  ...(field.egcs_ay_presentation === 'multiline' ? { presentation: field.egcs_ay_presentation } : {}),
   value: snapshotAnswer(field, values[field.id])
 }))

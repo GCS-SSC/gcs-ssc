@@ -1352,7 +1352,7 @@ CREATE INDEX fc_profile_search_financialsystemnumber_exact ON "Funding_Case_Agre
 CREATE TABLE "Funding_Case_Agreement_Submission" (
   id bigserial PRIMARY KEY,
   egcs_fc_fundingagreement bigint NOT NULL,
-  egcs_fc_target text NOT NULL CONSTRAINT fc_chk_submission_target CHECK (egcs_fc_target IN ('claim', 'forecast', 'amendment_budget')),
+  egcs_fc_target text NOT NULL CONSTRAINT fc_chk_submission_target CHECK (egcs_fc_target IN ('claim', 'forecast')),
   egcs_fc_sourcesystem text NOT NULL CONSTRAINT fc_chk_submission_sourcesystem CHECK (length(btrim(egcs_fc_sourcesystem)) > 0),
   egcs_fc_sourceid text NOT NULL CONSTRAINT fc_chk_submission_sourceid CHECK (length(btrim(egcs_fc_sourceid)) > 0),
   egcs_fc_sourcerevision text NOT NULL CONSTRAINT fc_chk_submission_sourcerevision CHECK (length(btrim(egcs_fc_sourcerevision)) > 0),
@@ -1361,28 +1361,21 @@ CREATE TABLE "Funding_Case_Agreement_Submission" (
   egcs_fc_mode text NOT NULL CONSTRAINT fc_chk_submission_mode CHECK (egcs_fc_mode IN ('automatic', 'review')),
   egcs_fc_revision integer NOT NULL CONSTRAINT fc_chk_submission_revision CHECK (egcs_fc_revision > 0),
   egcs_fc_payload jsonb NOT NULL CONSTRAINT fc_chk_submission_payload_object CHECK (jsonb_typeof(egcs_fc_payload) = 'object'),
-  egcs_fc_amendment bigint,
-  egcs_fc_budgetrevision text,
-  egcs_fc_blocker text,
   egcs_fc_result bigint,
-  egcs_fc_resultamendment bigint GENERATED ALWAYS AS (CASE WHEN egcs_fc_target = 'amendment_budget' THEN egcs_fc_result END) STORED,
   egcs_fc_resultforecast bigint GENERATED ALWAYS AS (CASE WHEN egcs_fc_target = 'forecast' THEN egcs_fc_result END) STORED,
   egcs_fc_resultclaim bigint GENERATED ALWAYS AS (CASE WHEN egcs_fc_target = 'claim' THEN egcs_fc_result END) STORED,
   egcs_fc_resulttype varchar(128) GENERATED ALWAYS AS (CASE egcs_fc_target
     WHEN 'claim' THEN 'fundingcaseagreementclaim'
-    WHEN 'forecast' THEN 'fundingcaseforecast'
-    WHEN 'amendment_budget' THEN 'fundingcaseamendment' END) STORED,
+    WHEN 'forecast' THEN 'fundingcaseforecast' END) STORED,
   egcs_fc_updatedat timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   egcs_fc_updatedby bigint,
   _deleted boolean NOT NULL DEFAULT false,
   CONSTRAINT fc_uq_submission_source UNIQUE (egcs_fc_fundingagreement, egcs_fc_sourcesystem, egcs_fc_sourceid),
-  CONSTRAINT fc_chk_submission_proponent_editing CHECK (egcs_fc_state <> 'proponent_editing' OR egcs_fc_target IN ('claim', 'forecast')),
-  CONSTRAINT fc_chk_submission_result_required CHECK ((egcs_fc_target IN ('claim', 'forecast') OR egcs_fc_state = 'accepted') = (egcs_fc_result IS NOT NULL)),
-  CONSTRAINT fc_chk_submission_amendment_target CHECK (egcs_fc_target = 'amendment_budget' OR (egcs_fc_amendment IS NULL AND egcs_fc_budgetrevision IS NULL))
+  CONSTRAINT fc_chk_submission_result_required CHECK (egcs_fc_result IS NOT NULL)
 );
 
 CREATE UNIQUE INDEX fc_uq_submission_financial_target ON "Funding_Case_Agreement_Submission"
-  (egcs_fc_result) WHERE egcs_fc_target IN ('claim', 'forecast');
+  (egcs_fc_result);
 
 CREATE TABLE "Funding_Case_Agreement_Submission_Event" (
   id bigserial PRIMARY KEY,
@@ -1401,8 +1394,6 @@ CREATE TABLE "Funding_Case_Agreement_Submission_Event" (
   egcs_fc_editsection jsonb CONSTRAINT fc_chk_submission_event_editsection CHECK (
     egcs_fc_editsection IS NULL OR (egcs_fc_kind = 'edited' AND jsonb_typeof(egcs_fc_editsection) = 'object')
   ),
-  egcs_fc_amendment bigint,
-  egcs_fc_budgetrevision text,
   egcs_fc_actor bigint,
   egcs_fc_createdat timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   _deleted boolean NOT NULL DEFAULT false,
@@ -3691,11 +3682,7 @@ ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission
 
 ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_updatedby" FOREIGN KEY (egcs_fc_updatedby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_amendment" FOREIGN KEY (egcs_fc_amendment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Amendment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
-
 ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result" FOREIGN KEY (egcs_fc_result, egcs_fc_resulttype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result_amendment" FOREIGN KEY (egcs_fc_resultamendment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Amendment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result_forecast" FOREIGN KEY (egcs_fc_resultforecast, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Forecast"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
