@@ -42,6 +42,7 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
   'corrections': { fr: 'corrections' },
   'forecasts': { fr: 'previsions' },
   'claims': { fr: 'demandes-de-remboursement' },
+  'requests': { fr: 'demandes-de-renseignements' },
   'submissions': { fr: 'soumissions' },
   'additional': { fr: 'renseignements-supplementaires' },
   'submission-policy': { fr: 'politique-de-soumission' },

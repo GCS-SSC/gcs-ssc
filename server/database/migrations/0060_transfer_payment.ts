@@ -375,7 +375,7 @@ CREATE TABLE "Transfer_Payment_Stream_Field_Assignment" (
   CONSTRAINT "Transfer_Payment_Stream_Field_Assignment_pkey" PRIMARY KEY (id),
   CONSTRAINT "tp_chk_stream_field_assignment_displayorder" CHECK ((egcs_tp_displayorder >= 0)),
   CONSTRAINT "tp_chk_stream_field_assignment_target" CHECK (
-    egcs_tp_target = 'agreement' OR (egcs_tp_target IN ('activity', 'claim', 'forecast') AND egcs_tp_section IS NULL)
+    egcs_tp_target IN ('agreement', 'claim', 'forecast') OR (egcs_tp_target = 'activity' AND egcs_tp_section IS NULL)
   )
 );
 
@@ -384,12 +384,16 @@ CREATE UNIQUE INDEX tp_idx_unique_live_field_assignment ON "Transfer_Payment_Str
 CREATE TABLE "Transfer_Payment_Stream_Field_Section" (
   "id" bigint DEFAULT nextval('"Transfer_Payment_Stream_Field_Section_id_seq"'::regclass) NOT NULL,
   "egcs_tp_transferpaymentstream" bigint NOT NULL,
+  "egcs_tp_target" text DEFAULT 'agreement' NOT NULL,
+  "egcs_tp_beforeentity" boolean DEFAULT false NOT NULL,
   "egcs_tp_name_en" text NOT NULL,
   "egcs_tp_name_fr" text NOT NULL,
   "egcs_tp_displayorder" integer DEFAULT 0 NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "tp_uq_stream_field_section_id_stream" UNIQUE (id, egcs_tp_transferpaymentstream),
+  CONSTRAINT "tp_uq_stream_field_section_id_stream" UNIQUE (id, egcs_tp_transferpaymentstream, egcs_tp_target),
   CONSTRAINT "Transfer_Payment_Stream_Field_Section_pkey" PRIMARY KEY (id),
+  CONSTRAINT "tp_chk_stream_field_section_target" CHECK (egcs_tp_target IN ('agreement', 'claim', 'forecast')),
+  CONSTRAINT "tp_chk_stream_field_section_beforeentity" CHECK (egcs_tp_target <> 'agreement' OR NOT egcs_tp_beforeentity),
   CONSTRAINT "tp_chk_stream_field_section_displayorder" CHECK ((egcs_tp_displayorder >= 0))
 );
 
@@ -1303,7 +1307,7 @@ ALTER TABLE "Transfer_Payment_Stream_Eligible_Recipient" ADD CONSTRAINT "tp_fk_s
 
 ALTER TABLE "Transfer_Payment_Stream_Eligible_Recipient" ADD CONSTRAINT "tp_fk_stream_eligible_recipient_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "tp_ref_field_assignment_section_stream" FOREIGN KEY (egcs_tp_section, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "tp_ref_field_assignment_section_stream" FOREIGN KEY (egcs_tp_section, egcs_tp_transferpaymentstream, egcs_tp_target) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream, egcs_tp_target) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "tp_fk_stream_field_assignment_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 

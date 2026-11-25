@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useActionContext } from '~/composables/useActionContext'
 import { useModalSession } from '~/composables/useModalSession'
 import type { Ref } from 'vue'
@@ -57,6 +57,32 @@ const {
   isHeroCollapsed
 } =
   await useTransferPaymentStreamDetailState(id, streamId, { immediate: !isNestedDetailRoute.value })
+
+const customFieldTabs = [
+  { value: 'custom-fields', key: 'custom_fields.agreement' },
+  { value: 'forecast-custom-fields', key: 'custom_fields.forecast' },
+  { value: 'claim-custom-fields', key: 'custom_fields.claim' }
+]
+const streamTabs = computed(() => {
+  const sortLabel = t('custom_fields.title')
+  const children = customFieldTabs.flatMap(({ value, key }) => {
+    const tab = tabs.value.find(item => item.value === value)
+    return tab ? [{ ...tab, icon: undefined, label: t(key), sortLabel, ui: { trigger: 'ps-12 hover:bg-transparent data-[state=active]:bg-transparent' } }] : []
+  })
+  const otherTabs = tabs.value.filter(tab => !customFieldTabs.some(child => child.value === tab.value))
+  if (!children.length) return otherTabs
+  return [
+    ...otherTabs,
+    {
+      key: 'custom_fields.title',
+      value: 'custom-fields-heading',
+      icon: 'i-lucide-list-filter',
+      navigationHeading: true,
+      ui: { trigger: 'px-3 text-xs font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-400 disabled:opacity-100 disabled:cursor-default' }
+    },
+    ...children
+  ]
+})
 
 usePageResourceError({
   identity: () => route.path,
@@ -171,7 +197,7 @@ const retryLoad = async () => {
               onClick: openUpdateStream
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" :priority-values="['general', 'amendment-types', 'amendment-subtypes']">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="streamTabs" :priority-values="['general', 'amendment-types', 'amendment-subtypes']">
             <div v-if="activeTabComponent" class="space-y-6">
               <component :is="activeTabComponent" v-bind="activeTabProps" />
             </div>

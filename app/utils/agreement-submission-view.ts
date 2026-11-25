@@ -70,6 +70,15 @@ export const claimCustomFieldEvidenceAnswers = (payload: unknown): AgreementCust
   return result.success ? result.data : undefined
 }
 
+/**
+ * Narrows a captured field value to its structured rows.
+ * @param value - Value from a submission snapshot.
+ * @returns Whether the captured value contains structured rows.
+ */
+export const isSubmissionStructuredEvidence = (value: ClaimCustomFieldSnapshot[number]['value'] | undefined):
+  value is Extract<ClaimCustomFieldSnapshot[number]['value'], { rows: unknown }> =>
+  Boolean(value && typeof value === 'object' && 'rows' in value)
+
 type ClaimAnswerEvidence = {
   key: string
   displayed: ClaimCustomFieldSnapshot[number]['value']

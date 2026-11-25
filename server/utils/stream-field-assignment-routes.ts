@@ -5,7 +5,7 @@ import { executeFreshAuthorizedTransferPaymentStreamRead, executeFreshAuthorized
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { readValidatedBodyI18n, parseI18n } from './api-validate'
 import { getDatabaseConstraintName } from './database-constraint-errors'
-import { readAssignedAgencyCustomFieldDefinitions, readAgreementCustomFieldSections } from './agreement-custom-fields'
+import { readAssignedAgencyCustomFieldDefinitions, readStreamCustomFieldSections } from './agreement-custom-fields'
 import { StreamFieldAssignmentCreateSchema, StreamFieldAssignmentPatchSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import type { Database, StreamFieldAssignmentTarget } from '~~/shared/types/database'
@@ -17,13 +17,14 @@ type AssignmentOperation = 'read' | 'create' | 'update' | 'delete'
  * @param event - Current request.
  * @param trx - Authorized transaction.
  * @param streamId - Owning Stream.
+ * @param target - Record type receiving the answers.
  * @param sectionId - Requested section.
  */
-const assertSection = async (event: H3Event, trx: Transaction<Database>, streamId: string, sectionId: string | null) => {
-  if (sectionId === null) return
+const assertSection = async (event: H3Event, trx: Transaction<Database>, streamId: string, target: StreamFieldAssignmentTarget, sectionId: string | null) => {
+  if (sectionId === null || target === 'activity') return
   const section = await trx.selectFrom('Transfer_Payment_Stream_Field_Section').select('id')
     .where('id', '=', sectionId).where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('_deleted', '=', false).executeTakeFirst()
+    .where('egcs_tp_target', '=', target).where('_deleted', '=', false).executeTakeFirst()
   if (!section) await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
 }
 
@@ -52,7 +53,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
     return await executeFreshAuthorizedTransferPaymentStreamRead(event, db, profileId, context.agencyId, streamId, async trx => {
       const [items, sections] = await Promise.all([
         readAssignedAgencyCustomFieldDefinitions(trx, streamId, target),
-        target === 'agreement' ? readAgreementCustomFieldSections(trx, streamId) : []
+        target === 'activity' ? [] : readStreamCustomFieldSections(trx, streamId, target)
       ])
       return { items, sections }
     })
@@ -60,7 +61,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
   const body = operation === 'create'
     ? await readValidatedBodyI18n(event, StreamFieldAssignmentCreateSchema)
     : operation === 'update' ? await readValidatedBodyI18n(event, StreamFieldAssignmentPatchSchema) : null
-  if (target !== 'agreement' && body?.egcs_tp_section != null) {
+  if (target === 'activity' && body?.egcs_tp_section != null) {
     return await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
   }
   if (operation === 'update' && body && !Object.keys(body).length) {
@@ -76,7 +77,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
       if (target !== 'claim' && target !== 'forecast' && (field.egcs_ay_kind === 'table' || field.egcs_ay_kind === 'repeating')) {
         return await badRequest(event, 'STRUCTURED_FIELD_TARGET_INVALID', 'apiErrors.transfer_payment.structured_custom_field_target_invalid')
       }
-      await assertSection(event, trx, streamId, create.egcs_tp_section)
+      await assertSection(event, trx, streamId, target, create.egcs_tp_section)
       try {
         return await trx.insertInto('Transfer_Payment_Stream_Field_Assignment')
           .values({ ...create, egcs_tp_transferpaymentstream: streamId, egcs_tp_target: target })
@@ -106,7 +107,7 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
       egcs_tp_displayorder: current.egcs_tp_displayorder,
       ...patch
     })
-    await assertSection(event, trx, streamId, merged.egcs_tp_section)
+    await assertSection(event, trx, streamId, target, merged.egcs_tp_section)
     return await trx.updateTable('Transfer_Payment_Stream_Field_Assignment').set({
       egcs_tp_section: merged.egcs_tp_section, egcs_tp_required: merged.egcs_tp_required,
       egcs_tp_active: merged.egcs_tp_active, egcs_tp_displayorder: merged.egcs_tp_displayorder

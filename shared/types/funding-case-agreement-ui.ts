@@ -434,6 +434,8 @@ export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementFor
   egcs_fc_customfields?: AgreementCustomFieldValues
   egcs_fc_customfielddefinitions?: AssignedAgencyCustomFieldDefinition[]
   fiscal_year_display?: string | null
+  submitting_proponent_name_en?: string | null
+  submitting_proponent_name_fr?: string | null
   forecast_revision_required: boolean
 }
 

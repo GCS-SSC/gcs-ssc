@@ -1,10 +1,10 @@
 import type {
-  AgreementCustomFieldValues,
+  AgreementCustomFieldPatch,
   AssignedAgencyCustomFieldDefinition,
   ClaimCustomFieldSnapshot
 } from '~~/shared/types/schemas/agreement-custom-fields'
 
-type ClaimFieldAnswer = AgreementCustomFieldValues[string]
+type ClaimFieldAnswer = AgreementCustomFieldPatch[string]
 type CapturedFieldAnswer = ClaimCustomFieldSnapshot[number]['value']
 
 /**
@@ -23,7 +23,9 @@ const snapshotAnswer = (field: AssignedAgencyCustomFieldDefinition, answer: Clai
   if (!structure || !answer.rows.length) return null
   const columns = structure.kind === 'table' ? structure.columns : structure.fields
   return {
+    kind: structure.kind,
     rows: answer.rows.map(row => ({
+      id: row.id,
       cells: columns.map(column => {
         const value = row.cells[column.id]
         return {
@@ -48,7 +50,7 @@ const snapshotAnswer = (field: AssignedAgencyCustomFieldDefinition, answer: Clai
  */
 export const claimCustomFieldSnapshot = (
   definitions: AssignedAgencyCustomFieldDefinition[],
-  values: AgreementCustomFieldValues
+  values: AgreementCustomFieldPatch
 ): ClaimCustomFieldSnapshot => definitions.filter(field => field.egcs_tp_active).map(field => ({
   key: field.id,
   labelEn: field.egcs_ay_name_en,

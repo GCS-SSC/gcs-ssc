@@ -8,7 +8,7 @@ import { parseI18n } from './api-validate'
 import { throwApiError } from './api-errors'
 import { readAssignedAgencyCustomFieldDefinitions } from '../database/stream-custom-field-definitions'
 
-export { readAgreementCustomFieldSections, readAssignedAgencyCustomFieldDefinitions } from '../database/stream-custom-field-definitions'
+export { readStreamCustomFieldSections, readAssignedAgencyCustomFieldDefinitions } from '../database/stream-custom-field-definitions'
 
 type ScalarCustomFieldValues = Selectable<Database['Funding_Case_Agreement_Profile']>['egcs_fc_customfields']
 

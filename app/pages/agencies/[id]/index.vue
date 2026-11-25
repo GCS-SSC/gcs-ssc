@@ -2,7 +2,10 @@
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useConfirmDeleteRequest } from '~/composables/useConfirmDeleteRequest'
+import type { DeleteTarget } from '~/composables/useConfirmDeleteRequest'
 import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useOperationLane } from '~/composables/useOperationLane'
 import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useActionContext } from '~/composables/useActionContext'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -101,7 +104,7 @@ const fieldCatalog = useResourceRequest<{ items: AgencyCustomFieldDefinition[] }
     return await response.json()
   }
 })
-const pendingFieldWrites = shallowReactive(new Set<string>())
+const fieldWrites = useOperationLane<string>()
 let fieldCatalogOwnerActive = true
 onBeforeUnmount(() => {
   fieldCatalogOwnerActive = false
@@ -124,6 +127,30 @@ const captureFieldCommitted: CaptureCommittedSettlement = () => {
   }
 }
 
+const { confirmDeleteRequest: confirmFieldDelete } = useConfirmDeleteRequest()
+/**
+ * Confirms a catalog deletion and refreshes the live Agency after acknowledgment.
+ * @param path - Captured field or option endpoint.
+ * @param target - Current accepted row and its captured identity.
+ * @param shouldProceed - Whether the originating panel still admits the delete.
+ */
+const removeFieldCatalogEntry: <Row>(path: string, target: DeleteTarget<Row>, shouldProceed: () => boolean) => Promise<void> = async (path, target, shouldProceed) => {
+  const operation = agencyActionContext.capture()
+  const committed = captureFieldCommitted()
+  if (!operation || !committed) return
+  const release = fieldWrites.acquire(path)
+  if (!release) return
+  try {
+    if (await confirmFieldDelete(path, {
+      operation,
+      target: { id: target.id, resolve: target.resolve, eligible: target.eligible },
+      shouldProceed
+    })) await committed.settle()
+  } finally {
+    release()
+  }
+}
+
 const reconciliationPendingRequests = shallowReactive(new Map<string, symbol>())
 
 const tabMap: TabMap = new Map([
@@ -132,7 +159,7 @@ const tabMap: TabMap = new Map([
   ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: () => ({ ...agencyResourceCapabilities(), showHeader: false, reconciliationPendingRequests }) }],
   ['customFields', { key: 'custom_fields.title', icon: 'i-lucide-list-filter', component: AgencyCustomFields, getProps: () => ({
     agencyId: id, showHeader: false, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value,
-    catalog: fieldCatalog, pendingFieldWrites, captureCommitted: captureFieldCommitted
+    catalog: fieldCatalog, fieldWrites, captureCommitted: captureFieldCommitted, removeCommitted: removeFieldCatalogEntry
   }) }],
   ['clauses', { key: 'clauses.title', icon: 'i-lucide-list-ordered', component: AgencyClauses, getProps: () => ({ agencyId: id, canManage: canUpdateAgency.value }) }],
   ['approvalTemplates', { key: 'agency.tabs.approval_templates', icon: 'i-lucide-stamp', component: AgencyApprovalTemplates, getProps: agencyResourceCapabilities }],

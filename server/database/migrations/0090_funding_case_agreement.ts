@@ -4,6 +4,7 @@ import { sql, type Kysely } from 'kysely'
 import { ACCOUNT_RECEIVABLE_CLAIM_REDUCTION_SQL } from '../schema/account-receivable-adjustment'
 import { installCreditMemoFunctions } from '../schema/credit-memo'
 import { installCommitmentCodingFunctions } from '../schema/commitment-coding'
+import { installAgreementRequests } from '../schema/agreement-requests'
 import type { Database } from '../../../shared/types/database'
 
 // Clean-cutover baseline: funding case agreement. Edit this subject directly.
@@ -607,7 +608,7 @@ CREATE UNIQUE INDEX fc_idx_currentbudgetversion ON "Funding_Case_Agreement_Budge
 
 CREATE TABLE "Funding_Case_Agreement_Claim" (
   "id" bigint NOT NULL,
-  "egcs_fc_applicantrecipient" bigint,
+  "egcs_fc_applicantrecipient" bigint NOT NULL,
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_fiscalyear" bigint NOT NULL,
   "egcs_fc_isfinalforyear" boolean NOT NULL,
@@ -877,6 +878,7 @@ CREATE UNIQUE INDEX fc_uq_correction_source_active ON "Funding_Case_Agreement_Co
 
 CREATE TABLE "Funding_Case_Agreement_Forecast" (
   "id" bigint NOT NULL,
+  "egcs_fc_applicantrecipient" bigint NOT NULL,
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_fiscalyear" bigint NOT NULL,
   "egcs_fc_version" bigint NOT NULL,
@@ -885,6 +887,10 @@ CREATE TABLE "Funding_Case_Agreement_Forecast" (
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_fc_customfields" jsonb NOT NULL DEFAULT '{}'::jsonb,
   "egcs_fc_customfielddefinitions" jsonb NOT NULL DEFAULT '[]'::jsonb,
+  "egcs_fc_createoperationkey" text,
+  "egcs_fc_createoperationreceipt" jsonb,
+  CONSTRAINT "fc_unq_forecastcreateoperation" UNIQUE (egcs_fc_fundingagreement, egcs_fc_createoperationkey),
+  CONSTRAINT "fc_chk_forecastcreateoperation" CHECK ((egcs_fc_createoperationkey IS NULL) = (egcs_fc_createoperationreceipt IS NULL)),
   CONSTRAINT "fc_chk_forecast_customfields_object" CHECK (jsonb_typeof(egcs_fc_customfields) = 'object'),
   CONSTRAINT "fc_chk_forecast_customfielddefinitions_array" CHECK (jsonb_typeof(egcs_fc_customfielddefinitions) = 'array'),
   CONSTRAINT "fc_chk_forecastversion" CHECK (egcs_fc_version >= 0),
@@ -1351,7 +1357,7 @@ CREATE TABLE "Funding_Case_Agreement_Submission" (
   egcs_fc_sourceid text NOT NULL CONSTRAINT fc_chk_submission_sourceid CHECK (length(btrim(egcs_fc_sourceid)) > 0),
   egcs_fc_sourcerevision text NOT NULL CONSTRAINT fc_chk_submission_sourcerevision CHECK (length(btrim(egcs_fc_sourcerevision)) > 0),
   egcs_fc_formatversion integer NOT NULL CONSTRAINT fc_chk_submission_formatversion CHECK (egcs_fc_formatversion > 0),
-  egcs_fc_state text NOT NULL CONSTRAINT fc_chk_submission_state CHECK (egcs_fc_state IN ('submitted', 'reviewing', 'returned', 'accepted')),
+  egcs_fc_state text NOT NULL CONSTRAINT fc_chk_submission_state CHECK (egcs_fc_state IN ('submitted', 'reviewing', 'returned', 'proponent_editing', 'accepted')),
   egcs_fc_mode text NOT NULL CONSTRAINT fc_chk_submission_mode CHECK (egcs_fc_mode IN ('automatic', 'review')),
   egcs_fc_revision integer NOT NULL CONSTRAINT fc_chk_submission_revision CHECK (egcs_fc_revision > 0),
   egcs_fc_payload jsonb NOT NULL CONSTRAINT fc_chk_submission_payload_object CHECK (jsonb_typeof(egcs_fc_payload) = 'object'),
@@ -1370,6 +1376,7 @@ CREATE TABLE "Funding_Case_Agreement_Submission" (
   egcs_fc_updatedby bigint,
   _deleted boolean NOT NULL DEFAULT false,
   CONSTRAINT fc_uq_submission_source UNIQUE (egcs_fc_fundingagreement, egcs_fc_sourcesystem, egcs_fc_sourceid),
+  CONSTRAINT fc_chk_submission_proponent_editing CHECK (egcs_fc_state <> 'proponent_editing' OR egcs_fc_target IN ('claim', 'forecast')),
   CONSTRAINT fc_chk_submission_result_required CHECK ((egcs_fc_target IN ('claim', 'forecast') OR egcs_fc_state = 'accepted') = (egcs_fc_result IS NOT NULL)),
   CONSTRAINT fc_chk_submission_amendment_target CHECK (egcs_fc_target = 'amendment_budget' OR (egcs_fc_amendment IS NULL AND egcs_fc_budgetrevision IS NULL))
 );
@@ -1380,7 +1387,7 @@ CREATE UNIQUE INDEX fc_uq_submission_financial_target ON "Funding_Case_Agreement
 CREATE TABLE "Funding_Case_Agreement_Submission_Event" (
   id bigserial PRIMARY KEY,
   egcs_fc_submission bigint NOT NULL,
-  egcs_fc_kind text NOT NULL CONSTRAINT fc_chk_submission_event_kind CHECK (egcs_fc_kind IN ('received', 'review_started', 'returned', 'accepted')),
+  egcs_fc_kind text NOT NULL CONSTRAINT fc_chk_submission_event_kind CHECK (egcs_fc_kind IN ('received', 'review_started', 'returned', 'return_withdrawn', 'accepted', 'edited')),
   egcs_fc_sourcerevision text NOT NULL CONSTRAINT fc_chk_submission_event_sourcerevision CHECK (length(btrim(egcs_fc_sourcerevision)) > 0),
   egcs_fc_formatversion integer NOT NULL CONSTRAINT fc_chk_submission_event_formatversion CHECK (egcs_fc_formatversion > 0),
   egcs_fc_payload jsonb CONSTRAINT fc_chk_submission_event_payload_object CHECK (jsonb_typeof(egcs_fc_payload) = 'object'),
@@ -1391,13 +1398,16 @@ CREATE TABLE "Funding_Case_Agreement_Submission_Event" (
   CONSTRAINT "fc_chk_submission_event_claimreferences_object" CHECK (jsonb_typeof(egcs_fc_claimreferences) = 'object'),
   CONSTRAINT "fc_chk_submission_event_claimcustomfields_array" CHECK (jsonb_typeof(egcs_fc_claimcustomfields) = 'array'),
   egcs_fc_description text,
+  egcs_fc_editsection jsonb CONSTRAINT fc_chk_submission_event_editsection CHECK (
+    egcs_fc_editsection IS NULL OR (egcs_fc_kind = 'edited' AND jsonb_typeof(egcs_fc_editsection) = 'object')
+  ),
   egcs_fc_amendment bigint,
   egcs_fc_budgetrevision text,
   egcs_fc_actor bigint,
   egcs_fc_createdat timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
   _deleted boolean NOT NULL DEFAULT false,
-  CONSTRAINT fc_chk_submission_event_payload_required CHECK ((egcs_fc_kind = 'review_started') = (egcs_fc_payload IS NULL)),
-  CONSTRAINT fc_chk_submission_event_return_description CHECK (egcs_fc_kind <> 'returned' OR COALESCE(length(btrim(egcs_fc_description)) > 0, false))
+  CONSTRAINT fc_chk_submission_event_payload_required CHECK ((egcs_fc_kind IN ('review_started', 'return_withdrawn', 'edited')) = (egcs_fc_payload IS NULL)),
+  CONSTRAINT fc_chk_submission_event_return_description CHECK (egcs_fc_kind NOT IN ('returned', 'edited') OR COALESCE(length(btrim(egcs_fc_description)) > 0, false))
 );
 
 CREATE INDEX fc_idx_submission_event ON "Funding_Case_Agreement_Submission_Event" (egcs_fc_submission, id);
@@ -2897,20 +2907,27 @@ AS $function$
       RETURN NEW;
     END $function$;
 
-CREATE FUNCTION trg_fn_validate_claim_submitting_proponent()
+CREATE FUNCTION trg_fn_validate_financial_submitting_proponent()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
     BEGIN
-      IF TG_OP = 'UPDATE' AND (OLD.egcs_fc_fundingagreement,OLD.egcs_fc_applicantrecipient)
-        IS NOT DISTINCT FROM (NEW.egcs_fc_fundingagreement,NEW.egcs_fc_applicantrecipient) THEN RETURN NEW; END IF;
+      IF TG_OP = 'UPDATE' THEN
+        IF (OLD.egcs_fc_fundingagreement, OLD.egcs_fc_applicantrecipient)
+          IS DISTINCT FROM (NEW.egcs_fc_fundingagreement, NEW.egcs_fc_applicantrecipient) THEN
+          RAISE EXCEPTION 'The owning Agreement and submitting Proponent are immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_financial_submitting_proponent_immutable';
+        END IF;
+        RETURN NEW;
+      END IF;
       IF NEW.egcs_fc_applicantrecipient IS NULL OR NOT EXISTS (
         SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" relation
         JOIN "Applicant_Recipient_Profile" proponent ON proponent.id = relation.egcs_fc_applicantrecipient AND NOT proponent._deleted AND proponent.egcs_ar_active
         WHERE relation.egcs_fc_fundingagreement = NEW.egcs_fc_fundingagreement
           AND relation.egcs_fc_applicantrecipient = NEW.egcs_fc_applicantrecipient AND NOT relation._deleted
-      ) THEN RAISE EXCEPTION 'Claim requires an active submitting Proponent on its Agreement'
-        USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_claim_submitting_proponent'; END IF;
+        FOR SHARE OF relation, proponent
+      ) THEN RAISE EXCEPTION 'An active submitting Proponent on the Agreement is required'
+        USING ERRCODE = '23514', CONSTRAINT = TG_ARGV[0]; END IF;
       RETURN NEW;
     END $function$;
 
@@ -3526,6 +3543,8 @@ ALTER TABLE "Funding_Case_Agreement_Correction_Source" ADD CONSTRAINT "fc_fk_cor
 
 ALTER TABLE "Funding_Case_Agreement_Forecast" ADD CONSTRAINT "fc_ref_forecastfiscalyearagreement" FOREIGN KEY (egcs_fc_fiscalyear, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
+ALTER TABLE "Funding_Case_Agreement_Forecast" ADD CONSTRAINT "fc_fk_forecast_applicant_recipient" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Agreement_Forecast" ADD CONSTRAINT "Funding_Case_Agreement_Forecast_egcs_fc_fiscalyear_fkey" FOREIGN KEY (egcs_fc_fiscalyear) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Forecast" ADD CONSTRAINT "Funding_Case_Agreement_Forecast_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
@@ -3806,7 +3825,7 @@ CREATE TRIGGER guard_forecast_custom_field_definitions_immutable BEFORE UPDATE O
 
 CREATE TRIGGER trg_soft_delete_fundingcaseagreementclaim_assignments AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseagreementclaim');
 
-CREATE TRIGGER trg_validate_claim_submitting_proponent BEFORE INSERT OR UPDATE OF egcs_fc_applicantrecipient, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_claim_submitting_proponent();
+CREATE TRIGGER trg_validate_claim_submitting_proponent BEFORE INSERT OR UPDATE OF egcs_fc_applicantrecipient, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_financial_submitting_proponent('fc_chk_claim_submitting_proponent');
 
 CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseagreementclaim_status_agency AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Claim" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_funding_status_agency();
 
@@ -3906,6 +3925,8 @@ CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseforecast_status_agency AFTER I
 
 CREATE TRIGGER trg_guard_forecast_identity BEFORE UPDATE OF egcs_fc_fundingagreement, egcs_fc_fiscalyear, egcs_fc_version ON "Funding_Case_Agreement_Forecast" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_forecast_identity();
 
+CREATE TRIGGER trg_validate_forecast_submitting_proponent BEFORE INSERT OR UPDATE OF egcs_fc_applicantrecipient, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Forecast" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_financial_submitting_proponent('fc_chk_forecast_submitting_proponent');
+
 CREATE TRIGGER trg_resolve_forecast_line_agreement BEFORE INSERT OR UPDATE OF egcs_fc_agreementforecast, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Forecast_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_forecast_line_agreement();
 
 CREATE TRIGGER guard_saved_budget_line_reference BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreementbudgetlineitem, _deleted ON "Funding_Case_Agreement_Forecast_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_saved_budget_line_reference();
@@ -3990,4 +4011,5 @@ CREATE TRIGGER trg_validate_agreement_revision BEFORE INSERT OR UPDATE ON "Fundi
 END $baseline$`.execute(db)
   await installAmendmentCatalogIntegrity(db)
   await installMonetaryTableGuards(db, 'agreement')
+  await installAgreementRequests(db)
 }

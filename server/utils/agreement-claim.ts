@@ -1,3 +1,4 @@
+import { recordSubmissionEditComments } from './agreement-submission-edit-comments'
 import { assertLinkedSubmissionActionAllowed } from './agreement-linked-submission-access'
 import { assertAgreementCurrency, assertCurrencyMoneyValues, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported claim helpers are intentionally documented by their descriptive names. */
@@ -47,7 +48,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareMoney, isPersistableMoney, maxMoney, parseMoney, subtractMoney, zeroMoney, type Money } from '~~/shared/utils/money'
-import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
+import { isAgreementSubmittingProponentAvailable } from './agreement-submitting-proponent'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolveAgreementLineFundingTotal } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 import { hasSuccessfulInitialAgreementApproval } from '~~/server/utils/agreement-approval-submission'
@@ -91,7 +92,7 @@ export const createAgreementClaimAggregate = async (
   event?: H3Event
 ): Promise<AgreementClaimAggregateCreateResult> => {
   if (!await hasSuccessfulInitialAgreementApproval(trx, input.agreementId)) return { status: 'initial_approval_required' }
-  if (!await isAgreementClaimProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) return { status: 'applicant_recipient_unavailable' }
+  if (!await isAgreementSubmittingProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) return { status: 'applicant_recipient_unavailable' }
   const currency = await resolveAgreementCurrency(trx, input.agreementId)
   if (!currency) return { status: 'agreement_unavailable' }
   if (input.lineItems.some(line => line.currency !== currency || parseMoney(line.amount).currency !== currency.toUpperCase())) {
@@ -749,7 +750,7 @@ export const patchAgreementClaimLineItem = async (
   initialContext: AgreementScopeContext,
   lineId: string
 ) => {
-  const patchValues = await readAgreementClaimLineItemPatchBody(event)
+  const { editComment, ...patchValues } = await readAgreementClaimLineItemPatchBody(event)
   if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
   const { egcs_fc_amount: patchedAmount, egcs_fc_totalamount: patchedTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
   try {
@@ -825,6 +826,9 @@ export const patchAgreementClaimLineItem = async (
         if (balanceError) return balanceError
         await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'claim', id: String(references.nextClaimId) })
 
+        for (const id of new Set([String(existing.egcs_fc_fundingagreementclaim), String(references.nextClaimId)])) {
+          await recordSubmissionEditComments(event, trx, { kind: 'claim', id }, { kind: 'amounts', text: editComment })
+        }
         await syncAgreementClaimLineItemPatchStatuses(trx, String(existing.egcs_fc_fundingagreementclaim), String(references.nextClaimId))
 
         return {
@@ -863,9 +867,6 @@ export const patchAgreementClaimForRoute = async (
       return claim
     }
 
-    if (Object.hasOwn(patchValues, 'egcs_fc_applicantrecipient') && !await isAgreementClaimProponentAvailable(trx, agreementId, String(patchValues.egcs_fc_applicantrecipient))) {
-      return await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
-    }
     await validateMergedFinancialPeriodPatch(event, claim, patchValues)
 
     if (Object.hasOwn(patchValues, 'egcs_fc_fiscalyear')) {
@@ -900,11 +901,11 @@ export const patchAgreementClaimForRoute = async (
       }
     }
 
-    const { egcs_fc_customfields: fieldChanges, customFieldPrecondition, ...claimChanges } = patchValues
+    const { egcs_fc_customfields: fieldChanges, customFieldPrecondition, customFieldComments, editComment, ...claimChanges } = patchValues
     const savedAnswers = await prepareFinancialCustomFieldPatch(event, trx, {
       target: 'claim', id: claimId, agreementId,
       definitions: claim.egcs_fc_customfielddefinitions, current: claim.egcs_fc_customfields,
-      patch: { egcs_fc_customfields: fieldChanges, customFieldPrecondition }
+      patch: { egcs_fc_customfields: fieldChanges, customFieldPrecondition, customFieldComments }
     })
     const customFieldsChanged = savedAnswers !== undefined
     const answerResult = fieldChanges === undefined ? {} : { customFieldsChanged }
@@ -917,6 +918,9 @@ export const patchAgreementClaimForRoute = async (
       return { ...current, ...answerResult }
     }
 
+    if (Object.keys(claimChanges).length > 0) {
+      await recordSubmissionEditComments(event, trx, { kind: 'claim', id: claimId }, { kind: 'details', text: editComment })
+    }
     const updated = await trx
       .updateTable('Funding_Case_Agreement_Claim')
       .set({ ...claimChanges, ...(customFieldsChanged ? { egcs_fc_customfields: savedAnswers } : {}) })

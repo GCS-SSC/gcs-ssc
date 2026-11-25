@@ -1,4 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3'
+import { recordSubmissionEditComments } from '~~/server/utils/agreement-submission-edit-comments'
+import { SubmissionEditMetadataSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import { badRequest } from '~~/server/utils/api-errors'
 import { resolveClaimLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
 import {
@@ -22,6 +24,7 @@ export default defineEventHandler(async event => {
   }
 
   const { agreementId, agreementContext, db } = prepared
+  const { editComment } = await readValidatedBodyI18n(event, SubmissionEditMetadataSchema.default({}))
   await executeAgreementClaimMutation(event, db, agreementId, agreementContext, async trx => {
     const child = await trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item').select('egcs_fc_fundingagreementclaim').where('id', '=', lineId).where('_deleted', '=', false).executeTakeFirst()
     return child ? [{ type: 'claim', id: String(child.egcs_fc_fundingagreementclaim) }] : []
@@ -42,6 +45,7 @@ export default defineEventHandler(async event => {
 
     const claim = await assertAgreementClaimEditable(event, trx, agreementId, String(existing.egcs_fc_fundingagreementclaim))
     if (!claim || typeof claim !== 'object' || !('id' in claim)) return claim
+    await recordSubmissionEditComments(event, trx, { kind: 'claim', id: String(existing.egcs_fc_fundingagreementclaim) }, { kind: 'amounts', text: editComment })
     await trx.updateTable('Funding_Case_Agreement_Claim_Reconcile_Line_Item').set({ _deleted: true }).where('egcs_fc_lineitem', '=', lineId).where('_deleted', '=', false).execute()
     await trx.updateTable('Funding_Case_Agreement_Claim_Line_Item').set({ _deleted: true }).where('id', '=', lineId).where('egcs_fc_fundingagreementclaim', '=', existing.egcs_fc_fundingagreementclaim).where('_deleted', '=', false).execute()
     await syncAgreementClaimEditingStatus(trx, String(existing.egcs_fc_fundingagreementclaim))

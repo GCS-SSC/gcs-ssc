@@ -45,6 +45,8 @@ export interface TranslatedTabItem {
   icon?: string
   value: string
   panelId?: string
+  sortLabel?: string
+  navigationHeading?: boolean
   ui?: { trigger?: string }
 }
 

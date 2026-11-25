@@ -4,7 +4,8 @@ import type { AgreementSubmissionTable, ClaimSubmissionReferenceSnapshot } from 
 import type {
   AgreementCustomFieldValues,
   AssignedAgencyCustomFieldDefinition,
-  ClaimCustomFieldSnapshot
+  ClaimCustomFieldSnapshot,
+  CustomFieldStructure
 } from '~~/shared/types/schemas/agreement-custom-fields'
 import { claimCustomFieldSnapshot } from '~~/shared/utils/claim-custom-field-snapshot'
 import { readClaimSubmissionEvidence } from '../utils/agreement-submission-claim-evidence'
@@ -76,7 +77,25 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
     egcs_fc_fundingagreementbudgetfiscalyear: year.id
   }).execute()
 
-  const [supportingDetails, volunteerHours, deliveryMethod] = await db.insertInto('Agency_Custom_Field').values([
+  const deliveryTable: CustomFieldStructure = {
+    kind: 'table',
+    maxRows: 10,
+    totals: 'columns',
+    columns: [
+      { id: 'item', labelEn: 'Item', labelFr: 'Article', kind: 'text', required: true },
+      { id: 'quantity', labelEn: 'Quantity', labelFr: 'Quantité', kind: 'number', required: true },
+      { id: 'date', labelEn: 'Received', labelFr: 'Reçu le', kind: 'date', required: false }
+    ]
+  }
+  const contactGroup: CustomFieldStructure = {
+    kind: 'repeating',
+    maxRows: 10,
+    fields: [
+      { id: 'name', labelEn: 'Name', labelFr: 'Nom', kind: 'text', required: true },
+      { id: 'email', labelEn: 'Email', labelFr: 'Courriel', kind: 'email', required: true }
+    ]
+  }
+  const [supportingDetails, volunteerHours, deliveryMethod, itemsDelivered, deliveryContacts] = await db.insertInto('Agency_Custom_Field').values([
     {
       egcs_ay_agency: '21',
       egcs_ay_name_en: 'Required supporting details',
@@ -98,9 +117,23 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
       egcs_ay_name_en: 'Delivery method',
       egcs_ay_name_fr: 'Mode de livraison',
       egcs_ay_kind: 'relational'
+    },
+    {
+      egcs_ay_agency: '21',
+      egcs_ay_name_en: 'Items delivered',
+      egcs_ay_name_fr: 'Articles livrés',
+      egcs_ay_kind: 'table',
+      egcs_ay_structure: sql<CustomFieldStructure>`${JSON.stringify(deliveryTable)}::jsonb`
+    },
+    {
+      egcs_ay_agency: '21',
+      egcs_ay_name_en: 'Delivery contacts',
+      egcs_ay_name_fr: 'Contacts de livraison',
+      egcs_ay_kind: 'repeating',
+      egcs_ay_structure: sql<CustomFieldStructure>`${JSON.stringify(contactGroup)}::jsonb`
     }
   ]).returning('id').execute()
-  if (!supportingDetails || !volunteerHours || !deliveryMethod) throw new Error('Claim demo fields were not created')
+  if (!supportingDetails || !volunteerHours || !deliveryMethod || !itemsDelivered || !deliveryContacts) throw new Error('Claim demo fields were not created')
   const [supplierDelivery, localPickup] = await db.insertInto('Agency_Custom_Field_Option').values([
     {
       egcs_ay_field: deliveryMethod.id,
@@ -120,27 +153,49 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
     }
   ]).returning('id').execute()
   if (!supplierDelivery || !localPickup) throw new Error('Claim demo options were not created')
+  const streamId = agreement.egcs_fc_transferpaymentstream
+  const [claimSupport, claimDelivery, forecastVolunteers, forecastDelivery] = await db.insertInto('Transfer_Payment_Stream_Field_Section').values([
+    { egcs_tp_target: 'claim', egcs_tp_name_en: 'Supporting information', egcs_tp_name_fr: 'Renseignements justificatifs', egcs_tp_displayorder: 1, egcs_tp_beforeentity: true, egcs_tp_transferpaymentstream: streamId },
+    { egcs_tp_target: 'claim', egcs_tp_name_en: 'Delivery', egcs_tp_name_fr: 'Livraison', egcs_tp_displayorder: 2, egcs_tp_transferpaymentstream: streamId },
+    { egcs_tp_target: 'forecast', egcs_tp_name_en: 'Volunteer planning', egcs_tp_name_fr: 'Planification du bénévolat', egcs_tp_displayorder: 1, egcs_tp_beforeentity: true, egcs_tp_transferpaymentstream: streamId },
+    { egcs_tp_target: 'forecast', egcs_tp_name_en: 'Delivery', egcs_tp_name_fr: 'Livraison', egcs_tp_displayorder: 2, egcs_tp_transferpaymentstream: streamId }
+  ]).returning('id').execute()
+  if (!claimSupport || !claimDelivery || !forecastVolunteers || !forecastDelivery) throw new Error('Submission demo sections were not created')
+
   await db.insertInto('Transfer_Payment_Stream_Field_Assignment').values(
-    [supportingDetails, volunteerHours, deliveryMethod].map((field, index) => ({
+    [supportingDetails, volunteerHours, deliveryMethod, itemsDelivered, deliveryContacts].map((field, index) => ({
       egcs_tp_transferpaymentstream: agreement.egcs_fc_transferpaymentstream,
       egcs_tp_agencyfield: field.id,
       egcs_tp_target: 'claim',
+      egcs_tp_section: index >= 2 ? claimDelivery.id : claimSupport.id,
       egcs_tp_required: index === 0,
       egcs_tp_displayorder: index + 1
     } satisfies Insertable<Database['Transfer_Payment_Stream_Field_Assignment']>))
   ).execute()
   await db.insertInto('Transfer_Payment_Stream_Field_Assignment').values(
-    [volunteerHours, deliveryMethod].map((field, index) => ({
+    [volunteerHours, deliveryMethod, itemsDelivered, deliveryContacts].map((field, index) => ({
       egcs_tp_transferpaymentstream: agreement.egcs_fc_transferpaymentstream,
       egcs_tp_agencyfield: field.id,
       egcs_tp_target: 'forecast',
+      egcs_tp_section: index > 0 ? forecastDelivery.id : forecastVolunteers.id,
       egcs_tp_required: false,
       egcs_tp_displayorder: index + 1
     }))
   ).execute()
   const forecastDefinitions = await readAssignedAgencyCustomFieldDefinitions(db, agreement.egcs_fc_transferpaymentstream, 'forecast')
   const claimDefinitions = await readAssignedAgencyCustomFieldDefinitions(db, agreement.egcs_fc_transferpaymentstream, 'claim')
+  const structuredAnswers: AgreementCustomFieldValues = {
+    [itemsDelivered.id]: { rows: [
+      { id: 'tables', cells: { item: 'Folding tables', quantity: '6', date: '2026-07-02' } },
+      { id: 'chairs', cells: { item: 'Stacking chairs', quantity: '24', date: '2026-07-02' } }
+    ] },
+    [deliveryContacts.id]: { rows: [
+      { id: 'morgan', cells: { name: 'Morgan Lee', email: 'morgan@example.com' } },
+      { id: 'camille', cells: { name: 'Camille Roy', email: 'camille@example.com' } }
+    ] }
+  }
   const customFields = {
+    ...structuredAnswers,
     [supportingDetails.id]: 'The supplier invoice includes furniture and installation.',
     [volunteerHours.id]: 18,
     [deliveryMethod.id]: [supplierDelivery.id]
@@ -161,6 +216,7 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
   }
   const forecast = {
     customFields: {
+      ...structuredAnswers,
       [volunteerHours.id]: 18,
       [deliveryMethod.id]: [supplierDelivery.id]
     } satisfies AgreementCustomFieldValues,
@@ -263,7 +319,8 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
     const draft = await db.insertInto('Funding_Case_Agreement_Forecast').values({
       egcs_fc_customfielddefinitions: sql<AssignedAgencyCustomFieldDefinition[]>`${JSON.stringify(forecastDefinitions)}::jsonb`,
       egcs_fc_customfields: answers,
-      egcs_fc_fundingagreement: agreement.id, egcs_fc_fiscalyear: forecast.fiscalYearId,
+      egcs_fc_fundingagreement: agreement.id, egcs_fc_applicantrecipient: forecast.applicantRecipientId,
+      egcs_fc_fiscalyear: forecast.fiscalYearId,
       egcs_fc_version: String(BigInt(version.version ?? '-1') + BigInt(1)), egcs_fc_status: draftStatus.id
     }).returning('id').executeTakeFirstOrThrow()
     await db.insertInto('Funding_Case_Agreement_Forecast_Line_Item').values({
@@ -317,6 +374,7 @@ export const seedAgreementSubmissionDemo = async (db: Transaction<Database>): Pr
     ...returnedClaim,
     receivedDate: '2026-07-02',
     customFields: {
+      ...structuredAnswers,
       [supportingDetails.id]: 'The corrected invoice lists freight and installation separately.',
       [deliveryMethod.id]: [localPickup.id]
     },

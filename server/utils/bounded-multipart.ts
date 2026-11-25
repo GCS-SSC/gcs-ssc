@@ -6,7 +6,7 @@ import type { BusboyInstance } from '@fastify/busboy'
 import type { H3Event, MultiPartData } from 'h3'
 
 export class MultipartLimitError extends Error {
-  constructor() {
+  constructor(readonly reason: 'bytes' | 'files' | 'fields' | 'parts' = 'bytes') {
     super('Multipart request exceeded its configured size or part limit')
     this.name = 'MultipartLimitError'
   }
@@ -45,7 +45,7 @@ export const readBoundedMultipartFormData = async (
   if (!/boundary=(?:"[^"]+"|[^;\s]+)/i.test(contentType)) return undefined
 
   const parts: MultiPartData[] = []
-  let limitExceeded = false
+  let limitError: MultipartLimitError | undefined
   let fileStreamError: unknown = null
   let parser: BusboyInstance
   try {
@@ -68,7 +68,7 @@ export const readBoundedMultipartFormData = async (
   parser.on('file', (name, stream, filename, _encoding, mimeType) => {
     const chunks: Buffer[] = []
     stream.on('limit', () => {
-      limitExceeded = true
+      limitError ??= new MultipartLimitError('bytes')
     })
     stream.on('error', (error: unknown) => {
       fileStreamError = error
@@ -80,19 +80,19 @@ export const readBoundedMultipartFormData = async (
   })
   parser.on('field', (name, value, _nameTruncated, valueTruncated, _encoding, mimeType) => {
     if (valueTruncated) {
-      limitExceeded = true
+      limitError ??= new MultipartLimitError('bytes')
       return
     }
     parts.push({ name, ...(mimeType ? { type: mimeType } : {}), data: Buffer.from(value) })
   })
   parser.on('filesLimit', () => {
-    limitExceeded = true
+    limitError ??= new MultipartLimitError('files')
   })
   parser.on('fieldsLimit', () => {
-    limitExceeded = true
+    limitError ??= new MultipartLimitError('fields')
   })
   parser.on('partsLimit', () => {
-    limitExceeded = true
+    limitError ??= new MultipartLimitError('parts')
   })
 
   let parserError: unknown
@@ -110,18 +110,17 @@ export const readBoundedMultipartFormData = async (
       const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk)
       totalBytes += chunk.byteLength
       if (totalBytes > options.maxTotalBytes) {
-        limitExceeded = true
-        break
+        throw new MultipartLimitError('bytes')
       }
       if (!parser.write(chunk)) await once(parser, 'drain')
-      if (limitExceeded || parserError) break
+      if (limitError || parserError) break
     }
-    if (limitExceeded) throw new MultipartLimitError()
+    if (limitError) throw limitError
     if (parserError) throw new MultipartParseError()
     parser.end()
     await completed
     if (parserError) throw new MultipartParseError()
-    if (limitExceeded) throw new MultipartLimitError()
+    if (limitError) throw limitError
     if (fileStreamError) throw new MultipartParseError()
     const capturedParts = new Map<string, unknown[]>()
     for (const part of parts) {
@@ -138,8 +137,8 @@ export const readBoundedMultipartFormData = async (
   } catch (error: unknown) {
     parser.destroy()
     if (!event.node.req.destroyed) event.node.req.resume()
-    if (limitExceeded) throw new MultipartLimitError()
-    if (error instanceof MultipartParseError) throw error
+    if (limitError) throw limitError
+    if (error instanceof MultipartLimitError || error instanceof MultipartParseError) throw error
     throw new MultipartParseError()
   }
 }

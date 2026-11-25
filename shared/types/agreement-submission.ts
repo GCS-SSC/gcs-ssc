@@ -9,11 +9,11 @@ import { PositivePostgresBigintIdSchema } from './schemas/common'
 
 export const AGREEMENT_SUBMISSION_TARGETS = ['claim', 'forecast', 'amendment_budget'] as const
 export const AGREEMENT_SUBMISSION_MODES = ['automatic', 'review'] as const
-export const AGREEMENT_SUBMISSION_STATES = ['submitted', 'reviewing', 'returned', 'accepted'] as const
+export const AGREEMENT_SUBMISSION_STATES = ['submitted', 'reviewing', 'returned', 'proponent_editing', 'accepted'] as const
 export type AgreementSubmissionTarget = typeof AGREEMENT_SUBMISSION_TARGETS[number]
 export type AgreementSubmissionMode = typeof AGREEMENT_SUBMISSION_MODES[number]
 export type AgreementSubmissionState = typeof AGREEMENT_SUBMISSION_STATES[number]
-export type AgreementSubmissionEventKind = 'received' | 'review_started' | 'returned' | 'accepted'
+export type AgreementSubmissionEventKind = 'received' | 'review_started' | 'returned' | 'return_withdrawn' | 'accepted' | 'edited'
 
 const postgresText = (value: string) => !value.includes('\0') && !/\p{Surrogate}/u.test(value)
 
@@ -79,10 +79,12 @@ export interface LinkedSubmissionOverviewReview {
   submissionId: string
   revision: number
   decisionDigest: string | null
+
 }
 
 export const AgreementSubmissionCommandSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('start'), revision }),
+  z.strictObject({ action: z.literal('withdraw_return'), revision }),
   z.strictObject({ action: z.literal('save'), revision, payload: AgreementSubmissionPayloadSchema }),
   z.strictObject({
     action: z.literal('return'),
@@ -133,7 +135,8 @@ export type AgreementSubmissionBudgetPreviewInput = z.infer<typeof AgreementSubm
 export type SubmissionRow = Omit<Selectable<AgreementSubmissionTable>,
   'egcs_fc_updatedat' | 'egcs_fc_resultamendment' | 'egcs_fc_resultforecast' | 'egcs_fc_resultclaim'
 > & { egcs_fc_updatedat: string }
-export type SubmissionEventRow = Omit<Selectable<AgreementSubmissionEventTable>, 'egcs_fc_createdat'> & {
+export type SubmissionEventRow = Omit<Selectable<AgreementSubmissionEventTable>, 'egcs_fc_createdat' | 'egcs_fc_editsection'> & {
+  egcs_fc_editsection?: Selectable<AgreementSubmissionEventTable>['egcs_fc_editsection']
   egcs_fc_createdat: string
   actorName: string | null
 }

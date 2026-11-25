@@ -1,4 +1,6 @@
 import { defineEventHandler, getRouterParam } from 'h3'
+import { recordSubmissionEditComments } from '~~/server/utils/agreement-submission-edit-comments'
+import { SubmissionEditMetadataSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import { badRequest } from '~~/server/utils/api-errors'
 import { assertAgreementForecastEditable, executeAgreementForecastMutation, prepareAgreementForecastRoute } from '~~/server/utils/agreement-forecast'
 import { resolveForecastLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
@@ -29,6 +31,7 @@ export default defineEventHandler(async event => {
   }
 
   const { agreementId, agreementContext, db } = prepared
+  const { editComment } = await readValidatedBodyI18n(event, SubmissionEditMetadataSchema.default({}))
   const result = await executeAgreementForecastMutation(event, db, agreementId, agreementContext, async trx => {
     const child = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item').select('egcs_fc_agreementforecast').where('id', '=', lineId).where('_deleted', '=', false).executeTakeFirst()
     return child ? [{ type: 'forecast', id: String(child.egcs_fc_agreementforecast) }] : []
@@ -53,6 +56,7 @@ export default defineEventHandler(async event => {
 
     const editable = await assertAgreementForecastEditable(event, trx, agreementId, String(existing.egcs_fc_agreementforecast))
     if (!editable || typeof editable !== 'object' || !('id' in editable)) return editable
+    await recordSubmissionEditComments(event, trx, { kind: 'forecast', id: String(existing.egcs_fc_agreementforecast) }, { kind: 'amounts', text: editComment })
     await trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item').set({ _deleted: true }).where('id', '=', lineId).where('egcs_fc_agreementforecast', '=', existing.egcs_fc_agreementforecast).where('_deleted', '=', false).execute()
     await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: String(existing.egcs_fc_agreementforecast) })
   }, { action: 'delete' })

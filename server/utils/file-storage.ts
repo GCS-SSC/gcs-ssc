@@ -147,14 +147,7 @@ export const deleteStoredFile = async (
   })
 }
 
-export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInput, registerUpload: RegisterStoredFileUpload): Promise<StoredFileRecord> => {
-  const attachmentTypeId = await ensureAttachmentType(
-    db, input.agencyId,
-    input.attachmentTypeNameEn || 'Document Template',
-    input.attachmentTypeNameFr || 'Modele de document',
-    input.attachmentTypeDescriptionEn || 'Template files used to generate documents.',
-    input.attachmentTypeDescriptionFr || 'Fichiers modeles utilises pour generer des documents.'
-  )
+export const stageStoredFile = async (db: Kysely<Database>, input: StoredFileInput) => {
   const provider = await requireProvider(db, input.agencyId)
   const purpose = input.purpose ?? 'document-template'
   const objectName = [
@@ -165,8 +158,43 @@ export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInp
   const reference = await writeProviderObject({
     provider, objectName, bytes: input.bytes, contentType: input.mimeType, purpose, target: input.target
   })
-  registerUpload({ agencyId: input.agencyId, providerId: provider.extension.key,
-    objectId: reference.objectId, locator: reference.locator, purpose, target: input.target })
+  const upload: StoredFileUpload = {
+    agencyId: input.agencyId, providerId: provider.extension.key,
+    objectId: reference.objectId, locator: reference.locator, purpose, target: input.target
+  }
+  return { upload, providerConfig: JSON.stringify(provider.config) }
+}
+
+type StagedFile = Awaited<ReturnType<typeof stageStoredFile>>
+
+export const assertStagedFileProvider = async (db: Kysely<Database>, agencyId: string, staged: StagedFile) => {
+  const selection = await db.selectFrom('extensions.agency_storage_selection as selection')
+    .innerJoin('extensions.agency_enablement as enablement', join => join
+      .onRef('enablement.agency_id', '=', 'selection.agency_id')
+      .onRef('enablement.extension_key', '=', 'selection.provider_key'))
+    .select(['selection.provider_key', 'enablement.config'])
+    .where('selection.agency_id', '=', agencyId).where('selection._deleted', '=', false)
+    .where('enablement.enabled', '=', true).where('enablement._deleted', '=', false)
+    .forUpdate().executeTakeFirst()
+  if (agencyId !== staged.upload.agencyId || selection?.provider_key !== staged.upload.providerId
+    || JSON.stringify(selection.config) !== staged.providerConfig) {
+    throw new Error('Selected storage provider changed during upload')
+  }
+}
+
+const resolveStoredFileType = async (db: Kysely<Database>, input: StoredFileInput) => {
+  return await ensureAttachmentType(
+    db, input.agencyId,
+    input.attachmentTypeNameEn || 'Document Template',
+    input.attachmentTypeNameFr || 'Modele de document',
+    input.attachmentTypeDescriptionEn || 'Template files used to generate documents.',
+    input.attachmentTypeDescriptionFr || 'Fichiers modeles utilises pour generer des documents.'
+  )
+}
+
+const insertStagedFile = async (
+  db: Kysely<Database>, input: StoredFileInput, { upload }: StagedFile, attachmentTypeId: string
+): Promise<StoredFileRecord> => {
   const values: Insertable<CommonAttachmentTable> = {
     egcs_cn_attachmenttype: attachmentTypeId,
     egcs_cn_name_en: input.nameEn,
@@ -174,9 +202,9 @@ export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInp
     egcs_cn_description_en: input.descriptionEn,
     egcs_cn_description_fr: input.descriptionFr,
     egcs_cn_filename: input.filename,
-    egcs_cn_provider: provider.extension.key,
-    egcs_cn_providerobjectid: reference.objectId,
-    egcs_cn_providerlocator: reference.locator,
+    egcs_cn_provider: upload.providerId,
+    egcs_cn_providerobjectid: upload.objectId,
+    egcs_cn_providerlocator: upload.locator,
     egcs_cn_mimetype: input.mimeType,
     egcs_cn_createdat: new Date(),
     egcs_cn_filesize: input.bytes.byteLength,
@@ -184,10 +212,20 @@ export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInp
   }
 
   const attachment = await withAuditCreationOwner('public.Common_Attachment',
-    { egcs_cn_provider: provider.extension.key, egcs_cn_providerobjectid: reference.objectId },
+    { egcs_cn_provider: upload.providerId, egcs_cn_providerobjectid: upload.objectId },
     input.target ?? { entityType: 'agency', entityId: input.agencyId },
     async () => await db.insertInto('Common_Attachment').values(values).returning('id').executeTakeFirstOrThrow())
-  return { id: String(attachment.id), providerId: provider.extension.key, objectId: reference.objectId, locator: reference.locator }
+  return { id: String(attachment.id), providerId: upload.providerId, objectId: upload.objectId, locator: upload.locator }
+}
+
+export const persistStagedFile = async (db: Kysely<Database>, input: StoredFileInput, staged: StagedFile) =>
+  await insertStagedFile(db, input, staged, await resolveStoredFileType(db, input))
+
+export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInput, registerUpload: RegisterStoredFileUpload): Promise<StoredFileRecord> => {
+  const attachmentTypeId = await resolveStoredFileType(db, input)
+  const staged = await stageStoredFile(db, input)
+  registerUpload(staged.upload)
+  return await insertStagedFile(db, input, staged, attachmentTypeId)
 }
 
 export const deleteStoredAttachmentById = async (

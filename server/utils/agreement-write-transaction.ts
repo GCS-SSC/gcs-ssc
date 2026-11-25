@@ -129,7 +129,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
     assignmentTarget?: ExactEntityTarget<AssignableEntityType> | ((trx: Transaction<Database>) => Promise<ExactEntityTarget<AssignableEntityType> | null>)
     blocksApprovalSubmission?: boolean
     allowDuringCloseout?: boolean
-    businessStatusMode?: BusinessStatusMutationMode | 'submission_evidence'
+    businessStatusMode?: BusinessStatusMutationMode | 'submission_evidence' | 'correspondence'
     businessStatusTarget?: ExactEntityTarget<CoreLifecycleEntityType>
     correctionFinancialMutation?: boolean
     correctionId?: string
@@ -244,14 +244,14 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
 
         try {
           const statusMode = options.businessStatusMode
-          const submissionEvidenceOnly = statusMode === 'submission_evidence'
-          if (!receivableCollection && !submissionEvidenceOnly) await lockBusinessStatus(
+          const recordEvidenceOnly = statusMode === 'submission_evidence' || statusMode === 'correspondence'
+          if (!receivableCollection && !recordEvidenceOnly) await lockBusinessStatus(
             trx,
             'fundingcaseagreement',
             agreementId,
             statusMode ?? (options.allowDuringCloseout === true ? 'engine' : 'ordinary')
           )
-          if (!submissionEvidenceOnly && options.businessStatusTarget && options.businessStatusTarget.entityType !== 'fundingcaseagreement') {
+          if (!recordEvidenceOnly && options.businessStatusTarget && options.businessStatusTarget.entityType !== 'fundingcaseagreement') {
             const targetStatus = await lockBusinessStatus(
               trx,
               options.businessStatusTarget.entityType,

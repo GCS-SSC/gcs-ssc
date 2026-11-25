@@ -1,4 +1,4 @@
-import { shallowReactive } from 'vue'
+import { useStreamCustomFieldSettings } from '~/composables/useStreamCustomFieldSettings'
 import TransferPaymentStreamClausesTab from '~/components/TransferPayment/TransferPaymentStreamClausesTab.vue'
 import { useStreamClauseLinks } from '~/composables/useStreamClauseLinks'
 import TransferPaymentStreamBudgetManagementTab from '~/components/TransferPayment/TransferPaymentStreamBudgetManagementTab.vue'
@@ -125,7 +125,6 @@ export const useTransferPaymentStreamDetailState = (
     eligible: () => profile.value?.id === id && stream.value?.id === streamId
   })
   const settingsPending = ref(false)
-  const submissionPolicyPendingRequests = shallowReactive(new Map<string, symbol>())
   /**
    * Persists Stream settings and accepts the acknowledged draft even if the section closes.
    * @param draft - Settings captured by the currently mounted editor.
@@ -223,11 +222,11 @@ export const useTransferPaymentStreamDetailState = (
       'monitorTypes',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.monitorTypes, icon: 'i-lucide-clipboard-check', component: TransferPaymentMonitorTypesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? '', canCreateChild: canCreateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
-    ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ key: 'custom-fields', transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
-    ['activityCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields, value: 'activity-custom-fields', icon: 'i-lucide-list-todo', component: CustomFieldsTab, getProps: () => ({ key: 'activity-custom-fields', transferPaymentId: id, streamId, target: 'activity', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
-    ['claimCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.claimCustomFields, value: 'claim-custom-fields', icon: 'i-lucide-receipt', component: CustomFieldsTab, getProps: () => ({ key: 'claim-custom-fields', transferPaymentId: id, streamId, target: 'claim', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
-    ['forecastCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.forecastCustomFields, value: 'forecast-custom-fields', icon: 'i-lucide-chart-column', component: CustomFieldsTab, getProps: () => ({ key: 'forecast-custom-fields', transferPaymentId: id, streamId, target: 'forecast', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
-    ['submissionPolicy', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.submissionPolicy, value: 'submission-policy', icon: 'i-lucide-inbox', component: StreamSubmissionPolicy, getProps: () => ({ programId: id, streamId, canUpdate: canDeleteChild.value, pendingRequests: submissionPolicyPendingRequests }) }],
+    ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ key: 'custom-fields', transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, catalog: customFieldSettings.agreement }) }],
+    ['activityCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields, value: 'activity-custom-fields', icon: 'i-lucide-list-todo', component: CustomFieldsTab, getProps: () => ({ key: 'activity-custom-fields', transferPaymentId: id, streamId, target: 'activity', canUpdateChild: canUpdateChild.value, catalog: customFieldSettings.activity }) }],
+    ['claimCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.claimCustomFields, value: 'claim-custom-fields', icon: 'i-lucide-receipt', component: CustomFieldsTab, getProps: () => ({ key: 'claim-custom-fields', transferPaymentId: id, streamId, target: 'claim', canUpdateChild: canUpdateChild.value, catalog: customFieldSettings.claim }) }],
+    ['forecastCustomFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.forecastCustomFields, value: 'forecast-custom-fields', icon: 'i-lucide-chart-column', component: CustomFieldsTab, getProps: () => ({ key: 'forecast-custom-fields', transferPaymentId: id, streamId, target: 'forecast', canUpdateChild: canUpdateChild.value, catalog: customFieldSettings.forecast }) }],
+    ['submissionPolicy', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.submissionPolicy, value: 'submission-policy', icon: 'i-lucide-inbox', component: StreamSubmissionPolicy, getProps: () => ({ canUpdate: canDeleteChild.value, settings: customFieldSettings.policy }) }],
     [
       'risk-management',
       {
@@ -294,6 +293,23 @@ export const useTransferPaymentStreamDetailState = (
       && (!('recommendationSetupId' in route.params) || typeof route.params.recommendationSetupId !== 'string')
     )),
     queryKey: 'section'
+  })
+
+  const customFieldSettings = useStreamCustomFieldSettings({
+    baseUrl: `/api/transfer-payments/${id}/streams/${streamId}`,
+    canUpdate: canUpdateChild,
+    canConfigurePolicy: canDeleteChild,
+    /** @returns The Stream settings section that activates its initial read. */
+    selected: () => {
+      switch (selectedTabKey.value) {
+        case TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields: return 'agreement'
+        case TRANSFER_PAYMENT_STREAM_TAB_KEYS.activityCustomFields: return 'activity'
+        case TRANSFER_PAYMENT_STREAM_TAB_KEYS.claimCustomFields: return 'claim'
+        case TRANSFER_PAYMENT_STREAM_TAB_KEYS.forecastCustomFields: return 'forecast'
+        case TRANSFER_PAYMENT_STREAM_TAB_KEYS.submissionPolicy: return 'policy'
+        default: return null
+      }
+    }
   })
 
   const clauseLinks = useStreamClauseLinks(id, streamId, agencyId, canUpdateChild,

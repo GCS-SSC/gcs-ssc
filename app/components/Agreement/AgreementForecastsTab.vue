@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import { useFormSession } from '~/composables/useFormSession'
+import { useEditorSettlement } from '~/composables/useEditorSettlement'
+import { useOperationLane } from '~/composables/useOperationLane'
 import { useActionContext } from '~/composables/useActionContext'
 import type { CapturedActionContext } from '~/composables/useActionContext'
 import { moneyMatchesSearch } from '~/utils/money-search'
+import { createBrowserUuid } from '~/utils/browser-uuid'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc */
 import { computed, onScopeDispose, ref, watch } from 'vue'
@@ -31,6 +34,7 @@ type ForecastVersionRow = Omit<BusinessRecordStateFields, 'approvalRuntimeId' | 
   fiscalYearDisplay: string
   forecastId: string
   forecastFiscalYearId: string
+  submittingProponentId: string
   isActive: boolean
   version: string
   status: FundingCaseAgreementForecastRow['egcs_fc_status']
@@ -70,9 +74,11 @@ const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
 const { isRecordLocked } = useBusinessStatusState()
-const isCreatingVersion: Ref<boolean> = ref(false)
-const pendingAction: Ref<symbol | null> = ref(null)
-let actionGeneration = 0
+const actionGeneration = ref(0)
+const actions = useOperationLane<number>()
+const isActionPending = computed(() => actions.isPending(actionGeneration.value))
+const createWrites = useOperationLane<'create'>()
+const isForecastCreateInFlight = computed(() => createWrites.isPending('create'))
 let isScopeActive = true
 onScopeDispose(() => {
   isScopeActive = false
@@ -83,15 +89,19 @@ const forecastModal = useCrudModal<FundingCaseAgreementForecastRow, FundingCaseA
   createState: () => ({}),
   updateState: forecast => ({
     id: forecast.id,
-    egcs_fc_fiscalyear: forecast.egcs_fc_fiscalyear
+    egcs_fc_fiscalyear: forecast.egcs_fc_fiscalyear,
+    egcs_fc_applicantrecipient: forecast.egcs_fc_applicantrecipient
   })
 })
 const forecastPending = useCrudModalPending(forecastModal.captureSession)
 const isSavingForecast = forecastPending.isPending
+const prepareForecastWrite = useEditorSettlement(forecastModal)
+type ForecastCreateAttempt =
+  | { kind: 'undispatched' }
+  | { kind: 'dispatched'; session: number; context: CapturedActionContext; intent: string; id: string }
+let createAttempt: ForecastCreateAttempt = { kind: 'undispatched' }
 watch(agreementIdRef, () => {
-  actionGeneration += 1
-  pendingAction.value = null
-  isCreatingVersion.value = false
+  actionGeneration.value += 1
   forecastModal.close()
 }, { flush: 'sync' })
 
@@ -114,6 +124,7 @@ const {
 const forecasts = computed<FundingCaseAgreementForecastOverviewRow['forecasts']>(() => overview.value?.forecasts ?? [])
 const createContext = useActionContext({ identity: [agreementIdRef], authority: () => canCreateRole })
 const deleteContext = useActionContext({ identity: [agreementIdRef], authority: () => canDeleteRole })
+watch(createContext.version, forecastModal.close, { flush: 'sync' })
 const captureCommitted = useCommittedSettlement({
   context: createContext,
   settle: async () => {
@@ -168,6 +179,7 @@ const versionRows = computed<ForecastVersionRow[]>(() => {
       fiscalYearDisplay: forecast.fiscal_year_display ?? t('common.unavailable'),
       forecastId: String(forecast.id),
       forecastFiscalYearId: String(forecast.egcs_fc_fiscalyear),
+      submittingProponentId: forecast.egcs_fc_applicantrecipient,
       version: forecast.egcs_fc_version,
       isActive: forecast.egcs_fc_active,
       status: forecast.egcs_fc_status,
@@ -238,8 +250,8 @@ const getForecastRoute = (row: ForecastVersionRow) =>
 const warnPrerequisite = (key: string) => toast.add({ title: toast.localized('common.warning'), description: toast.localized(key), color: 'warning' })
 const captureAction = () => {
   const owner = agreementId
-  const generation = actionGeneration
-  return () => isScopeActive && agreementId === owner && actionGeneration === generation
+  const generation = actionGeneration.value
+  return () => isScopeActive && agreementId === owner && actionGeneration.value === generation
 }
 const checkPrerequisites = async (isCurrent: () => boolean, recordId?: string): Promise<boolean> => {
   if (!isCurrent()) return false
@@ -278,32 +290,68 @@ const checkPrerequisites = async (isCurrent: () => boolean, recordId?: string): 
   }
 }
 const runAction = async (action: 'create' | 'delete', work: (isCurrent: () => boolean, operation: CapturedActionContext) => Promise<void>) => {
-  if (pendingAction.value || overviewStatus.value === 'pending') return
+  if (isActionPending.value || isSavingForecast.value || (action === 'delete' && isForecastCreateInFlight.value)
+    || overviewStatus.value === 'pending') return
   const operation = (action === 'create' ? createContext : deleteContext).capture()
   if (!operation) return
-  const token = Symbol('forecast-action')
+  const release = actions.acquire(actionGeneration.value)
+  if (!release) return
   const ownsScope = captureAction()
   const isCurrent = () => operation.isCurrent() && ownsScope()
-  pendingAction.value = token
   try {
     await work(isCurrent, operation)
   } catch (error: unknown) {
     if (isCurrent()) showError(error)
   } finally {
-    if (pendingAction.value === token) pendingAction.value = null
+    release()
   }
 }
-const createForecastVersion = (row: ForecastGroupedRow) => runAction('create', async (isCurrent, operation) => {
-  const forecast = getRepresentativeGroupedRow(row)
-  if (!forecast || !await checkPrerequisites(() => isCurrent() && operation.canDispatch()) || !operation.canDispatch()) return
+const openCreateForecast = (source?: ForecastVersionRow) => runAction('create', async (isCurrent, operation) => {
+  const session = forecastModal.captureSession()
+  if (!await checkPrerequisites(() => isCurrent() && operation.canDispatch())
+    || !operation.canDispatch() || !isCurrent() || forecastModal.captureSession() !== session) return
+  createAttempt = { kind: 'undispatched' }
+  forecastModal.openCreate()
+  if (source && selectedForecast.value) {
+    const activeSource = forecasts.value.find(
+      forecast => forecast.egcs_fc_active && String(forecast.egcs_fc_fiscalyear) === source.forecastFiscalYearId)
+    selectedForecast.value.egcs_fc_fiscalyear = source.forecastFiscalYearId
+    selectedForecast.value.egcs_fc_copyfromactive = !activeSource?.forecast_revision_required
+    selectedForecast.value.egcs_fc_applicantrecipient = activeSource?.egcs_fc_applicantrecipient ?? source.submittingProponentId
+  }
+})
+
+const saveForecast = async () => {
+  if (!selectedForecast.value) return
+  const write = prepareForecastWrite(createContext, captureCommitted)
+  if (!write || !forecastPending.begin(write.session)) return
+  const forecastState = { ...selectedForecast.value }
   const owner = agreementId
-  isCreatingVersion.value = true
+  const isNewVersion = forecastState.egcs_fc_copyfromactive !== undefined
+  let release: (() => void) | null = null
   try {
-    const created = await sendJson<{ id: string; other_funding_omitted?: boolean }>(`/api/agreements/${owner}/forecasts`, 'POST', {
-      egcs_fc_fiscalyear: forecast.forecastFiscalYearId,
-      egcs_fc_copyfromactive: !forecastsRequiringRevision.value.some(item => String(item.egcs_fc_fiscalyear) === forecast.forecastFiscalYearId)
-    })
-    if (isCurrent()) {
+    let created: { id: string; other_funding_omitted?: boolean }
+    try {
+      if (!await checkPrerequisites(write.canDispatch) || !write.canDispatch()) return
+      release = createWrites.acquire('create')
+      if (!release) return
+      const intent = JSON.stringify([
+        forecastState.egcs_fc_fiscalyear, forecastState.egcs_fc_applicantrecipient, forecastState.egcs_fc_copyfromactive ?? false
+      ])
+      if (createAttempt.kind === 'undispatched' || createAttempt.session !== write.session
+        || !createAttempt.context.isCurrent() || createAttempt.intent !== intent) {
+        createAttempt = { kind: 'dispatched', session: write.session, context: write.action, intent, id: createBrowserUuid() }
+      }
+      created = await sendJson<typeof created>(`/api/agreements/${owner}/forecasts`, 'POST', {
+        ...forecastState,
+        clientOperationId: createAttempt.id
+      })
+    } catch (error: unknown) {
+      if (write.isCurrent()) showError(error)
+      return
+    }
+    if (!await write.acknowledge()) return
+    if (isNewVersion) {
       if (created.other_funding_omitted) {
         toast.add({
           title: toast.localized('agreement.forecasts.program_only_copy_title'),
@@ -312,37 +360,13 @@ const createForecastVersion = (row: ForecastGroupedRow) => runAction('create', a
         })
       }
       await navigateTo(localePath(appRouteLocations.agreementForecastDetail(owner, String(created.id))))
-    }
-  } finally { if (isCurrent()) isCreatingVersion.value = false }
-})
-const openCreateForecast = () => runAction('create', async (isCurrent, operation) => {
-  const session = forecastModal.captureSession()
-  if (await checkPrerequisites(() => isCurrent() && operation.canDispatch()) && operation.canDispatch() && isCurrent() && forecastModal.captureSession() === session) forecastModal.openCreate()
-})
-
-const saveForecast = async () => {
-  if (!selectedForecast.value) return
-  const operation = createContext.capture()
-  const committed = captureCommitted()
-  if (!operation || !committed) return
-  const forecastState = selectedForecast.value
-  const session = forecastModal.captureSession()
-  const isCurrentScope = captureAction()
-  const isCurrent = () => operation.isCurrent() && isCurrentScope() && forecastModal.isCurrentSession(session)
-  if (!forecastPending.begin(session)) return
-  try {
-    try {
-      if (!await checkPrerequisites(() => isCurrent() && operation.canDispatch()) || !isCurrent() || !operation.canDispatch() || !committed.canDispatch()) return
-      await sendJson(`/api/agreements/${agreementId}/forecasts`, 'POST', forecastState)
-    } catch (error: unknown) {
-      if (isCurrent()) showError(error)
       return
     }
-    const closesInitiatingSession = operation.isCurrent() && isCurrentScope() && forecastModal.closeSession(session)
-    const settlement = await committed.settle()
-    if (settlement.kind !== 'refreshed' || !forecastModal.isLatestSession(session) || !closesInitiatingSession) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
-  } finally { forecastPending.end(session) }
+  } finally {
+    release?.()
+    forecastPending.end(write.session)
+  }
 }
 
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -403,11 +427,11 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
       :request-status="overviewStatus"
       :button-label="t('agreement.forecasts.add')"
       :show-button="canCreateRole"
-      :button-disabled="Boolean(pendingAction)"
+      :button-disabled="isActionPending"
       :search-placeholder="t('agreement.forecasts.search')"
       help-add-target="agreement.forecasts.add"
       help-search-target="agreement.forecasts.search"
-      @add="openCreateForecast" @retry="refreshOverview" @update:expanded="updateExpandedRows">
+      @add="openCreateForecast()" @retry="refreshOverview" @update:expanded="updateExpandedRows">
       <template #version-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row as ForecastGroupedRow)" class="contents">
           <div v-if="isFiscalYearGroupRow(row as ForecastGroupedRow)" class="flex w-full items-center gap-3 py-1">
@@ -469,14 +493,13 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
         <div class="flex items-center justify-end gap-2">
           <CommonActionButton
             v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canCreateRole"
-            :loading="isCreatingVersion"
-            :disabled="Boolean(pendingAction)"
+            :disabled="isActionPending"
             icon="i-lucide-plus"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="t('agreement.forecasts.add_version')"
-            @click="createForecastVersion(row as ForecastGroupedRow)" />
+            @click="openCreateForecast(getRepresentativeGroupedRow(row as ForecastGroupedRow) ?? undefined)" />
           <CommonActionButton
             v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow) && canDeleteRole"
             icon="i-lucide-trash"
@@ -500,9 +523,19 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
     <UModal
       v-if="selectedForecast"
       v-model:open="isForecastModalOpen"
-      :title="t('agreement.forecasts.add')">
+      :description="t('common.form_dialog_description')"
+      :title="t(selectedForecast.egcs_fc_copyfromactive === undefined ? 'agreement.forecasts.add' : 'agreement.forecasts.add_version')">
       <template #body>
         <UForm v-bind="formSession" :state="selectedForecast" :validate="validateForecast" :validate-on="[]" class="space-y-4" data-help-view="agreement.forecasts.forecast-dialog" data-help-label-en="Agreements — Forecast editor" data-help-label-fr="Ententes — Éditeur de prévision">
+          <UFormField :label="t('agreement.forecasts.submitting_proponent')" name="egcs_fc_applicantrecipient" :description="t('agreement.forecasts.submitting_proponent_description')" required>
+            <CommonServerLookupSelect
+              v-model="selectedForecast.egcs_fc_applicantrecipient"
+              :fetch-url="`/api/agreements/${agreementId}/claims/lookups/proponents`"
+              selected-values-query-key="selected"
+              value-key="id" label-en-key="label_en" label-fr-key="label_fr"
+              :disabled="isSavingForecast"
+              :limit="100" :show-value-in-label="false" close-on-select auto-select-single />
+          </UFormField>
           <UFormField :label="t('agreement.forecasts.fiscal_year')" name="egcs_fc_fiscalyear" required>
             <CommonBilingualSelectMenu
               v-model="selectedForecast.egcs_fc_fiscalyear"
@@ -510,6 +543,7 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"
+              :disabled="isSavingForecast || selectedForecast.egcs_fc_copyfromactive !== undefined"
               required
               aria-required="true"
               searchable />
@@ -519,7 +553,7 @@ const formSession = useFormSession({ owner: forecastModal, action: { kind: 'remo
             <CommonSaveButton
               :label="t('common.add')"
               :loading="isSavingForecast"
-              :disabled="isSavingForecast" data-help-target="agreement.forecasts.forecast-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
+              :disabled="isSavingForecast || isForecastCreateInFlight" data-help-target="agreement.forecasts.forecast-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

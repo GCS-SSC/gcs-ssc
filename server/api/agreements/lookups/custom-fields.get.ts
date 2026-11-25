@@ -1,7 +1,7 @@
 import { defineEventHandler } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeAgreementStreamLookupRoute, prepareAgreementStreamLookupRoute } from '~~/server/utils/agreement-stream-lookup-routes'
-import { readAssignedAgencyCustomFieldDefinitions, readAgreementCustomFieldSections } from '~~/server/utils/agreement-custom-fields'
+import { readAssignedAgencyCustomFieldDefinitions, readStreamCustomFieldSections } from '~~/server/utils/agreement-custom-fields'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 export default defineEventHandler(async event => {
@@ -10,6 +10,6 @@ export default defineEventHandler(async event => {
     if ('statusCode' in lookup) return lookup
     await authorize(event, 'agreement', lookup.permissionAction, async ({ context }) =>
       await authorizeAgreementStreamLookupRoute(db, lookup.permissionAction, lookup.streamId, lookup.streamScope, lookup.agreementContext, context))
-    return { items: await readAssignedAgencyCustomFieldDefinitions(db, lookup.streamId), sections: await readAgreementCustomFieldSections(db, lookup.streamId) }
+    return { items: await readAssignedAgencyCustomFieldDefinitions(db, lookup.streamId), sections: await readStreamCustomFieldSections(db, lookup.streamId) }
   })
 })

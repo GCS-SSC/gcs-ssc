@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { claimCustomFieldEvidenceAnswers, sameClaimCustomFieldEvidence } from '~/utils/agreement-submission-view'
+import { computed } from 'vue'
+import CommonSubmissionHistory from '~/components/Common/Submission/History.vue'
+import { claimCustomFieldEvidenceAnswers, sameClaimCustomFieldEvidence, isSubmissionStructuredEvidence } from '~/utils/agreement-submission-view'
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgreementSubmissionTarget, SubmissionEventRow } from '~~/shared/types/agreement-submission'
 
@@ -8,11 +9,20 @@ const { events, source, target } = defineProps<{ events: SubmissionEventRow[]; s
 const { t, locale } = useI18n()
 const snapshots = computed(() => events.filter(event => event.egcs_fc_payload !== null))
 const evidenceAnswers = computed(() => new Map(snapshots.value.map(event => [event.id, claimCustomFieldEvidenceAnswers(event.egcs_fc_payload)])))
-const snapshotFields = (event?: SubmissionEventRow) => target === 'forecast'
-  ? event?.egcs_fc_forecastcustomfields
-  : event?.egcs_fc_claimcustomfields
-const earlier = ref('')
-const later = ref('')
+const fieldsBySnapshot = computed(() => new Map(snapshots.value.map(event => {
+  const fields = target === 'forecast' ? event.egcs_fc_forecastcustomfields : event.egcs_fc_claimcustomfields
+  const answers = evidenceAnswers.value.get(event.id)
+  return [event.id, fields?.map(field => {
+    const raw = answers?.[field.key]
+    if (!isSubmissionStructuredEvidence(field.value) || !raw || typeof raw !== 'object' || !('rows' in raw)
+      || raw.rows.length !== field.value.rows.length) return field
+    return {
+      ...field,
+      value: { ...field.value, rows: field.value.rows.map((row, index) => ({ ...row, id: row.id ?? raw.rows[index]?.id })) }
+    }
+  })] as const
+})))
+const snapshotFields = (event?: SubmissionEventRow) => event && fieldsBySnapshot.value.get(event.id)
 /**
  * Hides the custom field IDs when the pinned labels are rendered separately.
  * @param event - Submission event selected for display.
@@ -48,59 +58,34 @@ const previousFieldAnswer = (index: number, field: ClaimCustomFieldSnapshot[numb
   )) return undefined
   return priorField.value
 }
-const before = computed(() => snapshots.value.find(event => event.id === earlier.value))
-const after = computed(() => snapshots.value.find(event => event.id === later.value))
-const dateFormatter = computed(() => new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeStyle: 'short' }))
-const versions = computed(() => snapshots.value.map((event, index) => ({
-  value: event.id,
-  label: t('submission.snapshot', { version: index + 1, event: t(`submission.event.${event.egcs_fc_kind}`) })
+const timeline = computed(() => events.map(event => ({
+  id: event.id,
+  title: t(`submission.event.${event.egcs_fc_kind}`),
+  datetime: event.egcs_fc_createdat,
+  actor: event.egcs_fc_kind === 'received' ? source : event.actorName ?? t('submission.system'),
+  revisionLabel: event.egcs_fc_kind === 'received'
+    ? t('submission.source_revision', { revision: event.egcs_fc_sourcerevision })
+    : undefined,
+  section: event.egcs_fc_editsection?.id === null
+    ? t('agreement.claims.additional_information')
+    : event.egcs_fc_editsection?.[locale.value === 'fr' ? 'fr' : 'en'],
+  description: event.egcs_fc_description
 })))
-watch(snapshots, (next, previous) => {
-  if (next.at(-1)?.id === previous?.at(-1)?.id) return
-  earlier.value = next.at(-2)?.id ?? ''
-  later.value = next.at(-1)?.id ?? ''
-}, { immediate: true })
 
 /**
- * Formats event times in the current reader's locale.
- * @param date Timestamp supplied by the API.
- * @returns A localized date and time.
+ * Formats a version picker option from its immutable event.
+ * @param event - Submission event with captured evidence.
+ * @param index - Zero-based version position.
+ * @returns Localized version label.
  */
-const dateTime = (date: string) => dateFormatter.value.format(new Date(date))
+const snapshotLabel = (event: SubmissionEventRow, index: number) =>
+  t('submission.snapshot', { version: index + 1, event: t(`submission.event.${event.egcs_fc_kind}`) })
 </script>
 
 <template>
-  <CommonDetailSection heading="h3" :title="t('submission.history')">
-    <ol class="space-y-4 border-l border-default pl-5">
-      <li v-for="event in events" :key="event.id" class="text-sm">
-        <div class="flex flex-wrap items-baseline gap-x-2">
-          <strong class="text-highlighted">{{ t(`submission.event.${event.egcs_fc_kind}`) }}</strong>
-          <time :datetime="event.egcs_fc_createdat" class="text-muted">{{ dateTime(event.egcs_fc_createdat) }}</time>
-        </div>
-        <p class="text-muted">
-          {{ event.egcs_fc_kind === 'received' ? source : event.actorName ?? t('submission.system') }}
-          <span v-if="event.egcs_fc_kind === 'received'"> · {{ t('submission.source_revision', { revision: event.egcs_fc_sourcerevision }) }}</span>
-        </p>
-        <p v-if="event.egcs_fc_description" class="mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">
-          {{ event.egcs_fc_description }}
-        </p>
-      </li>
-    </ol>
-
-    <section v-if="versions.length > 1" class="min-w-0 space-y-4">
-      <h4 class="font-semibold text-highlighted">
-        {{ t('submission.compare') }}
-      </h4>
-      <div class="grid gap-3 sm:grid-cols-2" data-field-exclude="Snapshot comparison filters do not edit business data.">
-        <UFormField :label="t('submission.before')">
-          <USelect v-model="earlier" :items="versions" class="w-full" />
-        </UFormField>
-        <UFormField :label="t('submission.after')">
-          <USelect v-model="later" :items="versions" class="w-full" />
-        </UFormField>
-      </div>
+  <CommonSubmissionHistory :events="timeline" :snapshots="snapshots" :snapshot-label="snapshotLabel">
+    <template #comparison="{ before, after }">
       <AgreementSubmissionChanges
-        v-if="before && after"
         :before="snapshotPayload(before)"
         :after="snapshotPayload(after)"
         :before-fields="snapshotFields(before) ?? undefined"
@@ -110,41 +95,37 @@ const dateTime = (date: string) => dateFormatter.value.format(new Date(date))
         :target="target"
         :claim-references="claimReferences(before, after)"
         history />
-    </section>
+    </template>
 
-    <div v-if="snapshots.length" class="divide-y divide-default overflow-hidden rounded-md border border-default">
-      <details v-for="(snapshot, index) in snapshots" :key="snapshot.id" class="group/snapshot text-sm">
-        <summary
-          class="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-2.5 font-medium text-highlighted hover:bg-elevated focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary group-open/snapshot:bg-elevated [&::-webkit-details-marker]:hidden">
-          <UIcon name="i-lucide-chevron-right" class="size-4 shrink-0 text-muted group-open/snapshot:rotate-90" aria-hidden="true" />
-          <span class="min-w-0 [overflow-wrap:anywhere]">{{ versions[index]?.label }}</span>
-        </summary>
-        <div class="min-w-0 space-y-5 border-t border-default px-4 py-4 sm:px-5">
-          <AgreementSubmissionValue
-            :value="snapshotPayload(snapshot)"
-            :previous="snapshotPayload(snapshots[index - 1])"
-            :target="target"
-            :claim-references="claimReferences(snapshots[index - 1], snapshot)"
-            snapshot />
-          <section v-if="snapshotFields(snapshot)?.length" class="space-y-3 border-t border-default pt-4">
-            <h4 class="font-semibold text-highlighted">
-              {{ t('agreement.claims.additional_information') }}
-            </h4>
-            <dl class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-x-6 gap-y-4">
-              <div v-for="field in snapshotFields(snapshot)" :key="field.key" class="min-w-0">
-                <dt class="mb-1 text-xs font-medium text-muted [overflow-wrap:anywhere]">
-                  {{ locale === 'fr' ? field.labelFr : field.labelEn }}
-                </dt>
-                <dd class="text-default">
-                  <AgreementSubmissionCustomFieldEvidence
-                    :value="field.value"
-                    :previous="previousFieldAnswer(index, field)" />
-                </dd>
-              </div>
-            </dl>
-          </section>
-        </div>
-      </details>
-    </div>
-  </CommonDetailSection>
+    <template #snapshot="{ snapshot, previous, index }">
+      <AgreementSubmissionValue
+        :value="snapshotPayload(snapshot)"
+        :previous="snapshotPayload(previous)"
+        :target="target"
+        :claim-references="claimReferences(previous, snapshot)"
+        snapshot />
+      <section v-if="snapshotFields(snapshot)?.length" class="space-y-3 border-t border-default pt-4">
+        <h4 class="font-semibold text-highlighted">
+          {{ t('agreement.claims.additional_information') }}
+        </h4>
+        <dl class="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-x-6 gap-y-4">
+          <div
+            v-for="field in snapshotFields(snapshot)"
+            :key="field.key"
+            class="min-w-0"
+            :class="{ 'col-span-full': isSubmissionStructuredEvidence(field.value) || isSubmissionStructuredEvidence(previousFieldAnswer(index, field)) }">
+            <dt class="mb-1 text-xs font-medium text-muted [overflow-wrap:anywhere]">
+              {{ locale === 'fr' ? field.labelFr : field.labelEn }}
+            </dt>
+            <dd class="text-default">
+              <AgreementSubmissionCustomFieldEvidence
+                :value="field.value"
+                :label="locale === 'fr' ? field.labelFr : field.labelEn"
+                :previous="previousFieldAnswer(index, field)" />
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </template>
+  </CommonSubmissionHistory>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, shallowRef, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import type { StreamSubmissionPolicySettings } from '~/composables/useStreamCustomFieldSettings'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { AGREEMENT_SUBMISSION_MODES, AGREEMENT_SUBMISSION_TARGETS } from '~~/shared/types/agreement-submission'
 import { StreamSubmissionPolicySchema } from '~~/shared/types/schemas/stream-submission-policy'
@@ -7,72 +8,34 @@ import type { StreamSubmissionPolicy } from '~~/shared/types/schemas/stream-subm
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
-const { programId, streamId, canUpdate, pendingRequests } = defineProps<{
-  programId: string
-  streamId: string
+const { canUpdate, settings } = defineProps<{
   canUpdate: boolean
-  pendingRequests: Map<string, symbol>
+  settings: StreamSubmissionPolicySettings
 }>()
 const { t } = useI18n()
-const { user, permissionRevision } = useAuth()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
 const validate = createValidator(StreamSubmissionPolicySchema)
 
-const resourceKey = computed(() => `${programId}/${streamId}`)
-const pending = computed(() => pendingRequests.has(resourceKey.value))
-const endpoint = computed(() => `/api/transfer-payments/${programId}/streams/${streamId}/submission-policy`)
-const identity = computed(() => JSON.stringify([resourceKey.value, user.value?.id, permissionRevision.value, canUpdate]))
-const canRead = computed(() => !!user.value?.id)
-
-// A remounted tab waits for the save owned by the Stream detail page before reading its baseline.
-const waitingForPreviousWrite = shallowRef(pending.value)
-const resource = useResourceRequest({
-  identity,
-  enabled: () => canRead.value && (!waitingForPreviousWrite.value || !pending.value),
-  /**
-   * Reads the policy for the current Stream settings panel.
-   * @param signal - Cancellation for the initiating panel request.
-   * @returns The stream's effective policy.
-   */
-  load: async signal => {
-    const response = await fetch(getClientRequestUrl(endpoint.value), { signal })
-    if (!response.ok) await throwFetchResponseError(response)
-    return StreamSubmissionPolicySchema.parse(await response.json())
-  }
-})
-
-const baseline = shallowRef<StreamSubmissionPolicy | null>(null)
+const resource = settings.request
+const pending = computed(() => settings.writes.isPending(settings.endpoint))
+const baseline = resource.data
 const draft = ref<StreamSubmissionPolicy | null>(null)
-watch(resource.data, value => {
-  baseline.value = value
+watch(baseline, value => {
   draft.value = value ? { ...value } : null
 }, { immediate: true, flush: 'sync' })
-let initiatingIdentity: string | null = null
-watch(pending, isPending => {
-  if (isPending) {
-    initiatingIdentity = identity.value
-    return
-  }
-  if (waitingForPreviousWrite.value) {
-    waitingForPreviousWrite.value = false
-    return
-  }
-  if (initiatingIdentity !== identity.value) void resource.refresh()
-  initiatingIdentity = null
-}, { flush: 'sync' })
 
 const formOwner = useModalSession()
-watch(identity, () => {
+watch(settings.identity, () => {
   formOwner.isOpen.value = false
   formOwner.isOpen.value = true
 }, { immediate: true, flush: 'sync' })
-const canDispatch = computed(() => !pending.value && draft.value !== null && baseline.value !== null)
+const canEdit = computed(() => canUpdate && !pending.value && resource.status.value === 'success')
 const actionContext = useActionContext({
-  identity: [() => resourceKey.value],
+  identity: [() => settings.identity.value],
   authority: () => canUpdate,
-  eligible: canDispatch
+  eligible: () => canEdit.value && draft.value !== null
 })
 const choices = computed(() => AGREEMENT_SUBMISSION_MODES.map(value => ({
   value,
@@ -91,31 +54,31 @@ const hasChanges = computed(() => AGREEMENT_SUBMISSION_TARGETS.some(target => dr
 const save = async (event: FormSubmitEvent<StreamSubmissionPolicy>) => {
   const { data } = event
   const operation = actionContext.capture()
-  if (!operation?.canDispatch() || !baseline.value || !hasChanges.value) return
+  const committed = settings.captureCommitted()
+  const session = formOwner.captureSession()
+  if (!operation?.canDispatch() || !committed?.canDispatch() || session === null || !baseline.value) return
   const updates: Partial<StreamSubmissionPolicy> = {}
   for (const target of AGREEMENT_SUBMISSION_TARGETS) {
     if (data[target] !== baseline.value[target]) updates[target] = data[target]
   }
-  const requestedResource = resourceKey.value
-  const url = getClientRequestUrl(endpoint.value)
-  const request = Symbol('submission-policy')
-  pendingRequests.set(requestedResource, request)
+  if (Object.keys(updates).length === 0) return
+  const { endpoint, writes } = settings
+  const ownsFeedback = () => operation.isCurrent() && formOwner.isCurrentSession(session)
+  const release = writes.acquire(endpoint)
+  if (!release) return
   try {
-    const response = await fetch(url, {
+    const response = await fetch(getClientRequestUrl(endpoint), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    const saved = StreamSubmissionPolicySchema.parse(await response.json())
-    if (!operation.isCurrent()) return
-    baseline.value = saved
-    draft.value = { ...saved }
-    toast.add({ title: toast.localized('common.success'), description: toast.localized('submission.policy.saved'), color: 'success' })
+    if (ownsFeedback()) toast.add({ title: toast.localized('common.success'), description: toast.localized('submission.policy.saved'), color: 'success' })
+    await committed.settle()
   } catch (error) {
-    if (operation.isCurrent()) showError(error)
+    if (ownsFeedback()) showError(error)
   } finally {
-    if (pendingRequests.get(requestedResource) === request) pendingRequests.delete(requestedResource)
+    release()
   }
 }
 const form = useFormSession({ owner: formOwner, action: { kind: 'remote', context: actionContext }, submit: save })
@@ -135,17 +98,17 @@ const form = useFormSession({ owner: formOwner, action: { kind: 'remote', contex
     <UForm v-if="draft" v-bind="form" :state="draft" :validate="validate" class="space-y-6">
       <div class="grid gap-4 lg:grid-cols-3">
         <UFormField :label="t('submission.target.claim')" name="claim" required>
-          <USelect v-model="draft.claim" :items="financialChoices" :disabled="!canUpdate || pending" required class="w-full" />
+          <USelect v-model="draft.claim" :items="financialChoices" :disabled="!canEdit" required class="w-full" />
         </UFormField>
         <UFormField :label="t('submission.target.forecast')" name="forecast" required>
-          <USelect v-model="draft.forecast" :items="financialChoices" :disabled="!canUpdate || pending" required class="w-full" />
+          <USelect v-model="draft.forecast" :items="financialChoices" :disabled="!canEdit" required class="w-full" />
         </UFormField>
         <UFormField :label="t('submission.target.amendment_budget')" name="amendment_budget" required>
-          <USelect v-model="draft.amendment_budget" :items="choices" :disabled="!canUpdate || pending" required class="w-full" />
+          <USelect v-model="draft.amendment_budget" :items="choices" :disabled="!canEdit" required class="w-full" />
         </UFormField>
       </div>
       <div v-if="canUpdate" class="flex justify-end">
-        <CommonSaveButton type="submit" :label="t('submission.policy.save')" :disabled="!hasChanges || pending" :loading="pending" />
+        <CommonSaveButton type="submit" :label="t('submission.policy.save')" :disabled="!hasChanges || !canEdit" :loading="pending" />
       </div>
     </UForm>
   </div>

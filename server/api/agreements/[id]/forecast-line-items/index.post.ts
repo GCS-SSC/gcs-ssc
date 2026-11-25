@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3'
+import { recordSubmissionEditComments } from '~~/server/utils/agreement-submission-edit-comments'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementForecastLineItemCreateSchema } from '~~/shared/types/schemas'
@@ -54,7 +55,7 @@ export default defineEventHandler(async event => {
         event, trx, validated.egcs_fc_agreementforecast,
         validated.egcs_fc_fundingagreementbudgetlineitem, validated.egcs_fc_month
       )
-      const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: authoredTotal, ...lineValues } = validated
+      const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: authoredTotal, editComment, ...lineValues } = validated
       const totalAmount = await resolveAgreementLineFundingTotal(event, trx, agreementId, { amount, total: authoredTotal, sources: fundingSources })
       const lineItem = await trx
         .insertInto('Funding_Case_Agreement_Forecast_Line_Item')
@@ -80,6 +81,7 @@ export default defineEventHandler(async event => {
       const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId: String(lineItem.id) })
       if (balanceError) return balanceError
       await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: validated.egcs_fc_agreementforecast })
+      await recordSubmissionEditComments(event, trx, { kind: 'forecast', id: validated.egcs_fc_agreementforecast }, { kind: 'amounts', text: editComment })
       return {
         ...lineItem,
         egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount, currency),

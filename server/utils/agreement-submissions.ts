@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agreement Submission command boundary. */
 import { isDeepStrictEqual } from 'node:util'
 import { isError, type H3Event } from 'h3'
-import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
+import { sql, type Kysely, type Selectable, type Transaction, type Updateable } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type {
   AgreementSubmissionPayload,
@@ -12,13 +12,19 @@ import type {
   AgreementSubmissionBudgetPreview,
   AgreementSubmissionBudgetPreviewInput,
   AgreementSubmissionCommand,
-  AgreementSubmissionEventKind,
   AgreementSubmissionList,
   AgreementSubmissionListQuery,
   AgreementSubmissionReceipt
 } from '~~/shared/types/agreement-submission'
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 import { agreementSubmissionTargetSchemas } from '~~/shared/types/schemas/agreement-submission-targets'
+import {
+  agreementSubmissionAcceptance,
+  agreementSubmissionReviewTransitions,
+  automaticBudgetSubmissionTransitions,
+  resolveAgreementSubmissionReceiptTransition,
+  type AgreementSubmissionTransition
+} from '~~/shared/utils/agreement-submission-transitions'
 import { claimCustomFieldSnapshot } from '~~/shared/utils/claim-custom-field-snapshot'
 import { readClaimSubmissionEvidence } from './agreement-submission-claim-evidence'
 import { assertClaimCustomFieldsComplete, parsePersistedClaimCustomFieldDefinitions } from './agreement-claim-custom-fields'
@@ -124,10 +130,11 @@ const detail = async (db: SubmissionDb, submission: Submission, canReview: boole
 const appendEvent = async (
   trx: Transaction<Database>,
   submission: Submission,
-  kind: AgreementSubmissionEventKind,
+  kind: NonNullable<AgreementSubmissionTransition['event']>,
   description: string | null = null
 ) => {
-  const evidence = kind !== 'review_started' && submission.egcs_fc_target === 'claim' && submission.egcs_fc_result
+  const capturesSnapshot = kind === 'received' || kind === 'returned' || kind === 'accepted'
+  const evidence = capturesSnapshot && submission.egcs_fc_target === 'claim' && submission.egcs_fc_result
     ? await readClaimSubmissionEvidence(
         trx,
         submission.egcs_fc_result,
@@ -136,7 +143,7 @@ const appendEvent = async (
       )
     : null
   let forecastFields: ClaimCustomFieldSnapshot = []
-  if (kind !== 'review_started' && submission.egcs_fc_target === 'forecast' && submission.egcs_fc_result) {
+  if (capturesSnapshot && submission.egcs_fc_target === 'forecast' && submission.egcs_fc_result) {
     const forecast = await trx.selectFrom('Funding_Case_Agreement_Forecast')
       .select(['egcs_fc_customfielddefinitions', 'egcs_fc_customfields'])
       .where('id', '=', submission.egcs_fc_result).where('_deleted', '=', false).executeTakeFirstOrThrow()
@@ -153,12 +160,36 @@ const appendEvent = async (
     egcs_fc_kind: kind,
     egcs_fc_sourcerevision: submission.egcs_fc_sourcerevision,
     egcs_fc_formatversion: submission.egcs_fc_formatversion,
-    egcs_fc_payload: kind === 'review_started' ? null : submission.egcs_fc_payload,
+    egcs_fc_payload: capturesSnapshot ? submission.egcs_fc_payload : null,
     egcs_fc_description: description,
     egcs_fc_actor: submission.egcs_fc_updatedby,
     egcs_fc_amendment: submission.egcs_fc_amendment,
     egcs_fc_budgetrevision: submission.egcs_fc_budgetrevision
   }).execute()
+}
+
+const nextSubmissionRevision = (submission: Submission | undefined) => ({
+  egcs_fc_revision: (submission?.egcs_fc_revision ?? 0) + 1,
+  egcs_fc_updatedat: new Date()
+})
+
+// The caller admits the transition while holding the Agreement and Submission locks.
+const persistSubmissionTransition = async (
+  trx: Transaction<Database>,
+  submission: Submission,
+  transition: AgreementSubmissionTransition,
+  changes: Updateable<Pick<AgreementSubmissionTable,
+    'egcs_fc_payload' | 'egcs_fc_updatedby' | 'egcs_fc_mode' | 'egcs_fc_amendment' | 'egcs_fc_budgetrevision' | 'egcs_fc_blocker' | 'egcs_fc_result'
+  >>,
+  description?: string
+) => {
+  const row = await trx.updateTable('Funding_Case_Agreement_Submission').set({
+    ...changes,
+    egcs_fc_state: transition.state,
+    ...nextSubmissionRevision(submission)
+  }).where('id', '=', submission.id).returningAll().executeTakeFirstOrThrow()
+  if (transition.event) await appendEvent(trx, row, transition.event, description)
+  return row
 }
 
 const currentPrimary = async (trx: Transaction<Database>, agreementId: string) => {
@@ -239,19 +270,14 @@ const materializeAmendment = async (
     primaryUserId: null,
     actorUserId: accepted.actorUserId
   })
-  const row = await trx.updateTable('Funding_Case_Agreement_Submission').set({
-    egcs_fc_state: 'accepted',
-    egcs_fc_revision: submission.egcs_fc_revision + 1,
+  return await persistSubmissionTransition(trx, submission, agreementSubmissionAcceptance, {
     egcs_fc_payload: accepted.payload,
     egcs_fc_amendment: accepted.amendmentId,
     egcs_fc_budgetrevision: accepted.expectedBudgetRevision,
     egcs_fc_updatedby: accepted.actor,
     egcs_fc_blocker: null,
-    egcs_fc_result: result.id,
-    egcs_fc_updatedat: new Date()
-  }).where('id', '=', submission.id).returningAll().executeTakeFirstOrThrow()
-  await appendEvent(trx, row, 'accepted')
-  return row
+    egcs_fc_result: result.id
+  })
 }
 
 const readAccess = async <T>(event: H3Event, agreementId: string, work: (
@@ -316,10 +342,30 @@ export const commandAgreementSubmission = async (
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, initial, async (trx, current, auth) => {
     const submission = await readSubmission(event, trx, agreementId, submissionId, true)
     if (submission.egcs_fc_revision !== command.revision) return await conflict(event, 'SUBMISSION_STALE', 'submission.errors.stale')
-    const state = command.action === 'start' ? 'submitted' : 'reviewing'
-    if (submission.egcs_fc_state !== state) return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
+    const transition = agreementSubmissionReviewTransitions[command.action]
+    if (command.action !== 'withdraw_return' && submission.egcs_fc_state !== transition.from) {
+      return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
+    }
     const actor = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!actor) return await forbidden(event)
+
+    if (command.action === 'withdraw_return') {
+      if (!linked || submission.egcs_fc_state !== transition.from) {
+        return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
+      }
+      const receipt = await trx.selectFrom('Funding_Case_Agreement_Submission_Event')
+        .select('egcs_fc_payload').where('egcs_fc_submission', '=', submissionId)
+        .where('egcs_fc_kind', '=', 'received').where('egcs_fc_sourcerevision', '=', submission.egcs_fc_sourcerevision)
+        .where('_deleted', '=', false).executeTakeFirst()
+      if (!receipt?.egcs_fc_payload) {
+        return await conflict(event, 'SUBMISSION_SOURCE_CONFLICT', 'submission.errors.source_conflict')
+      }
+      const row = await persistSubmissionTransition(trx, submission, transition, {
+        egcs_fc_payload: receipt.egcs_fc_payload,
+        egcs_fc_updatedby: actor
+      })
+      return await detail(trx, row, true, await allowsReturn(trx, current.streamId, linked.target))
+    }
 
     if (linked) {
       if (command.action === 'save' || ('payload' in command && command.payload !== undefined)
@@ -342,16 +388,10 @@ export const commandAgreementSubmission = async (
         return await conflict(event, 'SUBMISSION_FINANCIAL_STALE', 'submission.errors.financial_stale')
       }
       if (action === 'accept') await assertClaimCustomFieldsComplete(event, trx, linked.targetId, linked.target)
-      const state = action === 'start' ? 'reviewing' : action === 'return' ? 'returned' : 'accepted'
-      const row = await trx.updateTable('Funding_Case_Agreement_Submission').set({
-        egcs_fc_state: state,
+      const row = await persistSubmissionTransition(trx, submission, transition, {
         egcs_fc_payload: snapshot,
-        egcs_fc_updatedby: actor,
-        egcs_fc_updatedat: new Date(),
-        egcs_fc_revision: submission.egcs_fc_revision + 1
-      }).where('id', '=', submissionId).returningAll().executeTakeFirstOrThrow()
-      const eventKind = action === 'start' ? 'review_started' : action === 'return' ? 'returned' : 'accepted'
-      await appendEvent(trx, row, eventKind, action === 'return' ? command.description : null)
+        egcs_fc_updatedby: actor
+      }, action === 'return' ? command.description : undefined)
       return await detail(trx, row, true, canReturn)
     }
 
@@ -382,16 +422,11 @@ export const commandAgreementSubmission = async (
       return await detail(trx, row, true)
     }
 
-    const row = await trx.updateTable('Funding_Case_Agreement_Submission').set({
-      egcs_fc_state: command.action === 'return' ? 'returned' : 'reviewing',
+    const row = await persistSubmissionTransition(trx, submission, transition, {
       egcs_fc_mode: 'review',
       egcs_fc_payload: command.action === 'start' ? submission.egcs_fc_payload : (command.payload ?? submission.egcs_fc_payload),
-      egcs_fc_updatedby: actor,
-      egcs_fc_updatedat: new Date(),
-      egcs_fc_revision: submission.egcs_fc_revision + 1
-    }).where('id', '=', submissionId).returningAll().executeTakeFirstOrThrow()
-    if (command.action === 'start') await appendEvent(trx, row, 'review_started')
-    if (command.action === 'return') await appendEvent(trx, row, 'returned', command.description)
+      egcs_fc_updatedby: actor
+    }, command.action === 'return' ? command.description : undefined)
     return await detail(trx, row, true)
   }, { ...(command.action === 'accept' ? {} : evidenceOnly), assignmentTarget })
 }
@@ -432,7 +467,7 @@ export const previewSubmissionBudget = async (
 ): Promise<AgreementSubmissionBudgetPreview> => await readAccess(event, agreementId, async (db, auth, canReview) => {
   if (!canReview) return await forbidden(event)
   const row = await readSubmission(event, db, agreementId, submissionId)
-  if (row.egcs_fc_target !== 'amendment_budget' || row.egcs_fc_state !== 'reviewing') {
+  if (row.egcs_fc_target !== 'amendment_budget' || row.egcs_fc_state !== agreementSubmissionReviewTransitions.accept.from) {
     return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
   }
   if (row.egcs_fc_formatversion !== 1) return await conflict(event, 'SUBMISSION_FORMAT', 'submission.errors.format')
@@ -511,8 +546,9 @@ export const receiveAgreementSubmission = async (
         }
         return existing
       }
-      if (existing.egcs_fc_state !== 'returned') return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
     }
+    const transition = resolveAgreementSubmissionReceiptTransition(existing?.egcs_fc_state ?? null)
+    if (!transition) return await conflict(event, 'SUBMISSION_STATE', 'submission.errors.state')
 
     const amendmentId = input.amendmentId
       ? (await trx.selectFrom('Funding_Case_Agreement_Amendment').select('id')
@@ -569,16 +605,15 @@ export const receiveAgreementSubmission = async (
     const updates = {
       egcs_fc_sourcerevision: input.sourceRevision,
       egcs_fc_formatversion: input.formatVersion,
-      egcs_fc_state: 'submitted' as const,
+      egcs_fc_state: transition.state,
       egcs_fc_mode: existing?.egcs_fc_mode ?? policy[input.target] ?? 'review',
-      egcs_fc_revision: existing ? existing.egcs_fc_revision + 1 : 1,
+      ...nextSubmissionRevision(existing),
       egcs_fc_payload: input.payload,
       egcs_fc_amendment: amendmentId,
       egcs_fc_budgetrevision: input.expectedBudgetRevision ?? null,
       egcs_fc_blocker: null,
       egcs_fc_result: resultId,
-      egcs_fc_updatedby: null,
-      egcs_fc_updatedat: new Date()
+      egcs_fc_updatedby: null
     }
     const row = existing
       ? await trx.updateTable('Funding_Case_Agreement_Submission').set(updates)
@@ -590,12 +625,13 @@ export const receiveAgreementSubmission = async (
           egcs_fc_sourcesystem: input.sourceSystem,
           egcs_fc_sourceid: input.sourceId
         }).returningAll().executeTakeFirstOrThrow()
-    await appendEvent(trx, { ...row, egcs_fc_amendment: input.amendmentId ?? null }, 'received')
+    await appendEvent(trx, { ...row, egcs_fc_amendment: input.amendmentId ?? null }, transition.event)
     return row
   }, { ...evidenceOnly, ...authOptions })
 
   const automaticPending = (row: Submission) =>
-    row.egcs_fc_target === 'amendment_budget' && row.egcs_fc_state === 'submitted' && row.egcs_fc_mode === 'automatic' && row.egcs_fc_blocker == null
+    row.egcs_fc_target === 'amendment_budget' && row.egcs_fc_state === automaticBudgetSubmissionTransitions.from
+    && row.egcs_fc_mode === 'automatic' && row.egcs_fc_blocker == null
     && row.egcs_fc_sourcerevision === input.sourceRevision
   if (!automaticPending(received)) return submissionDto(received)
   try {
@@ -626,9 +662,7 @@ export const receiveAgreementSubmission = async (
     const result = await executeFreshAuthorizedAgreementWrite(event, db, agreementId, initial, async trx => {
       const row = await readSubmission(event, trx, agreementId, received.id, true)
       if (!automaticPending(row)) return row
-      return await trx.updateTable('Funding_Case_Agreement_Submission')
-        .set({ egcs_fc_blocker: blocker, egcs_fc_updatedat: new Date(), egcs_fc_revision: row.egcs_fc_revision + 1 })
-        .where('id', '=', row.id).returningAll().executeTakeFirstOrThrow()
+      return await persistSubmissionTransition(trx, row, automaticBudgetSubmissionTransitions.block, { egcs_fc_blocker: blocker })
     }, { ...evidenceOnly, ...authOptions })
     return submissionDto(result)
   }

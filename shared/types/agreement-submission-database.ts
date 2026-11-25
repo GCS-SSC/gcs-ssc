@@ -41,6 +41,12 @@ export interface AgreementSubmissionTable {
   _deleted: Generated<boolean>
 }
 
+export type AgreementSubmissionEditSection = {
+  id: string
+  en: string
+  fr: string
+} | { id: null }
+
 export interface AgreementSubmissionEventTable {
   id: Generated<string>
   egcs_fc_submission: string
@@ -52,6 +58,7 @@ export interface AgreementSubmissionEventTable {
   egcs_fc_claimcustomfields: Generated<ClaimCustomFieldSnapshot | null>
   egcs_fc_claimreferences: Generated<ClaimSubmissionReferenceSnapshot | null>
   egcs_fc_description: string | null
+  egcs_fc_editsection: Generated<AgreementSubmissionEditSection | null>
   egcs_fc_amendment: Generated<string | null>
   egcs_fc_budgetrevision: Generated<string | null>
   egcs_fc_actor: string | null

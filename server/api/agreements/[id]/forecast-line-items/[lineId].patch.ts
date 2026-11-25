@@ -1,3 +1,4 @@
+import { recordSubmissionEditComments } from '~~/server/utils/agreement-submission-edit-comments'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Route-local validation helpers are self-descriptive and not public API. */
@@ -118,7 +119,7 @@ const patchForecastLineItemForRoute = async (
     return await badRequest(event, 'AGREEMENT_FORECAST_LINE_ITEM_NOT_FOUND', 'apiErrors.agreement.forecast_line_item_not_found')
   }
 
-  const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementForecastLineItemPatchSchema)
+  const { editComment, ...patchValues } = await readValidatedBodyI18n(event, FundingCaseAgreementForecastLineItemPatchSchema)
   if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
   return await executeAgreementForecastMutation(event, db, agreementId, initialContext, async trx => {
     const child = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item').select('egcs_fc_agreementforecast').where('id', '=', lineId).where('_deleted', '=', false).executeTakeFirst()
@@ -206,6 +207,7 @@ const patchForecastLineItemForRoute = async (
     if (balanceError) return balanceError
     for (const forecastId of new Set([existing.egcs_fc_agreementforecast, String(updated.egcs_fc_agreementforecast)])) {
       await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: forecastId })
+      await recordSubmissionEditComments(event, trx, { kind: 'forecast', id: forecastId }, { kind: 'amounts', text: editComment })
     }
     return {
       ...updated,

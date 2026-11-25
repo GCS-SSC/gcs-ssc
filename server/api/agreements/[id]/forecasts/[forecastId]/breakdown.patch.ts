@@ -1,3 +1,4 @@
+import { recordSubmissionEditComments } from '~~/server/utils/agreement-submission-edit-comments'
 import { defineEventHandler, getRouterParam } from 'h3'
 import { FundingCaseAgreementForecastBreakdownPatchSchema } from '~~/shared/types/schemas'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -25,7 +26,11 @@ export default defineEventHandler(async event => {
   const actions = new Set<'create' | 'update'>(changes.cells.map(cell => cell.expected === null ? 'create' : 'update'))
   return await executeAgreementForecastMutation(
     event, db, agreementId, agreementContext, [{ type: 'forecast', id: forecastId }],
-    async trx => await saveAgreementForecastBreakdown(event, trx, agreementId, forecastId, changes),
+    async trx => {
+      const result = await saveAgreementForecastBreakdown(event, trx, agreementId, forecastId, changes)
+      await recordSubmissionEditComments(event, trx, { kind: 'forecast', id: forecastId }, { kind: 'amounts', text: changes.editComment })
+      return result
+    },
     { action: [...actions] }
   )
 })

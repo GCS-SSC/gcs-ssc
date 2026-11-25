@@ -5,13 +5,14 @@ import { useModalSession } from '~/composables/useModalSession'
 import type { ActionContext } from '~/composables/useActionContext'
 import type { z } from 'zod'
 
-const { actionContext, state, schema, title, submitLabel, pending = false, footerClass = 'pt-4' } = defineProps<{
+const { actionContext, state, schema, title, submitLabel, pending = false, submitDisabled = false, footerClass = 'pt-4' } = defineProps<{
   actionContext: ActionContext
   state: T | null
   schema: z.ZodType
   title: string
   submitLabel: string
   pending?: boolean
+  submitDisabled?: boolean
   footerClass?: string
 }>()
 
@@ -37,7 +38,7 @@ const formSession = useFormSession({ owner: modalSession, action: { kind: 'remot
         <slot :state="state" />
         <div class="flex justify-end gap-2" :class="footerClass">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />
-          <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending" />
+          <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending || submitDisabled" />
         </div>
       </UForm>
     </template>

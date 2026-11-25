@@ -9,6 +9,9 @@ const { title, description, heading } = defineProps<{
 <template>
   <section class="w-full min-w-0 space-y-8" data-section-width="full" data-testid="detail-section">
     <CommonDetailSectionHeader :title="title" :description="description" :heading="heading">
+      <template v-if="$slots['title-trailing']" #title-trailing>
+        <slot name="title-trailing" />
+      </template>
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
       </template>

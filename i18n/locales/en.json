@@ -1,4 +1,44 @@
 {
+  "agreement_requests": {
+    "external": "External",
+    "make_shareable": "Mark external",
+    "make_internal": "Make thread internal",
+    "internal_thread": "Internal thread",
+    "add_note": "Add note",
+    "note_tag": "Note",
+    "edit_message": "Edit message",
+    "response_tag": "Response",
+    "request_tag": "Request",
+    "title": "Requests",
+    "new_thread": "New request",
+    "search": "Search by subject",
+    "filter": "Filter by status",
+    "all": "All",
+    "open": "Open",
+    "resolved": "Resolved",
+    "no_threads": "There are no requests yet.",
+    "no_matches": "No requests match your search.",
+    "subject": "Subject",
+    "reply": "Log response",
+    "question_to_answer": "Request to answer",
+    "question_option": "Request {number} · {date} – {message}",
+    "add_question": "Add request",
+    "message": "Message",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "correspondence_at": "Correspondence date and time",
+    "unknown_author": "Staff",
+    "internal": "Internal",
+    "internal_help": "This setting applies to the conversation and its attachments. Notes always stay internal.",
+    "contact": "Autofill from a saved contact",
+    "contact_name": "Contact name",
+    "contact_email": "Contact email",
+    "attachments": "Attachments",
+    "read_only": "This record’s requests are read-only.",
+    "load_error": "Requests could not be loaded.",
+    "saved": "Request updated",
+    "download": "Download {name}"
+  },
   "portable_authoring": {
     "duplicate_name": "A schema with this name already exists. Enter a new name to create a separate draft.",
     "browse": "Browse schemas",
@@ -287,6 +327,10 @@
     "invalid_json": "Enter valid JSON."
   },
   "custom_fields": {
+    "agreement": "Agreement",
+    "forecast": "Forecast",
+    "claim": "Claim",
+    "before_entity": "Before entity",
     "decimal_places": "Decimal places",
     "decimal_places_hint": "Maximum decimal places: {places}",
     "minimum": "Minimum",
@@ -595,11 +639,13 @@
     "save": "Save draft",
     "save_success": "Draft changes saved.",
     "return": "Return for changes",
+    "withdraw_return": "Withdraw return",
     "return_description": "Short description",
     "confirm_return": "Confirm return",
     "accept": "Accept",
     "open_result": "Open {target}",
     "waiting": "Returned · Waiting for a revised submission",
+    "proponent_editing": "Proponent editing · Waiting for a revised submission",
     "needs_attention": "Needs attention",
     "budget_preview": "Proposed budget replacement",
     "replacement_notice": "This replaces the full proposed budget. Fiscal years, lines and funding sources omitted from the submission are removed from the proposal.",
@@ -639,12 +685,16 @@
       "submitted": "Submitted",
       "reviewing": "Editing",
       "returned": "Returned",
+      "proponent_editing": "Proponent editing",
       "accepted": "Accepted"
     },
+    "edit_comment": "Edit comment",
     "event": {
+      "edited": "Submission edited",
       "received": "Submission received",
       "review_started": "Editing started",
       "returned": "Returned for changes",
+      "return_withdrawn": "Return withdrawn",
       "accepted": "Accepted"
     },
     "policy": {
@@ -1332,8 +1382,8 @@
           "manager": "Remove groups where allowed. A group still used by a workflow may need to stay in place."
         },
         "agreement": {
-          "viewer": "Read agreement terms and see related records such as claims, payments, forecasts, and monitoring reports.",
-          "contributor": "Create agreements. On files assigned to you, you can enter claim amounts, prepare payments, update forecasts, record monitoring findings, or submit work for approval when the file is ready. Agreement assignees can review and return submissions. Acceptance also requires permission to write the destination.",
+          "viewer": "Read agreement terms and see related records such as claims, payments, forecasts, and monitoring reports. Read information requests and their attachments on claims and forecasts.",
+          "contributor": "Create agreements. On files assigned to you, you can enter claim amounts, prepare payments, update forecasts, record monitoring findings, or submit work for approval when the file is ready. Agreement assignees can review and return submissions. Acceptance also requires permission to write the destination. On claims and forecasts assigned to you, log correspondence and manage information requests.",
           "manager": "Remove assigned agreements or related records where the file status allows it. For example, you can delete an eligible draft claim that is assigned to you."
         },
         "applicant_recipient": {
@@ -1636,6 +1686,16 @@
     "return_home": "Return to dashboard"
   },
   "apiErrors": {
+    "agreementRequests": {
+      "entry_stale": "Someone changed this message after you opened it. Your draft is still open. Copy your changes before closing the dialog and reloading.",
+      "entry_locked": "Only the last editable message in this conversation can be changed.",
+      "not_found": "Request not found.",
+      "read_only": "Requests for this record are read-only.",
+      "resolved": "Reopen this request before adding a question.",
+      "question_not_found": "The question does not belong to this request.",
+      "request_conflict": "This submission has already been used for different correspondence. Reload and try again.",
+      "too_many_attachments": "You can attach up to five files per entry."
+    },
     "review_copy": {
       "alignment": "The previous assessment contains alignment information, but alignment is disabled for this assessment.",
       "custom_outcomes": "The previous assessment contains custom outcomes, but custom outcomes are disabled for this assessment.",
@@ -2015,6 +2075,8 @@
       "commitment_exceeds_program_funding": "The commitment total cannot exceed the agreement program funding total.",
       "payment_lines_must_match_total": "Payment line amounts must add up to the payment amount.",
       "invalid_forecast_fiscal_year": "The selected forecast fiscal year is invalid for this agreement.",
+      "forecast_create_operation_conflict": "This operation ID already created a Forecast with different inputs.",
+      "invalid_forecast_proponent": "Select an active proponent linked to this Agreement to submit the Forecast.",
       "invalid_forecast_budget_line_item": "The selected forecast budget line item is invalid for this forecast.",
       "invalid_claim_fiscal_year": "The selected claim fiscal year is invalid for this agreement.",
       "invalid_claim_budget_line_item": "The selected claim budget line item is invalid for this claim.",
@@ -2036,6 +2098,7 @@
       "currency_mismatch": "Currency must match the Agreement currency.",
       "initial_approval_required": "Complete the initial Agreement approval submission before creating a Claim or Payment.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
+      "submitting_proponent_immutable": "The submitting proponent cannot be changed after creation.",
       "claim_answers_stale": "The Claim or its submission has changed. Reload the latest answers before saving again.",
       "forecast_answers_stale": "The Forecast or its submission has changed. Reload the latest answers before saving again.",
       "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
@@ -2774,6 +2837,10 @@
     }
   },
   "validation": {
+    "request_attachment_size": "Each attachment must be 10 MB or smaller.",
+    "request_reply_before_question": "A reply cannot be dated before its question.",
+    "request_correspondence_date": "Enter a valid correspondence date and time.",
+    "request_reply_content": "Enter a message or add an attachment.",
     "duplicate_claim_source_line_id": "Use a different source line ID for each claim line.",
     "stream_budget_breakdown_conflict": "Turn off both Other Funding breakdown requirements before switching to Program Funding only.",
     "notification_field_binding_invalid": "Select a supported variable. Text variables use a field binding; date and time variables require a timezone.",
@@ -3566,7 +3633,9 @@
       }
     },
     "forecasts": {
-      "no_additional_information": "No additional fields are configured for this forecast.",
+      "submitting_proponent": "Submitting Proponent",
+      "submitting_proponent_description": "Select the proponent submitting this Forecast. The selection is fixed after creation.",
+      "no_additional_information": "No additional data is configured for this forecast.",
       "program_only_copy_title": "Program funding copied",
       "program_only_copy_notice": "This draft includes Program Funding only. The previous forecast retains its Other Funding.",
       "historical_budget_line_read_only": "This saved line is read-only because its budget line is no longer available in the current budget.",
@@ -3651,7 +3720,7 @@
       "submission_title": "Submission",
       "amounts_tab": "Amounts",
       "additional_tab": "Additional",
-      "no_additional_information": "No additional fields are configured for this claim.",
+      "no_additional_information": "No additional data is configured for this claim.",
       "reconcile_title": "Reconciliation",
       "cost_category": "Cost category",
       "submitted_amount": "Submitted amount",
@@ -3769,7 +3838,7 @@
         "completed_success": "Reconciliation completed successfully"
       },
       "submitting_proponent": "Submitting Proponent",
-      "submitting_proponent_description": "Select the Proponent submitting this Claim from this Agreement. The value can be changed while the Claim remains editable.",
+      "submitting_proponent_description": "Select the proponent submitting this Claim. The selection is fixed after creation.",
       "action_unavailable": "This action is unavailable in the current claim state.",
       "reconcile_prerequisites": "Complete the claim, allocate all submitted lines, and ensure no final reconciliation has been approved before starting a reconciliation."
     },
@@ -5079,7 +5148,10 @@
     "allTables": "All tables",
     "tableLabels": {
       "agreementSubmission": "Agreement submission",
-      "agreementSubmissionEvent": "Agreement submission event"
+      "agreementSubmissionEvent": "Agreement submission event",
+      "agreementRequestAttachment": "Agreement request attachment",
+      "agreementRequestEntry": "Agreement request entry",
+      "agreementRequestThread": "Agreement request thread"
     },
     "accessWindow": "Default search range: last 7 days. Use Filters to choose another period.",
     "accessPageRecords": "{count} records on this page",

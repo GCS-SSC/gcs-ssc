@@ -99,6 +99,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Common_Attachment': { kind: 'references', links: [
     { table: 'public.Common_Entity_Attachment', column: 'egcs_cn_attachment' },
     { table: 'public.Common_Approval_Attachment', column: 'egcs_cn_attachment' },
+    { table: 'public.Funding_Case_Agreement_Request_Attachment', column: 'egcs_fc_attachment' },
     { table: 'public.Funding_Case_Agreement_Generated_Document', column: 'egcs_fc_generatedattachment' },
     { table: 'public.Agency_Document_Template', column: 'egcs_ay_templateattachment_en' },
     { table: 'public.Agency_Document_Template', column: 'egcs_ay_templateattachment_fr' }
@@ -171,6 +172,9 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Funding_Case_Agreement_Submission': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
   'public.Funding_Case_Agreement_Submission_Event': parent('egcs_fc_submission', 'public.Funding_Case_Agreement_Submission'),
   'public.Funding_Case_Agreement_Claim': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
+  'public.Funding_Case_Agreement_Request_Thread': entity('egcs_fc_entityid', 'egcs_fc_entitytype'),
+  'public.Funding_Case_Agreement_Request_Entry': parent('egcs_fc_thread', 'public.Funding_Case_Agreement_Request_Thread'),
+  'public.Funding_Case_Agreement_Request_Attachment': parent('egcs_fc_entry', 'public.Funding_Case_Agreement_Request_Entry'),
   'public.Funding_Case_Agreement_Claim_Line_Item': parent('egcs_fc_fundingagreementclaim', 'public.Funding_Case_Agreement_Claim'),
   'public.Funding_Case_Agreement_Claim_Line_Item_Funding': parent('egcs_fc_claimlineitem', 'public.Funding_Case_Agreement_Claim_Line_Item'),
   'public.Funding_Case_Agreement_Claim_Reconcile': parent('egcs_fc_fundingagreementclaim', 'public.Funding_Case_Agreement_Claim'),

@@ -1,4 +1,5 @@
 import { defineEventHandler } from 'h3'
+import { recordSubmissionEditComments } from '~~/server/utils/agreement-submission-edit-comments'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementClaimLineItemCreateSchema } from '~~/shared/types/schemas'
@@ -53,7 +54,7 @@ export default defineEventHandler(async event => {
 
         const currency = await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
         await assertCurrencyMoneyValues(event, currency, [validated.egcs_fc_amount, validated.egcs_fc_totalamount, ...(validated.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)].filter(value => value !== undefined))
-        const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: authoredTotal, ...lineValues } = validated
+        const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: authoredTotal, editComment, ...lineValues } = validated
         const totalAmount = await resolveAgreementLineFundingTotal(event, trx, agreementId, { amount, total: authoredTotal, sources: fundingSources })
         const created = await trx
           .insertInto('Funding_Case_Agreement_Claim_Line_Item')
@@ -73,6 +74,7 @@ export default defineEventHandler(async event => {
         const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'claim', lineId: String(created.id) })
         if (balanceError) return balanceError
         await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'claim', id: validated.egcs_fc_fundingagreementclaim })
+        await recordSubmissionEditComments(event, trx, { kind: 'claim', id: validated.egcs_fc_fundingagreementclaim }, { kind: 'amounts', text: editComment })
 
         await syncAgreementClaimEditingStatus(trx, validated.egcs_fc_fundingagreementclaim)
 

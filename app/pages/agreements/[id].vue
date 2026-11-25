@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useActionContext } from '~/composables/useActionContext'
+import { useAgreementSubmissionCollection } from '~/composables/useAgreementSubmissionCollection'
 import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useTrackRecentRecord } from '~/composables/useRecentRecords'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
-import { useId, computed, onUnmounted, ref, toRaw, watch } from 'vue'
+import { useId, computed, onUnmounted, ref, shallowRef, toRaw, watch } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
@@ -73,6 +73,15 @@ type AgreementDetailForm = FundingCaseAgreementProfileForm & {
   can_update_child_records?: boolean
   can_delete_child_records?: boolean
 }
+
+type ProfileOperation =
+  | { kind: 'idle' }
+  | { kind: 'checking-edit' }
+  | { kind: 'checking-save' }
+  | { kind: 'writing' }
+  | { kind: 'reading-committed' }
+
+type ProfileReadback = { kind: 'current' } | { kind: 'required'; agreementId: string }
 
 type AgreementDetailProfile = FundingCaseAgreementProfileRow & {
   financialNumberPolicy?: AgreementFinancialNumberPolicy
@@ -148,9 +157,10 @@ const {
 
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
 let profileBaseline: AgreementDetailForm | null = null
-const profileReadbackRequired = ref(false)
+const profileReadback: Ref<ProfileReadback> = shallowRef({ kind: 'current' })
+const profileReadbackRequired = computed(() => profileReadback.value.kind === 'required')
 watch(id, () => {
-  profileReadbackRequired.value = false
+  profileReadback.value = { kind: 'current' }
 }, { flush: 'sync' })
 const profileFormSession = ref(0)
 const { can, canAny, permissionsReady } = useCan()
@@ -166,10 +176,10 @@ const actionContext = useActionContext({
   authority: canUpdateFinancialChildRole,
   eligible: () => status.value === 'success' && !profileReadbackRequired.value && canEditProfile.value
 })
-const mutations = useEditorMutationCoordinator({ getDraft: () => selectedProfile.value, context: actionContext })
-const isSaving = ref(false)
+const profileOperation: Ref<ProfileOperation> = shallowRef({ kind: 'idle' })
+const isSaving = computed(() => profileOperation.value.kind !== 'idle' && profileOperation.value.kind !== 'checking-edit')
 const { check: checkProfileAction } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId: id.value }))
-const isCheckingProfileEdit = ref(false)
+const isCheckingProfileEdit = computed(() => profileOperation.value.kind === 'checking-edit')
 let profileActionGeneration = 0
 watch([() => profile.value?.id, canUpdateFinancialChildRole, () => currentActor.value?.id, permissionRevision], () => {
   profileActionGeneration += 1
@@ -179,14 +189,14 @@ onUnmounted(() => {
 })
 /** Keeps a role-permitted Edit activation available while the profile is read-only. */
 const requestProfileEdit = async () => {
-  if (isCheckingProfileEdit.value || isSaving.value || !canUpdateFinancialChildRole.value) return
+  if (profileOperation.value.kind !== 'idle' || !canUpdateFinancialChildRole.value) return
   const generation = profileActionGeneration
   const proceed = () => generation === profileActionGeneration && canUpdateFinancialChildRole.value
-  isCheckingProfileEdit.value = true
+  profileOperation.value = { kind: 'checking-edit' }
   try {
     if (await checkProfileAction('update', 'profile', proceed) && proceed()) await refreshProfile()
   } finally {
-    isCheckingProfileEdit.value = false
+    profileOperation.value = { kind: 'idle' }
   }
 }
 
@@ -339,6 +349,10 @@ watch([selectedTab, canEditProfile], () => {
   profileActionGeneration += 1
 }, { flush: 'sync' })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
+const submissionCollection = useAgreementSubmissionCollection({
+  agreementId: id,
+  active: () => !isChildDetailRoute.value && selectedTab.value === 'submissions'
+})
 
 const helpVisitId = useId()
 const helpContext = computed<GuideObservedContext>(() => profile.value && String(profile.value.id) === String(route.params.id)
@@ -399,7 +413,7 @@ watch(profileRequestState, state => {
   const owner = value ? JSON.stringify([value.id, value.agency_id, value.program_id]) : null
   if (owner !== profileOwner) {
     profileOwner = owner
-    mutations.replaceSessionDraft(() => hydrateProfile(value))
+    hydrateProfile(value)
   } else if (state.kind === 'success') {
     const draft = selectedProfile.value
     const baseline = profileBaseline
@@ -419,10 +433,12 @@ watch(profileRequestState, state => {
         egcs_fc_customfields: { ...rebased.egcs_fc_customfields, ...laterAnswers }
       }
     } else if (!isSaving.value && JSON.stringify(draft) === JSON.stringify(baseline)) {
-      mutations.replaceSessionDraft(() => hydrateProfile(state.data))
+      hydrateProfile(state.data)
     }
   }
-  if (state.kind === 'success') profileReadbackRequired.value = false
+  if (state.kind === 'success' && profileReadback.value.kind === 'required' && state.data.id === profileReadback.value.agreementId) {
+    profileReadback.value = { kind: 'current' }
+  }
 }, { immediate: true, flush: 'sync' })
 
 /**
@@ -431,68 +447,67 @@ watch(profileRequestState, state => {
  * @param acknowledgeRiskSelection Settles the submitted rating selection without resetting newer edits.
  */
 const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: () => void) => {
-  if (!selectedProfile.value || isSaving.value || profileReadbackRequired.value) {
-    return
+  const originalDraft = selectedProfile.value
+  if (!originalDraft || profileOperation.value.kind !== 'idle' || profileReadbackRequired.value) return
+  const operation = actionContext.capture()
+  if (!operation?.canDispatch()) return
+
+  const generation = profileActionGeneration
+  const agreementId = id.value
+  const hydration = profileFormSession.value
+  const expectedDraft = JSON.stringify(originalDraft)
+  const proceed = () => operation.isCurrent() && generation === profileActionGeneration && profileFormSession.value === hydration
+  const ownsDraft = () => operation.canDispatch() && proceed() && selectedProfile.value === originalDraft && JSON.stringify(selectedProfile.value) === expectedDraft
+  const checking: ProfileOperation = { kind: 'checking-save' }
+  profileOperation.value = checking
+  try {
+    if (!await checkProfileAction('update', 'profile', ownsDraft) || !ownsDraft()) return
+    const {
+      egcs_fc_status: _status,
+      can_delete: _canDelete,
+      can_update: _canUpdate,
+      can_create_child_records_role: _canCreateChildRecordsRole,
+      can_update_child_records_role: _canUpdateChildRecordsRole,
+      can_delete_child_records_role: _canDeleteChildRecordsRole,
+      can_create_child_records: _canCreateChildRecords,
+      can_update_child_records: _canUpdateChildRecords,
+      can_delete_child_records: _canDeleteChildRecords,
+      ...body
+    } = originalDraft
+    const submittedProfile: AgreementDetailForm = JSON.parse(expectedDraft)
+    const submittedAnswers = submittedProfile.egcs_fc_customfields ?? {}
+    const changedFields = changedCustomFieldAnswers(profileBaseline?.egcs_fc_customfields ?? {}, submittedAnswers)
+    body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
+    const policy = profile.value?.financialNumberPolicy
+    if (policy?.readOnly || policy?.value !== undefined) delete body.egcs_fc_financialsystemnumber
+    if (!riskSelectionChanged) delete body.egcs_fc_riskscore
+    else body.egcs_fc_riskscore ??= null
+
+    profileOperation.value = { kind: 'writing' }
+    const response = await fetch(getClientRequestUrl(`/api/agreements/${agreementId}`), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!response.ok) await throwFetchResponseError(response)
+
+    if (id.value !== agreementId || profileRequestState.value.kind === 'disposed') return
+    if (profileFormSession.value === hydration) profileBaseline = submittedProfile
+    if (proceed()) acknowledgeRiskSelection?.()
+    profileReadback.value = { kind: 'required', agreementId }
+    profileOperation.value = { kind: 'reading-committed' }
+    if (!await refreshProfile() || !proceed()) return
+
+    toast.add({
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
+      color: 'success'
+    })
+  } catch (caughtError: unknown) {
+    if (proceed() && (profileOperation.value !== checking || ownsDraft())) showError(caughtError)
+  } finally {
+    profileOperation.value = { kind: 'idle' }
   }
-
-  await mutations.run('update', async token => {
-    const generation = profileActionGeneration
-    const agreementId = id.value
-    const hydration = profileFormSession.value
-    const originalDraft = selectedProfile.value
-    if (!originalDraft) return
-    const proceed = () => mutations.isTokenCurrent(token) && generation === profileActionGeneration && canUpdateFinancialChildRole.value
-    const ownsDraft = () => mutations.canContinue(token) && proceed() && selectedProfile.value === originalDraft && JSON.stringify(selectedProfile.value) === token.expectedDraft
-    let stage: 'checking' | 'writing' = 'checking'
-    isSaving.value = true
-    try {
-      if (!await checkProfileAction('update', 'profile', ownsDraft) || !ownsDraft()) return
-      const {
-        egcs_fc_status: _status,
-        can_delete: _canDelete,
-        can_update: _canUpdate,
-        can_create_child_records_role: _canCreateChildRecordsRole,
-        can_update_child_records_role: _canUpdateChildRecordsRole,
-        can_delete_child_records_role: _canDeleteChildRecordsRole,
-        can_create_child_records: _canCreateChildRecords,
-        can_update_child_records: _canUpdateChildRecords,
-        can_delete_child_records: _canDeleteChildRecords,
-        ...body
-      } = originalDraft
-      const submittedProfile: AgreementDetailForm = JSON.parse(token.expectedDraft)
-      const submittedAnswers = submittedProfile.egcs_fc_customfields ?? {}
-      const changedFields = changedCustomFieldAnswers(profileBaseline?.egcs_fc_customfields ?? {}, submittedAnswers)
-      body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
-      const policy = profile.value?.financialNumberPolicy
-      if (policy?.readOnly || policy?.value !== undefined) delete body.egcs_fc_financialsystemnumber
-      if (!riskSelectionChanged) delete body.egcs_fc_riskscore
-      else body.egcs_fc_riskscore ??= null
-
-      stage = 'writing'
-      const response = await fetch(getClientRequestUrl(`/api/agreements/${agreementId}`), {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      if (!response.ok) await throwFetchResponseError(response)
-
-      if (id.value !== agreementId || profileRequestState.value.kind === 'disposed') return
-      if (profileFormSession.value === hydration) profileBaseline = submittedProfile
-      if (proceed()) acknowledgeRiskSelection?.()
-      profileReadbackRequired.value = true
-      if (!await refreshProfile() || !proceed()) return
-
-      toast.add({
-        title: toast.localized('common.success'),
-        description: toast.localized('common.updated_success'),
-        color: 'success'
-      })
-    } catch (caughtError: unknown) {
-      if (proceed() && (stage === 'writing' || ownsDraft())) showError(caughtError)
-    } finally {
-      isSaving.value = false
-    }
-  })
 }
 
 /**
@@ -500,7 +515,7 @@ const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: (
  */
 const cancel = () => {
   if (isSaving.value) return
-  mutations.replaceSessionDraft(() => hydrateProfile(profile.value))
+  hydrateProfile(profile.value)
 }
 
 useFieldTooltipProvider(() => profile.value && String(profile.value.id) === String(route.params.id) ? { entityType: 'agreement', entityId: profile.value.id } : null)
@@ -779,7 +794,8 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <AgreementSubmissionsTab
               v-else-if="selectedTab === 'submissions'"
               :agreement-id="id"
-              :currency="profile.egcs_fc_currency" />
+              :currency="profile.egcs_fc_currency"
+              :owner="submissionCollection" />
 
             <AgreementClaimsTab
               v-else-if="selectedTab === 'claims'"

@@ -46,6 +46,8 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
       ))
       .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
+      .innerJoin('Applicant_Recipient_Profile as submitting_proponent', 'submitting_proponent.id',
+        'Funding_Case_Agreement_Forecast.egcs_fc_applicantrecipient')
       .where('Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement', '=', agreementId)
       .$if(Boolean(forecastId), query => query.where('Funding_Case_Agreement_Forecast.id', '=', forecastId!))
       .where('Funding_Case_Agreement_Forecast._deleted', '=', false)
@@ -55,6 +57,9 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
       .where('Agency_Fiscal_Year._deleted', '=', false)
       .select([
         'Funding_Case_Agreement_Forecast.id as id',
+        'Funding_Case_Agreement_Forecast.egcs_fc_applicantrecipient',
+        sql<string>`COALESCE(NULLIF(BTRIM(${sql.ref('submitting_proponent.egcs_ar_operatingname_en')}),''),${sql.ref('submitting_proponent.egcs_ar_legalname_en')},${''})`.as('submitting_proponent_name_en'),
+        sql<string>`COALESCE(NULLIF(BTRIM(${sql.ref('submitting_proponent.egcs_ar_operatingname_fr')}),''),${sql.ref('submitting_proponent.egcs_ar_legalname_fr')},${''})`.as('submitting_proponent_name_fr'),
         'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
         'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
         'Funding_Case_Agreement_Forecast.egcs_fc_status as egcs_fc_status',

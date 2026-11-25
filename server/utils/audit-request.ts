@@ -6,6 +6,20 @@ import type { GcsRegisteredExtension } from '../../shared/utils/extensions'
 import { sanitizeAuditInput } from './audit-inputs'
 
 const querySnapshots = new WeakMap<H3Event, { path: string; query: unknown }>()
+const agreementRequestsPath = /^\/api\/agreements\/[^/?]+\/requests\/[^/?]+\/[^/?]+(?:\/[^/?]+\/entries(?:\/([^/?]+))?)?\/?(?:\?|$)/
+
+const isAgreementCorrespondenceWrite = (event: H3Event): boolean => {
+  if (event.method !== 'POST' && event.method !== 'PATCH') return false
+  const route = agreementRequestsPath.exec(event.path)
+  if (!route) return false
+  const entryId = route[1]
+  return event.method === 'POST' ? entryId === undefined : entryId !== undefined
+}
+
+const restrictRequestInputs = (event: H3Event): void => {
+  event.context.auditRequestInputsRestricted = true
+  if (Object.hasOwn(event.context, 'auditRequestBody')) event.context.auditRequestBody = { state: 'restricted' }
+}
 
 const freezeSnapshot = (value: unknown): unknown => {
   if (value && typeof value === 'object') {
@@ -32,8 +46,7 @@ const requestQuerySnapshot = (event: H3Event): unknown => {
  */
 export const classifyExtensionAuditInputs = (event: H3Event, extension: Pick<GcsRegisteredExtension, 'requiredHostCapabilities'>): void => {
   if (extension.requiredHostCapabilities?.includes('extension-secrets')) {
-    event.context.auditRequestInputsRestricted = true
-    if (Object.hasOwn(event.context, 'auditRequestBody')) event.context.auditRequestBody = { state: 'restricted' }
+    restrictRequestInputs(event)
   }
 }
 
@@ -52,6 +65,7 @@ const requestInputsRestricted = (event: H3Event): boolean => {
     const extension = getGcsExtensionByKey(decodedKey)
     if (extension) classifyExtensionAuditInputs(event, extension)
   }
+  if (isAgreementCorrespondenceWrite(event)) restrictRequestInputs(event)
   if (/\/auth(?:\/|$)|secret|credential/i.test(event.path)) event.context.auditRequestInputsRestricted = true
   return event.context.auditRequestInputsRestricted === true
 }

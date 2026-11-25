@@ -2,14 +2,21 @@
 import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import type { $Fetch } from 'ofetch'
 import { useActionContext } from '~/composables/useActionContext'
+import type { useAgreementSubmissionCollection } from '~/composables/useAgreementSubmissionCollection'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useResourceRequest } from '~/composables/useResourceRequest'
+import { useSubmissionReturn } from '~/composables/useSubmissionReturn'
 import { AgreementSubmissionPayloadSchema } from '~~/shared/types/agreement-submission'
 import type { AgreementSubmissionBudgetPreview, AgreementSubmissionCommand, AgreementSubmissionDetail } from '~~/shared/types/agreement-submission'
 import { agreementSubmissionTargetSchemas } from '~~/shared/types/schemas/agreement-submission-targets'
+import { agreementSubmissionReviewTransitions } from '~~/shared/utils/agreement-submission-transitions'
 import { appRouteLocations } from '~/utils/route-locations'
 import { requiredSubmissionFields, submissionFieldKey, submissionFields } from '~/utils/agreement-submission-view'
 import type { SubmissionObject } from '~/utils/agreement-submission-view'
+
+type StandaloneDecision =
+  | { action: 'start' | 'save' | 'accept' }
+  | { action: 'return'; description: string }
 
 type BudgetOption = { id: string; nameEn: string; nameFr: string }
 
@@ -18,25 +25,25 @@ const { agreementId, submissionId, currency, commandPending, sendCommand } = def
   submissionId: string
   currency: string
   commandPending: boolean
-  sendCommand: (submissionId: string, command: AgreementSubmissionCommand) => Promise<AgreementSubmissionDetail | undefined>
+  sendCommand: ReturnType<typeof useAgreementSubmissionCollection>['sendCommand']
 }>()
 const { t, te, locale } = useI18n()
 const localePath = useLocalePath()
 const { showError, resolveDetails } = useApiErrorToast()
+const { user, permissionRevision } = useAuth()
 const toast = useLocalizedToast()
 const { translateMessage } = useZodI18n()
 const draft = shallowRef<SubmissionObject>({})
 const payloadHeading = ref<HTMLElement | null>(null)
-const description = ref('')
-const returning = ref(false)
-const returnError = ref(false)
-const actionError = ref(false)
+const recovery = shallowRef<{ kind: 'ready' } | { kind: 'write-failed'; error: unknown }>({ kind: 'ready' })
 const amendmentId = ref('')
-const confirmed = ref(false)
+const confirmedPreview = shallowRef<AgreementSubmissionBudgetPreview | null>(null)
 const apiPath = computed(() => `/api/agreements/${agreementId}/submissions/${submissionId}`)
+const identity = computed(() => JSON.stringify([apiPath.value, user.value?.id, permissionRevision.value]))
 const fetchJson: $Fetch = $fetch as $Fetch
 const resource = useResourceRequest({
-  identity: apiPath,
+  identity,
+  enabled: () => Boolean(user.value),
   load: signal => fetchJson<AgreementSubmissionDetail>(apiPath.value, { signal })
 })
 const committed = shallowRef<AgreementSubmissionDetail | null>(null)
@@ -47,11 +54,17 @@ const canReview = computed(() => detail.value?.canReview === true)
 const editable = computed(() => canReview.value && state.value === 'reviewing' && submission.value?.egcs_fc_formatversion === 1)
 const fields = computed(() => submission.value ? submissionFields[submission.value.egcs_fc_target] : null)
 const context = useActionContext({ identity: [() => agreementId, () => submissionId], authority: canReview })
+const returnContext = useActionContext({
+  identity: [apiPath, () => submission.value?.egcs_fc_revision, state],
+  authority: canReview
+})
 const mutation = useEditorMutationCoordinator({ context, getDraft: () => draft.value })
 const isPending = computed(() => commandPending || mutation.isPending.value)
+const canDecide = computed(() => !isPending.value && resource.status.value === 'success')
+const returnEditor = useSubmissionReturn({ context: returnContext, eligible: canDecide })
 const budgetMode = computed(() => editable.value && submission.value?.egcs_fc_target === 'amendment_budget')
 const options = useResourceRequest({
-  identity: apiPath,
+  identity,
   enabled: budgetMode,
   load: signal => fetchJson<{ options: BudgetOption[] }>(apiPath.value + '/budget-preview', { signal })
 })
@@ -59,7 +72,7 @@ const budgetOptions = computed(() => (options.data.value?.options ?? []).map(opt
   label: locale.value === 'fr' ? option.nameFr || option.nameEn : option.nameEn || option.nameFr,
   value: option.id
 })))
-const previewIdentity = computed(() => JSON.stringify([apiPath.value, submission.value?.egcs_fc_revision, amendmentId.value, draft.value]))
+const previewIdentity = computed(() => JSON.stringify([identity.value, submission.value?.egcs_fc_revision, amendmentId.value, draft.value]))
 const preview = useResourceRequest({
   identity: previewIdentity,
   enabled: () => budgetMode.value && amendmentId.value !== '',
@@ -70,6 +83,12 @@ const preview = useResourceRequest({
   })
 })
 const previewDetails = computed(() => resolveDetails(preview.error.value))
+const confirmation = computed({
+  get: () => preview.data.value !== null && confirmedPreview.value === preview.data.value,
+  set: checked => {
+    confirmedPreview.value = checked ? preview.data.value : null
+  }
+})
 const validationIssues = computed(() => {
   if (!editable.value || !submission.value) return []
   const parsed = agreementSubmissionTargetSchemas[submission.value.egcs_fc_target].safeParse(draft.value)
@@ -84,9 +103,7 @@ const validationIssues = computed(() => {
         message: translateMessage(issue.message, issue)
       }))
 })
-const canAccept = computed(() => editable.value && (
-  !budgetMode.value || (preview.data.value !== null && confirmed.value)
-))
+const canAccept = computed(() => editable.value && (!budgetMode.value || confirmation.value))
 const requiredKeys = computed(() => submission.value ? requiredSubmissionFields[submission.value.egcs_fc_target] : [])
 const blockerKey = computed(() => {
   const blocker = submission.value?.egcs_fc_blocker
@@ -106,8 +123,13 @@ const result = computed(() => {
   }
 })
 
-watch(previewIdentity, () => {
-  confirmed.value = false
+watch(identity, () => {
+  committed.value = null
+  recovery.value = { kind: 'ready' }
+  mutation.replaceSessionDraft(() => {
+    draft.value = {}
+    amendmentId.value = ''
+  })
 }, { flush: 'sync' })
 watch(() => resource.data.value, response => {
   if (!response) return
@@ -122,27 +144,27 @@ watch(() => resource.data.value, response => {
  * Loads a replacement preview against the currently selected draft Amendment.
  * @returns Whether the preview request established current evidence.
  */
-const loadPreview = () => {
-  confirmed.value = false
-  return preview.refresh()
-}
+const loadPreview = () => preview.refresh()
 
 /**
  * Reloads only the server record after a failed request.
  * @returns Whether the reload established current evidence.
  */
 const reload = () => {
-  actionError.value = false
+  if (isPending.value) return
+  recovery.value = { kind: 'ready' }
   return resource.refresh()
 }
 
 /**
  * Issues one transition against the current saved review revision.
- * @param action Requested review action.
+ * @param decision - Requested review action and its opening's validated reason.
  */
-const execute = async (action: AgreementSubmissionCommand['action']) => {
+const execute = async (decision: StandaloneDecision) => {
+  const { action } = decision
   const current = submission.value
-  if (!current || isPending.value) return
+  if (!current || !canDecide.value || !canReview.value) return
+  if (current.egcs_fc_state !== agreementSubmissionReviewTransitions[action].from) return
   const revision = current.egcs_fc_revision
   const parsed = AgreementSubmissionPayloadSchema.safeParse(draft.value)
   if (!parsed.success) return
@@ -153,14 +175,12 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
       request = { action, revision }
       break
     case 'save':
+      if (!editable.value) return
       request = { action, revision, payload }
       break
     case 'return':
-      if (!description.value.trim()) {
-        returnError.value = true
-        return
-      }
-      request = { action, revision, payload, description: description.value.trim() }
+      if (!returnEditor.session.isOpen.value || !returnContext.capture()?.canDispatch()) return
+      request = { action, revision, payload, description: decision.description }
       break
     case 'accept':
       if (!canAccept.value) return
@@ -173,12 +193,13 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
         : { action, revision, payload }
       break
   }
-  actionError.value = false
-  returnError.value = false
+  recovery.value = { kind: 'ready' }
   await mutation.run(action, async token => {
     try {
-      const response = await sendCommand(submissionId, request)
-      if (!response || !mutation.isTokenCurrent(token)) return
+      if (!mutation.canContinue(token)) return
+      const commandResult = await sendCommand(submissionId, request)
+      if (commandResult.kind !== 'committed' || !mutation.isTokenCurrent(token)) return
+      const response = commandResult.detail
       committed.value = response
       mutation.applyMutationRefresh(token, {
         apply: () => {
@@ -186,10 +207,6 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
         }
       })
       if (action === 'save') toast.add({ title: toast.localized('common.success'), description: toast.localized('submission.save_success'), color: 'success' })
-      if (action === 'return') {
-        returning.value = false
-        description.value = ''
-      }
       if (action !== 'save') {
         await nextTick()
         if (mutation.isTokenCurrent(token)) payloadHeading.value?.focus()
@@ -198,9 +215,8 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
       if (mutation.isTokenCurrent(token)) {
         if (action === 'accept' && budgetMode.value) {
           preview.reset()
-          confirmed.value = false
         }
-        actionError.value = true
+        recovery.value = { kind: 'write-failed', error }
         showError(error)
       }
     }
@@ -212,7 +228,7 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
   <CommonLoadingState v-if="resource.status.value === 'pending' && !detail" :label="t('common.loading')" />
   <CommonErrorNotice v-if="resource.error.value" :title="t('submission.detail_failed')">
     <template #actions>
-      <UButton color="error" variant="outline" @click="reload">
+      <UButton color="error" variant="outline" :disabled="isPending" @click="reload">
         {{ t('common.retry') }}
       </UButton>
     </template>
@@ -226,7 +242,7 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
         state: t(`submission.state.${submission.egcs_fc_state}`)
       })">
       <template v-if="state === 'submitted' && canReview" #actions>
-        <UButton icon="i-lucide-play" :loading="mutation.isActionPending('start')" :disabled="isPending" @click="execute('start')">
+        <UButton icon="i-lucide-play" :loading="mutation.isActionPending('start')" :disabled="!canDecide" @click="execute({ action: 'start' })">
           {{ t('submission.start') }}
         </UButton>
       </template>
@@ -238,9 +254,9 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
           v-if="state === 'returned'"
           tone="warning" icon="i-lucide-undo-2" :title="t('submission.waiting')" :description="latestReturn?.egcs_fc_description ?? undefined" />
         <CommonNotice v-if="submission.egcs_fc_formatversion !== 1" tone="warning" :title="t('submission.errors.format')" />
-        <CommonErrorNotice v-if="actionError" :title="t('submission.action_failed')">
+        <CommonErrorNotice v-if="recovery.kind === 'write-failed'" :title="t('submission.action_failed')">
           <template #actions>
-            <UButton color="error" variant="outline" :loading="resource.status.value === 'pending'" @click="reload">
+            <UButton color="error" variant="outline" :loading="resource.status.value === 'pending'" :disabled="isPending" @click="reload">
               {{ t('submission.reload') }}
             </UButton>
           </template>
@@ -309,42 +325,36 @@ const execute = async (action: AgreementSubmissionCommand['action']) => {
         </CommonErrorNotice>
         <div v-if="preview.data.value" class="space-y-4">
           <AgreementSubmissionChanges :before="preview.data.value.current" :after="preview.data.value.replacement" />
-          <UCheckbox v-model="confirmed" data-field-exclude="Transient confirmation of the previewed replacement." required :disabled="isPending" :label="t('submission.confirm_replacement')" />
+          <UCheckbox v-model="confirmation" data-field-exclude="Transient confirmation of the previewed replacement." required :disabled="isPending" :label="t('submission.confirm_replacement')" />
         </div>
       </section>
 
       <div v-if="state === 'reviewing' && canReview" class="flex flex-wrap gap-3">
         <UButton
-          v-if="editable" color="neutral" variant="outline" :disabled="isPending" :loading="mutation.isActionPending('save')"
-          @click="execute('save')">
+          v-if="editable" color="neutral" variant="outline" :disabled="!canDecide" :loading="mutation.isActionPending('save')"
+          @click="execute({ action: 'save' })">
           {{ t('submission.save') }}
         </UButton>
-        <UButton color="warning" variant="outline" :disabled="isPending" @click="returning = true">
-          {{ t('submission.return') }}
-        </UButton>
+        <AgreementSubmissionReturnDialog
+          :editor="returnEditor"
+          :busy="mutation.isActionPending('return')"
+          :disabled="!canDecide"
+          @confirm="description => execute({ action: 'return', description })">
+          <template #trigger>
+            <UButton color="warning" :disabled="!canDecide" @click="returnEditor.open">
+              {{ t('submission.return') }}
+            </UButton>
+          </template>
+          <UFormField data-field-scope="agreement.submission" name="description" required :label="t('submission.return_description')">
+            <UTextarea v-model="returnEditor.draft.description" class="w-full" required :maxlength="500" :disabled="!canDecide" />
+          </UFormField>
+        </AgreementSubmissionReturnDialog>
         <UButton
-          v-if="editable" color="success" icon="i-lucide-check" :disabled="!canAccept || isPending" :loading="mutation.isActionPending('accept')"
-          @click="execute('accept')">
+          v-if="editable" color="success" icon="i-lucide-check" :disabled="!canAccept || !canDecide" :loading="mutation.isActionPending('accept')"
+          @click="execute({ action: 'accept' })">
           {{ t('submission.accept') }}
         </UButton>
       </div>
-
-      <section v-if="returning && state === 'reviewing' && canReview" class="space-y-4 rounded-md border border-default p-4">
-        <h4 class="font-semibold text-highlighted">
-          {{ t('submission.return') }}
-        </h4>
-        <UFormField data-field-scope="agreement.submission" name="description" required :label="t('submission.return_description')" :error="returnError ? t('validation.required') : undefined">
-          <UTextarea v-model="description" class="w-full" required :maxlength="500" :disabled="isPending" />
-        </UFormField>
-        <div class="flex flex-wrap gap-3">
-          <UButton color="warning" :loading="mutation.isActionPending('return')" @click="execute('return')">
-            {{ t('submission.confirm_return') }}
-          </UButton>
-          <UButton color="neutral" variant="outline" :disabled="isPending" @click="returning = false">
-            {{ t('common.cancel') }}
-          </UButton>
-        </div>
-      </section>
     </CommonDetailSection>
     <AgreementSubmissionHistory :events="detail.events" :source="submission.egcs_fc_sourcesystem" :target="submission.egcs_fc_target" />
   </template>

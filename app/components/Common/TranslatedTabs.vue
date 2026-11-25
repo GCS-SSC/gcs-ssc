@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUpdated, ref, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, shallowRef, useId } from 'vue'
 import type { ComponentPublicInstance, Ref } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
@@ -51,13 +51,14 @@ const orderedItems = computed(() => {
     const leftIsGeneral = left.value === 'general' || left.key.endsWith('.general')
     const rightIsGeneral = right.value === 'general' || right.key.endsWith('.general')
     if (leftIsGeneral !== rightIsGeneral) return leftIsGeneral ? -1 : 1
-    return collator.compare(left.label ?? t(left.key), right.label ?? t(right.key))
+    return collator.compare(left.sortLabel ?? left.label ?? t(left.key), right.sortLabel ?? right.label ?? t(right.key))
   })
 })
 
 const translatedItems = computed(() =>
   orderedItems.value.map(item => ({
     ...item,
+    disabled: item.navigationHeading,
     label: item.label ?? t(item.key)
   }))
 )
@@ -65,7 +66,13 @@ const translatedItems = computed(() =>
 // Reka's roving-focus collection stays paired with their visible triggers.
 const itemsIdentity = computed(() => translatedItems.value.map(item => item.value).join('\u0000'))
 
-const isMobileExpanded = ref(false)
+type MobileNavigation =
+  | { kind: 'collapsed' }
+  | { kind: 'expanded' }
+  | { kind: 'restoring-focus' }
+  | { kind: 'disposed' }
+const mobileNavigation = shallowRef<MobileNavigation>({ kind: 'collapsed' })
+const isMobileExpanded = computed(() => mobileNavigation.value.kind === 'expanded')
 const mobileToggleContainer: Ref<HTMLElement | null> = ref(null)
 const mobilePanelId = `translated-tabs-mobile-panel-${useId()}`
 const mobileTabs = ref<ComponentPublicInstance | null>(null)
@@ -82,6 +89,11 @@ const associateExternalPanel = async () => {
     for (const [index, trigger] of triggers.entries()) {
       const element = trigger?.$el
       if (!(element instanceof HTMLElement)) continue
+      if (translatedItems.value[index]?.navigationHeading) {
+        element.setAttribute('aria-hidden', 'true')
+        continue
+      }
+      element.removeAttribute('aria-hidden')
       if (helpNavigationTarget && translatedItems.value[index]?.value === helpNavigationValue) element.setAttribute('data-help-target', helpNavigationTarget)
       else element.removeAttribute('data-help-target')
       if (content) continue
@@ -108,15 +120,21 @@ const selectedItem = computed(() => {
 })
 
 const toggleMobileTabs = () => {
-  isMobileExpanded.value = !isMobileExpanded.value
+  mobileNavigation.value = isMobileExpanded.value ? { kind: 'collapsed' } : { kind: 'expanded' }
 }
+onBeforeUnmount(() => {
+  mobileNavigation.value = { kind: 'disposed' }
+})
 
 /** Collapses the mobile list and restores focus after keyboard activation settles. */
 const closeMobileTabs = async () => {
-  if (!mobileAutoCloseOnSelect) return
-  isMobileExpanded.value = false
+  if (!mobileAutoCloseOnSelect || !isMobileExpanded.value) return
+  const restoration: MobileNavigation = { kind: 'restoring-focus' }
+  mobileNavigation.value = restoration
   await nextTick()
   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  if (mobileNavigation.value !== restoration) return
+  mobileNavigation.value = { kind: 'collapsed' }
   mobileToggleContainer.value?.querySelector<HTMLButtonElement>('button')?.focus()
 }
 
@@ -136,7 +154,8 @@ const onMobileTabUpdate = async (value: string | number) => {
  * @param event The click activation bubbling from a tab trigger.
  */
 const onMobilePanelClick = async (event: MouseEvent) => {
-  if (!(event.target instanceof HTMLElement) || !event.target.closest('[role="tab"]')) return
+  const trigger = event.target instanceof HTMLElement ? event.target.closest('[role="tab"]') : null
+  if (!trigger || trigger.matches('[disabled], [aria-disabled="true"], [aria-hidden="true"]')) return
   await closeMobileTabs()
 }
 </script>

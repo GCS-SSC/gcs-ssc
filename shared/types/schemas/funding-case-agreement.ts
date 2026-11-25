@@ -609,14 +609,16 @@ export type FundingCaseAgreementCommitmentLinePatch = z.infer<typeof FundingCase
 export type FundingCaseAgreementCommitmentLineItem = WithId<FundingCaseAgreementCommitmentLine>
 
 export const FundingCaseAgreementForecastBaseSchema = z.object({
+  egcs_fc_applicantrecipient: RequiredBigintSelectionId(),
   egcs_fc_fiscalyear: RequiredBigintSelectionId()
 })
 
 export const FundingCaseAgreementForecastCreateSchema = FundingCaseAgreementForecastBaseSchema.extend({
-  egcs_fc_copyfromactive: z.boolean().optional()
+  egcs_fc_copyfromactive: z.boolean().optional(),
+  clientOperationId: z.uuid({ error: 'validation.invalid_selection' }).optional()
 }).strict()
 
-export type FundingCaseAgreementForecast = z.infer<typeof FundingCaseAgreementForecastCreateSchema>
+export type FundingCaseAgreementForecast = Omit<z.infer<typeof FundingCaseAgreementForecastCreateSchema>, 'clientOperationId'>
 export type FundingCaseAgreementForecastItem = WithId<FundingCaseAgreementForecast & {
   egcs_fc_version: string
   egcs_fc_fundingagreement: string
@@ -634,8 +636,13 @@ export const FundingCaseAgreementForecastLineItemBaseSchema = z.object({
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 
-export const FundingCaseAgreementForecastLineItemCreateSchema = FundingCaseAgreementForecastLineItemBaseSchema.strict().superRefine(validateFinancialInputCurrencies)
-export const FundingCaseAgreementForecastLineItemPatchSchema = FundingCaseAgreementForecastLineItemBaseSchema.partial().strict().superRefine(validateFinancialInputCurrencies)
+export const SUBMISSION_EDIT_COMMENT_MAX_LENGTH = 500
+export const SubmissionEditCommentSchema = RequiredString().max(SUBMISSION_EDIT_COMMENT_MAX_LENGTH, { error: 'validation.max_length' })
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+export const SubmissionEditMetadataSchema = z.strictObject({ editComment: SubmissionEditCommentSchema.optional() })
+
+export const FundingCaseAgreementForecastLineItemCreateSchema = FundingCaseAgreementForecastLineItemBaseSchema.extend(SubmissionEditMetadataSchema.shape).strict().superRefine(validateFinancialInputCurrencies)
+export const FundingCaseAgreementForecastLineItemPatchSchema = FundingCaseAgreementForecastLineItemBaseSchema.partial().extend(SubmissionEditMetadataSchema.shape).strict().superRefine(validateFinancialInputCurrencies)
 
 export type FundingCaseAgreementForecastLineItem = z.infer<typeof FundingCaseAgreementForecastLineItemCreateSchema>
 export type FundingCaseAgreementForecastLineItemPatch = z.infer<typeof FundingCaseAgreementForecastLineItemPatchSchema>
@@ -671,7 +678,7 @@ export const FundingCaseAgreementForecastBreakdownCellSchema = z.object({
   }
 })
 
-export const FundingCaseAgreementForecastBreakdownPatchSchema = z.object({
+export const FundingCaseAgreementForecastBreakdownPatchSchema = SubmissionEditMetadataSchema.extend({
   cells: z.array(FundingCaseAgreementForecastBreakdownCellSchema)
     .min(1, { error: 'validation.required' })
     .max(2400, { error: 'validation.max_items' })
@@ -812,8 +819,13 @@ export const FundingCaseAgreementClaimCreateSchema = FundingCaseAgreementClaimBa
   }
 )
 
+export const FundingCaseAgreementClaimEditorSchema = FundingCaseAgreementClaimBaseSchema
+  .omit({ egcs_fc_applicantrecipient: true })
+  .superRefine(validatePeriodRange)
+
 const customFieldAnswerPatch = {
   egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
+  customFieldComments: z.record(z.union([PositivePostgresBigintIdSchema, z.literal('unsectioned')]), SubmissionEditCommentSchema).optional(),
   customFieldPrecondition: z.strictObject({
     submissionRevision: z.int32({ error: 'validation.invalid_number' }).positive({ error: 'validation.invalid_number' }).nullable(),
     previousAnswers: AgreementCustomFieldValuesSchema
@@ -838,7 +850,12 @@ export const FundingCaseAgreementForecastPatchSchema = z.strictObject(customFiel
   .refine(validateAnswerPrecondition, answerPreconditionIssue)
 
 export const FundingCaseAgreementClaimPatchSchema = FundingCaseAgreementClaimBaseSchema.partial()
-  .extend({ egcs_fc_status: ForbiddenBusinessStatusMutation(), ...customFieldAnswerPatch })
+  .extend({
+    egcs_fc_applicantrecipient: z.never({ error: 'validation.invalid_selection' }).optional(),
+    egcs_fc_status: ForbiddenBusinessStatusMutation(),
+    ...customFieldAnswerPatch,
+    ...SubmissionEditMetadataSchema.shape
+  })
   .superRefine(validatePeriodRange)
   .refine(validateAnswerPrecondition, answerPreconditionIssue)
 
@@ -862,8 +879,8 @@ export const FundingCaseAgreementClaimLineItemBaseSchema = z.object({
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 
-export const FundingCaseAgreementClaimLineItemCreateSchema = FundingCaseAgreementClaimLineItemBaseSchema.superRefine(validateFinancialInputCurrencies)
-export const FundingCaseAgreementClaimLineItemPatchSchema = FundingCaseAgreementClaimLineItemBaseSchema.partial().superRefine(validateFinancialInputCurrencies)
+export const FundingCaseAgreementClaimLineItemCreateSchema = FundingCaseAgreementClaimLineItemBaseSchema.extend(SubmissionEditMetadataSchema.shape).superRefine(validateFinancialInputCurrencies)
+export const FundingCaseAgreementClaimLineItemPatchSchema = FundingCaseAgreementClaimLineItemBaseSchema.partial().extend(SubmissionEditMetadataSchema.shape).superRefine(validateFinancialInputCurrencies)
 
 export type FundingCaseAgreementClaimLineItem = z.infer<typeof FundingCaseAgreementClaimLineItemCreateSchema>
 export type FundingCaseAgreementClaimLineItemPatch = z.infer<typeof FundingCaseAgreementClaimLineItemPatchSchema>

@@ -371,6 +371,9 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Transfer_Payment_Stream_Field_Assignment: TransferPaymentStreamFieldAssignmentTable
   Funding_Case_Agreement_Submission: import('./agreement-submission-database').AgreementSubmissionTable
   Funding_Case_Agreement_Submission_Event: import('./agreement-submission-database').AgreementSubmissionEventTable
+  Funding_Case_Agreement_Request_Thread: import('./agreement-requests').AgreementRequestThreadTable
+  Funding_Case_Agreement_Request_Entry: import('./agreement-requests').AgreementRequestEntryTable
+  Funding_Case_Agreement_Request_Attachment: import('./agreement-requests').AgreementRequestAttachmentTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
   Funding_Opportunity_Profile: FundingOpportunityProfileTable
   Funding_Opportunity_Stream: FundingOpportunityStreamTable
@@ -1592,9 +1595,12 @@ export interface FundingCaseAgreementBudgetLineItemFundingTable {
 }
 
 export interface FundingCaseAgreementForecastTable {
+  egcs_fc_createoperationkey: Generated<string | null>
+  egcs_fc_createoperationreceipt: Generated<{ intent: string; otherFundingOmitted: boolean } | null>
   egcs_fc_customfields: Generated<AgreementCustomFieldValues>
   egcs_fc_customfielddefinitions: Generated<AssignedAgencyCustomFieldDefinition[]>
   id: Generated<string>
+  egcs_fc_applicantrecipient: string
   egcs_fc_fundingagreement: string
   egcs_fc_fiscalyear: string
   egcs_fc_version: string
@@ -1626,7 +1632,7 @@ export interface FundingCaseAgreementForecastLineItemFundingTable {
 export interface FundingCaseAgreementClaimTable {
   id: Generated<string>
   egcs_fc_fundingagreement: string
-  egcs_fc_applicantrecipient: Generated<string | null>
+  egcs_fc_applicantrecipient: string
   egcs_fc_fiscalyear: string
   egcs_fc_isfinalforyear: boolean
   egcs_fc_periodend: number
@@ -2665,6 +2671,8 @@ export type DBTable<T> = T
 export interface TransferPaymentStreamFieldSectionTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
+  egcs_tp_target: Generated<Exclude<StreamFieldAssignmentTarget, 'activity'>>
+  egcs_tp_beforeentity: Generated<boolean>
   egcs_tp_name_en: string
   egcs_tp_name_fr: string
   egcs_tp_displayorder: Generated<number>

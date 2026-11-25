@@ -30,7 +30,7 @@ export const useResourceRequest = <T>(options: {
   initial?: 'immediate' | 'deferred'
   trigger?: 'identity' | 'refresh'
   refreshData?: 'retain' | 'clear'
-  failureData?: 'retain' | 'clear'
+  failureData?: 'retain' | 'clear' | ((error: unknown) => 'retain' | 'clear')
 }) => {
   const enabled = () => options.enabled === undefined || toValue(options.enabled)
   let startup: 'deferred' | 'ready' = options.initial === 'deferred' ? 'deferred' : 'ready'
@@ -60,7 +60,8 @@ export const useResourceRequest = <T>(options: {
       return true
     } catch (failure) {
       if (!isCurrent()) return false
-      state.value = { kind: 'error', data: options.failureData === 'clear' ? null : data.value, error: failure }
+      const failureData = typeof options.failureData === 'function' ? options.failureData(failure) : options.failureData
+      state.value = { kind: 'error', data: failureData === 'clear' ? null : data.value, error: failure }
       return false
     }
   }

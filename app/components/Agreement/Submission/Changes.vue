@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { compareClaimReference, compareSubmissionValues, compareUnlabeledSubmissionReference, fiscalMonthLabels, isSubmissionIdField, sameClaimCustomFieldEvidence, submissionFieldKey } from '~/utils/agreement-submission-view'
+import { compareClaimReference, compareSubmissionValues, compareUnlabeledSubmissionReference, fiscalMonthLabels, isSubmissionIdField, isSubmissionStructuredEvidence, sameClaimCustomFieldEvidence, submissionFieldKey } from '~/utils/agreement-submission-view'
 import type { ClaimReferenceComparison, SubmissionPathPart } from '~/utils/agreement-submission-view'
 import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submission'
 import type { AgreementCustomFieldPatch, ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
@@ -112,7 +112,12 @@ const changes = computed(() => {
           {{ t('submission.changed') }}
         </UBadge>
       </div>
-      <dl class="grid gap-3 text-sm sm:grid-cols-2">
+      <AgreementSubmissionCustomFieldEvidence
+        v-if="change.kind === 'custom' && (isSubmissionStructuredEvidence(change.before) || isSubmissionStructuredEvidence(change.after))"
+        :value="change.after"
+        :previous="change.before ?? null"
+        :label="change.title" />
+      <dl v-else class="grid gap-3 text-sm sm:grid-cols-2">
         <div class="min-w-0">
           <dt class="mb-1 font-medium text-muted">
             {{ t('submission.before') }}

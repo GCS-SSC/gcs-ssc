@@ -42,6 +42,8 @@ export default {
       'authorizeActiveAgencyCostCategory',
       'authorizeActiveAgencyLineItem',
       'authorizeAgreementResource',
+      'authorizeAgreementRequests',
+      'authorizeAgreementRequestAttachment',
       'authorizeAmendmentDocumentResource',
       'authorizeEntityTeamResource',
       'authorizeAttachmentTarget',

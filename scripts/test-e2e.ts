@@ -88,6 +88,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/agreement-budget-fiscal-year-review.spec.ts',
   'tests/e2e/agreement-claim-completion-presentation.spec.ts',
   'tests/e2e/agreement-claim-core.spec.ts',
+  'tests/e2e/agreement-requests.spec.ts',
   'tests/e2e/agreement-custom-fields-seed.spec.ts',
   'tests/e2e/agreement-custom-fields.spec.ts',
   'tests/e2e/agreement-delete-review.spec.ts',

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, shallowRef, toRaw, watch, type Ref } from 'vue'
+import { computed, ref, toRaw, watch, type Ref } from 'vue'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useActionContext } from '~/composables/useActionContext'
+import type { DeleteTarget } from '~/composables/useConfirmDeleteRequest'
 import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import type { useOperationLane } from '~/composables/useOperationLane'
 import type { useResourceRequest } from '~/composables/useResourceRequest'
 import { useFormSession } from '~/composables/useFormSession'
 import { getGroupedRowModel, type ExpandedState } from '@tanstack/vue-table'
@@ -28,19 +30,20 @@ type FieldRow = {
   childOption?: ChildOption
 }
 
-const { agencyId, canCreate, canUpdate, canDelete, catalog, pendingFieldWrites, captureCommitted, showHeader = true } = defineProps<{
+const { agencyId, canCreate, canUpdate, canDelete, catalog, fieldWrites, captureCommitted, removeCommitted, showHeader = true } = defineProps<{
   agencyId: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
   catalog: Pick<ReturnType<typeof useResourceRequest<{ items: AgencyField[] }>>, 'data' | 'status' | 'refresh'>
-  pendingFieldWrites: Set<string>
+  fieldWrites: ReturnType<typeof useOperationLane<string>>
   captureCommitted: CaptureCommittedSettlement
+  removeCommitted: <Row>(path: string, target: DeleteTarget<Row>, shouldProceed: () => boolean) => Promise<void>
   showHeader?: boolean
 }>()
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { user, permissionRevision } = useAuth()
 const { createValidator } = useZodI18n()
 const url = computed(() => `/api/agency/${agencyId}/custom-fields`)
 const data = computed(() => catalog.data.value)
@@ -59,8 +62,11 @@ const optionModal = useCrudModal<Partial<AgencyOption>>({
   updateState: option => ({ ...option })
 })
 const optionFieldId: Ref<string | null> = ref(null)
+const optionPath = (fieldId: string, id?: string) => `${url.value}/${fieldId}/options${id ? `/${id}` : ''}`
+const canOpenOption = (fieldId: string, id?: string) =>
+  status.value === 'success' && !fieldWrites.isPending(optionPath(fieldId, id))
 const canOpenField = (id: string) => canUpdate && status.value === 'success'
-  && !pendingFieldWrites.has(`${url.value}/${id}`)
+  && !fieldWrites.isPending(`${url.value}/${id}`)
 /**
  * Opens from the currently accepted catalog after any same-field write has settled.
  * @param id - Field identity in the accepted Agency catalog.
@@ -76,15 +82,23 @@ const fieldUpdateContext = useActionContext({ identity: [() => agencyId], author
   return Boolean(id && canOpenField(id) && data.value?.items.some(row => row.id === id))
 } })
 const fieldActionContext = () => fieldModal.selected.value?.id ? fieldUpdateContext : fieldCreateContext
-const optionCreateContext = useActionContext({ identity: [() => agencyId], authority: () => canCreate, eligible: () => Boolean(data.value?.items.some(field => field.id === optionFieldId.value)) })
-const optionUpdateContext = useActionContext({ identity: [() => agencyId], authority: () => canUpdate, eligible: () => Boolean(data.value?.items.find(field => field.id === optionFieldId.value)?.options.some(row => row.id === optionModal.selected.value?.id)) })
+const canCreateOption = () => {
+  const fieldId = optionFieldId.value
+  return Boolean(fieldId && canOpenOption(fieldId) && data.value?.items.some(field => field.id === fieldId))
+}
+/** @returns Whether the accepted option still admits a save. */
+const canUpdateOption = () => {
+  const fieldId = optionFieldId.value
+  const id = optionModal.selected.value?.id
+  return Boolean(fieldId && id && canOpenOption(fieldId, id)
+    && data.value?.items.find(field => field.id === fieldId)?.options.some(row => row.id === id))
+}
+const optionCreateContext = useActionContext({ identity: [() => agencyId], authority: () => canCreate, eligible: canCreateOption })
+const optionUpdateContext = useActionContext({ identity: [() => agencyId], authority: () => canUpdate, eligible: canUpdateOption })
 const optionActionContext = () => optionModal.selected.value?.id ? optionUpdateContext : optionCreateContext
-const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDelete })
+const deleteActionContext = useActionContext({ identity: [() => agencyId], authority: () => canDelete, eligible: () => status.value === 'success' })
 const fieldPending = useCrudModalPending(fieldModal.captureSession)
 const optionPending = useCrudModalPending(optionModal.captureSession)
-type CatalogContext = { kind: 'active'; agencyId: string } | { kind: 'disposed' }
-const context: Ref<CatalogContext> = shallowRef({ kind: 'active', agencyId })
-const ownsContext = (owner: CatalogContext) => owner.kind === 'active' && owner === context.value
 watch([() => canCreate, () => canUpdate], () => {
   if (fieldModal.selected.value && (fieldModal.selected.value.id ? !canUpdate : !canCreate)) fieldModal.close()
   if (optionModal.selected.value && (optionModal.selected.value.id ? !canUpdate : !canCreate)) optionModal.close()
@@ -209,8 +223,7 @@ watch(() => fieldModal.selected.value?.egcs_ay_multiple, multiple => {
   const selected = fieldModal.selected.value
   if (!multiple && selected?.egcs_ay_presentation === 'checkboxes') selected.egcs_ay_presentation = 'single_line'
 })
-watch(url, () => {
-  context.value = { kind: 'active', agencyId }
+watch([url, () => user.value?.id, permissionRevision], () => {
   search.value = ''
   pagination.value.pageIndex = 0
   expandedRows.value = {}
@@ -218,20 +231,19 @@ watch(url, () => {
   optionModal.close()
   optionFieldId.value = null
 }, { flush: 'sync' })
-onScopeDispose(() => {
-  context.value = { kind: 'disposed' }
-  fieldModal.close()
-  optionModal.close()
-})
-
 /**
  * Opens a relational option editor for one Agency field.
  * @param fieldId - Parent field identity.
  * @param option - Existing option when editing.
  */
 const openOption = (fieldId: string, option?: AgencyOption) => {
+  if (!canOpenOption(fieldId, option?.id)) return
+  const field = data.value?.items.find(row => row.id === fieldId)
+  if (!field) return
+  const accepted = option && field.options.find(row => row.id === option.id)
+  if (option && !accepted) return
   optionFieldId.value = fieldId
-  if (option) optionModal.openUpdate(option)
+  if (accepted) optionModal.openUpdate(accepted)
   else optionModal.openCreate()
 }
 
@@ -243,13 +255,16 @@ const saveField = async () => {
   const committed = captureCommitted()
   if (!operation?.canDispatch() || !committed?.canDispatch()) return
   const selected = fieldModal.selected.value
-  const owner = context.value
   const session = fieldModal.captureSession()
-  if (!selected || session === null || !ownsContext(owner)
+  if (!selected || session === null
     || (selected.id ? !canUpdate : !canCreate) || !fieldPending.begin(session)) return
   const { id } = selected
   const path = `${url.value}${id ? `/${id}` : ''}`
-  if (id) pendingFieldWrites.add(path)
+  const release = id ? fieldWrites.acquire(path) : null
+  if (id && !release) {
+    fieldPending.end(session)
+    return
+  }
   const body = {
     egcs_ay_name_en: selected.egcs_ay_name_en,
     egcs_ay_name_fr: selected.egcs_ay_name_fr,
@@ -263,7 +278,7 @@ const saveField = async () => {
     egcs_ay_structure: selected.egcs_ay_structure
   }
   let closedSession = false
-  const ownsFeedback = () => operation.isCurrent() && ownsContext(owner) && (
+  const ownsFeedback = () => operation.isCurrent() && (
     fieldModal.isCurrentSession(session) || (closedSession && fieldModal.isLatestSession(session))
   )
   try {
@@ -271,13 +286,13 @@ const saveField = async () => {
       method: id ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (operation.isCurrent() && ownsContext(owner)) closedSession = fieldModal.closeSession(session)
+    if (operation.isCurrent()) closedSession = fieldModal.closeSession(session)
     const result = await committed.settle()
     if (result.kind === 'unavailable' && result.error && ownsFeedback()) showError(result.error)
   } catch (saveError) {
     if (ownsFeedback()) showError(saveError)
   } finally {
-    if (id) pendingFieldWrites.delete(path)
+    release?.()
     fieldPending.end(session)
   }
 }
@@ -287,29 +302,32 @@ const saveField = async () => {
  */
 const saveOption = async () => {
   const operation = optionActionContext().capture()
-  if (!operation?.canDispatch()) return
+  const committed = captureCommitted()
+  if (!operation?.canDispatch() || !committed?.canDispatch()) return
   const selected = optionModal.selected.value
-  const owner = context.value
   const session = optionModal.captureSession()
   const fieldId = optionFieldId.value
-  if (!selected || !fieldId || session === null || !ownsContext(owner)
-    || (selected.id ? !canUpdate : !canCreate) || !optionPending.begin(session)) return
+  if (!selected || !fieldId || session === null) return
   const { id, egcs_ay_field: _field, ...body } = selected
-  let closedSession = false
-  const ownsFeedback = () => operation.isCurrent() && ownsContext(owner) && (
-    optionModal.isCurrentSession(session) || (closedSession && optionModal.captureSession() === null)
-  )
+  const path = optionPath(fieldId, id)
+  if (!optionPending.begin(session)) return
+  const release = fieldWrites.acquire(path)
+  if (!release) {
+    optionPending.end(session)
+    return
+  }
+  const ownsFeedback = () => operation.isCurrent() && optionModal.isCurrentSession(session)
   try {
-    const response = await fetch(getClientRequestUrl(`${url.value}/${fieldId}/options${id ? `/${id}` : ''}`), {
+    const response = await fetch(getClientRequestUrl(path), {
       method: id ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!operation.isCurrent() || !ownsContext(owner)) return
-    closedSession = optionModal.closeSession(session)
-    await refresh()
+    if (ownsFeedback()) optionModal.closeSession(session)
+    await committed.settle()
   } catch (saveError) {
     if (ownsFeedback()) showError(saveError)
   } finally {
+    release()
     optionPending.end(session)
   }
 }
@@ -320,8 +338,8 @@ const saveOption = async () => {
  * @param optionId - Accepted option identity when deleting a child.
  */
 const remove = async (fieldId: string, optionId?: string) => {
-  const owner = context.value
   const operation = deleteActionContext.capture()
+  if (!operation) return
   const id = optionId ?? fieldId
   const path = `${url.value}/${fieldId}${optionId ? `/options/${optionId}` : ''}`
   const resolve = () => {
@@ -329,14 +347,9 @@ const remove = async (fieldId: string, optionId?: string) => {
     return optionId ? field?.options.find(row => row.id === optionId) : field
   }
   try {
-    const removed = await confirmDeleteRequest(path, {
-      operation,
-      target: { id, resolve, eligible: () => canDelete },
-      shouldProceed: () => ownsContext(owner)
-    })
-    if (removed && operation?.isCurrent() && ownsContext(owner)) await refresh()
+    await removeCommitted(path, { id, resolve, eligible: () => canDelete }, operation.canDispatch)
   } catch (deleteError) {
-    if (operation?.isCurrent() && ownsContext(owner)) showError(deleteError)
+    if (operation.isCurrent()) showError(deleteError)
   }
 }
 const fieldFormSession = useFormSession({ owner: fieldModal, action: { kind: 'remote', context: fieldActionContext }, submit: saveField })
@@ -425,12 +438,12 @@ const optionFormSession = useFormSession({ owner: optionModal, action: { kind: '
       </template>
       <template #actions-cell="{ row }">
         <div v-if="row.groupingColumnId === 'fieldGroup'" class="flex justify-end gap-2">
-          <CommonActionButton v-if="canCreate && row.original.field.egcs_ay_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="`${t('custom_fields.add_option')}: ${label(row.original.field)}`" @click="openOption(row.original.field.id)" />
+          <CommonActionButton v-if="canCreate && row.original.field.egcs_ay_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="`${t('custom_fields.add_option')}: ${label(row.original.field)}`" :disabled="!canOpenOption(row.original.field.id)" @click="openOption(row.original.field.id)" />
           <CommonActionButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.field)}`" :disabled="!canOpenField(row.original.field.id)" @click="openField(row.original.field.id)" />
           <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.field)}`" @click="remove(row.original.field.id)" />
         </div>
         <div v-else-if="!row.getIsGrouped() && row.original.option" class="flex justify-end gap-2">
-          <CommonActionButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.option)}`" @click="openOption(row.original.field.id, row.original.option)" />
+          <CommonActionButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.option)}`" :disabled="!canOpenOption(row.original.field.id, row.original.option.id)" @click="openOption(row.original.field.id, row.original.option)" />
           <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.option)}`" @click="remove(row.original.field.id, row.original.option.id)" />
         </div>
       </template>
@@ -481,24 +494,26 @@ const optionFormSession = useFormSession({ owner: optionModal, action: { kind: '
     </UModal>
     <UModal v-model:open="optionModal.isOpen.value" :title="t('custom_fields.add_option')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="optionModal.selected.value" v-bind="optionFormSession" data-field-scope="agency.custom-field-option" :state="optionModal.selected.value" :validate="createValidator(AgencyCustomFieldOptionCreateSchema.strip())" class="space-y-4">
-          <UFormField :label="t('custom_fields.name_en')" name="egcs_ay_name_en" required>
-            <UInput v-model="optionModal.selected.value.egcs_ay_name_en" class="w-full" />
-          </UFormField>
-          <UFormField :label="t('custom_fields.name_fr')" name="egcs_ay_name_fr" required>
-            <UInput v-model="optionModal.selected.value.egcs_ay_name_fr" class="w-full" />
-          </UFormField>
-          <UFormField :label="t('custom_fields.category_en')" name="egcs_ay_category_en" :required="Boolean(optionModal.selected.value.egcs_ay_category_fr)">
-            <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_en" class="w-full" />
-          </UFormField>
-          <UFormField :label="t('custom_fields.category_fr')" name="egcs_ay_category_fr" :required="Boolean(optionModal.selected.value.egcs_ay_category_en)">
-            <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_fr" class="w-full" />
-          </UFormField>
-          <USwitch v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" data-ui-target="agency.custom-field-option.egcs_ay_active" />
-          <UFormField :label="t('custom_fields.order')" name="egcs_ay_displayorder">
-            <UInput v-model.number="optionModal.selected.value.egcs_ay_displayorder" type="number" min="0" />
-          </UFormField>
-          <CommonSaveButton :label="t('common.save')" :loading="optionPending.isPending.value" />
+        <UForm v-if="optionModal.selected.value" v-bind="optionFormSession" :disabled="optionPending.isPending.value" data-field-scope="agency.custom-field-option" :state="optionModal.selected.value" :validate="createValidator(AgencyCustomFieldOptionCreateSchema.strip())" class="space-y-4">
+          <fieldset :disabled="optionPending.isPending.value" class="min-w-0 space-y-4">
+            <UFormField :label="t('custom_fields.name_en')" name="egcs_ay_name_en" required>
+              <UInput v-model="optionModal.selected.value.egcs_ay_name_en" class="w-full" />
+            </UFormField>
+            <UFormField :label="t('custom_fields.name_fr')" name="egcs_ay_name_fr" required>
+              <UInput v-model="optionModal.selected.value.egcs_ay_name_fr" class="w-full" />
+            </UFormField>
+            <UFormField :label="t('custom_fields.category_en')" name="egcs_ay_category_en" :required="Boolean(optionModal.selected.value.egcs_ay_category_fr)">
+              <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_en" class="w-full" />
+            </UFormField>
+            <UFormField :label="t('custom_fields.category_fr')" name="egcs_ay_category_fr" :required="Boolean(optionModal.selected.value.egcs_ay_category_en)">
+              <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_fr" class="w-full" />
+            </UFormField>
+            <USwitch v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" data-ui-target="agency.custom-field-option.egcs_ay_active" />
+            <UFormField :label="t('custom_fields.order')" name="egcs_ay_displayorder">
+              <UInput v-model.number="optionModal.selected.value.egcs_ay_displayorder" type="number" min="0" />
+            </UFormField>
+            <CommonSaveButton :label="t('common.save')" :loading="optionPending.isPending.value" />
+          </fieldset>
         </UForm>
       </template>
     </UModal>

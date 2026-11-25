@@ -16,6 +16,7 @@ import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment
 import { compareMoney, parseMoney, zeroMoney } from '~~/shared/utils/money'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
 import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
+import { isAgreementSubmittingProponentAvailable } from './agreement-submitting-proponent'
 
 /**
  * Creates one inactive Draft Forecast with all monthly lines in the authorized transaction.
@@ -57,14 +58,9 @@ export const createAgreementForecastAggregate = async (
       return { status: 'total_cost_mismatch', lineNumber: index + 1 }
     }
   }
-  const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
-    .select('id')
-    .where('egcs_fc_fundingagreement', '=', input.agreementId)
-    .where('egcs_fc_applicantrecipient', '=', input.applicantRecipientId)
-    .where('_deleted', '=', false)
-    .forUpdate()
-    .executeTakeFirst()
-  if (!recipient) return { status: 'recipient_unavailable' }
+  if (!await isAgreementSubmittingProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) {
+    return { status: 'recipient_unavailable' }
+  }
 
   const fiscalYear = await trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
     .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id',
@@ -125,6 +121,7 @@ export const createAgreementForecastAggregate = async (
   }
 
   const forecast = await trx.insertInto('Funding_Case_Agreement_Forecast').values({
+    egcs_fc_applicantrecipient: input.applicantRecipientId,
     ...await captureForecastCustomFields(trx, input.streamId, receipt && { ...receipt, currency }, event),
     egcs_fc_fundingagreement: input.agreementId,
     egcs_fc_fiscalyear: input.fiscalYearId,

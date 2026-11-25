@@ -12,9 +12,9 @@ import { addMoney, compareMoney, isPersistableMoney, maxMoney, subtractMoney, su
 import { lockAgreementAggregate } from './agreement-aggregate-lock'
 import { readAgreementBudgetLineReference } from './agreement-budget-lineage'
 import { assertAgreementClaimBudgetFiscalYear, assertAgreementClaimBudgetLineItem } from './agreement-claim'
-import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
 import { assertAgreementCurrency, assertCurrencyMoneyValues } from './agreement-currency'
+import { isAgreementSubmittingProponentAvailable } from './agreement-submitting-proponent'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
 import { assertAgreementForecastBudgetFiscalYear, assertAgreementForecastBudgetLineItem } from './agreement-forecast'
 import { loadAgreementBudgetManagement } from './agreement-funding-breakdown'
@@ -46,7 +46,9 @@ const readClaim = (db: Kysely<Database>, { agreementId, targetId }: LinkedTarget
   .where('_deleted', '=', false).executeTakeFirst()
 
 const readForecast = (db: Kysely<Database>, { agreementId, targetId }: LinkedTarget) => db
-  .selectFrom('Funding_Case_Agreement_Forecast').select(['egcs_fc_fiscalyear', 'egcs_fc_active', 'egcs_fc_customfields', 'egcs_fc_customfielddefinitions'])
+  .selectFrom('Funding_Case_Agreement_Forecast').select([
+    'egcs_fc_applicantrecipient', 'egcs_fc_fiscalyear', 'egcs_fc_active', 'egcs_fc_customfields', 'egcs_fc_customfielddefinitions'
+  ])
   .where('id', '=', targetId).where('egcs_fc_fundingagreement', '=', agreementId)
   .where('_deleted', '=', false).executeTakeFirst()
 
@@ -206,7 +208,9 @@ export const readLinkedSubmissionSnapshot = async (
     }
   }))
   return {
-    ...sourcePayload, fiscalYearId: forecast.egcs_fc_fiscalyear,
+    ...sourcePayload,
+    applicantRecipientId: forecast.egcs_fc_applicantrecipient,
+    fiscalYearId: forecast.egcs_fc_fiscalyear,
     ...optionalSnapshotValue(sourcePayload, 'customFields',
       Object.hasOwn(sourcePayload, 'customFields') || definitions.length ? forecast.egcs_fc_customfields : undefined),
     lineItems
@@ -271,6 +275,9 @@ export const applyLinkedSubmissionRevision = async (
     const revised = await parseI18n(event, schemas.claim, payload)
     const claim = await readClaim(trx, input)
     if (!claim) throw missingTarget()
+    if (claim.egcs_fc_applicantrecipient !== revised.applicantRecipientId) {
+      return await badRequest(event, 'SUBMISSION_PROPONENT_IMMUTABLE', 'apiErrors.agreement.submitting_proponent_immutable')
+    }
     const answers = await validateClaimCustomFields(event, claim.egcs_fc_customfielddefinitions, {
       answers: revised.customFields ?? {}, requireAnswers: true, path: 'customFields', currency
     })
@@ -290,8 +297,8 @@ export const applyLinkedSubmissionRevision = async (
       }).where('id', '=', targetId).executeTakeFirstOrThrow()
       return
     }
-    if (!await isAgreementClaimProponentAvailable(trx, agreementId, revised.applicantRecipientId)) {
-      await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
+    if (!await isAgreementSubmittingProponentAvailable(trx, agreementId, revised.applicantRecipientId)) {
+      return await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
     }
     await assertAgreementClaimBudgetFiscalYear(event, trx, agreementId, revised.fiscalYearId)
     await assertCurrencyMoneyValues(event, currency, revised.lineItems.map(line => line.amount))
@@ -335,7 +342,6 @@ export const applyLinkedSubmissionRevision = async (
     }
     await trx.updateTable('Funding_Case_Agreement_Claim').set({
       egcs_fc_customfields: answers,
-      egcs_fc_applicantrecipient: revised.applicantRecipientId,
       egcs_fc_fiscalyear: revised.fiscalYearId,
       egcs_fc_isfinalforyear: revised.isFinalForYear,
       egcs_fc_periodstart: revised.periodStart,
@@ -388,15 +394,18 @@ export const applyLinkedSubmissionRevision = async (
     if (!forecast || forecast.egcs_fc_fiscalyear !== revised.fiscalYearId) {
       return await badRequest(event, 'INVALID_AGREEMENT_FORECAST_FISCAL_YEAR', 'apiErrors.agreement.invalid_forecast_fiscal_year')
     }
+    if (forecast.egcs_fc_applicantrecipient !== revised.applicantRecipientId) {
+      return await badRequest(event, 'SUBMISSION_PROPONENT_IMMUTABLE', 'apiErrors.agreement.submitting_proponent_immutable')
+    }
+    const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient').select('id')
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_applicantrecipient', '=', revised.applicantRecipientId)
+      .where('_deleted', '=', false).executeTakeFirst()
+    if (!recipient) return await badRequest(event, 'AGREEMENT_FORECAST_PROPONENT_INVALID', 'apiErrors.agreement.invalid_forecast_proponent')
     const answers = await validateClaimCustomFields(event, forecast.egcs_fc_customfielddefinitions, {
       target: 'forecast', answers: revised.customFields ?? {}, requireAnswers: true, path: 'customFields', currency
     })
     await trx.updateTable('Funding_Case_Agreement_Forecast').set({ egcs_fc_customfields: answers })
       .where('id', '=', targetId).executeTakeFirstOrThrow()
-    const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient').select('id')
-      .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_applicantrecipient', '=', revised.applicantRecipientId)
-      .where('_deleted', '=', false).executeTakeFirst()
-    if (!recipient) return await badRequest(event, 'AGREEMENT_FORECAST_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
     await assertAgreementForecastBudgetFiscalYear(event, trx, agreementId, revised.fiscalYearId)
     const cellKeys = new Set(revised.lineItems.map(line => `${line.budgetLineItemId}:${line.month}`))
     if (cellKeys.size !== revised.lineItems.length) {

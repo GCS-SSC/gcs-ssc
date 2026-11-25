@@ -28,10 +28,13 @@ export const AgreementCustomFieldValuesSchema = z.record(
 export const StreamFieldSectionCreateSchema = z.object({
   egcs_tp_name_en: Label,
   egcs_tp_name_fr: Label,
-  egcs_tp_displayorder: DisplayOrder.default(0)
+  egcs_tp_displayorder: DisplayOrder.default(0),
+  egcs_tp_beforeentity: z.boolean({ error: 'validation.invalid_selection' }).default(false)
 })
+export const StreamFieldSectionTargetSchema = z.enum(['agreement', 'claim', 'forecast'], { error: 'validation.invalid_selection' })
 export const StreamFieldSectionPatchSchema = StreamFieldSectionCreateSchema.extend({
-  egcs_tp_displayorder: StreamFieldSectionCreateSchema.shape.egcs_tp_displayorder.removeDefault()
+  egcs_tp_displayorder: StreamFieldSectionCreateSchema.shape.egcs_tp_displayorder.removeDefault(),
+  egcs_tp_beforeentity: StreamFieldSectionCreateSchema.shape.egcs_tp_beforeentity.removeDefault()
 }).partial()
 export type AgreementCustomFieldSection = z.infer<typeof StreamFieldSectionCreateSchema> & { id: string }
 
@@ -155,7 +158,8 @@ const distinctIds = (entries: { id: string }[]) => new Set(entries.map(entry => 
 const assignedClaimFieldSchema = AgencyCustomFieldBaseSchema.extend({
   id: PositivePostgresBigintIdSchema,
   assignmentId: PositivePostgresBigintIdSchema,
-  egcs_tp_section: z.null(),
+  egcs_tp_section: PositivePostgresBigintIdSchema.nullable(),
+  section: StreamFieldSectionPatchSchema.required().extend({ id: PositivePostgresBigintIdSchema }).optional(),
   egcs_tp_required: z.boolean(),
   egcs_tp_active: z.boolean(),
   egcs_tp_displayorder: DisplayOrder,
@@ -165,6 +169,9 @@ const assignedClaimFieldSchema = AgencyCustomFieldBaseSchema.extend({
   }).refine(optionCategoriesMatch)).refine(distinctIds)
 }).superRefine((field, ctx) => {
   validateAgencyCustomField(field, ctx)
+  if ((field.section?.id ?? null) !== field.egcs_tp_section) {
+    ctx.addIssue({ code: 'custom', path: ['section'], message: 'validation.invalid_selection' })
+  }
   if (field.egcs_ay_kind !== 'relational' && field.options.length > 0) {
     ctx.addIssue({ code: 'custom', path: ['options'], message: 'validation.invalid_selection' })
   }
@@ -177,7 +184,9 @@ const ClaimCustomFieldScalarEvidenceSchema = z.union([
   z.string(), z.number(), z.array(z.object({ en: z.string(), fr: z.string() })), MoneySchema, z.null()
 ])
 const ClaimCustomFieldRowsEvidenceSchema = z.object({
+  kind: z.enum(['table', 'repeating']).optional(),
   rows: z.array(z.object({
+    id: z.string().optional(),
     cells: z.array(z.object({
       labelEn: z.string(),
       labelFr: z.string(),

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import CommonSection from '~/components/Common/Section.vue'
 import AgreementFieldsCustomField from './CustomField.vue'
 import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
@@ -30,57 +31,67 @@ const catalogUrl = computed(() => {
   if (agreementId) query.set('agreement_id', agreementId)
   return `/api/agreements/lookups/custom-fields?${query}`
 })
-const requestKey = computed(() => activity
-  ? catalogUrl.value
-  : `agreement-custom-fields:${streamId}:${agreementId ?? 'new'}:${permissionAction}`)
-const { data, status, error, refresh, clear } = await useAsyncData<{ items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }>(requestKey, async (_nuxt, { signal }) => {
-  const response = await fetch(getClientRequestUrl(catalogUrl.value), { signal })
-  if (!response.ok) await throwFetchResponseError(response)
-  return await response.json() as { items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }
-})
-const historicalFields = ref<AssignedAgencyCustomFieldDefinition[]>([])
-const historicalSections = ref<AgreementCustomFieldSection[]>([])
-let abandoningCatalog = false
-watch(requestKey, () => {
-  historicalFields.value = []
-  historicalSections.value = []
-}, { flush: 'sync' })
-watch(data, (_current, previous) => {
-  if (abandoningCatalog) return
-  const previousById = new Map(historicalFields.value.map(field => [field.id, field]))
-  for (const field of previous?.items ?? []) {
-    const savedOptions = previousById.get(field.id)?.options ?? []
-    previousById.set(field.id, { ...field, options: [...new Map([...savedOptions, ...field.options].map(option => [option.id, option])).values()] })
+const { user, permissionRevision } = useAuth()
+const identity = computed(() => JSON.stringify([catalogUrl.value, user.value?.id, permissionRevision.value]))
+type Catalog = { items: AssignedAgencyCustomFieldDefinition[]; sections: AgreementCustomFieldSection[] }
+const { data, status, error, refresh, reset } = useResourceRequest<Catalog>({
+  identity,
+  enabled: () => Boolean(user.value?.id),
+  /** @param signal - Cancellation for this catalog identity.
+   * @returns The current authorized field catalog.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl(catalogUrl.value), { signal })
+    if (!response.ok) await throwFetchResponseError(response)
+    return await response.json()
   }
-  historicalFields.value = [...previousById.values()].filter(field => customFieldHasValue(model.value[field.id]))
-  historicalSections.value = [...new Map([...historicalSections.value, ...(previous?.sections ?? [])].map(section => [section.id, section])).values()]
+})
+const history = shallowRef<{ identity: string; catalog: Catalog } | null>(null)
+const currentHistory = computed(() => history.value?.identity === identity.value ? history.value.catalog : null)
+
+watch([identity, data], ([key, current], [previousKey, previous]) => {
+  if (key !== previousKey) history.value = null
+  if (!current || !previous || key !== previousKey) return
+  const fields = new Map(currentHistory.value?.items.map(field => [field.id, field]))
+  for (const field of previous.items) {
+    const options = [...(fields.get(field.id)?.options ?? []), ...field.options]
+    fields.set(field.id, { ...field, options: [...new Map(options.map(option => [option.id, option])).values()] })
+  }
+  const sections = [...(currentHistory.value?.sections ?? []), ...previous.sections]
+  history.value = {
+    identity: key,
+    catalog: {
+      items: [...fields.values()].filter(field => customFieldHasValue(model.value[field.id])),
+      sections: [...new Map(sections.map(section => [section.id, section])).values()]
+    }
+  }
 }, { flush: 'sync' })
+
 const { check: checkCatalogVersions, checking: checkingCatalog, failed: catalogCheckFailed } = useCatalogCacheRefresh(catalogUrl, change => {
   if (change.securityContextChanged) {
-    abandoningCatalog = true
-    historicalFields.value = []
-    historicalSections.value = []
-    clear()
-    return
+    history.value = null
+    reset()
+    if (!user.value?.id) return
   }
-  return refresh({ dedupe: 'cancel' }).then(() => !error.value)
+  return refresh()
 }, showError)
 const retryFields = async () => {
-  if (await checkCatalogVersions()) await refresh()
+  const key = identity.value
+  if (await checkCatalogVersions() && key === identity.value) await refresh()
 }
 const fields = computed(() => {
   const current = data.value?.items ?? []
   if (activity) return current.filter(field => (!readonly && field.egcs_tp_active) || customFieldHasValue(model.value[field.id]))
   const currentIds = new Set(current.map(field => field.id))
-  const historical = historicalFields.value.filter(field => !currentIds.has(field.id) && customFieldHasValue(model.value[field.id]))
+  const historical = (currentHistory.value?.items ?? []).filter(field => !currentIds.has(field.id) && customFieldHasValue(model.value[field.id]))
     .map(field => ({ ...field, egcs_tp_active: false }))
   return [...current, ...historical].filter(field => field.egcs_tp_active || customFieldHasValue(model.value[field.id]))
 })
 const sections = computed(() => {
-  const sectionDefinitions = [...new Map([...historicalSections.value, ...(data.value?.sections ?? [])].map(section => [section.id, section])).values()]
+  const sectionDefinitions = [...new Map([...(currentHistory.value?.sections ?? []), ...(data.value?.sections ?? [])].map(section => [section.id, section])).values()]
   const grouped = sectionDefinitions.map(section => ({ ...section, fields: fields.value.filter(field => field.egcs_tp_section === section.id) }))
   const unsectioned = fields.value.filter(field => field.egcs_tp_section === null)
-  if (placement !== 'configured' && unsectioned.length) grouped.push({ id: 'unsectioned', egcs_tp_name_en: t('custom_fields.title'), egcs_tp_name_fr: t('custom_fields.title'), egcs_tp_displayorder: 0, fields: unsectioned })
+  if (placement !== 'configured' && unsectioned.length) grouped.push({ id: 'unsectioned', egcs_tp_name_en: t('custom_fields.title'), egcs_tp_name_fr: t('custom_fields.title'), egcs_tp_displayorder: 0, egcs_tp_beforeentity: false, fields: unsectioned })
   return grouped.filter(section => section.fields.length && (placement !== 'profile' || section.id === 'unsectioned'))
 })
 const sectionLabel = (value: { egcs_tp_name_en: string, egcs_tp_name_fr: string }) => locale.value === 'fr' ? value.egcs_tp_name_fr : value.egcs_tp_name_en
@@ -93,7 +104,7 @@ const options = (field: AssignedAgencyCustomFieldDefinition) => {
   const selectedIds = field.egcs_ay_kind === 'relational' ? customFieldOptionIds(model.value[field.id]) : []
   const liveOptions = field.options.filter(option => option.egcs_ay_active || selectedIds.includes(option.id))
   const currentIds = new Set(liveOptions.map(option => option.id))
-  const historical = historicalFields.value.find(previous => previous.id === field.id)?.options ?? []
+  const historical = currentHistory.value?.items.find(previous => previous.id === field.id)?.options ?? []
   return [...liveOptions, ...historical.filter(option => selectedIds.includes(option.id) && !currentIds.has(option.id)).map(option => ({ ...option, disabled: true }))]
 }
 </script>

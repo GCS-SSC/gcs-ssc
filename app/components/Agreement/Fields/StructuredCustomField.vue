@@ -3,6 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import { computed, useId } from 'vue'
 import { nanoid } from 'nanoid'
 import AgreementFieldsCustomField from './CustomField.vue'
+import { sameCustomFieldAnswer } from '~~/shared/utils/agreement-custom-field-answers'
 import { customFieldTableTotals } from '~~/shared/types/schemas/agreement-custom-fields'
 import type {
   AssignedAgencyCustomFieldDefinition,
@@ -10,10 +11,11 @@ import type {
   CustomFieldStructuredAnswer
 } from '~~/shared/types/schemas/agreement-custom-fields'
 
-const { field, structure, currency, readonly = false, disabled = false } = defineProps<{
+const { field, structure, currency, previous, readonly = false, disabled = false } = defineProps<{
   field: AssignedAgencyCustomFieldDefinition
   structure: CustomFieldStructure
   currency?: string
+  previous?: CustomFieldStructuredAnswer | null
   readonly?: boolean
   disabled?: boolean
 }>()
@@ -36,6 +38,34 @@ const totals = computed(() => table.value && (rowTotals.value || columnTotals.va
 type Row = CustomFieldStructuredAnswer['rows'][number]
 type Cell = Row['cells'][string]
 type RepeatField = Extract<CustomFieldStructure, { kind: 'repeating' }>['fields'][number]
+
+const previousRows = computed(() => new Map(previous?.rows.map(row => [row.id, row])))
+const displayedRows = computed(() => {
+  if (!readonly || !previous) return rows.value
+  const retained = new Set(rows.value.map(row => row.id))
+  return [...rows.value, ...previous.rows.filter(row => !retained.has(row.id))]
+})
+const currentRowIds = computed(() => new Set(rows.value.map(row => row.id)))
+/**
+ * Checks the cell against the matching entry in the received answer.
+ * @param row - Displayed row.
+ * @param key - Pinned cell key.
+ * @returns Whether the displayed cell was added, changed, or removed.
+ */
+const cellChanged = (row: Row, key: string) => previous !== undefined
+  && !sameCustomFieldAnswer(previousRows.value.get(row.id)?.cells[key], currentRowIds.value.has(row.id) ? row.cells[key] : undefined)
+
+const rowChanges = computed(() => {
+  const changes = new Map<string, 'added' | 'changed' | 'removed'>()
+  if (!readonly || previous === undefined) return changes
+  for (const row of displayedRows.value) {
+    const old = previousRows.value.get(row.id)
+    if (!currentRowIds.value.has(row.id)) changes.set(row.id, 'removed')
+    else if (!old) changes.set(row.id, 'added')
+    else if ([...Object.keys(old.cells), ...Object.keys(row.cells)].some(key => cellChanged(row, key))) changes.set(row.id, 'changed')
+  }
+  return changes
+})
 
 const label = (item: { labelEn: string; labelFr: string }) => locale.value === 'fr' ? item.labelFr : item.labelEn
 const entryLabel = (index: number) => t('custom_fields.entry_number', { number: n(index + 1) })
@@ -162,7 +192,7 @@ const tableColumns = computed<TableColumn<Row>[]>(() => {
       :aria-labelledby="readonly ? undefined : labelId"
       :aria-describedby="readonly ? undefined : instructionsId">
       <template v-if="!readonly">
-        <div :id="labelId" class="text-sm font-medium text-highlighted">
+        <div :id="labelId" data-information-field-label class="text-sm font-medium text-highlighted">
           {{ fieldLabel }}
           <span v-if="field.egcs_tp_required" class="text-xs font-normal text-muted" aria-hidden="true">({{ t('common.field_required') }})</span>
         </div>
@@ -174,12 +204,12 @@ const tableColumns = computed<TableColumn<Row>[]>(() => {
         </p>
         <UFormField :name="formName" :required="field.egcs_tp_required" />
       </template>
-      <p v-if="readonly && !rows.length" class="text-sm text-default">
+      <p v-if="readonly && !displayedRows.length" class="text-sm text-default">
         {{ t('supplementary_information.no_answer') }}
       </p>
       <CommonCompactTable
-        v-if="table && rows.length"
-        :data="rows"
+        v-if="table && displayedRows.length"
+        :data="displayedRows"
         :columns="tableColumns"
         :get-row-id="row => row.id"
         :ui="{ caption: 'sr-only', thead: 'bg-elevated', tfoot: 'bg-elevated' }"
@@ -191,13 +221,26 @@ const tableColumns = computed<TableColumn<Row>[]>(() => {
         </template>
         <template #row-cell="{ row }">
           {{ n(row.index + 1) }}
+          <AgreementSubmissionRowChangeBadge :change="rowChanges.get(row.original.id)" />
         </template>
         <template v-for="column in table.columns" :key="column.id" #[`cell_${column.id}-header`]>
           {{ label(column) }}
           <span v-if="!readonly && column.required" class="text-xs font-normal text-muted" aria-hidden="true">({{ t('common.field_required') }})</span>
         </template>
         <template v-for="column in table.columns" :key="column.id" #[`cell_${column.id}-cell`]="{ row }">
-          <span v-if="readonly" class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ cellLabel(column.kind, row.original.cells[column.id]) }}</span>
+          <template v-if="readonly">
+            <div v-if="cellChanged(row.original, column.id)" class="flex flex-wrap gap-x-2">
+              <del v-if="previousRows.get(row.original.id)?.cells[column.id] != null" class="text-red-800 dark:text-red-200">
+                <span class="sr-only">{{ t('submission.before') }} </span>
+                {{ cellLabel(column.kind, previousRows.get(row.original.id)?.cells[column.id]) }}
+              </del>
+              <ins v-if="currentRowIds.has(row.original.id) && row.original.cells[column.id] != null" class="font-medium no-underline" :class="rowChanges.get(row.original.id) === 'added' ? 'text-emerald-800 dark:text-emerald-200' : 'text-highlighted'">
+                <span class="sr-only">{{ t('submission.after') }} </span>
+                {{ cellLabel(column.kind, row.original.cells[column.id]) }}
+              </ins>
+            </div>
+            <span v-else class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ cellLabel(column.kind, row.original.cells[column.id]) }}</span>
+          </template>
           <UFormField
             v-else
             :name="cellName(row.index, column.id)"
@@ -233,10 +276,11 @@ const tableColumns = computed<TableColumn<Row>[]>(() => {
             @click="removeRow(row.original.id)" />
         </template>
       </CommonCompactTable>
-      <div v-else-if="structure.kind === 'repeating' && rows.length" class="mt-3 space-y-3">
-        <fieldset v-for="(row, index) in rows" :key="row.id" class="min-w-0 rounded-md border border-default p-3">
+      <div v-else-if="structure.kind === 'repeating' && displayedRows.length" class="mt-3 space-y-3">
+        <fieldset v-for="(row, index) in displayedRows" :key="row.id" class="min-w-0 rounded-md border border-default p-3">
           <legend class="px-1 text-sm font-medium text-highlighted">
             {{ entryLabel(index) }}
+            <AgreementSubmissionRowChangeBadge :change="rowChanges.get(row.id)" />
           </legend>
           <div v-if="!readonly" class="flex justify-end">
             <UButton
@@ -263,7 +307,24 @@ const tableColumns = computed<TableColumn<Row>[]>(() => {
                   {{ childLabel }}
                 </dt>
                 <dd class="whitespace-pre-wrap text-sm text-default [overflow-wrap:anywhere]">
-                  {{ answer || t('supplementary_information.no_answer') }}
+                  <template v-if="cellChanged(row, child.id)">
+                    <AgreementFieldsCustomField
+                      v-if="previousRows.get(row.id)?.cells[child.id] != null"
+                      :field="child" :currency="currency" :options="child.options"
+                      :model-value="previousRows.get(row.id)?.cells[child.id]" readonly>
+                      <template #answer="{ answer: oldAnswer }">
+                        <del class="text-red-800 dark:text-red-200">
+                          <span class="sr-only">{{ t('submission.before') }} </span>{{ oldAnswer }}
+                        </del>
+                      </template>
+                    </AgreementFieldsCustomField>
+                    <ins v-if="currentRowIds.has(row.id)" class="font-medium no-underline" :class="rowChanges.get(row.id) === 'added' ? 'text-emerald-800 dark:text-emerald-200' : 'text-highlighted'">
+                      <span class="sr-only">{{ t('submission.after') }} </span>{{ answer || t('supplementary_information.no_answer') }}
+                    </ins>
+                  </template>
+                  <template v-else>
+                    {{ answer || t('supplementary_information.no_answer') }}
+                  </template>
                 </dd>
               </template>
             </AgreementFieldsCustomField>

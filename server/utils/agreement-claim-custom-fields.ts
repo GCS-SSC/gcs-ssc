@@ -1,10 +1,11 @@
 import { createError, type H3Event } from 'h3'
-import { sql, type Kysely } from 'kysely'
+import { sql, type Kysely, type Transaction } from 'kysely'
 import { readAssignedAgencyCustomFieldDefinitions } from '../database/stream-custom-field-definitions'
 import { useEvent } from 'nitropack/runtime'
 import { z } from 'zod'
 import { changedCustomFieldAnswers, sameCustomFieldAnswer } from '~~/shared/utils/agreement-custom-field-answers'
 import type { FundingCaseAgreementClaimPatch } from '~~/shared/types/schemas/funding-case-agreement'
+import type { AgreementSubmissionEditSection } from '~~/shared/types/agreement-submission-database'
 import type { Database } from '~~/shared/types/database'
 import {
   agreementCustomFieldMergeSchema,
@@ -18,6 +19,8 @@ import { assertAgreementCurrency } from './agreement-currency'
 import { resolveValidationDetails, throwApiError } from './api-errors'
 import { parseI18n } from './api-validate'
 import { resolveRequestLocale } from './request-locale'
+import { financialCustomFieldSectionKey } from '~~/shared/utils/financial-custom-field-sections'
+import { recordSubmissionEditComments } from './agreement-submission-edit-comments'
 
 /**
  * Parses stored live or pinned financial field definitions before use.
@@ -239,13 +242,13 @@ export const captureForecastCustomFields = async (
  * @returns New answers when there is an effective change.
  */
 export const prepareFinancialCustomFieldPatch = async (
-  event: H3Event, db: Kysely<Database>, input: {
+  event: H3Event, db: Transaction<Database>, input: {
     target: 'claim' | 'forecast'
     id: string
     agreementId: string
     definitions: unknown
     current: AgreementCustomFieldValues
-    patch: Pick<FundingCaseAgreementClaimPatch, 'egcs_fc_customfields' | 'customFieldPrecondition'>
+    patch: Pick<FundingCaseAgreementClaimPatch, 'egcs_fc_customfields' | 'customFieldPrecondition' | 'customFieldComments'>
   }
 ) => {
   const { target, id, agreementId, definitions, current, patch } = input
@@ -274,6 +277,18 @@ export const prepareFinancialCustomFieldPatch = async (
     })
   }
   if (changedKeys.length === 0) return undefined
+
+  const fields = await parsePersistedClaimCustomFieldDefinitions(definitions, event, target)
+  const sections = new Map<string, AgreementSubmissionEditSection>()
+  for (const field of fields.filter(item => changedKeys.includes(item.id))) {
+    const section = field.section
+    sections.set(financialCustomFieldSectionKey(field), section
+      ? { id: section.id, en: section.egcs_tp_name_en, fr: section.egcs_tp_name_fr }
+      : { id: null })
+  }
+  await recordSubmissionEditComments(event, db, { kind: target, id }, {
+    kind: 'custom-fields', sections, texts: patch.customFieldComments
+  })
 
   // Keep saved ordering for equivalent selections when other answers change.
   return Object.fromEntries(Object.entries(answers).map(([key, answer]) => {

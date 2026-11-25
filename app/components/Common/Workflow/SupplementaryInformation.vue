@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import CommonInformationSection from '~/components/Common/InformationSection.vue'
 import { useResourceRequest } from '~/composables/useResourceRequest'
 import type { Ref } from 'vue'
 import type { WorkflowSupplementaryInformationResponse } from '~~/shared/types/workflow-supplementary-information'
@@ -72,7 +73,7 @@ watch(() => [entityType, entityId], () => {
     </CommonErrorNotice>
 
     <template v-else-if="information">
-      <CommonEmptyState v-if="information.workflows.length === 0" icon="i-lucide-clipboard-list" :description="t('supplementary_information.empty')" />
+      <CommonInformationSection v-if="information.workflows.length === 0" :empty-message="t('supplementary_information.empty')" />
       <section
         v-for="workflow in information.workflows"
         :key="workflow.runtimeId"
@@ -87,24 +88,22 @@ watch(() => [entityType, entityId], () => {
             · {{ t('supplementary_information.completed_at', { date: formatDate(new Date(workflow.completedAt)) }) }}
           </p>
         </header>
-        <section
-          v-for="collection in workflow.collections"
+        <CommonInformationSection
+          v-for="(collection, index) in workflow.collections"
           :key="collection.id"
-          class="space-y-5"
+          :title="getBilingualValue(collection, 'name')"
+          :separated="index > 0"
           data-testid="supplementary-collection">
-          <header class="space-y-1">
+          <template #before-heading>
             <p class="text-xs font-medium text-muted">
               {{ t('workflow.step') }} {{ collection.memberSequence }}
             </p>
-            <h3 class="text-base font-semibold text-highlighted">
-              {{ getBilingualValue(collection, 'name') }}
-            </h3>
-            <p class="whitespace-pre-wrap break-words text-sm text-muted">
-              {{ getBilingualValue(collection, 'description') }}
-            </p>
-          </header>
+          </template>
+          <p class="whitespace-pre-wrap break-words text-sm text-muted">
+            {{ getBilingualValue(collection, 'description') }}
+          </p>
           <CommonQuestionnaireReadOnly :definition="collection.definition" :responses="collection.responses" />
-        </section>
+        </CommonInformationSection>
       </section>
     </template>
   </div>

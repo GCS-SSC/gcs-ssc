@@ -6,11 +6,14 @@ import type { FetchError } from 'ofetch'
 import { useActionContext, type ActionContext } from '~/composables/useActionContext'
 import { useCommittedSettlement } from '~/composables/useCommittedSettlement'
 import type { CommittedReadbackResult } from '~/composables/useCommittedSettlement'
+import { useEditorSettlement } from '~/composables/useEditorSettlement'
+import { useOperationLane } from '~/composables/useOperationLane'
 import { useFormSession } from '~/composables/useFormSession'
 import { useZodI18n } from '~/composables/useZodI18n'
 import { agreementCustomFieldMergeSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgreementCustomFieldPatch, AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
-import type { FundingCaseAgreementClaimPatch } from '~~/shared/types/schemas/funding-case-agreement'
+import { SubmissionEditCommentSchema, type FundingCaseAgreementClaimPatch } from '~~/shared/types/schemas/funding-case-agreement'
+import { financialCustomFieldSectionKey } from '~~/shared/utils/financial-custom-field-sections'
 import { changedCustomFieldAnswers } from '~~/shared/utils/agreement-custom-field-answers'
 
 type AnswerReadStatus = 'idle' | 'pending' | 'success' | 'error'
@@ -35,16 +38,16 @@ export const useSubmissionAnswerContexts = (options: {
   record: () => AnswerReadEvidence & { matches: boolean }
   eligible: () => boolean
 }) => {
-  const authority = ref(false)
+  const roleEvidence = ref<'unconfirmed' | 'allowed' | 'denied'>('unconfirmed')
   watch([options.profile, options.record], ([profile, record]) => {
     if (isDefinitiveReadError(profile.error) || isDefinitiveReadError(record.error)
       || (record.status === 'success' && !record.matches)) {
-      authority.value = false
+      roleEvidence.value = 'denied'
     } else if (profile.status === 'success') {
-      authority.value = profile.canUpdate
+      roleEvidence.value = profile.canUpdate ? 'allowed' : 'denied'
     }
   }, { immediate: true, flush: 'sync' })
-  const owner = { identity: options.identity, authority }
+  const owner = { identity: options.identity, authority: () => roleEvidence.value === 'allowed' }
   return {
     openingContext: useActionContext(owner),
     context: useActionContext({
@@ -54,7 +57,7 @@ export const useSubmissionAnswerContexts = (options: {
   }
 }
 
-type AnswerDraft = { egcs_fc_customfields: AgreementCustomFieldPatch }
+type AnswerDraft = { egcs_fc_customfields: AgreementCustomFieldPatch; customFieldComments: Record<string, string> }
 type AnswerPrecondition = NonNullable<FundingCaseAgreementClaimPatch['customFieldPrecondition']>
 type AnswerEditorState =
   | { kind: 'reading' }
@@ -82,9 +85,10 @@ const copyAnswers = (answers: AgreementCustomFieldPatch): AgreementCustomFieldPa
  * @param options.openingContext - Actor, security, record and role lifetime independent of read eligibility.
  * @param options.readAnswers - Last accepted answers for a new opening.
  * @param options.readSubmissionRevision - Last accepted linked Submission revision, or null for an unlinked financial record.
+ * @param options.readComments - Saved comments for the current source revision.
  * @param options.readDefinitions - Pinned definitions for validation.
  * @param options.isBlocked - Other active operations that block editing.
- * @param options.persist - Writes changed keys and reports whether values changed.
+ * @param options.persist - Writes changed keys and linked-review comments, and reports whether values changed.
  * @param options.readback - Refreshes the live page after acknowledgment.
  * @param options.onDenied - Reports an unavailable edit action.
  * @param options.isConflict - Identifies an outdated opening that must be reloaded.
@@ -97,9 +101,10 @@ export const useSubmissionAnswerEditor = (options: {
   openingContext: ActionContext
   readAnswers: () => AgreementCustomFieldValues
   readSubmissionRevision: () => number | null
+  readComments?: () => Record<string, string>
   readDefinitions: () => AssignedAgencyCustomFieldDefinition[]
   isBlocked: () => boolean
-  persist: (changes: AgreementCustomFieldPatch, precondition: AnswerPrecondition) => Promise<boolean>
+  persist: (changes: AgreementCustomFieldPatch, precondition: AnswerPrecondition, comments?: Record<string, string>) => Promise<boolean>
   readback: () => Promise<CommittedReadbackResult>
   onDenied: () => void
   isConflict: (error: unknown) => boolean
@@ -107,17 +112,22 @@ export const useSubmissionAnswerEditor = (options: {
   onSaved: () => void
 }) => {
   const editor: Ref<AnswerEditorState> = ref({ kind: 'reading' })
-  const isSaving = ref(false)
+  const writes = useOperationLane<'answers'>()
+  const isSaving = computed(() => writes.isPending('answers'))
   const { createValidator } = useZodI18n()
-  const validate = computed(() => createValidator(z.object({
-    egcs_fc_customfields: agreementCustomFieldMergeSchema(options.readDefinitions(), options.readAnswers(), { requireAnswers: false })
-  })))
   const captureSettlement = useCommittedSettlement({ context: options.context, settle: options.readback })
   let nextSession = 0
   const draft = computed(() => editor.value.kind === 'editing' ? editor.value.draft : null)
   const changes = computed(() => editor.value.kind === 'editing'
     ? changedCustomFieldAnswers(editor.value.baseline, editor.value.draft.egcs_fc_customfields)
     : {})
+  const commentSections = computed(() => editor.value.kind === 'editing' && editor.value.submissionRevision !== null
+    ? new Set(options.readDefinitions().filter(field => Object.hasOwn(changes.value, field.id)).map(financialCustomFieldSectionKey))
+    : new Set<string>())
+  const validate = computed(() => createValidator(z.object({
+    egcs_fc_customfields: agreementCustomFieldMergeSchema(options.readDefinitions(), options.readAnswers(), { requireAnswers: false }),
+    customFieldComments: z.object(Object.fromEntries([...commentSections.value].map(id => [id, SubmissionEditCommentSchema])))
+  })))
   const isDirty = computed(() => Object.keys(changes.value).length > 0)
   const isStale = computed(() => editor.value.kind === 'editing' && editor.value.status === 'stale')
   const canSave = computed(() => !isStale.value && isDirty.value && !options.readDefinitions().some(field =>
@@ -129,6 +139,16 @@ export const useSubmissionAnswerEditor = (options: {
     editor.value = { kind: 'reading' }
   }
 
+  const prepareWrite = useEditorSettlement({
+    captureSession,
+    isCurrentSession,
+    isLatestSession: session => nextSession === session,
+    closeSession: session => {
+      if (!isCurrentSession(session)) return false
+      close()
+      return true
+    }
+  })
   watch(options.openingContext.version, close, { flush: 'sync' })
 
   const setEditing = (enabled: boolean) => {
@@ -146,32 +166,38 @@ export const useSubmissionAnswerEditor = (options: {
     editor.value = {
       kind: 'editing', session: ++nextSession, status: 'current', baseline,
       submissionRevision: options.readSubmissionRevision(),
-      draft: { egcs_fc_customfields: copyAnswers(baseline) }
+      draft: { egcs_fc_customfields: copyAnswers(baseline), customFieldComments: { ...options.readComments?.() } }
     }
   }
 
   const save = async () => {
     const opening = editor.value
     if (opening.kind !== 'editing' || isSaving.value || options.isBlocked() || !canSave.value) return
-    const { session, submissionRevision, baseline } = opening
-    const settlement = captureSettlement()
-    if (!settlement?.canDispatch()) return
+    const { submissionRevision, baseline } = opening
+    const write = prepareWrite(options.context, captureSettlement)
+    if (!write?.canDispatch()) return
     const patch = copyAnswers(changes.value)
     const previousAnswers = Object.fromEntries(Object.keys(patch).map(key => [key, baseline[key] ?? null]))
-    isSaving.value = true
+    const release = writes.acquire('answers')
+    if (!release) return
     try {
-      const changed = await options.persist(patch, { submissionRevision, previousAnswers })
-      const ownsEditor = isCurrentSession(session)
-      if (ownsEditor) close()
-      const readback = await settlement.settle()
-      if (changed && ownsEditor && readback.kind === 'refreshed' && nextSession === session) options.onSaved()
+      const requiredSections = [...commentSections.value]
+      const comments = Object.fromEntries(requiredSections.map(id => [
+        id, SubmissionEditCommentSchema.parse(opening.draft.customFieldComments[id])
+      ]))
+      const precondition = { submissionRevision, previousAnswers }
+      const changed = requiredSections.length
+        ? await options.persist(patch, precondition, comments)
+        : await options.persist(patch, precondition)
+      const canReport = await write.acknowledge()
+      if (changed && canReport) options.onSaved()
     } catch (error: unknown) {
-      if (isCurrentSession(session)) {
+      if (write.isCurrent()) {
         if (options.isConflict(error)) opening.status = 'stale'
         else options.onError(error)
       }
     } finally {
-      isSaving.value = false
+      release()
     }
   }
 
@@ -188,5 +214,5 @@ export const useSubmissionAnswerEditor = (options: {
     return true
   }
 
-  return { draft, isDirty, canSave, isSaving, isStale, setEditing, discardStaleDraft, formSession, validate }
+  return { draft, isDirty, canSave, commentSections, isSaving, isStale, setEditing, discardStaleDraft, formSession, validate }
 }

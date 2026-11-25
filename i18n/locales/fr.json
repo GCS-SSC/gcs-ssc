@@ -1,4 +1,44 @@
 {
+  "agreement_requests": {
+    "external": "Externe",
+    "make_shareable": "Marquer comme externe",
+    "make_internal": "Marquer la conversation comme interne",
+    "internal_thread": "Conversation interne",
+    "add_note": "Ajouter une note",
+    "note_tag": "Note",
+    "edit_message": "Modifier le message",
+    "response_tag": "Réponse",
+    "request_tag": "Demande",
+    "title": "Demandes",
+    "new_thread": "Nouvelle demande",
+    "search": "Rechercher par objet",
+    "filter": "Filtrer par état",
+    "all": "Toutes",
+    "open": "Ouverte",
+    "resolved": "Résolue",
+    "no_threads": "Il n’y a encore aucune demande.",
+    "no_matches": "Aucune demande ne correspond à votre recherche.",
+    "subject": "Objet",
+    "reply": "Consigner une réponse",
+    "question_to_answer": "Demande à laquelle répondre",
+    "question_option": "Demande {number} · {date} – {message}",
+    "add_question": "Ajouter une demande",
+    "message": "Message",
+    "resolve": "Résoudre",
+    "reopen": "Rouvrir",
+    "correspondence_at": "Date et heure de la correspondance",
+    "unknown_author": "Personnel",
+    "internal": "Interne",
+    "internal_help": "Ce réglage s’applique à la conversation et à ses pièces jointes. Les notes restent toujours internes.",
+    "contact": "Préremplir à partir d’un contact enregistré",
+    "contact_name": "Nom du contact",
+    "contact_email": "Courriel du contact",
+    "attachments": "Pièces jointes",
+    "read_only": "Les demandes de ce dossier sont en lecture seule.",
+    "load_error": "Impossible de charger les demandes.",
+    "saved": "Demande mise à jour",
+    "download": "Télécharger {name}"
+  },
   "portable_authoring": {
     "duplicate_name": "Un schéma portant ce nom existe déjà. Saisissez un nouveau nom pour créer un brouillon distinct.",
     "browse": "Parcourir les schémas",
@@ -287,6 +327,10 @@
     "invalid_json": "Saisissez un JSON valide."
   },
   "custom_fields": {
+    "agreement": "Entente",
+    "forecast": "Prévision",
+    "claim": "Demande de remboursement",
+    "before_entity": "Avant le formulaire principal",
     "decimal_places": "Décimales",
     "decimal_places_hint": "Nombre maximal de décimales : {places}",
     "minimum": "Minimum",
@@ -595,11 +639,13 @@
     "save": "Enregistrer le brouillon",
     "save_success": "Les modifications du brouillon ont été enregistrées.",
     "return": "Retourner pour modification",
+    "withdraw_return": "Retirer le retour",
     "return_description": "Courte description",
     "confirm_return": "Confirmer le retour",
     "accept": "Accepter",
     "open_result": "Ouvrir le dossier · {target}",
     "waiting": "Retournée · En attente d’une soumission révisée",
+    "proponent_editing": "Modification par le demandeur · En attente d’une soumission révisée",
     "needs_attention": "Intervention requise",
     "budget_preview": "Remplacement du budget proposé",
     "replacement_notice": "Le budget proposé sera remplacé en entier. Les exercices, les postes et les sources de financement omis dans la soumission seront retirés de la proposition.",
@@ -639,12 +685,16 @@
       "submitted": "Soumise",
       "reviewing": "En cours de modification",
       "returned": "Retourné",
+      "proponent_editing": "Modification par le demandeur",
       "accepted": "Acceptée"
     },
+    "edit_comment": "Commentaire sur la modification",
     "event": {
+      "edited": "Soumission modifiée",
       "received": "Soumission reçue",
       "review_started": "Modification commencée",
       "returned": "Retournée pour modification",
+      "return_withdrawn": "Retour retiré",
       "accepted": "Acceptée"
     },
     "policy": {
@@ -1332,8 +1382,8 @@
           "manager": "Supprimez des groupes lorsque c’est permis. Un groupe encore utilisé dans un processus peut devoir être conservé."
         },
         "agreement": {
-          "viewer": "Consultez les modalités des ententes et les dossiers connexes, comme les demandes de remboursement, les paiements, les prévisions et les rapports de suivi.",
-          "contributor": "Créez des ententes. Dans les dossiers qui vous sont affectés, vous pouvez saisir les montants d’une demande de remboursement, préparer des paiements, actualiser des prévisions, consigner des constats de suivi ou soumettre le travail pour approbation. Les personnes assignées à une entente peuvent examiner et retourner ses soumissions. L’acceptation exige aussi le droit de modifier la destination.",
+          "viewer": "Consultez les modalités des ententes et les dossiers connexes, comme les demandes de remboursement, les paiements, les prévisions et les rapports de suivi. Consultez les demandes de renseignements et leurs pièces jointes sur les demandes de remboursement et les prévisions.",
+          "contributor": "Créez des ententes. Dans les dossiers qui vous sont affectés, vous pouvez saisir les montants d’une demande de remboursement, préparer des paiements, actualiser des prévisions, consigner des constats de suivi ou soumettre le travail pour approbation. Les personnes assignées à une entente peuvent examiner et retourner ses soumissions. L’acceptation exige aussi le droit de modifier la destination. Consignez la correspondance et gérez les demandes de renseignements sur les demandes de remboursement et les prévisions qui vous sont affectées.",
           "manager": "Supprimez des ententes ou des dossiers connexes qui vous sont affectés lorsque leur statut le permet. Vous pouvez, par exemple, supprimer une demande de remboursement à l’état d’ébauche qui vous est affectée."
         },
         "applicant_recipient": {
@@ -1636,6 +1686,16 @@
     "return_home": "Retourner au tableau de bord"
   },
   "apiErrors": {
+    "agreementRequests": {
+      "entry_stale": "Ce message a été modifié depuis son ouverture. Votre brouillon est toujours ouvert. Copiez vos modifications avant de fermer la boîte de dialogue et de recharger la page.",
+      "entry_locked": "Seul le dernier message modifiable de cette conversation peut être modifié.",
+      "not_found": "Demande introuvable.",
+      "read_only": "Les demandes pour ce dossier sont en lecture seule.",
+      "resolved": "Rouvrez cette demande avant d’ajouter une question.",
+      "question_not_found": "La question ne fait pas partie de cette demande.",
+      "request_conflict": "Cet envoi a déjà été utilisé pour une autre correspondance. Rechargez la page et réessayez.",
+      "too_many_attachments": "Vous pouvez joindre jusqu’à cinq fichiers par entrée."
+    },
     "review_copy": {
       "alignment": "L’évaluation précédente contient des renseignements sur l’harmonisation, mais l’harmonisation est désactivée pour cette évaluation.",
       "custom_outcomes": "L’évaluation précédente contient des résultats personnalisés, mais les résultats personnalisés sont désactivés pour cette évaluation.",
@@ -2015,6 +2075,8 @@
       "commitment_exceeds_program_funding": "Le total de l'engagement ne peut pas dépasser le financement de programme total de l'entente.",
       "payment_lines_must_match_total": "Les montants des lignes de paiement doivent égaler le montant du paiement.",
       "invalid_forecast_fiscal_year": "L'exercice financier de prévision sélectionné est invalide pour cette entente.",
+      "forecast_create_operation_conflict": "Cet identifiant d’opération a déjà servi à créer une prévision avec des données différentes.",
+      "invalid_forecast_proponent": "Sélectionnez un promoteur actif lié à cette entente pour soumettre la prévision.",
       "invalid_forecast_budget_line_item": "La ligne budgétaire sélectionnée est invalide pour cette prévision.",
       "invalid_claim_fiscal_year": "L'exercice financier de demande de remboursement sélectionné est invalide pour cette entente.",
       "invalid_claim_budget_line_item": "La ligne budgétaire sélectionnée est invalide pour cette demande de remboursement.",
@@ -2036,6 +2098,7 @@
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
       "initial_approval_required": "Terminez la soumission initiale de l’entente pour approbation avant de créer une demande de remboursement ou un paiement.",
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",
+      "submitting_proponent_immutable": "Le promoteur qui soumet la demande ou la prévision ne peut pas être modifié après la création.",
       "claim_answers_stale": "La demande de remboursement ou sa soumission a changé. Rechargez les réponses à jour avant d’enregistrer de nouveau.",
       "forecast_answers_stale": "La prévision ou sa soumission a changé. Rechargez les réponses à jour avant d’enregistrer de nouveau.",
       "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
@@ -2774,6 +2837,10 @@
     }
   },
   "validation": {
+    "request_attachment_size": "Chaque pièce jointe doit avoir une taille d’au plus 10 Mo.",
+    "request_reply_before_question": "Une réponse ne peut pas être datée d’avant sa question.",
+    "request_correspondence_date": "Saisissez une date et une heure de correspondance valides.",
+    "request_reply_content": "Saisissez un message ou ajoutez une pièce jointe.",
     "duplicate_claim_source_line_id": "Utilisez un identifiant de source distinct pour chaque poste de la demande de remboursement.",
     "stream_budget_breakdown_conflict": "Désactivez les deux exigences de ventilation des autres financements avant de choisir le financement du programme seulement.",
     "notification_field_binding_invalid": "Sélectionnez une variable prise en charge. Les variables texte utilisent un champ; les dates et les heures nécessitent un fuseau horaire.",
@@ -3566,7 +3633,9 @@
       }
     },
     "forecasts": {
-      "no_additional_information": "Aucun champ supplémentaire n’est configuré pour cette prévision.",
+      "submitting_proponent": "Promoteur présentant la prévision",
+      "submitting_proponent_description": "Sélectionnez le promoteur qui présente cette prévision. La sélection ne peut pas être modifiée après la création.",
+      "no_additional_information": "Aucune donnée supplémentaire n’est configurée pour cette prévision.",
       "program_only_copy_title": "Financement du programme copié",
       "program_only_copy_notice": "Cette ébauche comprend uniquement le financement du programme. La prévision précédente conserve ses autres sources de financement.",
       "historical_budget_line_read_only": "Cette ligne enregistrée est en lecture seule, car sa ligne budgétaire n’est plus disponible dans le budget courant.",
@@ -3651,7 +3720,7 @@
       "submission_title": "Soumission",
       "amounts_tab": "Montants",
       "additional_tab": "Renseignements supplémentaires",
-      "no_additional_information": "Aucun champ supplémentaire n’est configuré pour cette demande de remboursement.",
+      "no_additional_information": "Aucune donnée supplémentaire n’est configurée pour cette demande de remboursement.",
       "reconcile_title": "Rapprochement",
       "cost_category": "Catégorie de coût",
       "submitted_amount": "Montant soumis",
@@ -3769,7 +3838,7 @@
         "completed_success": "Rapprochement terminé avec succès"
       },
       "submitting_proponent": "Promoteur présentant la demande",
-      "submitting_proponent_description": "Sélectionnez le promoteur de cette entente qui soumet cette demande. La valeur peut être modifiée tant que la demande est modifiable.",
+      "submitting_proponent_description": "Sélectionnez le promoteur qui présente cette demande. La sélection ne peut pas être modifiée après la création.",
       "action_unavailable": "Cette action n’est pas disponible dans l’état actuel de la demande de remboursement.",
       "reconcile_prerequisites": "Terminez la demande de remboursement, répartissez toutes les lignes soumises et assurez-vous qu’aucun rapprochement final n’a été approuvé avant de commencer un rapprochement."
     },
@@ -5079,7 +5148,10 @@
     "allTables": "Toutes les tables",
     "tableLabels": {
       "agreementSubmission": "Soumission d’entente",
-      "agreementSubmissionEvent": "Événement de soumission d’entente"
+      "agreementSubmissionEvent": "Événement de soumission d’entente",
+      "agreementRequestAttachment": "Pièce jointe à une demande liée à une entente",
+      "agreementRequestEntry": "Entrée d’une demande liée à une entente",
+      "agreementRequestThread": "Fil de discussion d’une demande liée à une entente"
     },
     "accessWindow": "Période de recherche par défaut : les 7 derniers jours. Utilisez Filtres pour choisir une autre période.",
     "accessPageRecords": "{count} enregistrements sur cette page",

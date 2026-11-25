@@ -4,6 +4,9 @@ const model = defineModel<string>({ default: '' })
 const { t } = useI18n()
 const { data, error, refresh } = useFetch<{ events: string[]; access: string[] }, Error, string>('/api/admin/audit/tables' as string)
 const labelKeys = new Map([
+  ['public.Funding_Case_Agreement_Request_Attachment', 'audit.tableLabels.agreementRequestAttachment'],
+  ['public.Funding_Case_Agreement_Request_Entry', 'audit.tableLabels.agreementRequestEntry'],
+  ['public.Funding_Case_Agreement_Request_Thread', 'audit.tableLabels.agreementRequestThread'],
   ['public.Funding_Case_Agreement_Submission', 'audit.tableLabels.agreementSubmission'],
   ['public.Funding_Case_Agreement_Submission_Event', 'audit.tableLabels.agreementSubmissionEvent']
 ])

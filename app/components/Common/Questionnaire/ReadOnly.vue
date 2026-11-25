@@ -54,12 +54,12 @@ const selectedOptionDescription = (question: QuestionnaireQuestion): string => {
         <h5 class="text-sm font-semibold text-muted">
           {{ localized(subSection.label) }}
         </h5>
-        <dl class="divide-y divide-default">
+        <dl>
           <div v-for="question in subSection.questions" :key="question.key" class="space-y-2 py-4 first:pt-0">
-            <dt class="text-sm font-medium text-highlighted">
+            <dt class="text-highlighted">
               {{ localized(question.question) }}
             </dt>
-            <dd class="space-y-2 text-sm">
+            <dd class="space-y-2">
               <p v-if="question.type === 'text' && question.description" class="text-muted">
                 {{ localized(question.description) }}
               </p>
