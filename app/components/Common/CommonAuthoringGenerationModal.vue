@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { z } from 'zod'
+import { ofetch } from 'ofetch'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { useActionContext } from '~/composables/useActionContext'
 import { useModalSession } from '~/composables/useModalSession'
@@ -39,7 +40,7 @@ const generate = async () => {
   inFlight.value = true
   phase.value = { kind: 'pending' }
   try {
-    const result = await $fetch<{ envelope: unknown; notices: PortableAuthoringNotice[] }>(url, { method: 'POST', body })
+    const result = await ofetch<{ envelope: unknown; notices: PortableAuthoringNotice[] }>(url, { method: 'POST', body })
     if (!owner.isCurrent() || !session.isCurrentSession(opening)) return
     open.value = false
     emit('generated', result.envelope, result.notices)
@@ -60,7 +61,7 @@ const generate = async () => {
         <UFormField :label="t('authoring_generation.file')" required data-field-exclude="Transient source file for generation">
           <UInput type="file" class="w-full" :disabled="phase.kind === 'pending'" @change="selectFile" />
         </UFormField>
-        <UAlert v-if="phase.kind === 'error'" color="error" :title="phase.message" role="alert" />
+        <CommonNotice v-if="phase.kind === 'error'" tone="error" :title="phase.message" role="alert" />
         <p v-if="phase.kind === 'pending'" role="status">
           {{ t('authoring_generation.pending') }}
         </p>

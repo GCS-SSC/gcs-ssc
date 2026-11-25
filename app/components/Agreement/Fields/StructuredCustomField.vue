@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@nuxt/ui'
 import { computed, useId } from 'vue'
 import { nanoid } from 'nanoid'
 import AgreementFieldsCustomField from './CustomField.vue'
@@ -142,6 +143,15 @@ const cellLabel = (kind: string, value: Cell | undefined) => {
   }
   return value
 }
+const tableColumns = computed<TableColumn<Row>[]>(() => {
+  const columns: TableColumn<Row>[] = [{ id: 'row', header: t('custom_fields.row'), ...(columnTotals.value ? { footer: t('custom_fields.column_totals') } : {}) }]
+  for (const column of table.value?.columns ?? []) {
+    columns.push({ id: `cell_${column.id}`, header: label(column), meta: { class: { th: 'min-w-36', td: 'align-top' } } })
+  }
+  if (rowTotals.value) columns.push({ id: 'rowTotal', header: t('custom_fields.row_total') })
+  if (!readonly) columns.push({ id: 'actions', header: t('common.actions'), meta: { class: { th: '[&>div]:sr-only' } } })
+  return columns
+})
 </script>
 
 <template>
@@ -167,85 +177,62 @@ const cellLabel = (kind: string, value: Cell | undefined) => {
       <p v-if="readonly && !rows.length" class="text-sm text-default">
         {{ t('supplementary_information.no_answer') }}
       </p>
-      <div
+      <CommonCompactTable
         v-if="table && rows.length"
-        class="mt-3 overflow-x-auto rounded-md border border-default"
+        :data="rows"
+        :columns="tableColumns"
+        :get-row-id="row => row.id"
+        :ui="{ caption: 'sr-only', thead: 'bg-elevated', tfoot: 'bg-elevated' }"
+        class="mt-3"
         role="region"
-        :aria-label="fieldLabel"
-        tabindex="0">
-        <table class="w-full border-collapse text-sm">
-          <caption class="sr-only">
-            {{ fieldLabel }}
-          </caption>
-          <thead class="bg-elevated">
-            <tr>
-              <th scope="col" class="px-3 py-2 text-start">
-                {{ t('custom_fields.row') }}
-              </th>
-              <th v-for="column in table.columns" :key="column.id" scope="col" class="min-w-36 px-3 py-2 text-start">
-                {{ label(column) }}
-                <span v-if="!readonly && column.required" class="text-xs font-normal text-muted" aria-hidden="true">({{ t('common.field_required') }})</span>
-              </th>
-              <th v-if="rowTotals" scope="col" class="px-3 py-2 text-start">
-                {{ t('custom_fields.row_total') }}
-              </th>
-              <th v-if="!readonly" scope="col" class="px-3 py-2">
-                <span class="sr-only">{{ t('common.actions') }}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in rows" :key="row.id" class="border-t border-default">
-              <th scope="row" class="px-3 py-2 text-start font-medium">
-                {{ n(index + 1) }}
-              </th>
-              <td v-for="column in table.columns" :key="column.id" class="px-3 py-2 align-top">
-                <span v-if="readonly" class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ cellLabel(column.kind, row.cells[column.id]) }}</span>
-                <UFormField
-                  v-else
-                  :name="cellName(index, column.id)"
-                  :label="`${rowLabel(index)}, ${label(column)}`"
-                  :required="column.required"
-                  :ui="{ wrapper: 'sr-only', container: 'mt-0' }">
-                  <UInput
-                    :type="column.kind === 'date' ? 'date' : 'text'"
-                    :inputmode="column.kind === 'number' ? 'decimal' : undefined"
-                    :model-value="cellInputValue(column.kind, row.cells[column.id])"
-                    :required="column.required"
-                    :disabled="disabled"
-                    class="w-full"
-                    @input="updateTableInput($event, row.id, column)" />
-                </UFormField>
-              </td>
-              <td v-if="rowTotals" class="px-3 py-2 text-end tabular-nums">
-                {{ decimalLabel(totals?.rows[row.id]) }}
-              </td>
-              <td v-if="!readonly" class="px-3 py-2">
-                <UButton
-                  type="button"
-                  variant="ghost"
-                  color="neutral"
-                  icon="i-lucide-trash-2"
-                  :aria-label="t('custom_fields.remove_row', { number: n(index + 1) })"
-                  :disabled="disabled"
-                  @click="removeRow(row.id)" />
-              </td>
-            </tr>
-          </tbody>
-          <tfoot v-if="columnTotals" class="border-t border-default bg-elevated">
-            <tr>
-              <th scope="row" class="px-3 py-2 text-start">
-                {{ t('custom_fields.column_totals') }}
-              </th>
-              <td v-for="column in table.columns" :key="column.id" class="px-3 py-2 text-end tabular-nums">
-                {{ column.kind === 'number' ? decimalLabel(totals?.columns[column.id]) : '' }}
-              </td>
-              <td v-if="rowTotals" />
-              <td v-if="!readonly" />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+        :aria-label="fieldLabel">
+        <template #caption>
+          {{ fieldLabel }}
+        </template>
+        <template #row-cell="{ row }">
+          {{ n(row.index + 1) }}
+        </template>
+        <template v-for="column in table.columns" :key="column.id" #[`cell_${column.id}-header`]>
+          {{ label(column) }}
+          <span v-if="!readonly && column.required" class="text-xs font-normal text-muted" aria-hidden="true">({{ t('common.field_required') }})</span>
+        </template>
+        <template v-for="column in table.columns" :key="column.id" #[`cell_${column.id}-cell`]="{ row }">
+          <span v-if="readonly" class="whitespace-pre-wrap [overflow-wrap:anywhere]">{{ cellLabel(column.kind, row.original.cells[column.id]) }}</span>
+          <UFormField
+            v-else
+            :name="cellName(row.index, column.id)"
+            :label="`${rowLabel(row.index)}, ${label(column)}`"
+            :required="column.required"
+            :ui="{ wrapper: 'sr-only', container: 'mt-0' }">
+            <UInput
+              :type="column.kind === 'date' ? 'date' : 'text'"
+              :inputmode="column.kind === 'number' ? 'decimal' : undefined"
+              :model-value="cellInputValue(column.kind, row.original.cells[column.id])"
+              :required="column.required"
+              :disabled="disabled"
+              class="w-full"
+              @input="updateTableInput($event, row.original.id, column)" />
+          </UFormField>
+        </template>
+        <template v-for="column in table.columns" :key="column.id" #[`cell_${column.id}-footer`]>
+          <span class="block text-end tabular-nums">{{ column.kind === 'number' ? decimalLabel(totals?.columns[column.id]) : '' }}</span>
+        </template>
+        <template #rowTotal-cell="{ row }">
+          <span class="block text-end tabular-nums">{{ decimalLabel(totals?.rows[row.original.id]) }}</span>
+        </template>
+        <template #actions-header>
+          <span class="sr-only">{{ t('common.actions') }}</span>
+        </template>
+        <template #actions-cell="{ row }">
+          <CommonActionButton
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-trash-2"
+            :aria-label="t('custom_fields.remove_row', { number: n(row.index + 1) })"
+            :disabled="disabled"
+            @click="removeRow(row.original.id)" />
+        </template>
+      </CommonCompactTable>
       <div v-else-if="structure.kind === 'repeating' && rows.length" class="mt-3 space-y-3">
         <fieldset v-for="(row, index) in rows" :key="row.id" class="min-w-0 rounded-md border border-default p-3">
           <legend class="px-1 text-sm font-medium text-highlighted">

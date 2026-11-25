@@ -284,7 +284,7 @@ const retryImport = async () => {
           {{ t('portable_authoring.pending') }}
         </p>
         <div v-else-if="phase.kind === 'failed'" class="space-y-4">
-          <UAlert color="error" :title="phase.message" role="alert" />
+          <CommonNotice tone="error" :title="phase.message" role="alert" />
           <ul v-if="phase.details.length" class="list-disc space-y-1 ps-5">
             <li v-for="(detail, index) in phase.details" :key="index">
               {{ detail.path }} · {{ detail.reference }}
@@ -292,8 +292,8 @@ const retryImport = async () => {
           </ul>
         </div>
         <div v-else class="space-y-4">
-          <UAlert
-            color="success"
+          <CommonNotice
+            tone="success"
             icon="i-lucide-circle-check"
             :title="t('portable_authoring.created')"
             :description="locale === 'fr' ? phase.name.fr : phase.name.en" />

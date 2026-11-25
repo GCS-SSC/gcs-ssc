@@ -1,3 +1,4 @@
+import { ofetch } from 'ofetch'
 import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -13,7 +14,7 @@ export const useAuthoringGenerationAvailability = (agencyId: MaybeRefOrGetter<st
   const { data } = useResourceRequest({
     identity: () => JSON.stringify([toValue(agencyId), user.value?.id, permissionRevision.value]),
     enabled: () => Boolean(toValue(agencyId) && user.value?.id),
-    load: signal => $fetch<{ enabled: boolean }>(
+    load: signal => ofetch<{ enabled: boolean }>(
       getClientRequestUrl(`/api/agency/${encodeURIComponent(toValue(agencyId))}/authoring-generation`).toString(), { signal }
     )
   })

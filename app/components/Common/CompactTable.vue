@@ -9,6 +9,7 @@ const {
   loading = false,
   emptyText,
   tableClass,
+  getRowId,
   ui
 } = defineProps<{
   data: T[]
@@ -16,6 +17,7 @@ const {
   loading?: boolean
   emptyText?: string
   tableClass?: string
+  getRowId?: (row: T) => string
   ui?: Record<string, string>
 }>()
 
@@ -31,6 +33,7 @@ defineExpose({ table })
       :data="data"
       :columns="columns"
       :loading="loading"
+      :get-row-id="getRowId"
       :ui="ui"
       class="min-w-full overflow-visible"
       :class="tableClass">

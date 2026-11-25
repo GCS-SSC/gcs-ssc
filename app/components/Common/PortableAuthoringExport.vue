@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ofetch } from 'ofetch'
 import { createPortableAuthoringExport, type PortableAuthoringKind } from '~~/shared/utils/portable-authoring-schema'
 import { useActionContext } from '~/composables/useActionContext'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -16,7 +17,7 @@ const download = async () => {
   if (!action?.canDispatch() || pending.value) return
   pending.value = true
   try {
-    const record = await $fetch<Record<string, unknown>>(getClientRequestUrl(endpoint).toString())
+    const record = await ofetch<Record<string, unknown>>(getClientRequestUrl(endpoint).toString())
     if (!action.isCurrent()) return
     const schema = createPortableAuthoringExport(kind, record)
     const bytes = new Blob([JSON.stringify(schema, null, 2)], { type: 'application/json' })
