@@ -594,16 +594,16 @@ export const receiveAgreementSubmission = async (
     return submissionDto(result)
   } catch (error: unknown) {
     if (isError(error) && [401, 403].includes(error.statusCode)) throw error
-    const knownBlocker = expectedTargetError(error)
-    if (!knownBlocker) {
+    const blocker = expectedTargetError(error)
+    if (!blocker) {
       console.error({
         event: 'agreement.submission_automatic_failed',
         agreementId,
         submissionId: received.id,
         errorName: error instanceof Error ? error.name : 'Unknown'
       })
+      throw error
     }
-    const blocker = knownBlocker ?? 'SUBMISSION_TARGET_BLOCKED'
     const result = await executeFreshAuthorizedAgreementWrite(event, db, agreementId, initial, async trx => {
       const row = await readSubmission(event, trx, agreementId, received.id, true)
       if (!automaticPending(row)) return row
