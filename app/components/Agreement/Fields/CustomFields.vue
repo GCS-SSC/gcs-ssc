@@ -8,9 +8,10 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { customFieldHasValue, customFieldOptionIds } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgreementCustomFieldSection, AssignedAgencyCustomFieldDefinition, AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
 
-const { streamId, agreementId, activity, placement = 'all', readonly = false, permissionAction = 'create' } = defineProps<{
+const { streamId, agreementId, activity, currency, placement = 'all', readonly = false, permissionAction = 'create' } = defineProps<{
   streamId?: string
   agreementId?: string
+  currency?: string
   activity?: { agreementId: string; amendmentId?: string }
   placement?: 'all' | 'profile' | 'configured'
   readonly?: boolean
@@ -113,6 +114,7 @@ const options = (field: AssignedAgencyCustomFieldDefinition) => {
         :key="field.id"
         :model-value="model[field.id]"
         :field="field"
+        :currency="currency"
         :options="options(field)"
         :readonly="readonly"
         :select-disabled="checkingCatalog || catalogCheckFailed"

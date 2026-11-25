@@ -1,3 +1,4 @@
+import { parsePersistedClaimCustomFieldDefinitions } from '~~/server/utils/agreement-claim-custom-fields'
 import { readLinkedSubmissionOverviewReview } from '~~/server/utils/agreement-linked-submission-targets'
 import { loadAgreementBudgetManagement } from '~~/server/utils/agreement-funding-breakdown'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
@@ -298,6 +299,11 @@ const readRoute = async (event: H3Event, claimId?: string) => {
   const currentFiscalYearIds = new Set(currentFiscalYears.map(year => String(year.id)))
   const claimsWithState = await Promise.all(claimsWithRecordState.map(async claim => ({
     ...claim,
+    ...(claimId
+      ? {
+          egcs_fc_customfielddefinitions: await parsePersistedClaimCustomFieldDefinitions(claim.egcs_fc_customfielddefinitions, event)
+        }
+      : {}),
     fiscal_year_available: currentFiscalYearIds.has(String(claim.fiscal_year_id)),
     hasPositiveCompletionTerminus: await hasPositiveCompletionTerminus(
       db,

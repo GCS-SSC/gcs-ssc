@@ -303,7 +303,7 @@ const patchValidatedAgreementProfile = async (
   }
   const stored = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields').where('id', '=', agreementId).executeTakeFirstOrThrow()
   values.egcs_fc_customfields = await mergeAgreementCustomFields(
-    event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields ?? {}
+    event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields ?? {}, current.egcs_fc_currency
   )
 
   try {

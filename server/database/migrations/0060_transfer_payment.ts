@@ -577,6 +577,7 @@ AS $function$
     DECLARE
       owning_agency bigint;
       field_agency bigint;
+      field_kind text;
     BEGIN
       IF NEW._deleted AND TG_OP = 'UPDATE' THEN RETURN NEW; END IF;
       SELECT profile.egcs_tp_agency INTO owning_agency
@@ -584,13 +585,17 @@ AS $function$
       JOIN "Transfer_Payment_Profile" profile ON profile.id = stream.egcs_tp_transferpaymentprofile
       WHERE stream.id = NEW.egcs_tp_transferpaymentstream AND stream._deleted = false AND profile._deleted = false
       FOR SHARE OF stream, profile;
-      SELECT field.egcs_ay_agency INTO field_agency
+      SELECT field.egcs_ay_agency, field.egcs_ay_kind INTO field_agency, field_kind
       FROM "Agency_Custom_Field" field
       WHERE field.id = NEW.egcs_tp_agencyfield AND field._deleted = false
       FOR SHARE;
       IF owning_agency IS NULL OR field_agency IS NULL OR owning_agency <> field_agency THEN
         RAISE EXCEPTION 'Assigned field must belong to the Stream Agency'
           USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_field_assignment_agency';
+      END IF;
+      IF field_kind IN ('table', 'repeating') AND NEW.egcs_tp_target <> 'claim' THEN
+        RAISE EXCEPTION 'Structured custom fields can only be assigned to Claims'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_field_assignment_kind';
       END IF;
       RETURN NEW;
     END $function$;
@@ -1389,7 +1394,7 @@ CREATE TRIGGER validate_stream_operational_catalog_link BEFORE INSERT OR UPDATE 
 
 CREATE TRIGGER guard_eligible_proponent_types AFTER DELETE OR UPDATE ON "Transfer_Payment_Stream_Eligible_Recipient" FOR EACH ROW EXECUTE FUNCTION guard_stream_proponent_types();
 
-CREATE TRIGGER enforce_stream_field_assignment_agency BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_agencyfield, _deleted ON "Transfer_Payment_Stream_Field_Assignment" FOR EACH ROW EXECUTE FUNCTION enforce_stream_field_assignment_agency();
+CREATE TRIGGER enforce_stream_field_assignment_agency BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_agencyfield, egcs_tp_target, _deleted ON "Transfer_Payment_Stream_Field_Assignment" FOR EACH ROW EXECUTE FUNCTION enforce_stream_field_assignment_agency();
 
 CREATE TRIGGER trg_validate_stream_funding_subtype_agency BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_fundingsubtype, _deleted ON "Transfer_Payment_Stream_Funding_Subtype" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_stream_funding_subtype_agency();
 

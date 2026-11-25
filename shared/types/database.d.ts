@@ -13,7 +13,7 @@ import type { TransferPaymentBudgetFundingMode } from './schemas/transfer-paymen
 import type { TablePreferences } from './schemas/table-preferences'
 import type { StatusId } from './status'
 import type { PaymentEvidence } from './payment-evidence'
-import type { AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition } from './schemas/agreement-custom-fields'
+import type { AgreementCustomFieldValues, AssignedAgencyCustomFieldDefinition, CustomFieldStructure, ScalarCustomFieldValue } from './schemas/agreement-custom-fields'
 
 /** NUMERIC reads remain exact text; nonmonetary writes may use validated numbers. */
 export type DecimalColumn = ColumnType<string, string | number, string | number>
@@ -1365,7 +1365,7 @@ export interface CommonEntityAssignmentTable {
 
 export interface FundingCaseAgreementProfileTable {
   egcs_fc_currency: Currency_Codes
-  egcs_fc_customfields: Generated<Record<string, string | number | string[]>>
+  egcs_fc_customfields: Generated<Record<string, ScalarCustomFieldValue>>
   id: Generated<string>
   egcs_fc_agreementnumber: string
   egcs_fc_transferpaymentstream: string
@@ -1924,7 +1924,7 @@ export interface FundingCaseAgreementMonitorPromisingPracticeTable {
 }
 
 export interface FundingCaseAgreementActivityTable {
-  egcs_fc_customfields: Generated<Record<string, string | number | string[]>>
+  egcs_fc_customfields: Generated<Record<string, ScalarCustomFieldValue>>
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_activityversion: Generated<string>
@@ -2695,13 +2695,14 @@ export interface AgencyCustomFieldTable {
   egcs_ay_agency: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
-  egcs_ay_kind: 'text' | 'number' | 'relational'
+  egcs_ay_kind: AssignedAgencyCustomFieldDefinition['egcs_ay_kind']
   egcs_ay_multiple: Generated<boolean>
-  egcs_ay_presentation: Generated<'single_line' | 'multiline'>
+  egcs_ay_presentation: Generated<AssignedAgencyCustomFieldDefinition['egcs_ay_presentation']>
   egcs_ay_discriminator: Generated<boolean>
   egcs_ay_minimum: Generated<number | null>
   egcs_ay_maximum: Generated<number | null>
   egcs_ay_decimalplaces: Generated<number | null>
+  egcs_ay_structure: Generated<CustomFieldStructure | null>
   _deleted: Generated<boolean>
 }
 export interface AgencyCustomFieldOptionTable {

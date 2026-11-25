@@ -545,7 +545,7 @@ export const patchAgreementActivity = async (
   const activityPatchValues = mapAgreementActivityPatchValues(validated)
   if (validated.egcs_fc_customfields !== undefined) {
     activityPatchValues.egcs_fc_customfields = await validateActivityCustomFieldWrite(
-      event, db, streamId, existing.egcs_fc_customfields, validated.egcs_fc_customfields
+      event, db, agreementId, streamId, existing.egcs_fc_customfields, validated.egcs_fc_customfields
     )
   }
   if (Object.keys(activityPatchValues).length > 0) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { claimCustomFieldAnswerLabel, claimCustomFieldEvidenceAnswers, sameClaimCustomFieldEvidence } from '~/utils/agreement-submission-view'
+import { claimCustomFieldEvidenceAnswers, sameClaimCustomFieldEvidence } from '~/utils/agreement-submission-view'
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgreementSubmissionTarget, SubmissionEventRow } from '~~/shared/types/agreement-submission'
 
@@ -43,7 +43,7 @@ const previousFieldAnswer = (index: number, field: ClaimCustomFieldSnapshot[numb
     { key: field.key, displayed: priorField.value, answers: evidenceAnswers.value.get(previous.id) },
     { key: field.key, displayed: field.value, answers: evidenceAnswers.value.get(snapshots.value[index]?.id ?? '') }
   )) return undefined
-  return claimCustomFieldAnswerLabel(priorField.value, locale.value)
+  return priorField.value
 }
 const before = computed(() => snapshots.value.find(event => event.id === earlier.value))
 const after = computed(() => snapshots.value.find(event => event.id === later.value))
@@ -133,11 +133,9 @@ const dateTime = (date: string) => dateFormatter.value.format(new Date(date))
                   {{ locale === 'fr' ? field.labelFr : field.labelEn }}
                 </dt>
                 <dd class="text-default">
-                  <AgreementSubmissionValue
-                    :value="claimCustomFieldAnswerLabel(field.value, locale)"
-                    :previous="previousFieldAnswer(index, field)"
-                    :replace-previous="true"
-                    snapshot />
+                  <AgreementSubmissionCustomFieldEvidence
+                    :value="field.value"
+                    :previous="previousFieldAnswer(index, field)" />
                 </dd>
               </div>
             </dl>

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { LinkedSubmissionOverviewReview } from '~~/shared/types/agreement-submission'
-import { validateClaimCustomFields } from './agreement-claim-custom-fields'
+import { parsePersistedClaimCustomFieldDefinitions, validateClaimCustomFields } from './agreement-claim-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- Linked submissions use the domain's ordinary target checks. */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -8,8 +8,9 @@ import type { AgreementSubmissionPayload } from '~~/shared/types/agreement-submi
 import type { Database, JsonValue } from '~~/shared/types/database'
 import { agreementSubmissionTargetSchemas as schemas } from '~~/shared/types/schemas/agreement-submission-targets'
 import { matchClaimSubmissionLines } from '~~/shared/utils/agreement-submission-claim-lines'
-import { compareMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, isPersistableMoney, maxMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { lockAgreementAggregate } from './agreement-aggregate-lock'
+import { readAgreementBudgetLineReference } from './agreement-budget-lineage'
 import { assertAgreementClaimBudgetFiscalYear, assertAgreementClaimBudgetLineItem } from './agreement-claim'
 import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
@@ -151,6 +152,7 @@ export const readLinkedSubmissionSnapshot = async (
   if (target === 'claim') {
     const claim = await readClaim(db, input)
     if (!claim) throw missingTarget()
+    const definitions = await parsePersistedClaimCustomFieldDefinitions(claim.egcs_fc_customfielddefinitions)
     const lines = await readClaimLines(db, targetId)
     const lineFunding = await readLineFunding(db, target, lines)
     const matches = matchClaimSubmissionLines(sourceLines, lines.map(claimLineIdentity), 'snapshot')
@@ -177,7 +179,7 @@ export const readLinkedSubmissionSnapshot = async (
       periodEnd: claim.egcs_fc_periodend,
       receivedDate: new Date(claim.egcs_fc_receiveddate).toISOString().slice(0, 10),
       ...optionalSnapshotValue(sourcePayload, 'customFields',
-        Object.hasOwn(sourcePayload, 'customFields') || claim.egcs_fc_customfielddefinitions.length ? claim.egcs_fc_customfields : undefined),
+        Object.hasOwn(sourcePayload, 'customFields') || definitions.length ? claim.egcs_fc_customfields : undefined),
       lineItems
     }
   }
@@ -219,16 +221,22 @@ export const readLinkedSubmissionOverviewReview = async (
   }
 }
 
+type ClaimSourceLines = ReturnType<typeof schemas.claim.parse>['lineItems']
+
+const sameClaimSourceLines = (previous: ClaimSourceLines, revised: ClaimSourceLines) => {
+  if (previous.length !== revised.length) return false
+  // The Claim schema already rejects duplicate source line IDs.
+  if (previous.some(line => line.sourceLineId === undefined) || revised.some(line => line.sourceLineId === undefined)) {
+    return JSON.stringify(previous) === JSON.stringify(revised)
+  }
+  const previousById = new Map(previous.map(line => [line.sourceLineId, line]))
+  return revised.every(line => JSON.stringify(previousById.get(line.sourceLineId)) === JSON.stringify(line))
+}
+
 const removeClaimLine = async (trx: Transaction<Database>, lineId: string) => {
   await trx.updateTable('Funding_Case_Agreement_Claim_Line_Item_Funding').set({ _deleted: true })
     .where('egcs_fc_claimlineitem', '=', lineId).where('_deleted', '=', false).execute()
   await trx.updateTable('Funding_Case_Agreement_Claim_Line_Item').set({ _deleted: true }).where('id', '=', lineId).executeTakeFirstOrThrow()
-}
-
-const removeForecastLine = async (trx: Transaction<Database>, lineId: string) => {
-  await trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item_Funding').set({ _deleted: true })
-    .where('egcs_fc_forecastlineitem', '=', lineId).where('_deleted', '=', false).execute()
-  await trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item').set({ _deleted: true }).where('id', '=', lineId).executeTakeFirstOrThrow()
 }
 
 export const applyLinkedSubmissionRevision = async (
@@ -246,7 +254,7 @@ export const applyLinkedSubmissionRevision = async (
     const claim = await readClaim(trx, input)
     if (!claim) throw missingTarget()
     const answers = await validateClaimCustomFields(event, claim.egcs_fc_customfielddefinitions, {
-      answers: revised.customFields ?? {}, requireAnswers: true, path: 'customFields'
+      answers: revised.customFields ?? {}, requireAnswers: true, path: 'customFields', currency
     })
     const reconcile = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile').select('id')
       .where('egcs_fc_fundingagreementclaim', '=', targetId).where('_deleted', '=', false).executeTakeFirst()
@@ -255,7 +263,7 @@ export const applyLinkedSubmissionRevision = async (
     if (previous.success && previous.data.applicantRecipientId === revised.applicantRecipientId
       && previous.data.fiscalYearId === revised.fiscalYearId && previous.data.isFinalForYear === revised.isFinalForYear
       && previous.data.periodStart === revised.periodStart && previous.data.periodEnd === revised.periodEnd
-      && JSON.stringify(previous.data.lineItems) === JSON.stringify(revised.lineItems)) {
+      && sameClaimSourceLines(previous.data.lineItems, revised.lineItems)) {
       await trx.updateTable('Funding_Case_Agreement_Claim').set({
         egcs_fc_customfields: answers,
         ...(previous.data.receivedDate !== revised.receivedDate
@@ -320,7 +328,20 @@ export const applyLinkedSubmissionRevision = async (
       const existingIndex = matches.get(index)
       const existing = existingIndex === undefined ? undefined : existingLines[existingIndex]
       const sources = existing ? lineFunding.get(existing.id) ?? [] : []
-      const total = sumMoney([line.amount, ...sources.map(source => source.egcs_fc_amount)], currency)
+      const existingTotal = existing?.egcs_fc_currency === currency
+        ? parseDatabaseMoney(existing.egcs_fc_totalamount, currency)
+        : undefined
+      let total = line.amount
+      if (mode === 'automatic') {
+        total = sumMoney([line.amount, ...sources.map(source => source.egcs_fc_amount)], currency)
+      } else if (existing && existingTotal) {
+        total = mode === 'manual'
+          ? addMoney(line.amount, subtractMoney(existingTotal, parseDatabaseMoney(existing.egcs_fc_amount, currency)))
+          : maxMoney([line.amount, existingTotal], currency)
+      }
+      if (!isPersistableMoney(total) || compareMoney(total, line.amount) < 0) {
+        return await badRequest(event, 'AGREEMENT_FUNDING_TOTAL_MISMATCH', 'apiErrors.agreement.funding_breakdown_required')
+      }
       const values = {
         egcs_fc_fundingagreementclaim: targetId,
         egcs_fc_fundingagreementbudgetlineitem: line.budgetLineItemId,
@@ -344,6 +365,7 @@ export const applyLinkedSubmissionRevision = async (
     }
   } else {
     const revised = await parseI18n(event, schemas.forecast, payload)
+    const previous = await parseI18n(event, schemas.forecast, input.previousSourcePayload)
     const forecast = await readForecast(trx, input)
     if (!forecast || forecast.egcs_fc_fiscalyear !== revised.fiscalYearId) {
       return await badRequest(event, 'INVALID_AGREEMENT_FORECAST_FISCAL_YEAR', 'apiErrors.agreement.invalid_forecast_fiscal_year')
@@ -360,16 +382,38 @@ export const applyLinkedSubmissionRevision = async (
     await assertCurrencyMoneyValues(event, currency, revised.lineItems.flatMap(line => line.totalAmount ? [line.amount, line.totalAmount] : [line.amount]))
     const remaining = await readForecastLines(trx, targetId)
     const lineFunding = await readLineFunding(trx, target, remaining)
+    if (remaining.some(line => lineFunding.has(line.id)
+      && !cellKeys.has(`${line.egcs_fc_fundingagreementbudgetlineitem}:${line.egcs_fc_month}`))) {
+      throw new SubmissionTargetError('SUBMISSION_FORECAST_FUNDED_CELL_OMITTED', 'A funded Forecast cell is missing from the corrected submission.')
+    }
     for (const line of revised.lineItems) {
-      await assertAgreementForecastBudgetLineItem(event, trx, agreementId, forecast.egcs_fc_fiscalyear, line.budgetLineItemId)
-      const index = remaining.findIndex(old => old.egcs_fc_fundingagreementbudgetlineitem === line.budgetLineItemId && old.egcs_fc_month === line.month)
-      const existing = index === -1 ? undefined : remaining.splice(index, 1)[0]
+      const matchesCell = (budgetId: string, month: number) => budgetId === line.budgetLineItemId && month === line.month
+      const liveMatches = remaining.filter(old => matchesCell(old.egcs_fc_fundingagreementbudgetlineitem, old.egcs_fc_month))
+      const existing = liveMatches.length === 1 ? liveMatches[0] : undefined
+      const priorMatches = previous.lineItems.filter(old => matchesCell(old.budgetLineItemId, old.month))
+      const prior = priorMatches.length === 1 ? priorMatches[0] : undefined
+      const echoesPrior = prior && prior.amount.amount === line.amount.amount
+        && prior.amount.currency === line.amount.currency
+        && prior.totalAmount?.amount === line.totalAmount?.amount
+        && prior.totalAmount?.currency === line.totalAmount?.currency
+      const echoesReviewerCell = existing && priorMatches.length === 0
+        && line.amount.amount === existing.egcs_fc_amount && line.totalAmount?.amount === existing.egcs_fc_totalamount
+      if (existing) remaining.splice(remaining.indexOf(existing), 1)
+      if (existing?.egcs_fc_currency === currency && (echoesPrior || echoesReviewerCell)) {
+        const current = await readAgreementBudgetLineReference(trx, agreementId, forecast.egcs_fc_fiscalyear, line.budgetLineItemId, 'current-choice')
+        if (!current) continue
+      } else {
+        await assertAgreementForecastBudgetLineItem(event, trx, agreementId, forecast.egcs_fc_fiscalyear, line.budgetLineItemId)
+      }
       const sources = existing ? lineFunding.get(existing.id) ?? [] : []
       const calculated = sumMoney([line.amount, ...sources.map(source => source.egcs_fc_amount)], currency)
       let total: Money = line.totalAmount ?? calculated
       if (mode === 'program_only') {
         if (line.totalAmount) return await badRequest(event, 'AGREEMENT_FORECAST_TOTAL_COST_INVALID', 'apiErrors.agreement.total_cost_read_only')
         total = line.amount
+      }
+      if (!isPersistableMoney(total)) {
+        return await badRequest(event, 'AGREEMENT_FORECAST_TOTAL_COST_INVALID', 'apiErrors.agreement.forecast_total_cost_range')
       }
       if (compareMoney(total, line.amount) < 0 || ((mode === 'automatic' || sources.length > 0) && compareMoney(total, calculated) !== 0)) {
         return await badRequest(event, 'AGREEMENT_FORECAST_TOTAL_COST_INVALID', 'apiErrors.agreement.funding_breakdown_required')
@@ -388,7 +432,10 @@ export const applyLinkedSubmissionRevision = async (
         await trx.insertInto('Funding_Case_Agreement_Forecast_Line_Item').values(values).execute()
       }
     }
-    for (const line of remaining) await removeForecastLine(trx, line.id)
+    for (const line of remaining) {
+      await trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item').set({ _deleted: true })
+        .where('id', '=', line.id).executeTakeFirstOrThrow()
+    }
   }
   await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: target, id: targetId })
 }

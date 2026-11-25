@@ -18,6 +18,8 @@ import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/W
 import CommonSelectableTable from '~/components/Common/SelectableTable.vue'
 import AgreementClaimReconciliationLinesTable from '~/components/Agreement/AgreementClaimReconciliationLinesTable.vue'
 import AgreementFieldsCustomField from '~/components/Agreement/Fields/CustomField.vue'
+import AgreementFieldsStructuredCustomField from '~/components/Agreement/Fields/StructuredCustomField.vue'
+import type { AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { useActionContext } from '~/composables/useActionContext'
 import { useFormSession } from '~/composables/useFormSession'
@@ -106,11 +108,12 @@ const statusCatalog = useStatusCatalog()
 const agreementId = route.params.id as string
 const claimId = route.params.claimId as string
 const {
-  data: profile,
+  data: contextProfile,
   error: profileError,
   status: profileStatus,
   refresh: refreshProfile
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcaseagreementclaim/${claimId}/context`)
+const profile = computed(() => contextProfile.value?.can_read_agreement === false ? null : contextProfile.value)
 const getCurrency = (): string => {
   const currency = profile.value?.egcs_fc_currency
   if (!currency) throw new Error('Agreement currency is unavailable.')
@@ -193,7 +196,7 @@ const isCurrentPage = () => claimPageState === 'active'
 watch(() => route.path, disposeClaimPage, { flush: 'sync' })
 onScopeDispose(disposeClaimPage)
 const isHeroCollapsed = getHeroCollapsed('agreement-claim-detail')
-const authorizedClaimId = computed(() => profileStatus.value === 'success' ? claimId : undefined)
+const authorizedClaimId = computed(() => profileStatus.value === 'success' && profile.value ? claimId : undefined)
 const {
   tabs: extensionTabs,
   getExtensionTabItem
@@ -233,6 +236,8 @@ const reconcileLineItems = computed<FundingCaseAgreementClaimOverviewRow['reconc
 const activeClaim = computed(() => claims.value.find((claim: FundingCaseAgreementClaimOverviewRow['claims'][number]) => String(claim.id) === claimId) ?? null)
 const additionalInformationFields = computed(() => activeClaim.value?.egcs_fc_customfielddefinitions?.filter(field => field.egcs_tp_active) ?? [])
 const additionalInformationValues = computed(() => activeClaim.value?.egcs_fc_customfields ?? {})
+const structuredAnswer = (value: AgreementCustomFieldPatch[string] | undefined) =>
+  value && typeof value === 'object' && 'rows' in value ? value : null
 const claimFundingMode = computed(() => overview.value?.budgetManagement?.egcs_tp_budgetfundingmode ?? 'manual')
 const isHistoricalClaim = computed(() => Boolean(activeClaim.value?.isCompleted || activeClaim.value?.hasPositiveCompletionTerminus
   || getDefinition(activeClaim.value?.egcs_fc_status)?.readOnly || isTerminalStatus(activeClaim.value?.egcs_fc_status)))
@@ -449,7 +454,8 @@ const reconcileActionContext = useActionContext({
 })
 const showReconcileCompletion = computed(() => Boolean(activeReconcile.value))
 const hasLoadError = computed(() =>
-  Boolean(profileError.value)
+  contextProfile.value?.can_read_agreement === false
+  || Boolean(profileError.value)
   || Boolean(overviewError.value)
   || profileStatus.value === 'error'
   || overviewStatus.value === 'error'
@@ -804,6 +810,7 @@ const normalizedSubmissionSearch = computed(() => submissionSearch.value.trim().
 const unallocatedGroupLabel = computed(() => t('agreement.claims.unallocated'))
 
 const claimSubmissionRows = computed<ClaimSubmissionTableRow[]>(() => {
+  if (!profile.value?.egcs_fc_currency) return []
   const budgetRows = activeBudgetLineItems.value.flatMap((budgetLine: FundingCaseAgreementBudgetLineItemRow) => {
     const budgetLineId = String(budgetLine.id)
     const claimLines = claimLinesByBudgetId.value.get(budgetLineId) ?? []
@@ -1070,10 +1077,32 @@ const saveSubmission = async () => {
 }
 const submissionFormSession = useFormSession({ owner: submissionModal, action: { kind: 'remote', context: () => submissionTarget.value?.claimLineId != null ? submissionUpdateContext : submissionCreateContext }, submit: saveSubmission, onDenied: () => guardClaimAction(submissionTarget.value?.budgetLineId ? canEditClaimSubmissionAmount(submissionTarget.value.budgetLineId) : false, claimSubmissionEditWarning.value) })
 
-const additionalInformationContext = useActionContext({
+const additionalInformationRoleAccepted = ref(false)
+/**
+ * @param error - Failure from the Claim overview or context request.
+ * @returns Whether the response conclusively retires accepted editor authority.
+ */
+const isDefinitiveClaimReadError = (error: FetchError | null | undefined) =>
+  [401, 403, 404, 410].some(code => code === (error?.statusCode ?? error?.status ?? error?.response?.status))
+
+watch(() => [profileStatus.value, profile.value, profileError.value, overviewStatus.value, activeClaim.value, overviewError.value], () => {
+  if (isDefinitiveClaimReadError(profileError.value) || isDefinitiveClaimReadError(overviewError.value)
+    || (overviewStatus.value === 'success' && !activeClaim.value)) {
+    additionalInformationRoleAccepted.value = false
+  } else if (profileStatus.value === 'success') {
+    additionalInformationRoleAccepted.value = canUpdateClaim.value
+  }
+}, { immediate: true, flush: 'sync' })
+
+const additionalInformationOwner = {
   identity: [() => route.params.id, () => route.params.claimId],
-  authority: canUpdateClaim,
-  eligible: () => isCurrentPage() && activeClaim.value?.id === claimId && !claimSubmissionEditWarning.value
+  authority: additionalInformationRoleAccepted
+}
+const additionalInformationOpeningContext = useActionContext(additionalInformationOwner)
+const additionalInformationContext = useActionContext({
+  ...additionalInformationOwner,
+  eligible: () => isCurrentPage() && profileStatus.value === 'success' && overviewStatus.value === 'success'
+    && activeClaim.value?.id === claimId && !claimSubmissionEditWarning.value
 })
 const {
   draft: additionalInformationDraft,
@@ -1087,6 +1116,7 @@ const {
   discardStaleDraft: discardStaleAdditionalInformation
 } = useSubmissionAnswerEditor({
   context: additionalInformationContext,
+  openingContext: additionalInformationOpeningContext,
   readAnswers: () => additionalInformationValues.value,
   readSubmissionRevision: () => overview.value?.linkedReview?.revision ?? null,
   readDefinitions: () => additionalInformationFields.value,
@@ -1618,37 +1648,63 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                     {{ t('agreement.claims.additional_information_draft_hint') }}
                   </p>
                   <fieldset :disabled="isSavingAdditionalInformation" class="min-w-0 divide-y divide-default">
-                    <AgreementFieldsCustomField
-                      v-for="field in additionalInformationFields"
-                      :key="field.id"
-                      v-model="additionalInformationDraft.egcs_fc_customfields[field.id]"
-                      class="py-4 first:pt-0"
-                      :field="field"
-                      :options="field.options.filter(option => option.egcs_ay_active)"
-                      :disabled="isSavingAdditionalInformation" />
+                    <template v-for="field in additionalInformationFields" :key="field.id">
+                      <AgreementFieldsStructuredCustomField
+                        v-if="field.egcs_ay_structure"
+                        :model-value="structuredAnswer(additionalInformationDraft.egcs_fc_customfields[field.id])"
+                        class="py-4 first:pt-0"
+                        :field="field"
+                        :currency="profile?.egcs_fc_currency"
+                        :structure="field.egcs_ay_structure"
+                        :disabled="isSavingAdditionalInformation"
+                        @update:model-value="additionalInformationDraft.egcs_fc_customfields[field.id] = $event ?? null" />
+                      <AgreementFieldsCustomField
+                        v-else
+                        v-model="additionalInformationDraft.egcs_fc_customfields[field.id]"
+                        class="py-4 first:pt-0"
+                        :field="field"
+                        :currency="profile?.egcs_fc_currency"
+                        :options="field.options.filter(option => option.egcs_ay_active)"
+                        :disabled="isSavingAdditionalInformation" />
+                    </template>
                   </fieldset>
                   <div class="flex justify-end">
-                    <CommonSaveButton :label="t('common.save')" :disabled="!canSaveAdditionalInformation || submissionReviewBusy || submissionReview.pending.value" :loading="isSavingAdditionalInformation" />
+                    <CommonSaveButton :label="t('common.save')" :disabled="profileStatus !== 'success' || overviewStatus !== 'success' || !canSaveAdditionalInformation || submissionReviewBusy || submissionReview.pending.value" :loading="isSavingAdditionalInformation" />
                   </div>
                 </UForm>
                 <dl v-else class="divide-y divide-default" data-field-exclude="Read-only display of Agency-defined custom fields.">
-                  <AgreementFieldsCustomField
-                    v-for="field in additionalInformationFields"
-                    :key="field.id"
-                    class="py-4 first:pt-0"
-                    :field="field"
-                    :options="field.options"
-                    :model-value="additionalInformationValues[field.id]"
-                    readonly>
-                    <template #answer="{ label, answer }">
+                  <template v-for="field in additionalInformationFields" :key="field.id">
+                    <div v-if="field.egcs_ay_structure" class="min-w-0 py-4 first:pt-0">
                       <dt class="text-sm font-medium text-highlighted">
-                        {{ label }}
+                        {{ locale === 'fr' ? field.egcs_ay_name_fr : field.egcs_ay_name_en }}
                       </dt>
-                      <dd class="whitespace-pre-wrap text-sm text-default [overflow-wrap:anywhere]">
-                        {{ answer || t('supplementary_information.no_answer') }}
+                      <dd>
+                        <AgreementFieldsStructuredCustomField
+                          :field="field"
+                          :currency="profile?.egcs_fc_currency"
+                          :structure="field.egcs_ay_structure"
+                          :model-value="structuredAnswer(additionalInformationValues[field.id])"
+                          readonly />
                       </dd>
-                    </template>
-                  </AgreementFieldsCustomField>
+                    </div>
+                    <AgreementFieldsCustomField
+                      v-else
+                      class="py-4 first:pt-0"
+                      :field="field"
+                      :currency="profile?.egcs_fc_currency"
+                      :options="field.options"
+                      :model-value="additionalInformationValues[field.id]"
+                      readonly>
+                      <template #answer="{ label, answer }">
+                        <dt class="text-sm font-medium text-highlighted">
+                          {{ label }}
+                        </dt>
+                        <dd class="whitespace-pre-wrap text-sm text-default [overflow-wrap:anywhere]">
+                          {{ answer || t('supplementary_information.no_answer') }}
+                        </dd>
+                      </template>
+                    </AgreementFieldsCustomField>
+                  </template>
                 </dl>
               </template>
               <p v-else class="text-sm text-muted">

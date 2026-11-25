@@ -68,7 +68,7 @@ export default defineEventHandler(async event => {
       .insertInto('Funding_Case_Agreement_Activity')
       .values({
         ...activityValues,
-        egcs_fc_customfields: await validateActivityCustomFieldWrite(event, trx, currentContext.streamId, {}, customFieldPatch ?? {}),
+        egcs_fc_customfields: await validateActivityCustomFieldWrite(event, trx, agreementId, currentContext.streamId, {}, customFieldPatch ?? {}),
         egcs_fc_fundingagreement: agreementId
       } satisfies Insertable<FundingCaseAgreementActivityTable>)
       .returningAll()

@@ -32,6 +32,9 @@ export interface AgreementSubmissionTable {
   egcs_fc_budgetrevision: string | null
   egcs_fc_blocker: string | null
   egcs_fc_result: string | null
+  egcs_fc_resultamendment: GeneratedAlways<string | null>
+  egcs_fc_resultforecast: GeneratedAlways<string | null>
+  egcs_fc_resultclaim: GeneratedAlways<string | null>
   egcs_fc_resulttype: GeneratedAlways<'fundingcaseagreementclaim' | 'fundingcaseforecast' | 'fundingcaseamendment'>
   egcs_fc_updatedat: Generated<Date>
   egcs_fc_updatedby: string | null

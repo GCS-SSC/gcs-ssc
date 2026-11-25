@@ -25,7 +25,7 @@ export const readAssignedAgencyCustomFieldDefinitions = async (
       'assignment.egcs_tp_active', 'assignment.egcs_tp_displayorder', 'field.id',
       'field.egcs_ay_name_en', 'field.egcs_ay_name_fr', 'field.egcs_ay_kind',
       'field.egcs_ay_multiple', 'field.egcs_ay_presentation', 'field.egcs_ay_discriminator',
-      'field.egcs_ay_minimum', 'field.egcs_ay_maximum', 'field.egcs_ay_decimalplaces'
+      'field.egcs_ay_minimum', 'field.egcs_ay_maximum', 'field.egcs_ay_decimalplaces', 'field.egcs_ay_structure'
     ])
     .where('assignment.egcs_tp_transferpaymentstream', '=', streamId)
     .where('assignment.egcs_tp_target', '=', target)
@@ -44,7 +44,7 @@ export const readAssignedAgencyCustomFieldDefinitions = async (
     id: String(row.id),
     assignmentId: String(row.assignmentId),
     egcs_tp_section: row.egcs_tp_section === null ? null : String(row.egcs_tp_section),
-    section: sections.find(section => section.id === String(row.egcs_tp_section)),
+    ...(target === 'agreement' ? { section: sections.find(section => section.id === String(row.egcs_tp_section)) } : {}),
     options: options.filter(option => String(option.egcs_ay_field) === String(row.id))
       .map(option => ({
         id: String(option.id), egcs_ay_name_en: option.egcs_ay_name_en,

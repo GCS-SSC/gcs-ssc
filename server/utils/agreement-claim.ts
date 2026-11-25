@@ -53,7 +53,7 @@ import { assertAgreementLineFundingBalance, replaceAgreementLineFunding, resolve
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 import { hasSuccessfulInitialAgreementApproval } from '~~/server/utils/agreement-approval-submission'
 import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
-import { assertClaimCustomFieldDefinitionsAnswerable, validateClaimCustomFields } from './agreement-claim-custom-fields'
+import { assertClaimCustomFieldDefinitionsAnswerable, parsePersistedClaimCustomFieldDefinitions, validateClaimCustomFields } from './agreement-claim-custom-fields'
 import type { AgreementCustomFieldPatch, AssignedAgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 
 type AgreementClaimAggregateCreateInput = Omit<GcsExtensionAgreementClaimCreateInput, 'lineItems'> & {
@@ -168,12 +168,13 @@ export const createAgreementClaimAggregate = async (
     }
   }
 
-  const definitions = (await readAssignedAgencyCustomFieldDefinitions(trx, input.streamId, 'claim'))
+  const liveDefinitions = await readAssignedAgencyCustomFieldDefinitions(trx, input.streamId, 'claim')
+  const definitions = (await parsePersistedClaimCustomFieldDefinitions(liveDefinitions, receipt?.event ?? event))
     .filter(field => field.egcs_tp_active)
   await assertClaimCustomFieldDefinitionsAnswerable(definitions, receipt?.event ?? event)
   const answers = receipt
     ? await validateClaimCustomFields(receipt.event, definitions, {
-        answers: receipt.answers ?? {}, requireAnswers: true, path: 'customFields'
+        answers: receipt.answers ?? {}, requireAnswers: true, path: 'customFields', currency
       })
     : {}
   const claim = await trx.insertInto('Funding_Case_Agreement_Claim').values({
@@ -917,7 +918,8 @@ export const patchAgreementClaimForRoute = async (
           current: claim.egcs_fc_customfields,
           answers: fieldChanges,
           requireAnswers: false,
-          path: 'egcs_fc_customfields'
+          path: 'egcs_fc_customfields',
+          currency: await assertAgreementCurrency(event, trx, agreementId)
         })
     const answerChanges = answers === undefined ? undefined : changedCustomFieldAnswers(claim.egcs_fc_customfields, answers)
     if (customFieldPrecondition && Object.keys(answerChanges ?? {}).some(key =>

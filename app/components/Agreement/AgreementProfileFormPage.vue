@@ -22,6 +22,7 @@ const {
   agreementId,
   compact = false,
   pending = false,
+  saveBlocked = false,
   numberMode = 'manual',
   canKeepRatingAsManual = false,
   financialNumberPolicy
@@ -34,6 +35,7 @@ const {
   agreementId?: string
   compact?: boolean
   pending?: boolean
+  saveBlocked?: boolean
   canKeepRatingAsManual?: boolean
   numberMode?: 'manual' | 'generated' | null
   financialNumberPolicy?: AgreementFinancialNumberPolicy
@@ -153,7 +155,7 @@ const renderedFormBinding = computed(() => {
           :label="cancelLabel"
           :disabled="pending"
           @click="emit('cancel')" />
-        <CommonSaveButton data-help-target="agreement.profile-edit.save" data-help-kind="button" :label="submitLabel" :loading="pending" :disabled="pending || (permissionAction === 'create' && !!model.egcs_fc_transferpaymentstream && !numberMode)" />
+        <CommonSaveButton data-help-target="agreement.profile-edit.save" data-help-kind="button" :label="submitLabel" :loading="pending" :disabled="pending || saveBlocked || (permissionAction === 'create' && !!model.egcs_fc_transferpaymentstream && !numberMode)" />
       </div>
     </UForm>
   </div>

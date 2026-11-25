@@ -31,7 +31,7 @@ export default defineEventHandler(async event => {
     if (!outcomes) return await badRequest(event, 'INVALID_AGREEMENT_ACTIVITY_OUTCOME', 'apiErrors.agreement.invalid_activity_outcome')
     const parties = await validateAgreementResponsiblePartySelectionIds(trx, agreementId, responsiblePartyIds)
     if (!parties) return await badRequest(event, 'INVALID_AGREEMENT_ACTIVITY_RESPONSIBLE_PARTY', 'apiErrors.agreement.invalid_activity_responsible_party')
-    const customFields = await validateActivityCustomFieldWrite(event, trx, current.streamId, {}, customFieldPatch ?? {})
+    const customFields = await validateActivityCustomFieldWrite(event, trx, agreementId, current.streamId, {}, customFieldPatch ?? {})
     const created = await trx.insertInto('Funding_Case_Agreement_Activity').values({ ...values, egcs_fc_customfields: customFields, egcs_fc_fundingagreement: agreementId, egcs_fc_activityversion: versionId } satisfies Insertable<FundingCaseAgreementActivityTable>).returningAll().executeTakeFirstOrThrow()
     await syncAgreementActivityOutcomeSelections(trx, String(created.id), outcomeIds)
     await syncAgreementActivityResponsiblePartySelections(trx, String(created.id), responsiblePartyIds)

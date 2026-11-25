@@ -4,7 +4,7 @@ import type { AgreementSubmissionTarget } from '~~/shared/types/agreement-submis
 import type { ClaimSubmissionReferenceSnapshot } from '~~/shared/types/agreement-submission-database'
 import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { matchClaimSubmissionLines } from '~~/shared/utils/agreement-submission-claim-lines'
-import { isCanonicalMoney } from '~~/shared/utils/money'
+import { formatMoneyText, isCanonicalMoney } from '~~/shared/utils/money'
 
 export type SubmissionObject = Record<string, unknown>
 type InputKind = 'text' | 'boolean' | 'month' | 'date' | 'money' | 'percent' | 'id'
@@ -32,13 +32,22 @@ export const isSubmissionIdField = (key: string) => [
   'egcs_fc_applicantrecipient', 'egcs_fc_organizationcostcategory', 'egcs_fc_fundingsubtype'
 ].includes(key)
 
+type ClaimAnswerDisplay = ClaimCustomFieldSnapshot[number]['value']
+type ClaimScalarAnswerDisplay = Exclude<ClaimAnswerDisplay, { rows: unknown }>
+
 /**
  * Formats pinned Claim custom-field answers without consulting the current catalog.
  * @param value - Captured answer with bilingual option labels.
  * @param locale - Current display locale.
+ * @param format - Optional format recorded with a table cell.
  * @returns Localized answer, or null for a blank value.
  */
-export const claimCustomFieldAnswerLabel = (value: ClaimCustomFieldSnapshot[number]['value'], locale: string) => {
+export const claimCustomFieldAnswerLabel = (value: ClaimScalarAnswerDisplay, locale: string, format?: 'decimal') => {
+  if (format === 'decimal' && typeof value === 'string') {
+    const separator = new Intl.NumberFormat(locale).formatToParts(1.1).find(part => part.type === 'decimal')?.value ?? '.'
+    return value.replace('.', separator)
+  }
+  if (isCanonicalMoney(value)) return formatMoneyText(value, locale)
   if (typeof value === 'number') return new Intl.NumberFormat(locale, { maximumSignificantDigits: 21 }).format(value)
   if (Array.isArray(value)) return value.map(option => locale === 'fr' ? option.fr : option.en).join(', ')
   return value
@@ -61,9 +70,23 @@ type ClaimAnswerEvidence = {
   answers?: AgreementCustomFieldPatch
 }
 
-const evidenceValue = ({ displayed }: ClaimAnswerEvidence) => Array.isArray(displayed)
-  ? displayed.map(({ en, fr }) => JSON.stringify([en, fr]))
-  : displayed
+/**
+ * Uses visible answer content for historical comparisons, independent of display metadata.
+ * @param displayed - Captured field answer.
+ * @returns Comparable answer value.
+ */
+const evidenceValue = (displayed: ClaimAnswerDisplay) => {
+  if (Array.isArray(displayed)) return displayed.map(({ en, fr }) => JSON.stringify([en, fr]))
+  if (displayed && typeof displayed === 'object') {
+    if ('rows' in displayed) {
+      return JSON.stringify(displayed.rows.map(row => row.cells.map(({ labelEn, labelFr, value }) => [
+        labelEn, labelFr, Array.isArray(value) ? value.map(({ en, fr }) => JSON.stringify([en, fr])).sort() : value
+      ])))
+    }
+    return JSON.stringify(displayed)
+  }
+  return displayed
+}
 
 /**
  * Compares stable choice IDs when both snapshots include them and pinned labels for older evidence.
@@ -74,7 +97,7 @@ const evidenceValue = ({ displayed }: ClaimAnswerEvidence) => Array.isArray(disp
 export const sameClaimCustomFieldEvidence = (before: ClaimAnswerEvidence, after: ClaimAnswerEvidence) =>
   before.answers && after.answers
     ? sameCustomFieldAnswer(before.answers[before.key], after.answers[after.key])
-    : sameCustomFieldAnswer(evidenceValue(before), evidenceValue(after))
+    : sameCustomFieldAnswer(evidenceValue(before.displayed), evidenceValue(after.displayed))
 
 const fundingSource: SubmissionFields = {
   egcs_fc_fundingsubtype: 'id',

@@ -265,7 +265,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
       <template #type-cell="{ row }">
         <span v-if="row.groupingColumnId === 'sectionGroup'">{{ t('custom_fields.section') }}</span>
         <span v-else-if="row.groupingColumnId === 'categoryGroup'">{{ t('custom_fields.category') }}</span>
-        <span v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field">{{ t(`custom_fields.${row.original.field.egcs_ay_kind === 'text' ? row.original.field.egcs_ay_presentation : row.original.field.egcs_ay_kind === 'relational' ? (row.original.field.egcs_ay_multiple ? 'multiple_selection' : 'single_selection') : 'number'}`) }}</span>
+        <span v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field">{{ t(`custom_fields.${row.original.field.egcs_ay_kind === 'text' ? row.original.field.egcs_ay_presentation : row.original.field.egcs_ay_kind === 'relational' ? (row.original.field.egcs_ay_presentation === 'checkboxes' ? 'checkboxes' : row.original.field.egcs_ay_multiple ? 'multiple_selection' : 'single_selection') : row.original.field.egcs_ay_kind}`) }}</span>
       </template>
       <template #configuration-cell="{ row }">
         <div v-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex flex-wrap gap-2">
@@ -312,7 +312,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
       <template #body>
         <UForm v-if="assignmentModal.selected.value" v-bind="assignmentFormSession" data-field-scope="transfer-payment.custom-field-assignment" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4">
           <UFormField :label="t('custom_fields.agency_field')" name="egcs_tp_agencyfield" required>
-            <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />
+            <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :query="{ target }" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />
           </UFormField>
           <UFormField v-if="hasSections" :label="t('custom_fields.section')" name="egcs_tp_section">
             <CommonBilingualSelectMenu v-model="assignmentModal.selected.value.egcs_tp_section" :items="data?.sections ?? []" :prepend-options="[{ label: t('custom_fields.unsectioned'), value: null }]" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" value-key="id" />

@@ -315,13 +315,25 @@ CREATE TABLE "Agency_Custom_Field" (
   "egcs_ay_minimum" double precision,
   "egcs_ay_maximum" double precision,
   "egcs_ay_decimalplaces" integer,
+  "egcs_ay_structure" jsonb,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Custom_Field_pkey" PRIMARY KEY (id),
-  CONSTRAINT "ay_chk_custom_field_kind" CHECK ((egcs_ay_kind = ANY (ARRAY['text'::text, 'number'::text, 'relational'::text]))),
-  CONSTRAINT "ay_chk_custom_field_presentation" CHECK ((egcs_ay_presentation = ANY (ARRAY['single_line'::text, 'multiline'::text]))),
+  CONSTRAINT "ay_chk_custom_field_kind" CHECK (egcs_ay_kind IN ('text', 'number', 'currency', 'relational', 'email', 'date', 'table', 'repeating')),
   CONSTRAINT "ay_chk_custom_field_discriminator_kind" CHECK (((NOT egcs_ay_discriminator) OR (egcs_ay_kind = 'relational'::text))),
   CONSTRAINT "ay_chk_custom_field_multiple_kind" CHECK (((NOT egcs_ay_multiple) OR (egcs_ay_kind = 'relational'::text))),
-  CONSTRAINT "ay_chk_custom_field_presentation_kind" CHECK (((egcs_ay_kind = 'text'::text) OR (egcs_ay_presentation = 'single_line'::text))),
+  CONSTRAINT "ay_chk_custom_field_presentation_kind" CHECK (
+    egcs_ay_presentation = 'single_line'
+    OR (egcs_ay_kind = 'text' AND egcs_ay_presentation = 'multiline')
+    OR (egcs_ay_kind = 'relational' AND egcs_ay_multiple AND egcs_ay_presentation = 'checkboxes')
+  ),
+  CONSTRAINT "ay_chk_custom_field_structure" CHECK (
+    CASE WHEN egcs_ay_kind IN ('table', 'repeating') THEN
+      jsonb_typeof(egcs_ay_structure) IS NOT DISTINCT FROM 'object'
+      AND (egcs_ay_structure ->> 'kind') IS NOT DISTINCT FROM egcs_ay_kind
+      AND jsonb_typeof(egcs_ay_structure -> CASE WHEN egcs_ay_kind = 'table' THEN 'columns' ELSE 'fields' END)
+        IS NOT DISTINCT FROM 'array'
+    ELSE egcs_ay_structure IS NULL END
+  ),
   CONSTRAINT "ay_chk_custom_field_decimal_places" CHECK (
     egcs_ay_decimalplaces IS NULL OR (egcs_ay_kind = 'number' AND egcs_ay_decimalplaces BETWEEN 0 AND 324)
   ),

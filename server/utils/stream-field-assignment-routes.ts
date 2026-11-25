@@ -69,10 +69,13 @@ export const streamFieldAssignmentRoute = async (event: H3Event, operation: Assi
   return await executeFreshAuthorizedTransferPaymentStreamWrite(event, db, profileId, context.agencyId, streamId, 'update', async (trx, fresh) => {
     if (operation === 'create') {
       const create = StreamFieldAssignmentCreateSchema.parse(body)
-      const field = await trx.selectFrom('Agency_Custom_Field').select('id')
+      const field = await trx.selectFrom('Agency_Custom_Field').select(['id', 'egcs_ay_kind'])
         .where('id', '=', create.egcs_tp_agencyfield).where('egcs_ay_agency', '=', fresh.agencyId)
         .where('_deleted', '=', false).forShare().executeTakeFirst()
       if (!field) return await badRequest(event, 'INVALID_AGENCY_FIELD', 'apiErrors.request.invalid_resource')
+      if (target !== 'claim' && (field.egcs_ay_kind === 'table' || field.egcs_ay_kind === 'repeating')) {
+        return await badRequest(event, 'FIELD_CLAIM_ONLY', 'apiErrors.transfer_payment.custom_field_claim_only')
+      }
       await assertSection(event, trx, streamId, create.egcs_tp_section)
       try {
         return await trx.insertInto('Transfer_Payment_Stream_Field_Assignment')

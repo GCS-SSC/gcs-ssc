@@ -4,7 +4,7 @@ import { useActionContext } from '~/composables/useActionContext'
 import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useTrackRecentRecord } from '~/composables/useRecentRecords'
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
-import { useId, computed, onUnmounted, ref, watch } from 'vue'
+import { useId, computed, onUnmounted, ref, toRaw, watch } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
@@ -40,6 +40,7 @@ import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { isAgreementChildRoute } from '~/utils/agreement-child-route'
 import { useAgreementRiskSource } from '~/composables/useAgreementRiskSource'
 import { useUrlTabState } from '~/composables/useUrlTabState'
+import { changedCustomFieldAnswers } from '~~/shared/utils/agreement-custom-field-answers'
 
 definePageMeta({
   /**
@@ -106,11 +107,11 @@ const { getHeroCollapsed } = useDashboard()
 const { formatDate, toDateInput } = useDateHelpers()
 const { isRecordLocked } = useBusinessStatusState()
 const { user: currentActor, permissionRevision } = useAuth()
-const id = route.params.id as string
+const id = computed(() => String(route.params.id))
 const isChildDetailRoute = computed(() => isAgreementChildRoute(route))
 
-const { data: profile, error, status, refresh: refreshProfile } = useResourceRequest<AgreementDetailProfile>({
-  identity: () => JSON.stringify([id, currentActor.value?.id]),
+const { data: profile, error, status, state: profileRequestState, refresh: refreshProfile } = useResourceRequest<AgreementDetailProfile>({
+  identity: () => JSON.stringify([id.value, currentActor.value?.id, permissionRevision.value]),
   enabled: computed(() => !isChildDetailRoute.value),
   /**
    * Reads the authorized Agreement while its page owns the request.
@@ -118,14 +119,14 @@ const { data: profile, error, status, refresh: refreshProfile } = useResourceReq
    * @returns Current Agreement profile.
    */
   load: async signal => {
-    const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), { signal })
+    const response = await fetch(getClientRequestUrl(`/api/agreements/${id.value}`), { signal })
     if (!response.ok) await throwFetchResponseError(response)
     return await response.json() as AgreementDetailProfile
   }
 })
 useTrackRecentRecord('agreement', () => !isChildDetailRoute.value && status.value === 'success'
-  && String(profile.value?.id) === id
-  ? id
+  && String(profile.value?.id) === id.value
+  ? id.value
   : undefined)
 const { label: riskSourceLabel, workflowLabel: riskSourceWorkflowLabel, completedAt: riskSourceCompletedAt } = useAgreementRiskSource(() => profile.value?.risk_source)
 usePageResourceError({
@@ -142,10 +143,15 @@ const {
   getExtensionTabItem
 } = useExtensionEntityTabs({
   target: 'agreement',
-  agreementId: computed(() => isChildDetailRoute.value ? undefined : id)
+  agreementId: computed(() => isChildDetailRoute.value ? undefined : id.value)
 })
 
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
+let profileBaseline: AgreementDetailForm | null = null
+const profileReadbackRequired = ref(false)
+watch(id, () => {
+  profileReadbackRequired.value = false
+}, { flush: 'sync' })
 const profileFormSession = ref(0)
 const { can, canAny, permissionsReady } = useCan()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
@@ -156,13 +162,13 @@ const canCreateFinancialChildRole = computed(() => profile.value?.can_create_chi
 const canUpdateFinancialChildRole = computed(() => profile.value?.can_update_child_records_role === true)
 const canDeleteFinancialChildRole = computed(() => profile.value?.can_delete_child_records_role === true)
 const actionContext = useActionContext({
-  identity: [() => id, () => profile.value?.agency_id, () => profile.value?.program_id],
+  identity: [id, () => profile.value?.id, () => profile.value?.agency_id, () => profile.value?.program_id],
   authority: canUpdateFinancialChildRole,
-  eligible: canEditProfile
+  eligible: () => status.value === 'success' && !profileReadbackRequired.value && canEditProfile.value
 })
 const mutations = useEditorMutationCoordinator({ getDraft: () => selectedProfile.value, context: actionContext })
-const isSaving = mutations.isPending
-const { check: checkProfileAction } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId: id }))
+const isSaving = ref(false)
+const { check: checkProfileAction } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId: id.value }))
 const isCheckingProfileEdit = ref(false)
 let profileActionGeneration = 0
 watch([() => profile.value?.id, canUpdateFinancialChildRole, () => currentActor.value?.id, permissionRevision], () => {
@@ -329,6 +335,9 @@ const { selectedTab } = useUrlTabState({
   defaultTab: 'general',
   enabled: computed(() => !isChildDetailRoute.value && profile.value !== null && permissionsReady.value && extensionTabsStatus.value === 'success')
 })
+watch([selectedTab, canEditProfile], () => {
+  profileActionGeneration += 1
+}, { flush: 'sync' })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 
 const helpVisitId = useId()
@@ -341,35 +350,79 @@ const helpContext = computed<GuideObservedContext>(() => profile.value && String
   : { kind: 'pending' })
 const breadcrumbItems = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
-  { label: getBilingualValue(profile.value, 'egcs_fc_title', id) }
+  { label: getBilingualValue(profile.value, 'egcs_fc_title', id.value) }
 ])
 
 /**
- * Replaces the editable profile from accepted server evidence.
- * @param value - Current persisted profile, or absent evidence.
+ * @param value - Accepted Agreement profile.
+ * @returns An independent snapshot in the form's input format.
  */
-const hydrateProfile = (value: AgreementDetailProfile | null) => {
-  profileFormSession.value += 1
-  if (!value) {
-    selectedProfile.value = null
-    return
-  }
-
+const toProfileDraft = (value: AgreementDetailProfile): AgreementDetailForm => {
   const {
     financialNumberPolicy: _financialNumberPolicy,
     financialNumberPolicyUnavailable: _financialNumberPolicyUnavailable,
     ...profileFields
   } = value
-  selectedProfile.value = {
+  return {
     ...profileFields,
+    egcs_fc_customfields: structuredClone(toRaw(value.egcs_fc_customfields ?? {})),
     egcs_fc_authorizedassistancestartdate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistancestartdate)),
     egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistanceenddate))
   }
 }
-watch(profile, value => {
-  if (!mutations.isPending.value && (!value || value.id !== selectedProfile.value?.id || !mutations.isDirty.value)) {
+
+/** @param value - Current accepted profile, or absent evidence. */
+const hydrateProfile = (value: AgreementDetailProfile | null) => {
+  profileFormSession.value += 1
+  profileBaseline = value ? toProfileDraft(value) : null
+  selectedProfile.value = profileBaseline ? structuredClone(profileBaseline) : null
+}
+
+/**
+ * @param baseline - Extension payloads already present in the comparison baseline.
+ * @param draft - Extension payloads in the current draft.
+ * @returns Changed payloads for the next write. Profile GET does not return extension commands.
+ */
+const laterExtensionPayloads = (baseline: AgreementDetailForm['extensions'], draft: AgreementDetailForm['extensions']): AgreementDetailForm['extensions'] => {
+  const changes = Object.entries(draft ?? {}).flatMap(([extension, payload]) => {
+    const earlier = baseline?.[extension]
+    const entries = Object.entries(payload).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(earlier?.[key]))
+    return entries.length ? [[extension, Object.fromEntries(entries)]] : []
+  })
+  return changes.length ? Object.fromEntries(changes) : undefined
+}
+
+let profileOwner: string | null = null
+watch(profileRequestState, state => {
+  if (state.kind === 'disposed') return
+  const value = state.data
+  const owner = value ? JSON.stringify([value.id, value.agency_id, value.program_id]) : null
+  if (owner !== profileOwner) {
+    profileOwner = owner
     mutations.replaceSessionDraft(() => hydrateProfile(value))
+  } else if (state.kind === 'success') {
+    const draft = selectedProfile.value
+    const baseline = profileBaseline
+    if (profileReadbackRequired.value && draft && baseline) {
+      const fresh = toProfileDraft(state.data)
+      const laterFields = Object.fromEntries(Object.keys({ ...baseline, ...draft })
+        .filter(key => key !== 'egcs_fc_customfields' && key !== 'extensions'
+          && JSON.stringify(Reflect.get(draft, key)) !== JSON.stringify(Reflect.get(baseline, key)))
+        .map(key => [key, Reflect.get(draft, key)]))
+      const laterAnswers = changedCustomFieldAnswers(baseline.egcs_fc_customfields ?? {}, draft.egcs_fc_customfields ?? {})
+      const rebased = structuredClone(fresh)
+      profileBaseline = fresh
+      selectedProfile.value = {
+        ...rebased,
+        ...laterFields,
+        extensions: laterExtensionPayloads(baseline.extensions, draft.extensions),
+        egcs_fc_customfields: { ...rebased.egcs_fc_customfields, ...laterAnswers }
+      }
+    } else if (!isSaving.value && JSON.stringify(draft) === JSON.stringify(baseline)) {
+      mutations.replaceSessionDraft(() => hydrateProfile(state.data))
+    }
   }
+  if (state.kind === 'success') profileReadbackRequired.value = false
 }, { immediate: true, flush: 'sync' })
 
 /**
@@ -378,17 +431,20 @@ watch(profile, value => {
  * @param acknowledgeRiskSelection Settles the submitted rating selection without resetting newer edits.
  */
 const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: () => void) => {
-  if (!selectedProfile.value || isSaving.value) {
+  if (!selectedProfile.value || isSaving.value || profileReadbackRequired.value) {
     return
   }
 
   await mutations.run('update', async token => {
     const generation = profileActionGeneration
+    const agreementId = id.value
+    const hydration = profileFormSession.value
     const originalDraft = selectedProfile.value
     if (!originalDraft) return
     const proceed = () => mutations.isTokenCurrent(token) && generation === profileActionGeneration && canUpdateFinancialChildRole.value
     const ownsDraft = () => mutations.canContinue(token) && proceed() && selectedProfile.value === originalDraft && JSON.stringify(selectedProfile.value) === token.expectedDraft
     let stage: 'checking' | 'writing' = 'checking'
+    isSaving.value = true
     try {
       if (!await checkProfileAction('update', 'profile', ownsDraft) || !ownsDraft()) return
       const {
@@ -403,8 +459,9 @@ const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: (
         can_delete_child_records: _canDeleteChildRecords,
         ...body
       } = originalDraft
-      const currentFields = profile.value?.egcs_fc_customfields ?? {}
-      const changedFields = Object.fromEntries(Object.entries(body.egcs_fc_customfields ?? {}).filter(([key, value]) => value !== currentFields[key]))
+      const submittedProfile: AgreementDetailForm = JSON.parse(token.expectedDraft)
+      const submittedAnswers = submittedProfile.egcs_fc_customfields ?? {}
+      const changedFields = changedCustomFieldAnswers(profileBaseline?.egcs_fc_customfields ?? {}, submittedAnswers)
       body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
       const policy = profile.value?.financialNumberPolicy
       if (policy?.readOnly || policy?.value !== undefined) delete body.egcs_fc_financialsystemnumber
@@ -412,18 +469,18 @@ const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: (
       else body.egcs_fc_riskscore ??= null
 
       stage = 'writing'
-      const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
+      const response = await fetch(getClientRequestUrl(`/api/agreements/${agreementId}`), {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body)
       })
       if (!response.ok) await throwFetchResponseError(response)
 
-      if (!proceed()) return
-      acknowledgeRiskSelection?.()
-      mutations.acceptCommittedDraft(token)
+      if (id.value !== agreementId || profileRequestState.value.kind === 'disposed') return
+      if (profileFormSession.value === hydration) profileBaseline = submittedProfile
+      if (proceed()) acknowledgeRiskSelection?.()
+      profileReadbackRequired.value = true
       if (!await refreshProfile() || !proceed()) return
-      mutations.applyMutationRefresh(token, { apply: () => hydrateProfile(profile.value) })
 
       toast.add({
         title: toast.localized('common.success'),
@@ -432,6 +489,8 @@ const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: (
       })
     } catch (caughtError: unknown) {
       if (proceed() && (stage === 'writing' || ownsDraft())) showError(caughtError)
+    } finally {
+      isSaving.value = false
     }
   })
 }
@@ -440,6 +499,7 @@ const submit = async (riskSelectionChanged = false, acknowledgeRiskSelection?: (
  * Resets unsaved inline edits back to the last loaded agreement state.
  */
 const cancel = () => {
+  if (isSaving.value) return
   mutations.replaceSessionDraft(() => hydrateProfile(profile.value))
 }
 
@@ -490,6 +550,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
               :financial-number-policy="profile.financialNumberPolicy"
               :can-keep-rating-as-manual="profile.risk_source?.kind === 'workflow' || profile.risk_source?.kind === 'amendment'"
               :pending="isSaving"
+              :save-blocked="status !== 'success' || profileReadbackRequired"
               @submit="submit"
               @cancel="cancel" />
 
@@ -739,6 +800,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             <AgreementActivitiesTab
               v-else-if="selectedTab === 'activities'"
               :agreement-id="id"
+              :currency="profile.egcs_fc_currency"
               :date-range="{ startDate: profile.egcs_fc_authorizedassistancestartdate, endDate: profile.egcs_fc_authorizedassistanceenddate }"
               :action-target="{ kind: 'agreement', agreementId: id }"
               :can-create="canCreateFinancialChildRole"

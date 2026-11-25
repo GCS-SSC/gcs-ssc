@@ -130,7 +130,9 @@ export type AgreementSubmissionBudgetPreview = {
 export type AgreementSubmissionCommand = z.infer<typeof AgreementSubmissionCommandSchema>
 export type AgreementSubmissionReceipt = z.infer<typeof AgreementSubmissionReceiptSchema>
 export type AgreementSubmissionBudgetPreviewInput = z.infer<typeof AgreementSubmissionBudgetPreviewSchema>
-export type SubmissionRow = Omit<Selectable<AgreementSubmissionTable>, 'egcs_fc_updatedat'> & { egcs_fc_updatedat: string }
+export type SubmissionRow = Omit<Selectable<AgreementSubmissionTable>,
+  'egcs_fc_updatedat' | 'egcs_fc_resultamendment' | 'egcs_fc_resultforecast' | 'egcs_fc_resultclaim'
+> & { egcs_fc_updatedat: string }
 export type SubmissionEventRow = Omit<Selectable<AgreementSubmissionEventTable>, 'egcs_fc_createdat'> & {
   egcs_fc_createdat: string
   actorName: string | null

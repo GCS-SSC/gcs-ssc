@@ -1355,6 +1355,9 @@ CREATE TABLE "Funding_Case_Agreement_Submission" (
   egcs_fc_budgetrevision text,
   egcs_fc_blocker text,
   egcs_fc_result bigint,
+  egcs_fc_resultamendment bigint GENERATED ALWAYS AS (CASE WHEN egcs_fc_target = 'amendment_budget' THEN egcs_fc_result END) STORED,
+  egcs_fc_resultforecast bigint GENERATED ALWAYS AS (CASE WHEN egcs_fc_target = 'forecast' THEN egcs_fc_result END) STORED,
+  egcs_fc_resultclaim bigint GENERATED ALWAYS AS (CASE WHEN egcs_fc_target = 'claim' THEN egcs_fc_result END) STORED,
   egcs_fc_resulttype varchar(128) GENERATED ALWAYS AS (CASE egcs_fc_target
     WHEN 'claim' THEN 'fundingcaseagreementclaim'
     WHEN 'forecast' THEN 'fundingcaseforecast'
@@ -3173,6 +3176,16 @@ AS $function$
       END IF;
       RETURN NEW;
     END $function$;
+CREATE FUNCTION guard_claim_custom_field_definitions_immutable() RETURNS trigger LANGUAGE plpgsql AS $function$
+BEGIN
+  IF NEW.egcs_fc_customfielddefinitions IS DISTINCT FROM OLD.egcs_fc_customfielddefinitions THEN
+    RAISE EXCEPTION 'Claim custom field definitions cannot change'
+      USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_claim_customfielddefinitions_immutable';
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+
 CREATE FUNCTION guard_reconciliation_claim_immutable() RETURNS trigger LANGUAGE plpgsql AS $function$
 BEGIN
   IF NEW.egcs_fc_fundingagreementclaim IS DISTINCT FROM OLD.egcs_fc_fundingagreementclaim THEN
@@ -3647,6 +3660,12 @@ ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission
 
 ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result" FOREIGN KEY (egcs_fc_result, egcs_fc_resulttype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype) ON DELETE RESTRICT;
 
+ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result_amendment" FOREIGN KEY (egcs_fc_resultamendment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Amendment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
+
+ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result_forecast" FOREIGN KEY (egcs_fc_resultforecast, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Forecast"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
+
+ALTER TABLE "Funding_Case_Agreement_Submission" ADD CONSTRAINT "fc_fk_submission_result_claim" FOREIGN KEY (egcs_fc_resultclaim, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Claim"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Agreement_Submission_Event" ADD CONSTRAINT "fc_fk_submission_event_submission" FOREIGN KEY (egcs_fc_submission) REFERENCES "Funding_Case_Agreement_Submission"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Submission_Event" ADD CONSTRAINT "fc_fk_submission_event_actor" FOREIGN KEY (egcs_fc_actor) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
@@ -3765,6 +3784,8 @@ CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE O
 CREATE CONSTRAINT TRIGGER trg_enforce_fundingcaseagreementclaim_assignment_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Claim" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcaseagreementclaim');
 
 CREATE TRIGGER trg_register_fundingcaseagreementclaim BEFORE INSERT ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION register_entity('fundingcaseagreementclaim');
+
+CREATE TRIGGER guard_claim_custom_field_definitions_immutable BEFORE UPDATE OF egcs_fc_customfielddefinitions ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION guard_claim_custom_field_definitions_immutable();
 
 CREATE TRIGGER trg_soft_delete_fundingcaseagreementclaim_assignments AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Claim" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseagreementclaim');
 

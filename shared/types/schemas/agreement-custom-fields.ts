@@ -1,6 +1,18 @@
 import { z } from 'zod'
+import { MoneySchema } from './money'
+import { isCanonicalMoney, type Money } from '../../utils/money'
+import { sameCustomFieldAnswer } from '../../utils/agreement-custom-field-answers'
 import { PositivePostgresBigintIdSchema } from './common'
 import { CHECKLIST_RESULTS } from './checklist/checklist'
+
+import {
+  CustomFieldStructuredAnswerSchema, CustomFieldStructureSchema, customFieldDateSchema, customFieldDecimalPlaces as decimalPlaces,
+  customFieldEmailSchema, validateStructuredCustomField
+} from './custom-field-structure'
+import type { CustomFieldStructuredAnswer } from './custom-field-structure'
+
+export { CustomFieldStructuredAnswerSchema, CustomFieldStructureSchema, customFieldTableTotals } from './custom-field-structure'
+export type { CustomFieldStructuredAnswer, CustomFieldStructure } from './custom-field-structure'
 
 const Label = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
   .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
@@ -11,7 +23,7 @@ const CategoryLabel = z.preprocess(
 )
 export const AgreementCustomFieldValuesSchema = z.record(
   PositivePostgresBigintIdSchema,
-  z.union([z.string(), z.number({ error: 'validation.custom_field_number' }), z.array(PositivePostgresBigintIdSchema), z.null()], { error: 'validation.invalid_selection' })
+  z.union([z.string(), z.number({ error: 'validation.custom_field_number' }), z.array(PositivePostgresBigintIdSchema), CustomFieldStructuredAnswerSchema, MoneySchema, z.null()], { error: 'validation.invalid_selection' })
 )
 export const StreamFieldSectionCreateSchema = z.object({
   egcs_tp_name_en: Label,
@@ -26,10 +38,11 @@ export type AgreementCustomFieldSection = z.infer<typeof StreamFieldSectionCreat
 export const AgencyCustomFieldBaseSchema = z.object({
   egcs_ay_name_en: Label,
   egcs_ay_name_fr: Label,
-  egcs_ay_kind: z.enum(['text', 'number', 'relational']),
+  egcs_ay_kind: z.enum(['text', 'number', 'relational', 'email', 'date', 'currency', 'table', 'repeating']),
   egcs_ay_multiple: z.boolean().default(false),
-  egcs_ay_presentation: z.enum(['single_line', 'multiline']).default('single_line'),
+  egcs_ay_presentation: z.enum(['single_line', 'multiline', 'checkboxes']).default('single_line'),
   egcs_ay_discriminator: z.boolean().default(false),
+  egcs_ay_structure: CustomFieldStructureSchema.nullish(),
   egcs_ay_minimum: z.number({ error: 'validation.custom_field_number' }).nullish(),
   egcs_ay_maximum: z.number({ error: 'validation.custom_field_number' }).nullish(),
   // The smallest positive JavaScript number is 5e-324.
@@ -58,12 +71,33 @@ const validateAgencyCustomField = (value: z.infer<typeof AgencyCustomFieldBaseSc
   if (value.egcs_ay_discriminator && value.egcs_ay_kind !== 'relational') {
     ctx.addIssue({ code: 'custom', path: ['egcs_ay_discriminator'], message: 'validation.invalid_selection' })
   }
-  if (value.egcs_ay_kind !== 'text' && value.egcs_ay_presentation !== 'single_line') {
+  if ((value.egcs_ay_presentation === 'multiline' && value.egcs_ay_kind !== 'text')
+    || (value.egcs_ay_presentation === 'checkboxes' && (value.egcs_ay_kind !== 'relational' || !value.egcs_ay_multiple))) {
     ctx.addIssue({ code: 'custom', path: ['egcs_ay_presentation'], message: 'validation.invalid_selection' })
+  }
+  const needsStructure = value.egcs_ay_kind === 'table' || value.egcs_ay_kind === 'repeating'
+  if (needsStructure ? value.egcs_ay_structure?.kind !== value.egcs_ay_kind : value.egcs_ay_structure != null) {
+    ctx.addIssue({ code: 'custom', path: ['egcs_ay_structure'], message: 'validation.invalid_selection' })
   }
 }
 
 export const AgencyCustomFieldCreateSchema = AgencyCustomFieldBaseSchema.superRefine(validateAgencyCustomField)
+  .superRefine((field, ctx) => {
+    if (field.egcs_ay_structure?.kind !== 'repeating') return
+    field.egcs_ay_structure.fields.forEach((child, index) => {
+      if (child.minimum !== undefined && child.maximum !== undefined && child.minimum > child.maximum) return
+      if (child.required && child.kind === 'number' && !customFieldNumberHasAnswer({
+        egcs_ay_minimum: child.minimum,
+        egcs_ay_maximum: child.maximum,
+        egcs_ay_decimalplaces: child.decimalPlaces
+      })) {
+        ctx.addIssue({
+          code: 'custom', path: ['egcs_ay_structure', 'fields', index, 'decimalPlaces'],
+          message: 'validation.custom_field_number_unanswerable'
+        })
+      }
+    })
+  })
 export const AgencyCustomFieldPatchSchema = AgencyCustomFieldBaseSchema.extend({
   egcs_ay_multiple: AgencyCustomFieldBaseSchema.shape.egcs_ay_multiple.removeDefault(),
   egcs_ay_presentation: AgencyCustomFieldBaseSchema.shape.egcs_ay_presentation.removeDefault(),
@@ -78,9 +112,10 @@ export const AgencyCustomFieldOptionBaseSchema = z.object({
   egcs_ay_active: z.boolean().default(true),
   egcs_ay_displayorder: DisplayOrder.default(0)
 }).strict()
+const optionCategoriesMatch = (value: z.infer<typeof AgencyCustomFieldOptionBaseSchema>) =>
+  (value.egcs_ay_category_en === null) === (value.egcs_ay_category_fr === null)
 export const AgencyCustomFieldOptionCreateSchema = AgencyCustomFieldOptionBaseSchema.refine(
-  value => (value.egcs_ay_category_en === null) === (value.egcs_ay_category_fr === null),
-  { error: 'validation.required', path: ['egcs_ay_category_fr'] }
+  optionCategoriesMatch, { error: 'validation.required', path: ['egcs_ay_category_fr'] }
 )
 export const AgencyCustomFieldOptionPatchSchema = AgencyCustomFieldOptionBaseSchema.extend({
   egcs_ay_category_en: AgencyCustomFieldOptionBaseSchema.shape.egcs_ay_category_en.removeDefault(),
@@ -116,11 +151,47 @@ export type AssignedAgencyCustomFieldDefinition = z.infer<typeof AgencyCustomFie
   options: Array<z.infer<typeof AgencyCustomFieldOptionCreateSchema> & { id: string }>
 }
 
+const distinctIds = (entries: { id: string }[]) => new Set(entries.map(entry => entry.id)).size === entries.length
+const assignedClaimFieldSchema = AgencyCustomFieldBaseSchema.extend({
+  id: PositivePostgresBigintIdSchema,
+  assignmentId: PositivePostgresBigintIdSchema,
+  egcs_tp_section: z.null(),
+  egcs_tp_required: z.boolean(),
+  egcs_tp_active: z.boolean(),
+  egcs_tp_displayorder: DisplayOrder,
+  options: z.array(AgencyCustomFieldOptionBaseSchema.extend({
+    id: PositivePostgresBigintIdSchema,
+    egcs_ay_active: z.boolean()
+  }).refine(optionCategoriesMatch)).refine(distinctIds)
+}).superRefine((field, ctx) => {
+  validateAgencyCustomField(field, ctx)
+  if (field.egcs_ay_kind !== 'relational' && field.options.length > 0) {
+    ctx.addIssue({ code: 'custom', path: ['options'], message: 'validation.invalid_selection' })
+  }
+})
+
+export const PersistedClaimCustomFieldDefinitionsSchema = z.array(assignedClaimFieldSchema).refine(distinctIds)
+  .refine(fields => new Set(fields.map(field => field.assignmentId)).size === fields.length)
+
+const ClaimCustomFieldScalarEvidenceSchema = z.union([
+  z.string(), z.number(), z.array(z.object({ en: z.string(), fr: z.string() })), MoneySchema, z.null()
+])
+const ClaimCustomFieldRowsEvidenceSchema = z.object({
+  rows: z.array(z.object({
+    cells: z.array(z.object({
+      labelEn: z.string(),
+      labelFr: z.string(),
+      format: z.literal('decimal').optional(),
+      value: ClaimCustomFieldScalarEvidenceSchema
+    }))
+  }))
+})
+
 export const ClaimCustomFieldSnapshotSchema = z.array(z.object({
   key: PositivePostgresBigintIdSchema,
   labelEn: z.string(),
   labelFr: z.string(),
-  value: z.union([z.string(), z.number(), z.array(z.object({ en: z.string(), fr: z.string() })), z.null()])
+  value: z.union([ClaimCustomFieldScalarEvidenceSchema, ClaimCustomFieldRowsEvidenceSchema])
 }))
 
 export type ClaimCustomFieldSnapshot = z.infer<typeof ClaimCustomFieldSnapshotSchema>
@@ -131,30 +202,30 @@ export type AgencyCustomFieldDefinition = z.infer<typeof AgencyCustomFieldCreate
   options: Array<z.infer<typeof AgencyCustomFieldOptionCreateSchema> & { id: string }>
 }
 
-export type AgreementCustomFieldValues = Record<string, string | number | string[]>
+export type ScalarCustomFieldValue = string | number | string[] | Money
+export type CustomFieldValue = ScalarCustomFieldValue | CustomFieldStructuredAnswer
+export type AgreementCustomFieldValues = Record<string, CustomFieldValue>
 
 /**
- * Reads canonical relational selections without interpreting scalar field values.
- * @param value - Stored relational value or an absent selection.
- * @returns Selected option IDs.
+ * Reads canonical choice IDs without interpreting scalar or structured answers.
+ * @param value - Stored choice or absent answer.
+ * @returns Selected IDs.
  */
-export const customFieldOptionIds = (value: string | number | string[] | null | undefined): string[] => {
+export const customFieldOptionIds = (value: CustomFieldValue | null | undefined): string[] => {
   if (value === null || value === undefined) return []
   if (!Array.isArray(value)) throw new TypeError('Relational custom-field values must be option-ID arrays')
   return value
 }
 
-export const customFieldHasValue = (value: string | number | string[] | null | undefined): boolean =>
-  Array.isArray(value) ? value.length > 0 : typeof value === 'string' ? value.trim().length > 0 : typeof value === 'number'
-
 /**
- * Counts fractional digits in the canonical decimal representation of a number.
- * @param value - A finite numeric answer.
- * @returns Fractional digits, including digits represented by a negative exponent.
+ * @param value - Stored or cleared answer.
+ * @returns Whether the answer has content.
  */
-const decimalPlaces = (value: number): number => {
-  const [coefficient = '', exponent = '0'] = String(value).split('e')
-  return Math.max(0, (coefficient.split('.')[1]?.length ?? 0) - Number(exponent))
+export const customFieldHasValue = (value: CustomFieldValue | null | undefined): boolean => {
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'number') return true
+  return isCanonicalMoney(value) || Boolean(value && 'rows' in value && value.rows.length)
 }
 
 /**
@@ -188,11 +259,12 @@ export type AgreementCustomFieldPatch = z.infer<typeof AgreementCustomFieldValue
  * @param options - Required answer validation settings.
  * @param options.requireAnswers - Validate that required fields have answers.
  * @param options.labelRequiredAnswers - Include the bilingual field label in required-answer errors.
+ * @param options.currency - Owning Agreement denomination, when known.
  */
 export const agreementCustomFieldMergeSchema = (
   definitions: AssignedAgencyCustomFieldDefinition[],
   current: AgreementCustomFieldValues,
-  { requireAnswers = true, labelRequiredAnswers = false }: { requireAnswers?: boolean; labelRequiredAnswers?: boolean } = {}
+  { requireAnswers = true, labelRequiredAnswers = false, currency }: { requireAnswers?: boolean; labelRequiredAnswers?: boolean; currency?: string } = {}
 ) => AgreementCustomFieldValuesSchema.transform((patch, ctx): AgreementCustomFieldValues => {
   const merged = { ...current }
   const fields = new Map(definitions.map(field => [field.id, field]))
@@ -205,8 +277,9 @@ export const agreementCustomFieldMergeSchema = (
     }
     const kind = field.egcs_ay_kind
     const active = field.egcs_tp_active
-    const blank = supplied === null || (typeof supplied === 'string' && supplied.trim() === '')
+    const blank = supplied === null || (kind !== 'currency' && typeof supplied === 'string' && supplied.trim() === '')
       || (kind === 'relational' && Array.isArray(supplied) && supplied.length === 0)
+      || ((kind === 'table' || kind === 'repeating') && typeof supplied === 'object' && !Array.isArray(supplied) && 'rows' in supplied && supplied.rows.length === 0)
     if (blank) {
       Reflect.deleteProperty(merged, id)
       continue
@@ -220,14 +293,37 @@ export const agreementCustomFieldMergeSchema = (
       issue(id, 'validation.invalid_selection')
       continue
     }
-    const unchanged = kind === 'relational'
-      ? JSON.stringify([...customFieldOptionIds(supplied)].sort()) === JSON.stringify([...customFieldOptionIds(current[id])].sort())
-      : supplied === current[id]
+    const unchanged = sameCustomFieldAnswer(supplied, previousValue)
     if (!active && !unchanged) {
       issue(id, 'validation.custom_field_inactive')
       continue
     }
-    if (kind === 'text') {
+    if (kind === 'table' || kind === 'repeating') {
+      if (!field.egcs_ay_structure || typeof supplied !== 'object' || Array.isArray(supplied) || !('rows' in supplied)) issue(id, 'validation.invalid_selection')
+      else {
+        validateStructuredCustomField(field.egcs_ay_structure, supplied, requireAnswers, (path, message, missing) => {
+          if (labelRequiredAnswers && missing) {
+            ctx.addIssue({
+              code: 'custom', path: [id, ...path],
+              message: kind === 'table' ? 'validation.custom_field_named_row_required' : 'validation.custom_field_named_entry_required',
+              params: {
+                row: missing.row, field_en: missing.labelEn, field_fr: missing.labelFr,
+                group_en: field.egcs_ay_name_en, group_fr: field.egcs_ay_name_fr
+              }
+            })
+          } else ctx.addIssue({ code: 'custom', path: [id, ...path], message })
+        }, currency)
+        merged[id] = supplied
+      }
+    } else if (kind === 'currency') {
+      if (!isCanonicalMoney(supplied)) issue(id, 'validation.invalid_number')
+      else if (currency && supplied.currency !== currency.toUpperCase()) issue(id, 'validation.invalid_selection')
+      else merged[id] = supplied
+    } else if (kind === 'email' || kind === 'date') {
+      const parsed = (kind === 'email' ? customFieldEmailSchema : customFieldDateSchema).safeParse(supplied)
+      if (!parsed.success) issue(id, kind === 'email' ? 'validation.custom_field_email' : 'validation.custom_field_date')
+      else merged[id] = parsed.data
+    } else if (kind === 'text') {
       if (typeof supplied !== 'string') issue(id, 'validation.invalid_selection')
       else if (field.egcs_ay_presentation === 'single_line' && /[\r\n\u2028\u2029]/u.test(supplied)) issue(id, 'validation.custom_field_single_line')
       else merged[id] = supplied

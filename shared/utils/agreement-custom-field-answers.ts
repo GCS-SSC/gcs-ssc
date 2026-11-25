@@ -1,10 +1,13 @@
 import type { AgreementCustomFieldPatch } from '../types/schemas/agreement-custom-fields'
 
+import { isCanonicalMoney } from './money'
+
 type Answer = AgreementCustomFieldPatch[string] | undefined
 
 const isBlankAnswer = (answer: Answer) =>
   answer == null || (typeof answer === 'string' && !answer.trim())
   || (Array.isArray(answer) && answer.length === 0)
+  || (typeof answer === 'object' && !Array.isArray(answer) && 'rows' in answer && answer.rows.length === 0)
 
 /**
  * Compares answer values without treating a different selection order as an edit.
@@ -14,10 +17,20 @@ const isBlankAnswer = (answer: Answer) =>
  */
 export const sameCustomFieldAnswer = (left: Answer, right: Answer): boolean => {
   if (isBlankAnswer(left)) return isBlankAnswer(right)
+  if (isCanonicalMoney(left)) return isCanonicalMoney(right) && left.amount === right.amount && left.currency === right.currency
   if (Array.isArray(left) && Array.isArray(right)) {
     if (left.length !== right.length) return false
     const sortedRight = [...right].sort()
     return [...left].sort().every((id, index) => id === sortedRight[index])
+  }
+  if (left && right && typeof left === 'object' && typeof right === 'object'
+    && !Array.isArray(left) && !Array.isArray(right) && 'rows' in left && 'rows' in right) {
+    return left.rows.length === right.rows.length && left.rows.every((row, index) => {
+      const counterpart = right.rows[index]
+      return counterpart?.id === row.id
+        && [...new Set([...Object.keys(row.cells), ...Object.keys(counterpart.cells)])]
+          .every(id => sameCustomFieldAnswer(row.cells[id], counterpart.cells[id]))
+    })
   }
   return left === right
 }

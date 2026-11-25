@@ -2,6 +2,8 @@
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import type { CaptureCommittedSettlement } from '~/composables/useCommittedSettlement'
+import { useResourceRequest } from '~/composables/useResourceRequest'
 import { useActionContext } from '~/composables/useActionContext'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -38,6 +40,7 @@ import AgencyTransferPayments from '~/components/Agency/AgencyTransferPayments.v
 import AgencyStatuses from '~/components/Agency/AgencyStatuses.vue'
 import AgencyExtensionsTab from '~/components/Extension/AgencyExtensionsTab.vue'
 import CommonLoadingState from '~/components/Common/LoadingState.vue'
+import type { AgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgencyProfileItem } from '~~/shared/types/schemas'
 
 definePageMeta({
@@ -83,6 +86,44 @@ const agencyResourceCapabilities = () => ({
   canDelete: canDeleteAgency.value
 })
 
+const { user: currentActor, permissionRevision } = useAuth()
+const fieldCatalogEnabled = ref(false)
+const fieldCatalog = useResourceRequest<{ items: AgencyCustomFieldDefinition[] }>({
+  identity: () => JSON.stringify([id, currentActor.value?.id, permissionRevision.value]),
+  enabled: fieldCatalogEnabled,
+  /**
+   * @param signal - Catalog request lifetime.
+   * @returns The accepted Agency field catalog.
+   */
+  load: async signal => {
+    const response = await fetch(getClientRequestUrl(`/api/agency/${id}/custom-fields`), { signal })
+    if (!response.ok) await throwFetchResponseError(response)
+    return await response.json()
+  }
+})
+const pendingFieldWrites = shallowReactive(new Set<string>())
+let fieldCatalogOwnerActive = true
+onBeforeUnmount(() => {
+  fieldCatalogOwnerActive = false
+})
+/** @returns The write admission and readback for this live Agency catalog. */
+const captureFieldCommitted: CaptureCommittedSettlement = () => {
+  const operation = agencyActionContext.capture()
+  if (!operation?.canDispatch()) return null
+
+  return {
+    canDispatch: operation.canDispatch,
+    /** @returns Readback under the active Agency view. */
+    settle: async () => {
+      if (!fieldCatalogOwnerActive || route.params.id !== id) return { kind: 'retired' }
+      // Refresh the committed resource under the live context, even if the submitting editor has retired.
+      return await fieldCatalog.refresh()
+        ? { kind: 'refreshed' }
+        : { kind: 'unavailable', error: fieldCatalog.error.value }
+    }
+  }
+}
+
 const reconciliationPendingRequests = shallowReactive(new Map<string, symbol>())
 
 const tabMap: TabMap = new Map([
@@ -90,7 +131,8 @@ const tabMap: TabMap = new Map([
   ['general', { key: 'agency.tabs.general', icon: 'i-lucide-info', component: AgencyDetailGeneralTab, getProps: () => ({ agency: agency.value }) }],
   ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: () => ({ ...agencyResourceCapabilities(), showHeader: false, reconciliationPendingRequests }) }],
   ['customFields', { key: 'custom_fields.title', icon: 'i-lucide-list-filter', component: AgencyCustomFields, getProps: () => ({
-    agencyId: id, showHeader: false, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value
+    agencyId: id, showHeader: false, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value,
+    catalog: fieldCatalog, pendingFieldWrites, captureCommitted: captureFieldCommitted
   }) }],
   ['clauses', { key: 'clauses.title', icon: 'i-lucide-list-ordered', component: AgencyClauses, getProps: () => ({ agencyId: id, canManage: canUpdateAgency.value }) }],
   ['approvalTemplates', { key: 'agency.tabs.approval_templates', icon: 'i-lucide-stamp', component: AgencyApprovalTemplates, getProps: agencyResourceCapabilities }],
@@ -260,6 +302,10 @@ const {
   enabled: permissionsReady,
   defaultTabId: 'general'
 })
+
+watch(activeTabComponent, component => {
+  if (component === AgencyCustomFields) fieldCatalogEnabled.value = true
+}, { immediate: true })
 
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('agency-detail')

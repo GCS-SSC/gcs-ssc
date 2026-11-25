@@ -7,6 +7,7 @@ import type { FundingCaseAgreementActivityForm, FundingCaseAgreementActivityRow 
 import { FundingCaseAgreementActivityCreateSchema } from '~~/shared/types/schemas'
 import { createAgreementActivitySchema } from '~~/shared/types/schemas/agreement-activity'
 import { customFieldHasValue } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
 import { parseDate } from '@internationalized/date'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import CommonEitherLanguage from '~/components/Common/EitherLanguage.vue'
@@ -17,8 +18,9 @@ import CustomFields from './Fields/CustomFields.vue'
 
 type AgreementActivityCrudRow = FundingCaseAgreementActivityRow & Record<string, unknown>
 
-const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, actionTarget, dateRange, staticMode = false, embedded = false } = defineProps<{
+const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, actionTarget, dateRange, currency, staticMode = false, embedded = false } = defineProps<{
   agreementId: string
+  currency?: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -143,7 +145,7 @@ const restoreViewFocus = (event: Event) => {
 const buildUpdatePayload = (state: Partial<AgreementActivityCrudRow>, original: AgreementActivityCrudRow) => {
   const { egcs_fc_customfields: values, ...payload } = state
   const before = original.egcs_fc_customfields ?? {}
-  const normalized = (value: string | string[] | number | null | undefined) => customFieldHasValue(value) ? JSON.stringify(value) : undefined
+  const normalized = (value: AgreementCustomFieldPatch[string] | undefined) => customFieldHasValue(value) ? JSON.stringify(value) : undefined
   const changes = Object.fromEntries(Object.entries(values ?? {}).filter(([id, value]) =>
     normalized(value) !== normalized(before[id])))
   return Object.keys(changes).length ? { ...payload, egcs_fc_customfields: changes } : payload
@@ -377,6 +379,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
             v-model="(state as FundingCaseAgreementActivityForm).egcs_fc_customfields"
             data-field-container="Composite editor; its individual field declarations own their identities."
             :activity="customFieldActivity"
+            :currency="currency"
             :permission-action="state.id ? 'update' : 'create'" />
         </Suspense>
       </div>
@@ -401,6 +404,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
           data-field-container="Composite display for Agency-defined custom fields."
           :model-value="viewedActivity.egcs_fc_customfields ?? {}"
           :activity="customFieldActivity"
+          :currency="currency"
           permission-action="read"
           readonly />
       </Suspense>

@@ -44,7 +44,7 @@ export const localizeBilingualIssueParams = (
     return localized[base]
   }
 
-  for (const base of ['question', 'outcome', 'activity', 'field']) {
+  for (const base of ['question', 'outcome', 'activity', 'field', 'group']) {
     if (`${base}_en` in localized || `${base}_fr` in localized) localized[base] = resolve(base)
   }
 

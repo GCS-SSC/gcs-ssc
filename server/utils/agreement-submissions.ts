@@ -18,8 +18,9 @@ import type {
   AgreementSubmissionReceipt
 } from '~~/shared/types/agreement-submission'
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
+import { agreementSubmissionTargetSchemas } from '~~/shared/types/schemas/agreement-submission-targets'
 import { readClaimSubmissionEvidence } from './agreement-submission-claim-evidence'
-import { assertClaimCustomFieldsComplete } from './agreement-claim-custom-fields'
+import { assertClaimCustomFieldsComplete, parsePersistedClaimCustomFieldDefinitions } from './agreement-claim-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource, canAccessAgreement, resolveAgreementScopeContext, type AgreementScopeContext } from './agreement'
 import { hasActiveAgreementCloseoutWorkflow } from './agreement-closeout'
@@ -90,7 +91,12 @@ const readSubmission = async (event: H3Event, db: SubmissionDb, agreementId: str
   return row ?? await notFound(event, 'SUBMISSION_NOT_FOUND', 'submission.errors.not_found')
 }
 
-const submissionDto = (row: Submission) => ({
+const submissionDto = ({
+  egcs_fc_resultamendment: _resultAmendment,
+  egcs_fc_resultforecast: _resultForecast,
+  egcs_fc_resultclaim: _resultClaim,
+  ...row
+}: Submission) => ({
   ...row,
   egcs_fc_updatedat: new Date(row.egcs_fc_updatedat).toISOString()
 })
@@ -120,7 +126,7 @@ const appendEvent = async (
   description: string | null = null
 ) => {
   const evidence = kind !== 'review_started' && submission.egcs_fc_target === 'claim' && submission.egcs_fc_result
-    ? await readClaimSubmissionEvidence(trx, submission.egcs_fc_result)
+    ? await readClaimSubmissionEvidence(trx, submission.egcs_fc_result, parsePersistedClaimCustomFieldDefinitions)
     : null
   await trx.insertInto('Funding_Case_Agreement_Submission_Event').values({
     egcs_fc_claimcustomfields: evidence?.fields.length ? sql<ClaimCustomFieldSnapshot>`${JSON.stringify(evidence.fields)}::jsonb` : null,
@@ -506,9 +512,20 @@ export const receiveAgreementSubmission = async (
       await assertBusinessStatusMutationAllowed(event, trx, 'fundingcaseagreement', agreementId)
       resultId = await surfaceTargetError(event, async () => {
         if (existing?.egcs_fc_result) {
+          const previousReceipt = await trx.selectFrom('Funding_Case_Agreement_Submission_Event')
+            .select(['egcs_fc_formatversion', 'egcs_fc_payload'])
+            .where('egcs_fc_submission', '=', existing.id).where('egcs_fc_kind', '=', 'received')
+            .where('egcs_fc_sourcerevision', '=', existing.egcs_fc_sourcerevision)
+            .where('_deleted', '=', false).executeTakeFirst()
+          if (previousReceipt?.egcs_fc_formatversion !== 1
+            || existing.egcs_fc_formatversion !== previousReceipt.egcs_fc_formatversion
+            || !previousReceipt.egcs_fc_payload
+            || !agreementSubmissionTargetSchemas[targetKind].safeParse(previousReceipt.egcs_fc_payload).success) {
+            return await conflict(event, 'SUBMISSION_SOURCE_CONFLICT', 'submission.errors.source_conflict')
+          }
           const revision = {
             event, agreementId, target: targetKind, targetId: existing.egcs_fc_result,
-            payload: input.payload, previousSourcePayload: existing.egcs_fc_payload
+            payload: input.payload, previousSourcePayload: previousReceipt.egcs_fc_payload
           }
           await applyLinkedSubmissionRevision(trx, revision)
           return existing.egcs_fc_result

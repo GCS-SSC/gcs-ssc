@@ -18,14 +18,26 @@ type AnswerEditorState =
   | { kind: 'reading' }
   | { kind: 'editing'; session: number; status: 'current' | 'stale'; submissionRevision: number | null; baseline: AgreementCustomFieldPatch; draft: AnswerDraft }
 
+const copyAnswer = (answer: AgreementCustomFieldPatch[string]): AgreementCustomFieldPatch[string] => {
+  if (Array.isArray(answer)) return [...answer]
+  if (!answer || typeof answer !== 'object' || !('rows' in answer)) return answer
+  return {
+    rows: answer.rows.map(row => ({
+      id: row.id,
+      cells: Object.fromEntries(Object.entries(row.cells).map(([id, value]) => [id, Array.isArray(value) ? [...value] : value]))
+    }))
+  }
+}
+
 const copyAnswers = (answers: AgreementCustomFieldPatch): AgreementCustomFieldPatch =>
-  Object.fromEntries(Object.entries(answers).map(([key, answer]) => [key, Array.isArray(answer) ? [...answer] : answer]))
+  Object.fromEntries(Object.entries(answers).map(([key, answer]) => [key, copyAnswer(answer)]))
 
 /**
  * Owns an inline answer draft and its single write through committed readback.
  * The page supplies authorization, transport and its authoritative read.
  * @param options - Answer resource and action bindings.
  * @param options.context - Page-owned action identity and authorization.
+ * @param options.openingContext - Actor, security, record and role lifetime independent of read eligibility.
  * @param options.readAnswers - Last accepted answers for a new opening.
  * @param options.readSubmissionRevision - Last accepted linked Submission revision, or null for an unlinked Claim.
  * @param options.readDefinitions - Pinned definitions for validation.
@@ -40,6 +52,7 @@ const copyAnswers = (answers: AgreementCustomFieldPatch): AgreementCustomFieldPa
  */
 export const useSubmissionAnswerEditor = (options: {
   context: ActionContext
+  openingContext: ActionContext
   readAnswers: () => AgreementCustomFieldValues
   readSubmissionRevision: () => number | null
   readDefinitions: () => AssignedAgencyCustomFieldDefinition[]
@@ -74,7 +87,7 @@ export const useSubmissionAnswerEditor = (options: {
     editor.value = { kind: 'reading' }
   }
 
-  watch(options.context.version, close, { flush: 'sync' })
+  watch(options.openingContext.version, close, { flush: 'sync' })
 
   const setEditing = (enabled: boolean) => {
     if (isSaving.value || options.isBlocked() || isStale.value) return

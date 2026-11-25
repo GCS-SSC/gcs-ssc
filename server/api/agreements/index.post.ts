@@ -242,7 +242,7 @@ export default defineEventHandler(async event => {
                 completed,
                 subtypeContext.agreementType
               ) as AgreementWriteValues
-              values.egcs_fc_customfields = await mergeAgreementCustomFields(event, trx, streamId, {}, validated.egcs_fc_customfields ?? {})
+              values.egcs_fc_customfields = await mergeAgreementCustomFields(event, trx, streamId, {}, validated.egcs_fc_customfields ?? {}, completed.egcs_fc_currency)
               values.egcs_fc_status = await lockAgencyDraftStatus(trx, currentStreamContext.agencyId)
               // Canonical Stream locks serialize supported number writers. A final
               // uniqueness failure rolls back the entire aggregate and its counters.

@@ -16,6 +16,7 @@ import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financi
 import { captureSubmissionRisk } from './risk-readiness'
 import { assertAgreementActivitiesWithinDuration } from './agreement-activity'
 import { FundingCaseAgreementTitleProposalSchema } from '~~/shared/types/schemas/funding-case-agreement'
+import { formatMoneyText, isCanonicalMoney } from '~~/shared/utils/money'
 import { parseI18n } from './api-validate'
 import { mergeAgreementCustomFields, readActivityCustomFieldDefinitions, readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 import { readAgreementSelectedClauses } from './agreement-clauses'
@@ -170,16 +171,20 @@ const normalizeValue = (value: unknown): JsonValue => {
 const normalizeRow = (row: Record<string, unknown>): Record<string, JsonValue> =>
   normalizeValue(row) as Record<string, JsonValue>
 
+const displayCustomFieldEvidence = (field: AssignedAgencyCustomFieldDefinition, value: AgreementCustomFieldValues[string] | undefined) => {
+  if (isCanonicalMoney(value)) return bilingualValue(formatMoneyText(value, 'en-CA'), formatMoneyText(value, 'fr-CA'))
+  if (field.egcs_ay_kind !== 'relational') return String(value)
+  const selections = customFieldOptionIds(value).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { egcs_ay_name_en: optionId, egcs_ay_name_fr: optionId })
+  return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
+}
+
 const captureCustomFields = (definitions: AssignedAgencyCustomFieldDefinition[], values: AgreementCustomFieldValues) =>
   definitions.filter(field => customFieldHasValue(values[field.id])).map(field => ({
     fieldId: field.id,
     section: field.section ? { id: field.section.id, label: bilingualValue(field.section.egcs_tp_name_en, field.section.egcs_tp_name_fr), order: field.section.egcs_tp_displayorder } : null,
     label: bilingualValue(field.egcs_ay_name_en, field.egcs_ay_name_fr),
     value: values[field.id],
-    display: field.egcs_ay_kind !== 'relational' ? String(values[field.id]) : (() => {
-      const selections = customFieldOptionIds(values[field.id]).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { egcs_ay_name_en: optionId, egcs_ay_name_fr: optionId })
-      return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
-    })()
+    display: displayCustomFieldEvidence(field, values[field.id])
   }))
 
 export const canonicalSerializeAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot | JsonValue): string =>
@@ -254,7 +259,7 @@ export const buildAgreementApprovalSnapshot = async (
       .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   }
   if (!amendment) {
-    await mergeAgreementCustomFields(event, trx, String(agreement.egcs_fc_transferpaymentstream), agreement.egcs_fc_customfields, {})
+    await mergeAgreementCustomFields(event, trx, String(agreement.egcs_fc_transferpaymentstream), agreement.egcs_fc_customfields, {}, agreement.egcs_fc_currency)
   }
   const agreementReferences = amendment ? null : await trx.selectFrom('Funding_Case_Agreement_Profile')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
@@ -499,7 +504,7 @@ export const buildAgreementApprovalSnapshot = async (
   const activityFieldDefinitions = activities.length ? await readActivityCustomFieldDefinitions(trx, streamId) : []
   const activityFieldsById = new Map(activityFieldDefinitions.map(field => [field.id, field]))
   const activityFieldIssues = activities.flatMap(activity => {
-    const result = agreementCustomFieldMergeSchema(activityFieldDefinitions, activity.egcs_fc_customfields).safeParse({})
+    const result = agreementCustomFieldMergeSchema(activityFieldDefinitions, activity.egcs_fc_customfields, { currency: agreement.egcs_fc_currency }).safeParse({})
     return result.error?.issues.map((issue): z.ZodIssue => {
       const fieldId = String(issue.path[0])
       const field = activityFieldsById.get(fieldId)

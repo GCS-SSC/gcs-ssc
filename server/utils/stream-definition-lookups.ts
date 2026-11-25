@@ -10,7 +10,7 @@ import { getValidatedQueryI18n } from './api-validate'
 import { badRequest, notFound } from './api-errors'
 import { escapeLikePattern } from './sql-like'
 
-const QuerySchema = PaginationSchema.extend({ entityType: EntityTypeIdentitySchema.optional(), ids: z.union([PositivePostgresBigintIdSchema, z.array(PositivePostgresBigintIdSchema).min(1).max(100)]).optional() }).strict()
+const QuerySchema = PaginationSchema.extend({ entityType: EntityTypeIdentitySchema.optional(), target: z.enum(['agreement', 'activity', 'claim']).optional(), ids: z.union([PositivePostgresBigintIdSchema, z.array(PositivePostgresBigintIdSchema).min(1).max(100)]).optional() }).strict()
 
 export const streamDefinitionLookup = async (event: H3Event, kind: 'custom-fields' | 'workflows' | 'review-sets') => {
   const profileId = getRouterParam(event, 'id')
@@ -19,12 +19,13 @@ export const streamDefinitionLookup = async (event: H3Event, kind: 'custom-field
   return await executeFreshReadSnapshot(event, async db => {
     const access = await authorizeTransferPaymentStreamResource(event, 'update', profileId, streamId)
     if (!access) return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
-    const { page, limit, search, entityType, ids } = await getValidatedQueryI18n(event, QuerySchema)
+    const { page, limit, search, entityType, ids, target } = await getValidatedQueryI18n(event, QuerySchema)
     const selectedIds = ids === undefined ? [] : Array.isArray(ids) ? ids : [ids]
     const pattern = search ? `%${escapeLikePattern(search)}%` : undefined
     if (kind === 'custom-fields') {
       let query = db.selectFrom('Agency_Custom_Field')
         .where('egcs_ay_agency', '=', access.agencyId).where('_deleted', '=', false)
+      if (target !== 'claim') query = query.where('egcs_ay_kind', 'not in', ['table', 'repeating'])
       if (selectedIds.length) query = query.where('id', 'in', selectedIds)
       if (pattern) query = query.where(eb => eb.or([
         eb('egcs_ay_name_en', 'ilike', pattern), eb('egcs_ay_name_fr', 'ilike', pattern)

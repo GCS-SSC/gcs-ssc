@@ -25,6 +25,7 @@ export const readAgencyCustomFieldDefinitions = async (
     egcs_ay_discriminator: field.egcs_ay_discriminator,
     egcs_ay_minimum: field.egcs_ay_minimum, egcs_ay_maximum: field.egcs_ay_maximum,
     egcs_ay_decimalplaces: field.egcs_ay_decimalplaces,
+    egcs_ay_structure: field.egcs_ay_structure,
     options: options.filter(option => String(option.egcs_ay_field) === String(field.id)).map(option => ({
       id: String(option.id), egcs_ay_name_en: option.egcs_ay_name_en,
       egcs_ay_name_fr: option.egcs_ay_name_fr, egcs_ay_category_en: option.egcs_ay_category_en,
