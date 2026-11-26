@@ -242,9 +242,6 @@ const {
 const isFiscalYearGroupRow = (row: ClaimGroupedRow) => isGroupRow(row, FISCAL_YEAR_GROUP_COLUMN_ID)
 const getGroupedRowTotal = (row: ClaimGroupedRow, key: 'submittedAmount' | 'reconciledAmount') =>
   sumMoney((row.leafRows ?? row.subRows ?? []).map(item => item.original[key]), currency)
-const getGroupedClaimStatuses = (row: ClaimGroupedRow) => [
-  ...new Set((row.leafRows ?? row.subRows ?? []).map(item => item.original.egcs_fc_status))
-]
 
 const getClaimRoute = (row: ClaimTableRow) => localePath(appRouteLocations.agreementClaimDetail(agreementId, String(row.id)))
 
@@ -495,14 +492,8 @@ const formSession = useFormSession({
       </template>
 
       <template #status-cell="{ row }">
-        <div v-if="isFiscalYearGroupRow(row as ClaimGroupedRow)" class="flex flex-wrap gap-1">
-          <CommonStatusBadge
-            v-for="status in getGroupedClaimStatuses(row as ClaimGroupedRow)"
-            :key="status"
-            :status-id="status" />
-        </div>
         <CommonRecordState
-          v-else
+          v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow)"
           :status-id="row.original.egcs_fc_status"
           :is-completed="row.original.isCompleted" />
       </template>
