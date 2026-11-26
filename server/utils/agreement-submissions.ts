@@ -10,7 +10,8 @@ import type {
   AgreementSubmissionCommand,
   AgreementSubmissionList,
   AgreementSubmissionListQuery,
-  AgreementSubmissionReceipt
+  AgreementSubmissionReceipt,
+  SubmissionEventSummary
 } from '~~/shared/types/agreement-submission'
 import type { ClaimCustomFieldSnapshot } from '~~/shared/types/schemas/agreement-custom-fields'
 import { agreementSubmissionTargetSchemas } from '~~/shared/types/schemas/agreement-submission-targets'
@@ -223,28 +224,62 @@ export const listAgreementSubmissions = async (event: H3Event, agreementId: stri
   await readAccess(event, agreementId, async (db, authorization, canReview, context) => {
     const linked = query.target ? query : null
     const collection = db.selectFrom('Funding_Case_Agreement_Submission as submission')
+      .leftJoin('Funding_Case_Agreement_Claim as claim', join => join
+        .on('submission.egcs_fc_target', '=', 'claim')
+        .onRef('claim.id', '=', 'submission.egcs_fc_result')
+        .onRef('claim.egcs_fc_fundingagreement', '=', 'submission.egcs_fc_fundingagreement'))
+      .leftJoin('Funding_Case_Agreement_Forecast as forecast', join => join
+        .on('submission.egcs_fc_target', '=', 'forecast')
+        .onRef('forecast.id', '=', 'submission.egcs_fc_result')
+        .onRef('forecast.egcs_fc_fundingagreement', '=', 'submission.egcs_fc_fundingagreement'))
+      .leftJoin('Funding_Case_Agreement_Budget_Fiscal_Year as budgetYear', join => join
+        .onRef('budgetYear.egcs_fc_fundingagreement', '=', 'submission.egcs_fc_fundingagreement')
+        .on(eb => eb('budgetYear.id', '=', eb.fn.coalesce('claim.egcs_fc_fiscalyear', 'forecast.egcs_fc_fiscalyear'))))
+      .leftJoin('Agency_Fiscal_Year as fiscalYear', 'fiscalYear.id', 'budgetYear.egcs_fc_fiscalyear')
       .selectAll('submission')
-      .select(eb => eb.or([
-        eb.and([
-          eb('submission.egcs_fc_target', '=', 'claim'),
-          eb.exists(eb.selectFrom('Funding_Case_Agreement_Claim as claim').select('claim.id')
-            .whereRef('claim.id', '=', 'submission.egcs_fc_result')
-            .where('claim.egcs_fc_fundingagreement', '=', agreementId).where('claim._deleted', '=', false))
-        ]),
-        eb.and([
-          eb('submission.egcs_fc_target', '=', 'forecast'),
-          eb.exists(eb.selectFrom('Funding_Case_Agreement_Forecast as forecast').select('forecast.id')
-            .whereRef('forecast.id', '=', 'submission.egcs_fc_result')
-            .where('forecast.egcs_fc_fundingagreement', '=', agreementId).where('forecast._deleted', '=', false))
-        ])
-      ]).as('targetAvailable'))
+      .select([
+        'claim._deleted as claimDeleted',
+        'forecast._deleted as forecastDeleted',
+        'claim.egcs_fc_periodstart as claimPeriodStart',
+        'claim.egcs_fc_periodend as claimPeriodEnd',
+        'fiscalYear.egcs_ay_fiscalyeardisplay as fiscalYearDisplay'
+      ])
       .where('submission.egcs_fc_fundingagreement', '=', agreementId).where('submission._deleted', '=', false)
-    const rows = await (linked ? collection.where('egcs_fc_target', '=', linked.target).where('egcs_fc_result', '=', linked.targetId) : collection)
-      .orderBy('egcs_fc_updatedat', 'desc').orderBy('id', 'desc').execute()
+    const rows = await (linked ? collection.where('submission.egcs_fc_target', '=', linked.target).where('submission.egcs_fc_result', '=', linked.targetId) : collection)
+      .orderBy('submission.egcs_fc_updatedat', 'desc').orderBy('submission.id', 'desc').execute()
     const allowed = linked && rows.length > 0
       ? await canReviewLinkedTarget(db, authorization, context, linked.target, linked.targetId)
       : !linked && canReview
-    return { items: rows.map(({ targetAvailable, ...row }) => ({ ...submissionDto(row), targetAvailable: Boolean(targetAvailable) })), canReview: allowed }
+    const eventsBySubmission = new Map<string, SubmissionEventSummary[]>()
+    if (rows.length > 0) {
+      const events = await db.selectFrom('Funding_Case_Agreement_Submission_Event as entry')
+        .leftJoin('Common_User as actor', 'actor.id', 'entry.egcs_fc_actor')
+        .select([
+          'entry.egcs_fc_submission', 'entry.id', 'entry.egcs_fc_kind', 'entry.egcs_fc_sourcerevision',
+          'entry.egcs_fc_createdat', 'entry.egcs_fc_description', 'actor.egcs_cn_name as actorName'
+        ])
+        .where('entry.egcs_fc_submission', 'in', rows.map(row => row.id))
+        .where('entry._deleted', '=', false)
+        .orderBy('entry.id', 'asc')
+        .execute()
+      for (const { egcs_fc_submission: submissionId, ...event } of events) {
+        const summaries = eventsBySubmission.get(submissionId) ?? []
+        summaries.push({ ...event, egcs_fc_createdat: new Date(event.egcs_fc_createdat).toISOString() })
+        eventsBySubmission.set(submissionId, summaries)
+      }
+    }
+    return {
+      items: rows.map(({ claimDeleted, forecastDeleted, fiscalYearDisplay, claimPeriodStart, claimPeriodEnd, ...row }) => ({
+        ...submissionDto(row),
+        targetAvailable: claimDeleted === false || forecastDeleted === false,
+        fiscalYearDisplay,
+        events: eventsBySubmission.get(row.id) ?? [],
+        claimPeriod: claimPeriodStart === null || claimPeriodEnd === null
+          ? null
+          : { start: claimPeriodStart, end: claimPeriodEnd }
+      })),
+      canReview: allowed
+    }
   })
 
 export const getAgreementSubmission = async (event: H3Event, agreementId: string, submissionId: string) =>

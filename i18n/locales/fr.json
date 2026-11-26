@@ -615,6 +615,7 @@
     "partial_update_metadata_failed": "Les détails de la pièce jointe ont été enregistrés, mais pas ses métadonnées de stockage. Vérifiez les métadonnées conservées et réessayez."
   },
   "submission": {
+    "record": "Demande de remboursement ou prévision",
     "title": "Soumissions",
     "reference": "Référence de la source",
     "destination": "Destination",

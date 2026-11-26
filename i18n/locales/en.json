@@ -615,6 +615,7 @@
     "partial_update_metadata_failed": "The attachment details were saved, but its storage metadata was not. Review the preserved metadata and try saving again."
   },
   "submission": {
+    "record": "Claim or forecast",
     "title": "Submissions",
     "reference": "Source reference",
     "destination": "Destination",

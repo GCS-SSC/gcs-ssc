@@ -127,4 +127,12 @@ export interface AgreementSubmissionList {
   items: AgreementSubmissionListItem[]
   canReview: boolean
 }
-export type AgreementSubmissionListItem = SubmissionRow & { targetAvailable: boolean }
+export type SubmissionEventSummary = Pick<SubmissionEventRow,
+  'id' | 'egcs_fc_kind' | 'egcs_fc_sourcerevision' | 'egcs_fc_createdat' | 'egcs_fc_description' | 'actorName'
+>
+export type AgreementSubmissionListItem = SubmissionRow & {
+  targetAvailable: boolean
+  fiscalYearDisplay: string | null
+  claimPeriod: { start: number; end: number } | null
+  events: SubmissionEventSummary[]
+}
