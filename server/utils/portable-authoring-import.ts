@@ -31,7 +31,7 @@ const receiptSchema = z.strictObject({
   report: PortableAuthoringImportReportSchema
 })
 
-export const withPortableAuthoringImport = async <TDefinition extends PortableAuthoringSchema, TResult extends { id: string }>(
+const withPortableAuthoringImport = async <TDefinition extends PortableAuthoringSchema, TResult extends { id: string }>(
   event: H3Event,
   trx: Transaction<Database>,
   agencyId: string,
@@ -93,8 +93,9 @@ export const withPortableAuthoringImport = async <TDefinition extends PortableAu
     .where('id', '=', result.id).executeTakeFirst()
   return { importReport: report }
 }
+export { withPortableAuthoringImport }
 
-export const readPortableAuthoringCreate = async <TNormal extends z.ZodType, TPortable extends z.ZodType>(
+const readPortableAuthoringCreate = async <TNormal extends z.ZodType, TPortable extends z.ZodType>(
   event: H3Event,
   normal: TNormal,
   portable: TPortable
@@ -103,3 +104,4 @@ export const readPortableAuthoringCreate = async <TNormal extends z.ZodType, TPo
   if (input && typeof input === 'object' && 'portable' in input) return await parseI18n(event, portable, input)
   return await parseI18n(event, normal, input)
 }
+export { readPortableAuthoringCreate }

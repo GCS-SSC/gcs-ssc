@@ -190,7 +190,7 @@ export const auditFieldContracts = async (root: string): Promise<FieldContractAu
       const argument = expression.arguments[method === 'withFormRequirements' ? 1 : 0]
       return argument ? resolveExpression(scope, argument, seen) : []
     }
-    if (ts.isPropertyAccessExpression(callee) && ['omit', 'pick', 'partial', 'required', 'strict', 'passthrough'].includes(method)) {
+    if (ts.isPropertyAccessExpression(callee) && ['omit', 'pick', 'partial', 'required', 'strict', 'strip', 'passthrough'].includes(method)) {
       const bases = await resolveExpression(scope, callee.expression, seen)
       return bases.flatMap(candidate => {
         const schema = candidate.schema as unknown as Record<string, (...args: unknown[]) => z.ZodType>

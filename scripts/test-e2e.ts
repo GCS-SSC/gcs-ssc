@@ -9,6 +9,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { fileURLToPath } from 'node:url'
 import { Client } from 'pg'
 import { NUXT_ARTIFACT_LOCK_ENV, runWithNuxtArtifactLock } from './nuxt-artifact-lock'
+import { observeManagedServerOutput, parseManagedClientUrl, waitForManagedServerReady } from './managed-e2e-readiness'
+import type { ManagedServerListening } from './managed-e2e-readiness'
 
 const DEFAULT_PORT = 3005
 const DEFAULT_WAIT_TIMEOUT_MS = 60_000
@@ -86,9 +88,11 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/agreement-budget-core.spec.ts',
   'tests/e2e/agreement-budget-financial-limits.spec.ts',
   'tests/e2e/agreement-budget-fiscal-year-review.spec.ts',
+  'tests/e2e/agreement-claim-answer-concurrency.spec.ts',
   'tests/e2e/agreement-claim-completion-presentation.spec.ts',
   'tests/e2e/agreement-claim-core.spec.ts',
   'tests/e2e/agreement-requests.spec.ts',
+  'tests/e2e/claim-structured-custom-fields.spec.ts',
   'tests/e2e/agreement-custom-fields-seed.spec.ts',
   'tests/e2e/agreement-custom-fields.spec.ts',
   'tests/e2e/agreement-delete-review.spec.ts',
@@ -212,6 +216,9 @@ export type E2eTestSelection = {
   selectedSpec: string | undefined
 }
 
+type ManagedBindHost = '::' | '0.0.0.0'
+type ManagedNetwork = { bindHost: ManagedBindHost; ipv6LoopbackAvailable: boolean }
+
 type E2eScriptConfig = {
   forwardedPlaywrightArgs: string[]
   suite: E2eSuite
@@ -220,6 +227,7 @@ type E2eScriptConfig = {
   ownsLocalFileStorageDir: boolean
   preferredPort: number
   port: number
+  network: ManagedNetwork
   baseUrl: string
   baseUrlFromEnv?: string
   timeoutMs: number
@@ -259,8 +267,6 @@ const createPostgresSchemaClient: PostgresSchemaClientFactory = connectionString
   new Client({ connectionString }) as PostgresSchemaClient
 
 type E2eCommandRunner = (command: string[]) => Promise<number>
-
-type ManagedServerProcess = Pick<Bun.Subprocess, 'exited' | 'exitCode' | 'signalCode'>
 
 const runInheritedCommandWithEnv = async (
   command: string[],
@@ -327,21 +333,46 @@ export const prepareManagedProductionServer = async (
 }
 
 /**
- * Waits for a specified number of milliseconds.
+ * Probes ephemeral IPv6 binds using the same runtime that hosts Nitro and Nuxt.
  *
- * @param ms - The number of milliseconds to wait.
- * @returns A promise that resolves after the timeout.
+ * @returns The wildcard to bind and whether IPv6 loopback is available.
  */
-const wait = (ms: number): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-const formatManagedServerExit = (process: ManagedServerProcess, exitCode: number): string => {
-  if (process.signalCode) {
-    return `signal ${process.signalCode} (managed exit ${exitCode})`
-  }
-
-  return `exit code ${process.exitCode ?? exitCode}`
+export const probeManagedNetwork = async (): Promise<ManagedNetwork> => {
+  const child = Bun.spawn(['node', '--input-type=module', '-e', `
+    import { randomUUID } from 'node:crypto'
+    import { createConnection, createServer } from 'node:net'
+    const acceptsIPv4 = server => new Promise(resolve => {
+      const token = randomUUID()
+      server.on('connection', socket => socket.end(token))
+      const client = createConnection(server.address().port, '127.0.0.1')
+      const timer = setTimeout(() => client.destroy(), 1000)
+      let receipt = ''
+      client.setEncoding('utf8')
+      client.on('data', chunk => { receipt += chunk })
+      client.once('error', () => {})
+      client.once('close', () => {
+        clearTimeout(timer)
+        resolve(receipt === token)
+      })
+    })
+    const probe = host => new Promise((resolve, reject) => {
+      const server = createServer()
+      server.once('error', error => {
+        if (['EAFNOSUPPORT', 'EADDRNOTAVAIL', 'EPROTONOSUPPORT'].includes(error.code)) resolve(false)
+        else reject(error)
+      })
+      server.listen(0, host, async () => {
+        const supported = host === '::' ? await acceptsIPv4(server) : true
+        server.close(error => error ? reject(error) : resolve(supported))
+      })
+    })
+    const flags = await Promise.all([probe('::'), probe('::1')])
+    process.stdout.write(flags.join(' '))
+  `], { stdout: 'pipe', stderr: 'inherit' })
+  const [exitCode, result] = await Promise.all([child.exited, new Response(child.stdout).text()])
+  const flags = /^(true|false) (true|false)$/.exec(result)
+  if (exitCode !== 0 || !flags) throw new Error('Could not probe Node IPv6 bind support for managed E2E.')
+  return { bindHost: flags[1] === 'true' ? '::' : '0.0.0.0', ipv6LoopbackAvailable: flags[2] === 'true' }
 }
 
 /**
@@ -355,14 +386,7 @@ const canBindHost = async (port: number, host: string): Promise<boolean> => {
   return await new Promise(resolve => {
     const server = createServer()
 
-    server.once('error', (error: NodeJS.ErrnoException) => {
-      if (error.code === 'EAFNOSUPPORT') {
-        resolve(true)
-        return
-      }
-
-      resolve(false)
-    })
+    server.once('error', () => resolve(false))
     server.once('listening', () => {
       server.close(() => resolve(true))
     })
@@ -372,99 +396,26 @@ const canBindHost = async (port: number, host: string): Promise<boolean> => {
 }
 
 /**
- * Checks if a port is available on localhost.
- *
- * @param port - The port to check.
- * @returns True if the port is available, false otherwise.
- */
-const isPortAvailable = async (port: number): Promise<boolean> => {
-  const hosts = ['127.0.0.1', '::1']
-
-  for (const host of hosts) {
-    const available = await canBindHost(port, host)
-    if (!available) {
-      return false
-    }
-  }
-
-  return true
-}
-
-/**
  * Finds an available port starting from a preferred port.
  *
  * @param preferredPort - The starting port to check.
  * @param scanLimit - The maximum number of ports to check.
+ * @param network - The probed wildcard and loopback capabilities.
  * @returns The first available port found.
  * @throws Error if no port is found within the scan limit.
  */
-const findAvailablePort = async (preferredPort: number, scanLimit: number): Promise<number> => {
-  for (let offset = 0; offset <= scanLimit; offset += 1) {
+const findAvailablePort = async (preferredPort: number, scanLimit: number, network: ManagedNetwork): Promise<number> => {
+  const hosts = [network.bindHost, '127.0.0.1']
+  if (network.ipv6LoopbackAvailable) hosts.push('::1')
+  candidate: for (let offset = 0; offset <= scanLimit; offset += 1) {
     const candidatePort = preferredPort + offset
-    if (await isPortAvailable(candidatePort)) {
-      return candidatePort
+    for (const host of hosts) {
+      if (!await canBindHost(candidatePort, host)) continue candidate
     }
+    return candidatePort
   }
 
   throw new Error(`Could not find an available port between ${preferredPort} and ${preferredPort + scanLimit}`)
-}
-
-/**
- * Waits for the server to be ready at a given URL.
- *
- * @param url - The URL to check.
- * @param timeoutMs - The timeout in milliseconds.
- * @param serverProcess - Managed server process whose early exit must fail startup.
- * @param fetcher - Health request implementation, overridable for focused tests.
- * @param waiter - Poll-delay implementation, overridable for focused tests.
- * @throws Error if the server is not ready within the timeout.
- */
-export const waitForManagedServerReady = async (
-  url: string,
-  timeoutMs: number,
-  serverProcess: ManagedServerProcess,
-  fetcher: typeof fetch = fetch,
-  waiter: (ms: number) => Promise<void> = wait
-): Promise<void> => {
-  const startedAt = Date.now()
-  const serverExit = serverProcess.exited.then(exitCode => ({ exitCode, kind: 'exit' as const }))
-  const throwExitedBeforeReady = (exitCode: number): never => {
-    throw new Error(
-      `Managed server exited before becoming ready at ${url}: ${formatManagedServerExit(serverProcess, exitCode)}.`
-    )
-  }
-
-  while (Date.now() - startedAt < timeoutMs) {
-    const healthCheck = fetcher(url)
-      .then(response => response.ok
-        ? { kind: 'ready' as const }
-        : { kind: 'unavailable' as const })
-      .catch(() => ({ kind: 'unavailable' as const }))
-    const healthOrExit = await Promise.race([healthCheck, serverExit])
-
-    if (healthOrExit.kind === 'exit') {
-      throwExitedBeforeReady(healthOrExit.exitCode)
-    }
-    if (healthOrExit.kind === 'ready') {
-      const ownershipCheck = await Promise.race([
-        serverExit,
-        new Promise<{ kind: 'running' }>(resolve => setImmediate(() => resolve({ kind: 'running' })))
-      ])
-      if (ownershipCheck.kind === 'exit') throwExitedBeforeReady(ownershipCheck.exitCode)
-      if (serverProcess.exitCode !== null) throwExitedBeforeReady(serverProcess.exitCode)
-      return
-    }
-
-    const waitOrExit = await Promise.race([
-      waiter(500).then(() => ({ kind: 'waited' as const })),
-      serverExit
-    ])
-    if (waitOrExit.kind === 'exit') {
-      throwExitedBeforeReady(waitOrExit.exitCode)
-    }
-  }
-
-  throw new Error(`Timed out waiting for managed server at ${url}`)
 }
 
 const readSpecArg = (rawArgs: string[], index: number): string => {
@@ -887,20 +838,24 @@ export const createManagedE2eDataPaths = async (
   }
 }
 
-const resolveE2ePort = async (
+export const resolveE2ePort = async (
   baseUrlFromEnv: string | undefined,
-  preferredPort: number
+  preferredPort: number,
+  network: ManagedNetwork
 ): Promise<number> => {
   if (baseUrlFromEnv) {
-    const url = new URL(baseUrlFromEnv)
+    const url = parseManagedClientUrl(baseUrlFromEnv)
     return Number(url.port || (url.protocol === 'https:' ? 443 : 80))
   }
 
-  return await findAvailablePort(preferredPort, DEFAULT_PORT_SCAN_LIMIT)
+  return await findAvailablePort(preferredPort, DEFAULT_PORT_SCAN_LIMIT, network)
 }
 
-const resolveBaseUrl = (baseUrlFromEnv: string | undefined, port: number): string =>
-  baseUrlFromEnv || `http://localhost:${port}`
+export const resolveBaseUrl = (
+  baseUrlFromEnv: string | undefined,
+  port: number,
+  serverMode: E2eScriptConfig['serverMode']
+): string => baseUrlFromEnv || `http://${serverMode === 'development' ? '127.0.0.1' : 'localhost'}:${port}`
 
 /**
  * Uses a single-owner production process for every PGlite-backed managed suite.
@@ -921,10 +876,11 @@ const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
   const selection = resolveE2eTestSelection(process.argv.slice(2), process.env.E2E_SPEC?.trim())
   const preferredPort = getNumberProcessEnvValue('E2E_PORT', DEFAULT_PORT)
   const baseUrlFromEnv = process.env.PLAYWRIGHT_BASE_URL
-  const port = await resolveE2ePort(baseUrlFromEnv, preferredPort)
-  const baseUrl = resolveBaseUrl(baseUrlFromEnv, port)
+  const network = await probeManagedNetwork()
+  const port = await resolveE2ePort(baseUrlFromEnv, preferredPort, network)
   const timeoutMs = getNumberProcessEnvValue('E2E_SERVER_WAIT_MS', DEFAULT_WAIT_TIMEOUT_MS)
   const serverMode = resolveManagedE2eServerMode(selection.suite, process.env.E2E_SERVER_MODE)
+  const baseUrl = resolveBaseUrl(baseUrlFromEnv, port, serverMode)
   const postgresTestUrl = selection.suite === 'postgres'
     ? requireDisposableE2ePostgresUrl(process.env)
     : undefined
@@ -946,6 +902,7 @@ const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
     ownsLocalFileStorageDir: dataPaths.ownsLocalFileStorageDir,
     preferredPort,
     port,
+    network,
     baseUrl,
     baseUrlFromEnv,
     timeoutMs,
@@ -973,7 +930,7 @@ export const buildE2eEnv = (
     PGLITE_ACCESS_DATA_DIR: pgliteAccessDataDir,
     GCS_LOCAL_FILE_STORAGE_DIR: localFileStorageDir,
     BETTER_AUTH_SECRET: getProcessEnvValue('BETTER_AUTH_SECRET', DEFAULT_AUTH_SECRET),
-    BETTER_AUTH_URL: getProcessEnvValue('BETTER_AUTH_URL', baseUrl),
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL?.trim() || baseUrl,
     BETTER_AUTH_TRUSTED_ORIGINS: getProcessEnvValue('BETTER_AUTH_TRUSTED_ORIGINS', baseUrl),
     BETTER_AUTH_DISABLE_LOGGER: getProcessEnvValue('BETTER_AUTH_DISABLE_LOGGER', 'true'),
     NUXT_DISABLE_SOURCEMAPS: getProcessEnvValue('NUXT_DISABLE_SOURCEMAPS', 'true'),
@@ -1034,25 +991,48 @@ const logPortSelection = (config: E2eScriptConfig): void => {
  *
  * @param port - Managed development-server port.
  * @param serverMode - Selected managed server mode.
+ * @param bindHost - Loopback address selected for the development child.
  * @returns Direct child command for the runner.
  */
 export const buildManagedServerCommand = (
   port: number,
-  serverMode: E2eScriptConfig['serverMode']
+  serverMode: E2eScriptConfig['serverMode'],
+  bindHost: string
 ): string[] => serverMode === 'production'
   ? ['node', '.output/server/index.mjs']
-  : ['bun', 'run', 'scripts/dev.ts', '--no-fork', '--port', String(port)]
+  : ['bun', 'run', 'scripts/dev.ts', '--no-fork', '--port', String(port), '--host', bindHost]
 
-const spawnManagedServer = (
+export const spawnManagedServer = (
   port: number,
   env: NodeJS.ProcessEnv,
-  serverMode: E2eScriptConfig['serverMode']
-): Bun.Subprocess =>
-  Bun.spawn(buildManagedServerCommand(port, serverMode), {
+  serverMode: E2eScriptConfig['serverMode'],
+  network: ManagedNetwork,
+  baseUrl = resolveBaseUrl(undefined, port, serverMode)
+): { process: Bun.Subprocess; listening: ManagedServerListening } => {
+  const clientHost = parseManagedClientUrl(baseUrl).hostname
+  const devHost = clientHost === '[::1]' ? '::1' : /^127\./.test(clientHost) ? clientHost : '127.0.0.1'
+  const bindHost = serverMode === 'production' ? env.NITRO_HOST || env.HOST || network.bindHost : devHost
+  const child = Bun.spawn(buildManagedServerCommand(port, serverMode, bindHost), {
     cwd: process.cwd(),
-    env: { ...env, PORT: String(port) },
-    stdio: ['inherit', 'inherit', 'inherit']
+    env: { ...env, PORT: String(port), NITRO_HOST: bindHost },
+    stdio: ['inherit', 'pipe', 'inherit']
   })
+  const receipt = observeManagedServerOutput(child.stdout, serverMode).then(address => {
+    // Nuxt can display localhost for a numeric loopback bind.
+    if (serverMode === 'development' && address.hostname === 'localhost') {
+      address.hostname = bindHost === '::1' ? '[::1]' : bindHost
+    }
+    return address
+  })
+  return {
+    process: child,
+    listening: {
+      receipt,
+      ...(bindHost === '::' && network.bindHost === '::' ? { ipv6Wildcard: 'dual-stack' } : {}),
+      ...(!network.ipv6LoopbackAvailable ? { ipv6LoopbackUnavailable: true } : {})
+    }
+  }
+}
 
 const spawnPlaywright = (
   forwardedPlaywrightArgs: string[],
@@ -1113,13 +1093,13 @@ const runE2eTests = async (
   serverEnv: NodeJS.ProcessEnv,
   additionalCleanup?: () => Promise<void>
 ): Promise<void> => {
-  const devProcess = spawnManagedServer(config.port, serverEnv, config.serverMode)
+  const { process: devProcess, listening } = spawnManagedServer(config.port, serverEnv, config.serverMode, config.network, config.baseUrl)
   let e2eProcess: Bun.Subprocess | undefined
   const cleanup = createProcessCleanup(devProcess, () => e2eProcess, additionalCleanup)
   const { handleSigint, handleSigterm } = registerCleanupSignals(cleanup)
 
   try {
-    await waitForManagedServerReady(`${config.baseUrl}/api/health`, config.timeoutMs, devProcess)
+    await waitForManagedServerReady(`${config.baseUrl}/api/health`, config.timeoutMs, devProcess, listening)
     e2eProcess = spawnPlaywright(config.forwardedPlaywrightArgs, config.baseUrl, env)
     process.exitCode = await e2eProcess.exited
   } finally {
@@ -1136,6 +1116,7 @@ const main = async (): Promise<void> => {
   const rawArgs = process.argv.slice(2)
   resolveE2eTestSelection(rawArgs, process.env.E2E_SPEC?.trim())
   if (process.env[NUXT_ARTIFACT_LOCK_ENV] !== '1') {
+    if (process.env.PLAYWRIGHT_BASE_URL) parseManagedClientUrl(process.env.PLAYWRIGHT_BASE_URL)
     process.exitCode = await runWithNuxtArtifactLock([
       process.execPath,
       fileURLToPath(import.meta.url),

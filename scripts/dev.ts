@@ -240,7 +240,10 @@ const main = async (): Promise<void> => {
   const port = resolveDevPort(forwardedArgs)
   const host = resolveDevHost(forwardedArgs)
   const devAuthOrigins = buildDevAuthOrigins(host, port)
-  const authUrl = devAuthOrigins[0] ?? `http://localhost:${port}`
+  const managedAuthUrl = process.env.GCS_E2E_SERVER_MODE === 'development'
+    ? process.env.BETTER_AUTH_URL?.trim()
+    : undefined
+  const authUrl = managedAuthUrl || devAuthOrigins[0] || `http://localhost:${port}`
   const proc = Bun.spawn(['bun', 'x', 'nuxt', 'dev', ...forwardedArgs], {
     cwd: process.cwd(),
     env: {

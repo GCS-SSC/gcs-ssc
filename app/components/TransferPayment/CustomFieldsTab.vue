@@ -337,7 +337,7 @@ const assignmentFormSession = useFormSession({ owner: assignmentModal, action: {
     </UModal>
     <UModal v-model:open="assignmentModal.isOpen.value" :title="t('custom_fields.assign_field')">
       <template #body>
-        <UForm v-if="assignmentModal.selected.value" v-bind="assignmentFormSession" :disabled="assignmentPending.isPending.value" data-field-scope="transfer-payment.custom-field-assignment" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4">
+        <UForm v-if="assignmentModal.selected.value" v-bind="assignmentFormSession" :disabled="assignmentPending.isPending.value" data-field-scope="transfer-payment.custom-field-assignment" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema.strip())" class="space-y-4">
           <fieldset :disabled="assignmentPending.isPending.value" class="min-w-0 space-y-4">
             <UFormField :label="t('custom_fields.agency_field')" name="egcs_tp_agencyfield" required>
               <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :query="{ target }" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />

@@ -73,7 +73,7 @@ export interface LinkedSubmissionOverviewReview {
 
 }
 
-export const AgreementSubmissionCommandSchema = z.discriminatedUnion('action', [
+const AgreementSubmissionCommandSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('start'), revision }),
   z.strictObject({ action: z.literal('withdraw_return'), revision }),
   z.strictObject({ action: z.literal('save'), revision, payload: AgreementSubmissionPayloadSchema }),
@@ -93,6 +93,7 @@ export const AgreementSubmissionCommandSchema = z.discriminatedUnion('action', [
     payload: AgreementSubmissionPayloadSchema.optional()
   })
 ])
+export { AgreementSubmissionCommandSchema }
 
 export const AgreementSubmissionListQuerySchema = z.union([
   z.strictObject({

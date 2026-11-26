@@ -3,6 +3,8 @@ import { spawn as spawnChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { Readable } from 'node:stream'
+import { observeManagedServerOutput, waitForManagedServerReady } from './managed-e2e-readiness'
 
 export type ManagedExtensionE2eConfig = {
   acceptedSpec: string
@@ -15,12 +17,13 @@ export type ManagedChild = {
   readonly exitCode: number | null
   readonly exited: Promise<number>
   readonly signalCode: NodeJS.Signals | null
+  readonly stdout?: ReadableStream<Uint8Array>
   kill: (signal?: NodeJS.Signals) => boolean
 }
 
 type SpawnManagedChild = (
   command: string[],
-  options: { cwd: string, env: NodeJS.ProcessEnv, stdio: ['inherit', 'inherit', 'inherit'] }
+  options: { cwd: string, env: NodeJS.ProcessEnv, stdio: ['inherit', 'inherit' | 'pipe', 'inherit'] }
 ) => ManagedChild
 
 type ManagedSignalSource = {
@@ -92,6 +95,7 @@ const spawnManagedChild: SpawnManagedChild = (command, options) => {
      * @returns The terminating signal or null.
      */
     get signalCode() { return child.signalCode },
+    ...(child.stdout ? { stdout: Readable.toWeb(child.stdout) } : {}),
     kill: signal => child.kill(signal)
   }
 }
@@ -151,23 +155,16 @@ const prepareHost = async (environment: NodeJS.ProcessEnv): Promise<void> => {
 }
 
 /**
- * Waits until the managed host reports healthy.
+ * Verifies that the managed host owns the listener before checking health.
  *
  * @param url - The managed host base URL.
  * @param server - The managed server process.
  */
 const waitForHost = async (url: string, server: ManagedChild): Promise<void> => {
-  for (let attempt = 0; attempt < 240; attempt += 1) {
-    if (server.exitCode !== null) throw new Error(`Managed extension host exited with code ${server.exitCode}.`)
-    try {
-      const response = await fetch(`${url}/api/health`)
-      if (response.ok) return
-    } catch {
-      // The managed server is still starting.
-    }
-    await new Promise(resolveWait => setTimeout(resolveWait, 250))
-  }
-  throw new Error('Timed out waiting for the managed extension host.')
+  if (!server.stdout) throw new Error('Managed extension host stdout is required for the listening receipt.')
+  await waitForManagedServerReady(
+    `${url}/api/health`, 60_000, server, observeManagedServerOutput(server.stdout, 'production')
+  )
 }
 
 /**
@@ -294,8 +291,8 @@ export const runManagedExtensionE2e = async (
     await dependencies.prepareHost(environment)
     server = dependencies.spawn(['node', '.output/server/index.mjs'], {
       cwd: repositoryRoot,
-      env: { ...environment, PORT: String(port) },
-      stdio: ['inherit', 'inherit', 'inherit']
+      env: { ...environment, PORT: String(port), NITRO_HOST: '127.0.0.1' },
+      stdio: ['inherit', 'pipe', 'inherit']
     })
     dependencies.signalSource.once('SIGINT', handleSigint)
     dependencies.signalSource.once('SIGTERM', handleSigterm)

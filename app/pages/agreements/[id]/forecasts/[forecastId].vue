@@ -142,6 +142,15 @@ onScopeDispose(() => {
   disposed = true
 })
 const breakdownEvidence = ref<'ready' | 'uncertain' | 'acknowledged'>('ready')
+let breakdownLifetime = 0
+watch([() => forecastPageActor.value?.id, () => route.path], () => {
+  breakdownLifetime += 1
+  breakdownEvidence.value = 'ready'
+}, { flush: 'sync' })
+const captureBreakdownReadback = () => {
+  const lifetime = breakdownLifetime
+  return () => !disposed && Boolean(forecastPageActor.value?.id) && breakdownLifetime === lifetime
+}
 const breakdownReloadRequired = computed(() => breakdownEvidence.value !== 'ready')
 const approvalsRefreshKey: Ref<number> = ref(0)
 const completionComments = ref('')
@@ -289,7 +298,7 @@ const activeForecastIsLocked = computed(() => isRecordLocked(activeForecast.valu
 const canCreateForecastLineItems = computed(() => profile.value?.can_create_agreement_role === true)
 const canEditForecastBreakdown = computed(() => canCreateForecastLineItems.value || canUpdateForecast.value)
 const breakdownAction = useActionContext({
-  identity: [() => agreementId, () => forecastId, canCreateForecastLineItems, canUpdateForecast],
+  identity: [() => route.path, canCreateForecastLineItems, canUpdateForecast],
   authority: canEditForecastBreakdown,
   eligible: submissionReview.canEdit
 })
@@ -324,14 +333,18 @@ const hasLoadError = computed(() =>
   || overviewStatus.value === 'error'
   || Boolean(assignmentError.value)
   || assignmentStatus.value === 'error'
+  || (selectedTab.value === 'additional' && needsSubmissionEditComment.value
+    && Boolean(submissionReview.error.value || submissionReview.stale.value || submissionReview.failed.value))
 )
 const isLoadingDetail = computed(() => profileStatus.value === 'pending' || overviewStatus.value === 'pending'
   || assignmentStatus.value === 'pending'
   || (statusCatalog.state.value.status === 'pending' && !statusCatalog.getById(activeForecast.value?.egcs_fc_status)))
+const hasForecastOverview = () => overviewStatus.value === 'success' && !overviewError.value && Boolean(activeForecast.value)
 const retryLoad = async () => {
   if (isSavingBreakdown.value || additionalInformationEditor.isSaving.value) return
-  await Promise.all([refreshProfile(), submissionReview.refresh(), refreshAssignmentRoster()])
-  if (!disposed && overviewStatus.value === 'success') breakdownEvidence.value = 'ready'
+  const ownsReadback = captureBreakdownReadback()
+  const [reviewLoaded] = await Promise.all([submissionReview.refresh(), refreshProfile(), refreshAssignmentRoster()])
+  if (ownsReadback() && reviewLoaded && hasForecastOverview()) breakdownEvidence.value = 'ready'
 }
 
 const additionalInformationContexts = useSubmissionAnswerContexts({
@@ -683,16 +696,18 @@ const setDraftFundingAmount = (budgetLineId: string, subtype: string, month: num
     draftFundingAmounts.value = Object.fromEntries(Object.entries(draftFundingAmounts.value).filter(([draftKey]) => draftKey !== key))
   } else draftFundingAmounts.value[key] = amount
 }
-const canClearRetiredForecastSources = (row: ForecastBreakdownTableRow) => row.historical
+const canApplyRetiredForecastClear = (row: ForecastBreakdownTableRow) => row.historical
   && showForecastFunding.value && !isHistoricalForecast.value && !activeForecastIsLocked.value
   && submissionReview.canEdit.value && isAssigned.value && canUpdateForecast.value
+  && displayedBudgetLineItems.value.some(line => line.id === row.budgetLineId && line.historical)
+const canClearRetiredForecastSources = (row: ForecastBreakdownTableRow) => canApplyRetiredForecastClear(row)
   && activeForecastLineItems.value.some(line => getStableBudgetLineId(line) === row.budgetLineId
     && getProposedFundingSources(row.budgetLineId, line.egcs_fc_month).length > 0)
 const applyForecastFundingRemoval = (
   row: ForecastBreakdownTableRow, mode: 'remove' | 'clear', owner: CapturedActionContext, ownsOpening: () => boolean, editComment?: string
 ) => saveForecastBreakdown(owner, ownsOpening, editComment, () => {
   const source = row.funding
-  if (mode === 'clear' && !canClearRetiredForecastSources(row)) return false
+  if (mode === 'clear' && !canApplyRetiredForecastClear(row)) return false
   for (let month = 0; month < MONTH_KEYS.length; month += 1) {
     if (mode === 'clear') {
       for (const item of getProposedFundingSources(row.budgetLineId, month)) {
@@ -904,20 +919,20 @@ const toggleQuarter = (quarter: QuarterKey) => {
 }
 
 const refreshPage = async () => {
+  const ownsReadback = captureBreakdownReadback()
   await refreshOverview()
-  if (!disposed) approvalsRefreshKey.value += 1
+  if (ownsReadback()) approvalsRefreshKey.value += 1
 }
 
-const reloadForecastBreakdown = async (owner: CapturedActionContext, ownsOpening: () => boolean) => {
+const reloadForecastBreakdown = async (linked: boolean, ownsReadback: () => boolean, ownsOpening: () => boolean) => {
   try {
-    if (needsSubmissionEditComment.value) {
-      await submissionReview.refresh()
-      if (!disposed) approvalsRefreshKey.value += 1
-    } else await refreshPage()
-    if (!owner.isCurrent()) return false
-    if (overviewError.value || overviewStatus.value === 'error') {
+    const reviewLoaded = linked ? await submissionReview.refresh() : true
+    if (!linked) await refreshOverview()
+    if (!ownsReadback()) return false
+    if (!reviewLoaded || !hasForecastOverview()) {
       throw overviewError.value ?? new Error(t('common.resource_table_load_failed'))
     }
+    approvalsRefreshKey.value += 1
     breakdownEvidence.value = 'ready'
     return true
   } catch (error: unknown) {
@@ -928,11 +943,13 @@ const reloadForecastBreakdown = async (owner: CapturedActionContext, ownsOpening
 
 const saveForecastBreakdown = async (owner: CapturedActionContext, ownsOpening: () => boolean, editComment: string | undefined, stageChanges: () => boolean) => {
   if (!ownsOpening() || isSavingBreakdown.value || additionalInformationEditor.isSaving.value) return false
+  const ownsReadback = captureBreakdownReadback()
 
   try {
     breakdownOperation.value = 'recovering'
-    if (breakdownReloadRequired.value && !await reloadForecastBreakdown(owner, ownsOpening)) return false
-    if (!ownsOpening() || overviewStatus.value !== 'success' || overviewError.value || !activeForecast.value
+    if (breakdownReloadRequired.value
+      && !await reloadForecastBreakdown(Boolean(submissionReview.detail.value) || needsSubmissionEditComment.value, owner.isCurrent, ownsOpening)) return false
+    if (!ownsOpening() || !hasForecastOverview()
       || !canMutateForecast(canEditForecastBreakdown.value) || !breakdownAction.capture()?.canDispatch() || !stageChanges()) return false
     const cells: FundingCaseAgreementForecastBreakdownPatch['cells'] = []
 
@@ -990,13 +1007,14 @@ const saveForecastBreakdown = async (owner: CapturedActionContext, ownsOpening: 
     }
 
     if (cells.length === 0) return true
+    const linked = needsSubmissionEditComment.value
     breakdownOperation.value = 'saving'
     breakdownEvidence.value = 'uncertain'
     await saveJson(`/api/agreements/${agreementId}/forecasts/${forecastId}/breakdown`, 'PATCH', { cells, editComment })
-    if (!owner.isCurrent()) return true
+    if (!ownsReadback()) return true
     breakdownEvidence.value = 'acknowledged'
     breakdownOperation.value = 'refreshing'
-    const reloaded = await reloadForecastBreakdown(owner, ownsOpening)
+    const reloaded = await reloadForecastBreakdown(linked, ownsReadback, ownsOpening)
     if (reloaded && ownsOpening()) {
       toast.add({
         title: toast.localized('common.success'),
@@ -1010,7 +1028,7 @@ const saveForecastBreakdown = async (owner: CapturedActionContext, ownsOpening: 
     if (ownsOpening()) showError(error)
     if (owner.isCurrent() && breakdownOperation.value === 'saving') {
       breakdownOperation.value = 'recovering'
-      await reloadForecastBreakdown(owner, ownsOpening)
+      await reloadForecastBreakdown(Boolean(submissionReview.detail.value) || needsSubmissionEditComment.value, owner.isCurrent, ownsOpening)
     }
     return false
   } finally {

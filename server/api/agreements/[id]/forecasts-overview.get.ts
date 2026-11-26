@@ -14,6 +14,7 @@ import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { z } from 'zod'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from '~~/server/utils/agreement-budget-funding'
+import { submittingProponentDisplayName } from '~~/server/utils/agreement-submitting-proponent'
 
 export const ForecastOverviewQuerySchema = z.object({
   forecastId: PositivePostgresBigintIdSchema.optional()
@@ -58,8 +59,8 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
       .select([
         'Funding_Case_Agreement_Forecast.id as id',
         'Funding_Case_Agreement_Forecast.egcs_fc_applicantrecipient',
-        sql<string>`COALESCE(NULLIF(BTRIM(${sql.ref('submitting_proponent.egcs_ar_operatingname_en')}),''),${sql.ref('submitting_proponent.egcs_ar_legalname_en')},${''})`.as('submitting_proponent_name_en'),
-        sql<string>`COALESCE(NULLIF(BTRIM(${sql.ref('submitting_proponent.egcs_ar_operatingname_fr')}),''),${sql.ref('submitting_proponent.egcs_ar_legalname_fr')},${''})`.as('submitting_proponent_name_fr'),
+        submittingProponentDisplayName('submitting_proponent', 'en').as('submitting_proponent_name_en'),
+        submittingProponentDisplayName('submitting_proponent', 'fr').as('submitting_proponent_name_fr'),
         'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
         'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
         'Funding_Case_Agreement_Forecast.egcs_fc_status as egcs_fc_status',

@@ -47,11 +47,11 @@ RUN set -eux; \
   }; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 1e6f9f3a5e3ae3bddb774936931d60bdff4ff6de; \
   fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number e38b1441bc58fae25121d2fe0d0b4e114e843e50; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments ddbd9f1eb8b353336d7d7d0499541178e1db5396; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 442ae57a94abafda7b52697c29fc5e126ed10b18; \
   fetch_workspace https://github.com/GCS-SSC/gcs-bpmn.git extensions/gcs-bpmn 5a9873246127de502dacf20cad120b60eb939f7c; \
   fetch_workspace https://github.com/GCS-SSC/gcs-feedback.git extensions/gcs-feedback 95b1735dea81cca50e0f4805575c925b4b1cefc9; \
   fetch_workspace https://github.com/GCS-SSC/gcs-file-authoring.git extensions/gcs-file-authoring 658932f8a468b383159c65fae099fd425b946b9f; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration daf35cb61ff2cd19a7630ea3802da8a0f5a4e320; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 9a94cfcb132fbd807a9fb38302dc7d75b16968bb; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation e69302dda77193c0cf44bcd5573d98ca455ff69e; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 3763ddeb60701b44df0e59c8141b8804bac787b2; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 393f304413603635f74e2c5695f1222f1f2aafe2; \

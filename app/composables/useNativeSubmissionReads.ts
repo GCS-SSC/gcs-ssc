@@ -4,7 +4,7 @@ import type { CommittedReadbackResult } from '~/composables/useCommittedSettleme
 
 type NativeSubmissionOverview = {
   isLinked: () => boolean
-  refreshLinked: () => Promise<unknown>
+  refreshLinked: () => Promise<boolean>
   refresh: () => Promise<unknown>
   status: () => string
   error: () => unknown
@@ -42,9 +42,10 @@ export const useNativeSubmissionReads = ({ actorId, permissionRevision, overview
 
   /** @returns Evidence from the owning overview after native or linked refresh. */
   const readback = async (): Promise<CommittedReadbackResult> => {
-    if (overview.isLinked()) await overview.refreshLinked()
+    let linkedLoaded = true
+    if (overview.isLinked()) linkedLoaded = await overview.refreshLinked()
     else await overview.refresh()
-    return overview.status() === 'success'
+    return linkedLoaded && overview.status() === 'success'
       ? { kind: 'available' }
       : { kind: 'unavailable', error: overview.error() }
   }

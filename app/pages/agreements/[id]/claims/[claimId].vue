@@ -509,12 +509,14 @@ const hasLoadError = computed(() =>
   || Boolean(overviewError.value)
   || profileStatus.value === 'error'
   || overviewStatus.value === 'error'
+  || (selectedClaimTab.value === 'additional' && needsSubmissionEditComment.value
+    && submissionReview.status.value === 'error')
 )
 const isLoadingDetail = computed(() => profileStatus.value === 'pending' || overviewStatus.value === 'pending'
   || assignmentStatus.value === 'pending'
   || (!activeClaimStatus.value && statusCatalog.state.value.status === 'pending'))
 const retryLoad = async () => {
-  if (!isCurrentPage()) return
+  if (!isCurrentPage() || submissionReview.reloading.value || isSavingAdditionalInformation.value) return
   await Promise.all([refreshProfile(), submissionReview.refresh()])
 }
 
@@ -1421,7 +1423,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
   <div data-field-tooltip-context="agreement" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Reconciliation" data-scope-label-fr="Ententes > Demandes de remboursement > Rapprochement" class="flex w-full flex-col">
     <CommonErrorNotice v-if="hasLoadError" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
+        <UButton :label="t('common.retry')" :loading="isLoadingDetail || submissionReview.reloading.value || isSavingAdditionalInformation" @click="retryLoad" />
       </template>
     </CommonErrorNotice>
     <div v-else-if="isLoadingDetail && (!profile || !activeClaim)" role="status" aria-live="polite" class="sr-only">

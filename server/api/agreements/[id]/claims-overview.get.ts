@@ -16,6 +16,7 @@ import { z } from 'zod'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from '~~/server/utils/agreement-budget-funding'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { submittingProponentDisplayName } from '~~/server/utils/agreement-submitting-proponent'
 
 export const ClaimOverviewQuerySchema = z.object({
   claimId: PositivePostgresBigintIdSchema.optional()
@@ -121,8 +122,8 @@ const readRoute = async (event: H3Event, claimId?: string) => {
         'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
         claimFiscalYearId.as('fiscal_year_id'),
         'Funding_Case_Agreement_Claim.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',
-        sql<string>`COALESCE(NULLIF(BTRIM(${sql.ref('submitting_proponent.egcs_ar_operatingname_en')}), ''),${sql.ref('submitting_proponent.egcs_ar_legalname_en')},${''})`.as('submitting_proponent_name_en'),
-        sql<string>`COALESCE(NULLIF(BTRIM(${sql.ref('submitting_proponent.egcs_ar_operatingname_fr')}), ''),${sql.ref('submitting_proponent.egcs_ar_legalname_fr')},${''})`.as('submitting_proponent_name_fr'),
+        submittingProponentDisplayName('submitting_proponent', 'en').as('submitting_proponent_name_en'),
+        submittingProponentDisplayName('submitting_proponent', 'fr').as('submitting_proponent_name_fr'),
         'Funding_Case_Agreement_Claim.egcs_fc_isfinalforyear as egcs_fc_isfinalforyear',
         'Funding_Case_Agreement_Claim.egcs_fc_periodend as egcs_fc_periodend',
         'Funding_Case_Agreement_Claim.egcs_fc_periodstart as egcs_fc_periodstart',

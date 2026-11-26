@@ -14,14 +14,14 @@ const { title, titleId, description, heading = 'h2' } = defineProps<{
         <h3
           v-if="heading === 'h3'"
           :id="titleId"
-          class="break-words text-lg font-semibold text-highlighted [overflow-wrap:anywhere]"
+          class="text-lg font-semibold text-highlighted [overflow-wrap:anywhere]"
           data-testid="detail-section-title">
           {{ title }}
         </h3>
         <h2
           v-else
           :id="titleId"
-          class="break-words text-xl font-semibold text-highlighted [overflow-wrap:anywhere]"
+          class="text-xl font-semibold text-highlighted [overflow-wrap:anywhere]"
           data-testid="detail-section-title">
           {{ title }}
         </h2>
